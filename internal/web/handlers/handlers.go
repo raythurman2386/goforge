@@ -10,9 +10,11 @@ import (
 func Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status": "ok",
-	})
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HealthReady returns a readiness check response.
@@ -26,10 +28,12 @@ func HealthReady(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "ok",
 		"checks": checks,
-	})
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // Index handles the root path.
@@ -43,7 +47,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 func LoginPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// TODO: Render actual login template
-	w.Write([]byte(`<!DOCTYPE html>
+	if _, err := w.Write([]byte(`<!DOCTYPE html>
 <html>
 <head>
     <title>GoCool - Login</title>
@@ -58,5 +62,7 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
         </a>
     </div>
 </body>
-</html>`))
+</html>`)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

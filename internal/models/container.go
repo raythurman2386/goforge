@@ -10,13 +10,20 @@ import (
 type ContainerStatus string
 
 const (
-	ContainerStatusCreated    ContainerStatus = "created"
-	ContainerStatusRunning    ContainerStatus = "running"
-	ContainerStatusPaused     ContainerStatus = "paused"
+	// ContainerStatusCreated indicates the container has been created but not started.
+	ContainerStatusCreated ContainerStatus = "created"
+	// ContainerStatusRunning indicates the container is currently running.
+	ContainerStatusRunning ContainerStatus = "running"
+	// ContainerStatusPaused indicates the container is paused.
+	ContainerStatusPaused ContainerStatus = "paused"
+	// ContainerStatusRestarting indicates the container is in the process of restarting.
 	ContainerStatusRestarting ContainerStatus = "restarting"
-	ContainerStatusRemoving   ContainerStatus = "removing"
-	ContainerStatusExited     ContainerStatus = "exited"
-	ContainerStatusDead       ContainerStatus = "dead"
+	// ContainerStatusRemoving indicates the container is being removed.
+	ContainerStatusRemoving ContainerStatus = "removing"
+	// ContainerStatusExited indicates the container has exited.
+	ContainerStatusExited ContainerStatus = "exited"
+	// ContainerStatusDead indicates the container is dead.
+	ContainerStatusDead ContainerStatus = "dead"
 )
 
 // PortMapping represents a port mapping between host and container.

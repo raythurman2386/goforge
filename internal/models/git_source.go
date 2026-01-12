@@ -9,10 +9,14 @@ import (
 type GitSourceType string
 
 const (
+	// GitSourceTypeGitHub represents GitHub provider.
 	GitSourceTypeGitHub GitSourceType = "github"
+	// GitSourceTypeGitLab represents GitLab provider.
 	GitSourceTypeGitLab GitSourceType = "gitlab"
-	GitSourceTypeGitea  GitSourceType = "gitea"
-	GitSourceTypeSSH    GitSourceType = "ssh"
+	// GitSourceTypeGitea represents Gitea provider.
+	GitSourceTypeGitea GitSourceType = "gitea"
+	// GitSourceTypeSSH represents a raw git repository accessed via SSH.
+	GitSourceTypeSSH GitSourceType = "ssh"
 )
 
 // GitSource represents a configured git provider.

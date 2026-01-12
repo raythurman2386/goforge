@@ -19,7 +19,7 @@ func Setup(level, format string) *slog.Logger {
 
 	var output io.Writer = os.Stdout
 
-	if strings.ToLower(format) == "json" {
+	if strings.EqualFold(format, "json") {
 		handler = slog.NewJSONHandler(output, opts)
 	} else {
 		handler = slog.NewTextHandler(output, opts)

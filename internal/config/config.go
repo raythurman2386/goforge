@@ -15,7 +15,9 @@ import (
 type DatabaseType string
 
 const (
-	DatabaseTypeSQLite   DatabaseType = "sqlite"
+	// DatabaseTypeSQLite uses SQLite database.
+	DatabaseTypeSQLite DatabaseType = "sqlite"
+	// DatabaseTypePostgres uses PostgreSQL database.
 	DatabaseTypePostgres DatabaseType = "postgres"
 )
 
@@ -126,13 +128,14 @@ func Load() (*Config, error) {
 // applyDefaults sets default values, especially for dev mode.
 func (c *Config) applyDefaults() {
 	// Determine database type and set defaults
-	if c.DatabaseURL == "" {
+	switch {
+	case c.DatabaseURL == "":
 		// Default to SQLite
 		c.DatabaseURL = "sqlite://./data/gocool.db"
 		c.DatabaseType = DatabaseTypeSQLite
-	} else if strings.HasPrefix(c.DatabaseURL, "sqlite://") || strings.HasPrefix(c.DatabaseURL, "file:") {
+	case strings.HasPrefix(c.DatabaseURL, "sqlite://") || strings.HasPrefix(c.DatabaseURL, "file:"):
 		c.DatabaseType = DatabaseTypeSQLite
-	} else {
+	default:
 		c.DatabaseType = DatabaseTypePostgres
 	}
 
@@ -245,6 +248,8 @@ func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
 }
 
 // generateRandomKey generates a random base64-encoded key.
+//
+//nolint:unparam // length is currently always 32 but this is intended to be a flexible utility
 func generateRandomKey(length int) string {
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {

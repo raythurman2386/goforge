@@ -4,12 +4,14 @@ package database
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 
 	"github.com/user/gocool/internal/config"
@@ -47,6 +49,7 @@ func (m *Migrator) init() error {
 	var driver database.Driver
 	var err error
 	var sourceURL string
+	var src source.Driver
 
 	switch m.dbType {
 	case config.DatabaseTypePostgres:
@@ -56,12 +59,12 @@ func (m *Migrator) init() error {
 		}
 		sourceURL = "migrations/postgres"
 
-		source, err := iofs.New(postgresFS, sourceURL)
+		src, err = iofs.New(postgresFS, sourceURL)
 		if err != nil {
 			return fmt.Errorf("failed to create migration source: %w", err)
 		}
 
-		m.migrate, err = migrate.NewWithInstance("iofs", source, "postgres", driver)
+		m.migrate, err = migrate.NewWithInstance("iofs", src, "postgres", driver)
 		if err != nil {
 			return fmt.Errorf("failed to create migrator: %w", err)
 		}
@@ -73,12 +76,12 @@ func (m *Migrator) init() error {
 		}
 		sourceURL = "migrations/sqlite"
 
-		source, err := iofs.New(sqliteFS, sourceURL)
+		src, err = iofs.New(sqliteFS, sourceURL)
 		if err != nil {
 			return fmt.Errorf("failed to create migration source: %w", err)
 		}
 
-		m.migrate, err = migrate.NewWithInstance("iofs", source, "sqlite3", driver)
+		m.migrate, err = migrate.NewWithInstance("iofs", src, "sqlite3", driver)
 		if err != nil {
 			return fmt.Errorf("failed to create migrator: %w", err)
 		}
@@ -92,7 +95,7 @@ func (m *Migrator) init() error {
 
 // Up runs all pending migrations.
 func (m *Migrator) Up() error {
-	if err := m.migrate.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.migrate.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration up failed: %w", err)
 	}
 	return nil
@@ -100,7 +103,7 @@ func (m *Migrator) Up() error {
 
 // Down rolls back the last migration.
 func (m *Migrator) Down() error {
-	if err := m.migrate.Steps(-1); err != nil && err != migrate.ErrNoChange {
+	if err := m.migrate.Steps(-1); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration down failed: %w", err)
 	}
 	return nil
@@ -108,23 +111,23 @@ func (m *Migrator) Down() error {
 
 // Reset rolls back all migrations and re-applies them.
 func (m *Migrator) Reset() error {
-	if err := m.migrate.Down(); err != nil && err != migrate.ErrNoChange {
+	if err := m.migrate.Down(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration reset (down) failed: %w", err)
 	}
-	if err := m.migrate.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.migrate.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration reset (up) failed: %w", err)
 	}
 	return nil
 }
 
 // Version returns the current migration version.
-func (m *Migrator) Version() (uint, bool, error) {
+func (m *Migrator) Version() (version uint, dirty bool, err error) {
 	return m.migrate.Version()
 }
 
 // Steps migrates up or down by the given number of steps.
 func (m *Migrator) Steps(n int) error {
-	if err := m.migrate.Steps(n); err != nil && err != migrate.ErrNoChange {
+	if err := m.migrate.Steps(n); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration steps failed: %w", err)
 	}
 	return nil

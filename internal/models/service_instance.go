@@ -10,11 +10,16 @@ import (
 type ServiceInstanceStatus string
 
 const (
-	ServiceStatusPending  ServiceInstanceStatus = "pending"
+	// ServiceStatusPending indicates the service is being provisioned.
+	ServiceStatusPending ServiceInstanceStatus = "pending"
+	// ServiceStatusStarting indicates the service is starting up.
 	ServiceStatusStarting ServiceInstanceStatus = "starting"
-	ServiceStatusRunning  ServiceInstanceStatus = "running"
-	ServiceStatusStopped  ServiceInstanceStatus = "stopped"
-	ServiceStatusFailed   ServiceInstanceStatus = "failed"
+	// ServiceStatusRunning indicates the service is running.
+	ServiceStatusRunning ServiceInstanceStatus = "running"
+	// ServiceStatusStopped indicates the service is stopped.
+	ServiceStatusStopped ServiceInstanceStatus = "stopped"
+	// ServiceStatusFailed indicates the service has failed.
+	ServiceStatusFailed ServiceInstanceStatus = "failed"
 )
 
 // ServiceInstance represents a deployed one-click service.

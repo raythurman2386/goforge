@@ -9,22 +9,33 @@ import (
 type DeploymentStatus string
 
 const (
-	DeploymentStatusPending    DeploymentStatus = "pending"
-	DeploymentStatusCloning    DeploymentStatus = "cloning"
-	DeploymentStatusBuilding   DeploymentStatus = "building"
-	DeploymentStatusDeploying  DeploymentStatus = "deploying"
-	DeploymentStatusRunning    DeploymentStatus = "running"
-	DeploymentStatusFailed     DeploymentStatus = "failed"
+	// DeploymentStatusPending indicates the deployment is waiting to start.
+	DeploymentStatusPending DeploymentStatus = "pending"
+	// DeploymentStatusCloning indicates the repository is being cloned.
+	DeploymentStatusCloning DeploymentStatus = "cloning"
+	// DeploymentStatusBuilding indicates the application is being built.
+	DeploymentStatusBuilding DeploymentStatus = "building"
+	// DeploymentStatusDeploying indicates the application is being deployed.
+	DeploymentStatusDeploying DeploymentStatus = "deploying"
+	// DeploymentStatusRunning indicates the deployment has finished successfully.
+	DeploymentStatusRunning DeploymentStatus = "running"
+	// DeploymentStatusFailed indicates the deployment has failed.
+	DeploymentStatusFailed DeploymentStatus = "failed"
+	// DeploymentStatusRolledBack indicates the deployment was rolled back.
 	DeploymentStatusRolledBack DeploymentStatus = "rolled_back"
-	DeploymentStatusCancelled  DeploymentStatus = "cancelled"
+	// DeploymentStatusCanceled indicates the deployment was canceled.
+	DeploymentStatusCanceled DeploymentStatus = "canceled"
 )
 
 // TriggerType represents what triggered the deployment.
 type TriggerType string
 
 const (
-	TriggerTypeManual   TriggerType = "manual"
-	TriggerTypeWebhook  TriggerType = "webhook"
+	// TriggerTypeManual indicates a manual deployment.
+	TriggerTypeManual TriggerType = "manual"
+	// TriggerTypeWebhook indicates a deployment triggered by a webhook.
+	TriggerTypeWebhook TriggerType = "webhook"
+	// TriggerTypeRollback indicates a deployment triggered by a rollback.
 	TriggerTypeRollback TriggerType = "rollback"
 )
 
@@ -49,8 +60,11 @@ type Deployment struct {
 func (d *Deployment) IsTerminal() bool {
 	switch d.Status {
 	case DeploymentStatusRunning, DeploymentStatusFailed,
-		DeploymentStatusRolledBack, DeploymentStatusCancelled:
+		DeploymentStatusRolledBack, DeploymentStatusCanceled:
 		return true
+	case DeploymentStatusPending, DeploymentStatusCloning,
+		DeploymentStatusBuilding, DeploymentStatusDeploying:
+		return false
 	default:
 		return false
 	}
@@ -72,9 +86,13 @@ func (d *Deployment) Duration() time.Duration {
 type DeploymentLogLevel string
 
 const (
+	// LogLevelDebug indicates a debug message.
 	LogLevelDebug DeploymentLogLevel = "debug"
-	LogLevelInfo  DeploymentLogLevel = "info"
-	LogLevelWarn  DeploymentLogLevel = "warn"
+	// LogLevelInfo indicates an informational message.
+	LogLevelInfo DeploymentLogLevel = "info"
+	// LogLevelWarn indicates a warning message.
+	LogLevelWarn DeploymentLogLevel = "warn"
+	// LogLevelError indicates an error message.
 	LogLevelError DeploymentLogLevel = "error"
 )
 

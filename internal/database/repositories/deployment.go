@@ -135,16 +135,17 @@ func (r *DeploymentRepository) UpdateStatus(ctx context.Context, id string, stat
 	var query string
 	var args []interface{}
 
-	if status == models.DeploymentStatusFailed || status == models.DeploymentStatusRunning ||
-		status == models.DeploymentStatusRolledBack || status == models.DeploymentStatusCancelled {
+	switch {
+	case status == models.DeploymentStatusFailed || status == models.DeploymentStatusRunning ||
+		status == models.DeploymentStatusRolledBack || status == models.DeploymentStatusCanceled:
 		// Terminal state - set finished_at
 		query = `UPDATE deployments SET status = $2, error_message = $3, finished_at = $4 WHERE id = $1`
 		args = []interface{}{id, status, errorMsg, time.Now()}
-	} else if status == models.DeploymentStatusCloning {
+	case status == models.DeploymentStatusCloning:
 		// First state - set started_at
 		query = `UPDATE deployments SET status = $2, started_at = $3 WHERE id = $1`
 		args = []interface{}{id, status, time.Now()}
-	} else {
+	default:
 		query = `UPDATE deployments SET status = $2 WHERE id = $1`
 		args = []interface{}{id, status}
 	}
