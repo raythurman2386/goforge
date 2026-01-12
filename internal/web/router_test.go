@@ -1,12 +1,24 @@
 package web
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/user/gocool/internal/config"
 )
+
+func setupTestRouterDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
+	}
+	return db
+}
 
 func TestNewRouter(t *testing.T) {
 	cfg := &config.Config{
@@ -14,8 +26,10 @@ func TestNewRouter(t *testing.T) {
 		Port:     8080,
 		LogLevel: "info",
 	}
+	db := setupTestRouterDB(t)
+	defer db.Close()
 
-	router := NewRouter(cfg)
+	router := NewRouter(cfg, db)
 	if router == nil {
 		t.Fatal("NewRouter() returned nil")
 	}
@@ -27,8 +41,10 @@ func TestRouter_HealthEndpoint(t *testing.T) {
 		Port:     8080,
 		LogLevel: "info",
 	}
+	db := setupTestRouterDB(t)
+	defer db.Close()
 
-	router := NewRouter(cfg)
+	router := NewRouter(cfg, db)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -49,8 +65,10 @@ func TestRouter_HealthReadyEndpoint(t *testing.T) {
 		Port:     8080,
 		LogLevel: "info",
 	}
+	db := setupTestRouterDB(t)
+	defer db.Close()
 
-	router := NewRouter(cfg)
+	router := NewRouter(cfg, db)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -71,8 +89,10 @@ func TestRouter_IndexRedirect(t *testing.T) {
 		Port:     8080,
 		LogLevel: "info",
 	}
+	db := setupTestRouterDB(t)
+	defer db.Close()
 
-	router := NewRouter(cfg)
+	router := NewRouter(cfg, db)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -105,8 +125,10 @@ func TestRouter_LoginPage(t *testing.T) {
 		Port:     8080,
 		LogLevel: "info",
 	}
+	db := setupTestRouterDB(t)
+	defer db.Close()
 
-	router := NewRouter(cfg)
+	router := NewRouter(cfg, db)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -127,8 +149,10 @@ func TestRouter_NotFound(t *testing.T) {
 		Port:     8080,
 		LogLevel: "info",
 	}
+	db := setupTestRouterDB(t)
+	defer db.Close()
 
-	router := NewRouter(cfg)
+	router := NewRouter(cfg, db)
 	server := httptest.NewServer(router)
 	defer server.Close()
 

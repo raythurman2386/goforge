@@ -1,0 +1,33 @@
+package errors
+
+import (
+	"github.com/user/gocool/internal/web/templates/layouts"
+)
+
+templ ErrorPage(code int, title, message string) {
+	@layouts.Base(title) {
+		<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+			<div class="max-w-md w-full text-center">
+				<h1 class="text-9xl font-extrabold text-indigo-600">{ title }</h1>
+				<p class="text-2xl font-bold text-gray-900 mt-4">{ message }</p>
+				<div class="mt-6">
+					<a href="/dashboard" class="text-indigo-600 hover:text-indigo-500 font-medium">
+						Go back home &rarr;
+					</a>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ NotFound() {
+	@ErrorPage(404, "404", "Page not found")
+}
+
+templ InternalError() {
+	@ErrorPage(500, "500", "Something went wrong")
+}
+
+templ Forbidden() {
+	@ErrorPage(403, "403", "Access denied")
+}

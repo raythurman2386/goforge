@@ -140,15 +140,14 @@ func (r *ProjectRepository) Update(ctx context.Context, project *models.Project)
 
 	query := `
 		UPDATE projects SET
-			name = $2, description = $3, git_source_id = $4, repository_url = $5,
-			repository_name = $6, default_branch = $7, dockerfile_path = $8,
-			docker_compose_path = $9, build_context = $10, build_args = $11,
-			health_check_path = $12, health_check_interval = $13, auto_deploy = $14,
-			updated_at = $15
-		WHERE id = $1`
+			name = ?, description = ?, git_source_id = ?, repository_url = ?,
+			repository_name = ?, default_branch = ?, dockerfile_path = ?,
+			docker_compose_path = ?, build_context = ?, build_args = ?,
+			health_check_path = ?, health_check_interval = ?, auto_deploy = ?,
+			updated_at = ?
+		WHERE id = ?`
 
 	result, err := r.db.ExecContext(ctx, query,
-		project.ID,
 		project.Name,
 		project.Description,
 		project.GitSourceID,
@@ -163,6 +162,7 @@ func (r *ProjectRepository) Update(ctx context.Context, project *models.Project)
 		project.HealthCheckInterval,
 		project.AutoDeploy,
 		project.UpdatedAt,
+		project.ID,
 	)
 	if err != nil {
 		return err

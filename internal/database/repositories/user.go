@@ -137,12 +137,11 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 
 	query := `
 		UPDATE users SET 
-			email = $2, password_hash = $3, github_id = $4, github_username = $5,
-			github_access_token = $6, avatar_url = $7, updated_at = $8
-		WHERE id = $1`
+			email = ?, password_hash = ?, github_id = ?, github_username = ?,
+			github_access_token = ?, avatar_url = ?, updated_at = ?
+		WHERE id = ?`
 
 	result, err := r.db.ExecContext(ctx, query,
-		user.ID,
 		user.Email,
 		user.PasswordHash,
 		user.GitHubID,
@@ -150,6 +149,7 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 		user.GitHubAccessToken,
 		user.AvatarURL,
 		user.UpdatedAt,
+		user.ID,
 	)
 	if err != nil {
 		return err

@@ -1,0 +1,57 @@
+package projects
+
+import (
+	"github.com/user/gocool/internal/models"
+	"github.com/user/gocool/internal/web/templates/layouts"
+	"github.com/user/gocool/internal/web/templates/components"
+)
+
+templ List(projects []*models.Project) {
+	@layouts.AppLayout("Projects") {
+		<div class="md:flex md:items-center md:justify-between mb-6">
+			<div class="flex-1 min-w-0">
+				<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+					Projects
+				</h2>
+			</div>
+			<div class="mt-4 flex md:mt-0 md:ml-4">
+				<button hx-get="/projects/new" hx-target="body" hx-push-url="true" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+					New Project
+				</button>
+			</div>
+		</div>
+
+		if len(projects) == 0 {
+			@components.EmptyState(
+				"No projects",
+				"Get started by creating your first project.",
+				"Create Project",
+				"/projects/new",
+			)
+		} else {
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				for _, p := range projects {
+					<a href={ templ.URL("/projects/" + p.ID) } class="block bg-white shadow rounded-lg hover:shadow-md transition-shadow duration-200">
+						<div class="p-6">
+							<div class="flex items-center justify-between">
+								<h3 class="text-lg font-medium text-gray-900 truncate">{ p.Name }</h3>
+								<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+									Active
+								</span>
+							</div>
+							<p class="mt-2 text-sm text-gray-500 truncate">
+								{ p.RepositoryURL }
+							</p>
+							<div class="mt-4 flex items-center text-xs text-gray-400">
+								<svg class="flex-shrink-0 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+								</svg>
+								Updated { p.UpdatedAt.Format("2006-01-02") }
+							</div>
+						</div>
+					</a>
+				}
+			</div>
+		}
+	}
+}

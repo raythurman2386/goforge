@@ -139,6 +139,17 @@ func (m *Migrator) Force(version int) error {
 	return m.migrate.Force(version)
 }
 
+// MigrateUp is a helper function that runs migrations for a database.
+func MigrateUp(db *DB, cfg *config.Config) error {
+	migrator, err := NewMigrator(db)
+	if err != nil {
+		return err
+	}
+	defer migrator.Close()
+
+	return migrator.Up()
+}
+
 // Close closes the migration resources.
 func (m *Migrator) Close() error {
 	sourceErr, dbErr := m.migrate.Close()

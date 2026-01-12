@@ -1,0 +1,84 @@
+package projects
+
+import (
+	"github.com/user/gocool/internal/models"
+	"github.com/user/gocool/internal/web/templates/layouts"
+)
+
+templ Detail(project *models.Project, activeTab string) {
+	@layouts.AppLayout(project.Name) {
+		<div class="mb-6">
+			<nav class="flex space-x-4" aria-label="Tabs">
+				<a href={ templ.URL("/projects/" + project.ID) } 
+					class={ "px-3 py-2 font-medium text-sm rounded-md ", 
+						templ.KV("bg-indigo-100 text-indigo-700", activeTab == "overview"),
+						templ.KV("text-gray-500 hover:text-gray-700", activeTab != "overview") }>
+					Overview
+				</a>
+				<a href={ templ.URL("/projects/" + project.ID + "/deployments") }
+					class={ "px-3 py-2 font-medium text-sm rounded-md ",
+						templ.KV("bg-indigo-100 text-indigo-700", activeTab == "deployments"),
+						templ.KV("text-gray-500 hover:text-gray-700", activeTab != "deployments") }>
+					Deployments
+				</a>
+				<a href={ templ.URL("/projects/" + project.ID + "/settings") }
+					class={ "px-3 py-2 font-medium text-sm rounded-md ",
+						templ.KV("bg-indigo-100 text-indigo-700", activeTab == "settings"),
+						templ.KV("text-gray-500 hover:text-gray-700", activeTab != "settings") }>
+					Settings
+				</a>
+			</nav>
+		</div>
+
+		if activeTab == "overview" {
+			@Overview(project)
+		} else if activeTab == "deployments" {
+			@Deployments(project)
+		} else if activeTab == "settings" {
+			@Settings(project)
+		}
+	}
+}
+
+templ Overview(project *models.Project) {
+	<div class="bg-white shadow overflow-hidden sm:rounded-lg">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-lg leading-6 font-medium text-gray-900">Project Overview</h3>
+			<p class="mt-1 max-w-2xl text-sm text-gray-500">Details and configuration.</p>
+		</div>
+		<div class="border-t border-gray-200">
+			<dl>
+				<div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+					<dt class="text-sm font-medium text-gray-500">Repository</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{ project.RepositoryURL }</dd>
+				</div>
+				<div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+					<dt class="text-sm font-medium text-gray-500">Default Branch</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{ project.DefaultBranch }</dd>
+				</div>
+			</dl>
+		</div>
+	</div>
+}
+
+templ Deployments(project *models.Project) {
+	<div class="text-center py-12">
+		<p class="text-gray-500 italic">Deployment history will appear here.</p>
+	</div>
+}
+
+templ Settings(project *models.Project) {
+	<div class="bg-white shadow sm:rounded-lg">
+		<div class="px-4 py-5 sm:p-6">
+			<h3 class="text-lg font-medium leading-6 text-gray-900">Delete Project</h3>
+			<div class="mt-2 max-w-xl text-sm text-gray-500">
+				<p>Once you delete a project, there is no going back. Please be certain.</p>
+			</div>
+			<div class="mt-5">
+				<button type="button" hx-delete={ "/projects/" + project.ID } hx-confirm="Are you sure you want to delete this project?" class="inline-flex items-center justify-center px-4 py-2 border border-transparent font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm">
+					Delete Project
+				</button>
+			</div>
+		</div>
+	</div>
+}
