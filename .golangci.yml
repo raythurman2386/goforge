@@ -28,6 +28,16 @@ issues:
         - revive
       text: "dot-imports"
 
+    # Relax linting rules for test files
+    - path: _test\.go
+      linters:
+        - errcheck
+        - errorlint
+        - gocritic
+        - gofmt
+        - misspell
+        - noctx
+
     # Generated templ files
     - path: _templ\.go
       linters:
