@@ -1,0 +1,66 @@
+# Air configuration for hot reload
+# https://github.com/air-verse/air
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # Build command
+  cmd = "make templ && go build -o ./tmp/main ./cmd/gocool"
+  # Binary output
+  bin = "./tmp/main"
+  # Arguments to pass to the binary
+  args_bin = ["serve"]
+  # Watch these extensions
+  include_ext = ["go", "templ", "sql"]
+  # Exclude directories
+  exclude_dir = ["static", "tmp", "vendor", "bin", "node_modules", ".git"]
+  # Exclude files
+  exclude_file = []
+  # Exclude patterns (regex)
+  exclude_regex = ["_test\\.go", "_templ\\.go"]
+  # Exclude unchanged files
+  exclude_unchanged = true
+  # Follow symlinks
+  follow_symlink = false
+  # Full binary path
+  full_bin = ""
+  # Log directory
+  log = "build-errors.log"
+  # Poll interval (ms) - 0 uses fsnotify
+  poll = false
+  poll_interval = 500
+  # Delay before rebuild (ms)
+  delay = 1000
+  # Stop running old binary before building
+  stop_on_error = true
+  # Send interrupt signal before killing
+  send_interrupt = true
+  # Kill delay (ms)
+  kill_delay = 500
+  # Rerun on startup
+  rerun = false
+  # Rerun delay (ms)
+  rerun_delay = 500
+
+[log]
+  # Show log time
+  time = false
+  # Only show main log
+  main_only = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  # Delete tmp directory on exit
+  clean_on_exit = true
+
+[screen]
+  # Clear screen on rebuild
+  clear_on_rebuild = true
+  # Keep scroll position
+  keep_scroll = true

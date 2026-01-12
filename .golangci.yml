@@ -1,0 +1,168 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - bin
+    - static
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters:
+  enable:
+    # Default linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Additional linters
+    - bodyclose        # Check HTTP response body is closed
+    - contextcheck     # Check context.Context is passed correctly
+    - dupl             # Code duplication detection
+    - durationcheck    # Check duration multiplication
+    - errname          # Check error naming conventions
+    - errorlint        # Find issues with error wrapping
+    - exhaustive       # Check exhaustiveness of enum switch
+    - exportloopref    # Check for pointers to loop variables
+    - gocognit         # Cognitive complexity
+    - goconst          # Find repeated strings that could be constants
+    - gocritic         # Opinionated linter
+    - gofmt            # Check formatting
+    - goimports        # Check imports
+    - goprintffuncname # Check printf-like functions are named correctly
+    - gosec            # Security issues
+    - misspell         # Spelling mistakes
+    - nakedret         # Naked returns in large functions
+    - nilerr           # Return nil error after checking err != nil
+    - noctx            # HTTP requests without context
+    - nolintlint       # Check nolint directives
+    - prealloc         # Slice preallocation hints
+    - predeclared      # Shadowing predeclared identifiers
+    - revive           # Replacement for golint
+    - rowserrcheck     # Check sql.Rows.Err is checked
+    - sqlclosecheck    # Check sql.Rows/sql.Stmt is closed
+    - stylecheck       # Style mistakes
+    - tparallel        # Detect t.Parallel() misuse
+    - unconvert        # Unnecessary type conversions
+    - unparam          # Unused function parameters
+    - whitespace       # Whitespace issues
+
+  disable:
+    - funlen           # Function length (too restrictive)
+    - gochecknoglobals # No globals (too restrictive for config)
+    - gochecknoinits   # No init functions (sometimes needed)
+    - gomnd            # Magic numbers (too noisy)
+    - lll              # Line length (handled by gofmt)
+    - wsl              # Whitespace linter (too opinionated)
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # Too noisy
+
+  gocognit:
+    min-complexity: 30
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - hugeParam # Too restrictive for struct params
+
+  goimports:
+    local-prefixes: github.com/user/gocool
+
+  gosec:
+    excludes:
+      - G104 # Unhandled errors (covered by errcheck)
+      - G304 # File path from variable (intentional in file handling)
+
+  misspell:
+    locale: US
+
+  nakedret:
+    max-func-lines: 30
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unreachable-code
+
+  stylecheck:
+    checks:
+      - all
+      - -ST1000 # Package comments (too strict)
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Test files can have longer functions
+    - path: _test\.go
+      linters:
+        - gocognit
+        - dupl
+
+    # Allow dot imports for test packages
+    - path: _test\.go
+      linters:
+        - revive
+      text: "dot-imports"
+
+    # Generated templ files
+    - path: _templ\.go
+      linters:
+        - all
+
+    # Main function is allowed to be long
+    - path: cmd/gocool/main\.go
+      linters:
+        - gocognit
+
+  exclude:
+    # errcheck: Allow not checking errors in defer close
+    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
