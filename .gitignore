@@ -5,7 +5,6 @@ bin/
 *.dll
 *.so
 *.dylib
-gocool
 
 # Test binary, built with `go test -c`
 *.test
