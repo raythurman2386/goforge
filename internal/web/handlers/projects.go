@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/user/gocool/internal/auth"
 	"github.com/user/gocool/internal/models"
 	"github.com/user/gocool/internal/project"
@@ -89,6 +90,12 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	envs, err := h.projectService.ListEnvironments(r.Context(), id)
+	if err != nil {
+		http.Error(w, "failed to list environments", http.StatusInternalServerError)
+		return
+	}
+
 	tab := "overview"
 	if strings.HasSuffix(r.URL.Path, "/deployments") {
 		tab = "deployments"
@@ -96,7 +103,7 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		tab = "settings"
 	}
 
-	component := projects.Detail(p, tab)
+	component := projects.Detail(p, envs, tab)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render project detail page", http.StatusInternalServerError)
 	}

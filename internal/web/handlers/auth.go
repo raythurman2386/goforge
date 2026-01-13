@@ -13,19 +13,25 @@ import (
 	"github.com/user/gocool/internal/web/templates/pages"
 )
 
+const (
+	schemeHTTPS = "https"
+)
+
 // AuthHandler handles authentication related requests.
 type AuthHandler struct {
 	sessionManager *auth.SessionManager
 	userRepo       *repositories.UserRepository
 	githubProvider *auth.GitHubProvider
+	authenticator  auth.Authenticator
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(sm *auth.SessionManager, ur *repositories.UserRepository, gp *auth.GitHubProvider) *AuthHandler {
+func NewAuthHandler(sm *auth.SessionManager, ur *repositories.UserRepository, gp *auth.GitHubProvider, a auth.Authenticator) *AuthHandler {
 	return &AuthHandler{
 		sessionManager: sm,
 		userRepo:       ur,
 		githubProvider: gp,
+		authenticator:  a,
 	}
 }
 
@@ -50,19 +56,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	rememberMe := r.FormValue("remember_me") == "on"
 
-	user, err := h.userRepo.GetByEmail(r.Context(), email)
+	user, err := h.authenticator.Authenticate(r.Context(), email, password)
 	if err != nil {
-		http.Error(w, "invalid email or password", http.StatusUnauthorized)
-		return
-	}
-
-	if !user.PasswordHash.Valid {
-		http.Error(w, "invalid email or password", http.StatusUnauthorized)
-		return
-	}
-
-	match, err := auth.ComparePassword(password, user.PasswordHash.String)
-	if err != nil || !match {
 		http.Error(w, "invalid email or password", http.StatusUnauthorized)
 		return
 	}
@@ -74,7 +69,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == "https")
+	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -128,7 +123,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == "https")
+	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -201,7 +196,7 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == "https")
+	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 

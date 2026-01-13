@@ -1,3 +1,4 @@
+// Package docker provides Docker SDK integration.
 package docker
 
 import (

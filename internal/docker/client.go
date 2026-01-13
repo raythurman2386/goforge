@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
 
@@ -26,6 +27,11 @@ func NewClient(host string) (*Client, error) {
 	}
 
 	return &Client{docker: cli}, nil
+}
+
+// GetStats returns statistics for a container.
+func (c *Client) GetStats(ctx context.Context, id string) (container.StatsResponseReader, error) {
+	return c.docker.ContainerStats(ctx, id, false)
 }
 
 // Ping checks the connection to the Docker daemon.

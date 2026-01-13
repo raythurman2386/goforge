@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -54,7 +55,7 @@ func (s *Service) Pull(ctx context.Context, path string) error {
 		RemoteName: "origin",
 		Progress:   os.Stdout,
 	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return fmt.Errorf("failed to pull repository: %w", err)
 	}
 

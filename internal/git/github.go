@@ -1,3 +1,4 @@
+// Package git provides git operations and provider integrations.
 package git
 
 import (
@@ -9,15 +10,15 @@ import (
 	"github.com/user/gocool/internal/models"
 )
 
-// GitHubProvider implements the Provider interface for GitHub.
-type GitHubProvider struct{}
+// HubProvider implements the Provider interface for GitHub.
+type HubProvider struct{}
 
-// NewGitHubProvider creates a new GitHubProvider.
-func NewGitHubProvider() *GitHubProvider {
-	return &GitHubProvider{}
+// NewGitHubProvider creates a new HubProvider (previously GitHubProvider).
+func NewGitHubProvider() *HubProvider {
+	return &HubProvider{}
 }
 
-func (p *GitHubProvider) getClient(ctx context.Context, source *models.GitSource) *github.Client {
+func (p *HubProvider) getClient(ctx context.Context, source *models.GitSource) *github.Client {
 	if !source.AccessToken.Valid {
 		return github.NewClient(nil)
 	}
@@ -30,7 +31,7 @@ func (p *GitHubProvider) getClient(ctx context.Context, source *models.GitSource
 }
 
 // ListRepositories retrieves repositories from GitHub.
-func (p *GitHubProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
+func (p *HubProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
 	client := p.getClient(ctx, source)
 
 	// List repositories for the authenticated user
@@ -46,7 +47,7 @@ func (p *GitHubProvider) ListRepositories(ctx context.Context, source *models.Gi
 		return nil, err
 	}
 
-	var repos []*Repository
+	repos := make([]*Repository, 0, len(ghRepos))
 	for _, r := range ghRepos {
 		repos = append(repos, &Repository{
 			Name:          r.GetName(),
@@ -62,7 +63,7 @@ func (p *GitHubProvider) ListRepositories(ctx context.Context, source *models.Gi
 }
 
 // ListBranches retrieves branches for a repository from GitHub.
-func (p *GitHubProvider) ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
+func (p *HubProvider) ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
 	client := p.getClient(ctx, source)
 
 	opts := &github.BranchListOptions{
@@ -76,7 +77,7 @@ func (p *GitHubProvider) ListBranches(ctx context.Context, source *models.GitSou
 		return nil, err
 	}
 
-	var branches []*Branch
+	branches := make([]*Branch, 0, len(ghBranches))
 	for _, b := range ghBranches {
 		branches = append(branches, &Branch{
 			Name: b.GetName(),

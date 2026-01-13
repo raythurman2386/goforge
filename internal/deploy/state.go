@@ -20,11 +20,21 @@ func (s *Service) Transition(ctx context.Context, deploymentID string, to models
 		return fmt.Errorf("invalid state transition from %s to %s", d.Status, to)
 	}
 
-	return s.UpdateStatus(ctx, deploymentID, to, errorMsg)
+	if err := s.UpdateStatus(ctx, deploymentID, to, errorMsg); err != nil {
+		return err
+	}
+
+	// Broadcast status update
+	s.sseHub.Broadcast(fmt.Sprintf("deployment:%s", deploymentID), map[string]interface{}{
+		"status": to,
+		"error":  errorMsg,
+	})
+
+	return nil
 }
 
 func isValidTransition(from, to models.DeploymentStatus) bool {
-	// Any state can transition to failed or cancelled
+	// Any state can transition to failed or canceled
 	if to == models.DeploymentStatusFailed || to == models.DeploymentStatusCanceled {
 		return true
 	}
@@ -40,13 +50,15 @@ func isValidTransition(from, to models.DeploymentStatus) bool {
 		return to == models.DeploymentStatusRunning
 	case models.DeploymentStatusRunning:
 		return to == models.DeploymentStatusRolledBack
+	case models.DeploymentStatusFailed, models.DeploymentStatusRolledBack, models.DeploymentStatusCanceled:
+		return false
 	default:
 		return false
 	}
 }
 
 // Log logs a message for a deployment.
-func (s *Service) Log(ctx context.Context, deploymentID string, level, source, message string) error {
+func (s *Service) Log(ctx context.Context, deploymentID, level, source, message string) error {
 	// For now, we'll just print to stdout until we implement DeploymentLogRepository
 	fmt.Printf("[%s] [%s] [%s] %s\n", time.Now().Format(time.RFC3339), level, source, message)
 	return nil

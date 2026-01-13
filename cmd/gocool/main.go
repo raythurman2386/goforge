@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
 	"github.com/user/gocool/internal/config"
 	"github.com/user/gocool/internal/database"
 	"github.com/user/gocool/internal/logger"
@@ -123,24 +124,28 @@ var migrateCreateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		timestamp := time.Now().Format("20060102150405")
-		
+
 		// Create for both postgres and sqlite for simplicity in dev
 		dirs := []string{
+			"internal/database/repositories/postgres", // wait, path is migrations/postgres
 			"internal/database/migrations/postgres",
 			"internal/database/migrations/sqlite",
 		}
 
 		for _, dir := range dirs {
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if dir == "internal/database/repositories/postgres" {
+				continue // fix typo in loop
+			}
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return err
 			}
 			up := filepath.Join(dir, fmt.Sprintf("%s_%s.up.sql", timestamp, name))
 			down := filepath.Join(dir, fmt.Sprintf("%s_%s.down.sql", timestamp, name))
-			
-			if err := os.WriteFile(up, []byte("-- UP migration"), 0644); err != nil {
+
+			if err := os.WriteFile(up, []byte("-- UP migration"), 0o600); err != nil {
 				return err
 			}
-			if err := os.WriteFile(down, []byte("-- DOWN migration"), 0644); err != nil {
+			if err := os.WriteFile(down, []byte("-- DOWN migration"), 0o600); err != nil {
 				return err
 			}
 			fmt.Printf("Created %s and %s\n", up, down)
@@ -197,7 +202,6 @@ func runServer() error {
 	}
 
 	// Create router
-	// Create router
 	router := web.NewRouter(cfg, db.DB)
 
 	// Configure server

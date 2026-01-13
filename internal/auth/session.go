@@ -87,7 +87,7 @@ func (s *SessionManager) GetSession(ctx context.Context, token string) (*models.
 	if time.Since(session.LastActiveAt) > time.Minute {
 		if updateErr := s.sessionRepo.UpdateLastActive(ctx, session.ID); updateErr != nil {
 			// Log error but don't fail the request for last active update
-			return session, user, nil
+			return session, user, updateErr
 		}
 	}
 

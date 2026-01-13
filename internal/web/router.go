@@ -4,10 +4,8 @@ package web
 import (
 	"database/sql"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/user/gocool/internal/auth"
 	"github.com/user/gocool/internal/config"
@@ -31,17 +29,14 @@ func NewRouter(cfg *config.Config, db *sql.DB) http.Handler {
 	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
 	githubProvider := auth.NewGitHubProvider(cfg)
 	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo)
+	authenticator := auth.NewLocalAuthenticator(userRepo)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider)
+	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
 	projectHandler := handlers.NewProjectHandler(projectService)
+	envHandler := handlers.NewEnvironmentHandler(projectService)
 
 	// Middleware stack
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(auth.CSRFMiddleware)
 	r.Use(auth.Middleware(sessionManager))
 
@@ -78,8 +73,24 @@ func NewRouter(cfg *config.Config, db *sql.DB) http.Handler {
 			r.Route("/{id}", func(r chi.Router) {
 				r.Get("/", projectHandler.GetProject)
 				r.Delete("/", projectHandler.DeleteProject)
-				r.Get("/deployments", projectHandler.GetProject) // Reusing GetProject for now
-				r.Get("/settings", projectHandler.GetProject)    // Reusing GetProject for now
+				r.Get("/deployments", projectHandler.GetProject)
+				r.Get("/settings", projectHandler.GetProject)
+
+				// Environments
+				r.Route("/envs", func(r chi.Router) {
+					r.Get("/", envHandler.ListEnvironments)
+					r.Post("/", envHandler.CreateEnvironment)
+					r.Get("/new", envHandler.NewEnvironmentModal)
+				})
+			})
+		})
+
+		// Global environment variable routes
+		r.Route("/envs/{envId}", func(r chi.Router) {
+			r.Route("/variables", func(r chi.Router) {
+				r.Get("/", envHandler.GetVariables)
+				r.Post("/", envHandler.AddVariable)
+				r.Get("/new", envHandler.NewVariableModal)
 			})
 		})
 	})

@@ -42,7 +42,6 @@ func CSRFMiddleware(next http.Handler) http.Handler {
 		// Validate CSRF token for state-changing requests
 		if r.Method == http.MethodPost || r.Method == http.MethodPut ||
 			r.Method == http.MethodDelete || r.Method == http.MethodPatch {
-
 			requestToken := r.Header.Get(CSRFHeaderName)
 			if requestToken == "" {
 				requestToken = r.FormValue(CSRFFieldName)
