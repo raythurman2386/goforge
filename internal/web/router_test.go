@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/user/gocool/internal/config"
+	"github.com/user/gocool/internal/services"
 )
 
 func setupTestRouterDB(t *testing.T) *sql.DB {
@@ -28,8 +29,9 @@ func TestNewRouter(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
+	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db)
+	router := NewRouter(cfg, db, catalog)
 	if router == nil {
 		t.Fatal("NewRouter() returned nil")
 	}
@@ -43,8 +45,9 @@ func TestRouter_HealthEndpoint(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
+	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db)
+	router := NewRouter(cfg, db, catalog)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -67,8 +70,9 @@ func TestRouter_HealthReadyEndpoint(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
+	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db)
+	router := NewRouter(cfg, db, catalog)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -91,8 +95,9 @@ func TestRouter_IndexRedirect(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
+	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db)
+	router := NewRouter(cfg, db, catalog)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -127,8 +132,9 @@ func TestRouter_LoginPage(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
+	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db)
+	router := NewRouter(cfg, db, catalog)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -151,8 +157,9 @@ func TestRouter_NotFound(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
+	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db)
+	router := NewRouter(cfg, db, catalog)
 	server := httptest.NewServer(router)
 	defer server.Close()
 

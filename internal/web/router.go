@@ -11,11 +11,12 @@ import (
 	"github.com/user/gocool/internal/config"
 	"github.com/user/gocool/internal/database/repositories"
 	"github.com/user/gocool/internal/project"
+	"github.com/user/gocool/internal/services"
 	"github.com/user/gocool/internal/web/handlers"
 )
 
 // NewRouter creates and configures the HTTP router.
-func NewRouter(cfg *config.Config, db *sql.DB) http.Handler {
+func NewRouter(cfg *config.Config, db *sql.DB, catalog *services.Catalog) http.Handler {
 	r := chi.NewRouter()
 
 	// Initialize repositories
@@ -24,17 +25,22 @@ func NewRouter(cfg *config.Config, db *sql.DB) http.Handler {
 	projectRepo := repositories.NewProjectRepository(db)
 	environmentRepo := repositories.NewEnvironmentRepository(db)
 	envVariableRepo := repositories.NewEnvVariableRepository(db)
+	containerRepo := repositories.NewContainerRepository(db)
+	instanceRepo := repositories.NewServiceInstanceRepository(db)
 
 	// Initialize services
 	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
 	githubProvider := auth.NewGitHubProvider(cfg)
 	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo)
 	authenticator := auth.NewLocalAuthenticator(userRepo)
+	// TODO: Pass docker client
+	instanceService := services.NewInstanceService(instanceRepo, containerRepo, nil, catalog)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
 	projectHandler := handlers.NewProjectHandler(projectService)
 	envHandler := handlers.NewEnvironmentHandler(projectService)
+	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
 
 	// Middleware stack
 	r.Use(auth.CSRFMiddleware)
@@ -91,6 +97,21 @@ func NewRouter(cfg *config.Config, db *sql.DB) http.Handler {
 				r.Get("/", envHandler.GetVariables)
 				r.Post("/", envHandler.AddVariable)
 				r.Get("/new", envHandler.NewVariableModal)
+			})
+		})
+
+		// Service Catalog
+		r.Route("/services", func(r chi.Router) {
+			r.Get("/", serviceHandler.Catalog)
+			r.Post("/", serviceHandler.Deploy) // Fallback if specific template route isn't used
+			r.Get("/{template}/configure", serviceHandler.Configure)
+			r.Post("/{template}", serviceHandler.Deploy)
+
+			// Instance management
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", serviceHandler.Show)
+				r.Delete("/", serviceHandler.Delete)
+				r.Post("/restart", serviceHandler.Restart)
 			})
 		})
 	})

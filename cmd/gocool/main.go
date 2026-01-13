@@ -17,6 +17,7 @@ import (
 	"github.com/user/gocool/internal/config"
 	"github.com/user/gocool/internal/database"
 	"github.com/user/gocool/internal/logger"
+	"github.com/user/gocool/internal/services"
 	"github.com/user/gocool/internal/web"
 )
 
@@ -201,8 +202,15 @@ func runServer() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	// Initialize service catalog
+	catalog := services.NewCatalog(cfg.TemplatesDir)
+	if err := catalog.LoadTemplates(); err != nil {
+		log.Error("failed to load service templates", "error", err)
+		// Continue anyway, maybe templates dir is empty
+	}
+
 	// Create router
-	router := web.NewRouter(cfg, db.DB)
+	router := web.NewRouter(cfg, db.DB, catalog)
 
 	// Configure server
 	srv := &http.Server{

@@ -1,0 +1,53 @@
+name: postgres
+display_name: PostgreSQL
+description: The world's most advanced open source relational database.
+icon: postgres
+category: database
+
+versions:
+  - "16"
+  - "15"
+  - "14"
+default_version: "16"
+
+config:
+  - name: database
+    label: Database Name
+    type: text
+    default: "app"
+    required: true
+  - name: username
+    label: Username
+    type: text
+    default: "postgres"
+    required: true
+  - name: password
+    label: Password
+    type: password
+    generate: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "postgres:{{ .Version }}"
+  ports:
+    - container: 5432
+      protocol: tcp
+  environment:
+    POSTGRES_DB: "{{ .Config.database }}"
+    POSTGRES_USER: "{{ .Config.username }}"
+    POSTGRES_PASSWORD: "{{ .Config.password }}"
+  volumes:
+    - name: data
+      path: /var/lib/postgresql/data
+  health_check:
+    test: ["CMD-SHELL", "pg_isready -U {{ .Config.username }}"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "postgres://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:5432/{{ .Config.database }}"
