@@ -65,7 +65,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ### Phase 1: Project Foundation
 
-- [ ] **1.1** Initialize Go module: `go mod init github.com/user/gocool`
+- [ ] **1.1** Initialize Go module: `go mod init github.com/raythurman2386/gocool`
 - [ ] **1.2** Create directory structure as specified in Section 4
 - [ ] **1.3** Add core dependencies to go.mod:
   - `github.com/go-chi/chi/v5` (router)

@@ -35,11 +35,11 @@ build: templ css
 
 ## dev: Run with hot reload (requires air)
 dev:
-	$(AIR)
+	GOCOOL_DEV_MODE=true $(AIR)
 
 ## run: Run the server directly
 run: templ
-	$(GOCMD) run ./cmd/gocool
+	GOCOOL_DEV_MODE=true $(GOCMD) run ./cmd/gocool
 
 ## test: Run all tests
 test:

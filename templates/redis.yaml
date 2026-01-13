@@ -1,0 +1,40 @@
+name: redis
+display_name: Redis
+description: The open source, in-memory data store used by millions of developers as a database, cache, streaming engine, and message broker.
+icon: redis
+category: database
+
+versions:
+  - "7"
+  - "6"
+default_version: "7"
+
+config:
+  - name: password
+    label: Password
+    type: password
+    generate: true
+    required: true
+
+resources:
+  cpu: "0.25"
+  memory: "256m"
+
+docker:
+  image: "redis:{{ .Version }}"
+  ports:
+    - container: 6379
+      protocol: tcp
+  environment:
+    REDIS_PASSWORD: "{{ .Config.password }}"
+  volumes:
+    - name: data
+      path: /data
+  health_check:
+    test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "redis://:{{ .Config.password }}@{{ .ContainerName }}:6379"

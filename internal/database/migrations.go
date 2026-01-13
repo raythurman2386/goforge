@@ -14,7 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 
-	"github.com/user/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/config"
 )
 
 //go:embed migrations/postgres/*.sql
@@ -137,6 +137,17 @@ func (m *Migrator) Steps(n int) error {
 // Use with caution - this is for fixing broken migration state.
 func (m *Migrator) Force(version int) error {
 	return m.migrate.Force(version)
+}
+
+// MigrateUp is a helper function that runs migrations for a database.
+func MigrateUp(db *DB, cfg *config.Config) error {
+	migrator, err := NewMigrator(db)
+	if err != nil {
+		return err
+	}
+	defer migrator.Close()
+
+	return migrator.Up()
 }
 
 // Close closes the migration resources.

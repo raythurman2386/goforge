@@ -71,7 +71,6 @@ linters:
     # Additional linters
     - bodyclose        # Check HTTP response body is closed
     - contextcheck     # Check context.Context is passed correctly
-    - dupl             # Code duplication detection
     - durationcheck    # Check duration multiplication
     - errname          # Check error naming conventions
     - errorlint        # Find issues with error wrapping
@@ -100,6 +99,7 @@ linters:
     - whitespace       # Whitespace issues
 
   disable:
+    - dupl             # Acceptable duplication in repositories
     - funlen           # Function length (too restrictive)
     - gochecknoglobals # No globals (too restrictive for config)
     - gochecknoinits   # No init functions (sometimes needed)
@@ -132,7 +132,7 @@ linters-settings:
       - hugeParam # Too restrictive for struct params
 
   goimports:
-    local-prefixes: github.com/user/gocool
+    local-prefixes: github.com/raythurman2386/gocool
 
   gosec:
     excludes:

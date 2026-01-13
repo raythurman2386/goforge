@@ -69,7 +69,7 @@ See `.env.example` for the complete list of variables (database URL, encryption 
 **Refer to `AGENTS.md` for strict guidelines.** Key points:
 
 *   **Formatting:** Standard `gofmt`.
-*   **Imports:** Grouped: Standard Lib -> Third Party -> Local (`github.com/user/gocool/...`).
+*   **Imports:** Grouped: Standard Lib -> Third Party -> Local (`github.com/raythurman2386/gocool/...`).
 *   **Errors:** Always wrap errors: `fmt.Errorf("failed to x: %w", err)`. Use sentinel errors (`ErrNotFound`) where appropriate.
 *   **Context:** Pass `context.Context` as the first argument to functions performing I/O.
 *   **Frontend:**

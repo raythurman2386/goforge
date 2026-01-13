@@ -2,26 +2,49 @@
 package web
 
 import (
+	"database/sql"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/user/gocool/internal/config"
-	"github.com/user/gocool/internal/web/handlers"
+	"github.com/raythurman2386/gocool/internal/auth"
+	"github.com/raythurman2386/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/project"
+	"github.com/raythurman2386/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/web/handlers"
 )
 
 // NewRouter creates and configures the HTTP router.
-func NewRouter(cfg *config.Config) http.Handler {
+func NewRouter(cfg *config.Config, db *sql.DB, catalog *services.Catalog) http.Handler {
 	r := chi.NewRouter()
 
+	// Initialize repositories
+	userRepo := repositories.NewUserRepository(db)
+	sessionRepo := repositories.NewSessionRepository(db)
+	projectRepo := repositories.NewProjectRepository(db)
+	environmentRepo := repositories.NewEnvironmentRepository(db)
+	envVariableRepo := repositories.NewEnvVariableRepository(db)
+	containerRepo := repositories.NewContainerRepository(db)
+	instanceRepo := repositories.NewServiceInstanceRepository(db)
+
+	// Initialize services
+	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
+	githubProvider := auth.NewGitHubProvider(cfg)
+	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo)
+	authenticator := auth.NewLocalAuthenticator(userRepo)
+	// TODO: Pass docker client
+	instanceService := services.NewInstanceService(instanceRepo, containerRepo, nil, catalog)
+
+	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
+	projectHandler := handlers.NewProjectHandler(projectService)
+	envHandler := handlers.NewEnvironmentHandler(projectService)
+	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
+
 	// Middleware stack
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(auth.CSRFMiddleware)
+	r.Use(auth.Middleware(sessionManager))
 
 	// Serve static files
 	fileServer := http.FileServer(http.Dir("static"))
@@ -34,18 +57,64 @@ func NewRouter(cfg *config.Config) http.Handler {
 	// Public routes
 	r.Group(func(r chi.Router) {
 		r.Get("/", handlers.Index)
-		r.Get("/login", handlers.LoginPage)
+		r.Get("/login", authHandler.LoginPage)
+		r.Post("/auth/login", authHandler.Login)
+		r.Get("/auth/register", authHandler.RegisterPage)
+		r.Post("/auth/register", authHandler.Register)
+		r.Get("/auth/github", authHandler.GitHubLogin)
+		r.Get("/auth/github/callback", authHandler.GitHubCallback)
+		r.Post("/auth/logout", authHandler.Logout)
 	})
 
-	// TODO: Add authenticated routes
-	// r.Group(func(r chi.Router) {
-	// 	r.Use(authMiddleware)
-	// 	r.Get("/dashboard", handlers.Dashboard)
-	// 	r.Route("/projects", func(r chi.Router) {
-	// 		r.Get("/", handlers.ListProjects)
-	// 		r.Post("/", handlers.CreateProject)
-	// 	})
-	// })
+	// Authenticated routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth)
+		r.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("Welcome to Dashboard!")) //nolint:errcheck // simple dashboard response for now
+		})
+		r.Route("/projects", func(r chi.Router) {
+			r.Get("/", projectHandler.ListProjects)
+			r.Get("/new", projectHandler.NewProjectPage)
+			r.Post("/", projectHandler.CreateProject)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", projectHandler.GetProject)
+				r.Delete("/", projectHandler.DeleteProject)
+				r.Get("/deployments", projectHandler.GetProject)
+				r.Get("/settings", projectHandler.GetProject)
+
+				// Environments
+				r.Route("/envs", func(r chi.Router) {
+					r.Get("/", envHandler.ListEnvironments)
+					r.Post("/", envHandler.CreateEnvironment)
+					r.Get("/new", envHandler.NewEnvironmentModal)
+				})
+			})
+		})
+
+		// Global environment variable routes
+		r.Route("/envs/{envId}", func(r chi.Router) {
+			r.Route("/variables", func(r chi.Router) {
+				r.Get("/", envHandler.GetVariables)
+				r.Post("/", envHandler.AddVariable)
+				r.Get("/new", envHandler.NewVariableModal)
+			})
+		})
+
+		// Service Catalog
+		r.Route("/services", func(r chi.Router) {
+			r.Get("/", serviceHandler.Catalog)
+			r.Post("/", serviceHandler.Deploy) // Fallback if specific template route isn't used
+			r.Get("/{template}/configure", serviceHandler.Configure)
+			r.Post("/{template}", serviceHandler.Deploy)
+
+			// Instance management
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", serviceHandler.Show)
+				r.Delete("/", serviceHandler.Delete)
+				r.Post("/restart", serviceHandler.Restart)
+			})
+		})
+	})
 
 	return r
 }

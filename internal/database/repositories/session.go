@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 // SessionRepository handles session data access.
@@ -97,8 +97,8 @@ func (r *SessionRepository) GetByUserID(ctx context.Context, userID string) ([]*
 
 // UpdateLastActive updates the last active time for a session.
 func (r *SessionRepository) UpdateLastActive(ctx context.Context, id string) error {
-	query := `UPDATE sessions SET last_active_at = $2 WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id, time.Now())
+	query := `UPDATE sessions SET last_active_at = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, query, time.Now(), id)
 	return err
 }
 

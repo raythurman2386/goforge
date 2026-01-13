@@ -1,20 +1,30 @@
-package auth_test
+package auth
 
 import (
 	"testing"
-
-	"golang.org/x/crypto/argon2"
 )
 
-func TestArgon2Dependency(t *testing.T) {
-	// Simple test to ensure the dependency is available and works
-	password := []byte("password")
-	salt := []byte("somesalt")
+func TestHashPassword(t *testing.T) {
+	password := "secure-password"
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatalf("HashPassword() error = %v", err)
+	}
 
-	// Use Argon2id as specified in the spec
-	hash := argon2.IDKey(password, salt, 1, 64*1024, 4, 32)
+	if hash == "" {
+		t.Fatal("HashPassword() returned empty string")
+	}
 
-	if len(hash) != 32 {
-		t.Errorf("Expected hash length 32, got %d", len(hash))
+	match, err := ComparePassword(password, hash)
+	if err != nil {
+		t.Fatalf("ComparePassword() error = %v", err)
+	}
+	if !match {
+		t.Error("ComparePassword() did not match original password")
+	}
+
+	match, _ = ComparePassword("wrong-password", hash)
+	if match {
+		t.Error("ComparePassword() matched wrong password")
 	}
 }

@@ -1,0 +1,43 @@
+package pages_services
+
+import (
+	"fmt"
+	"github.com/raythurman2386/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/web/templates/layouts"
+	"github.com/raythurman2386/gocool/internal/web/templates/components"
+)
+
+templ Configure(tmpl *services.ServiceTemplate, csrfToken string) {
+	@layouts.AppLayout("Configure " + tmpl.DisplayName) {
+		<div class="max-w-2xl mx-auto bg-white shadow sm:rounded-lg">
+			<div class="px-4 py-5 sm:p-6">
+				<h3 class="text-lg font-medium leading-6 text-gray-900">Configure { tmpl.DisplayName }</h3>
+				<p class="mt-1 text-sm text-gray-500">Customize your deployment.</p>
+				
+				<form class="mt-6 space-y-6" action={ templ.SafeURL("/services/" + tmpl.Name) } method="POST">
+					<input type="hidden" name="csrf_token" value={ csrfToken } />
+					
+					@components.Input("Service Name", "name", "text", tmpl.Name, true)
+
+					for _, field := range tmpl.Config {
+						if field.Type == "password" && field.Generate {
+							// TODO: Client-side generation or hidden field
+							@components.Input(field.Label, field.Name, "password", "", field.Required)
+						} else if field.Type == "number" {
+							@components.Input(field.Label, field.Name, "number", fmt.Sprintf("%v", field.Default), field.Required)
+						} else {
+							@components.Input(field.Label, field.Name, "text", fmt.Sprintf("%v", field.Default), field.Required)
+						}
+					}
+
+					<div class="pt-5 border-t border-gray-200 flex justify-end space-x-3">
+						<a href="/services" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+							Cancel
+						</a>
+						@components.Button("Deploy Service", "primary")
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}

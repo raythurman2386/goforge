@@ -13,7 +13,7 @@ import (
 	_ "github.com/lib/pq"           // PostgreSQL driver
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
-	"github.com/user/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/config"
 )
 
 // DB wraps the sql.DB with additional functionality.

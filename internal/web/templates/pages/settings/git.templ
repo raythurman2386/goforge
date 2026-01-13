@@ -1,0 +1,98 @@
+package settings
+
+import (
+	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/web/templates/layouts"
+	"github.com/raythurman2386/gocool/internal/web/templates/components"
+)
+
+templ GitSources(sources []*models.GitSource, csrfToken string) {
+	@layouts.AppLayout("Git Sources") {
+		<div class="md:flex md:items-center md:justify-between mb-6">
+			<div class="flex-1 min-w-0">
+				<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+					Git Sources
+				</h2>
+			</div>
+			<div class="mt-4 flex md:mt-0 md:ml-4">
+				<button hx-get="/settings/git/new" hx-target="body" hx-swap="beforeend" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+					Add Source
+				</button>
+			</div>
+		</div>
+
+		if len(sources) == 0 {
+			@components.EmptyState(
+				"No git sources",
+				"Connect your GitHub, GitLab or other git providers.",
+				"Add Source",
+				"/settings/git/new",
+			)
+		} else {
+			<div class="bg-white shadow overflow-hidden sm:rounded-md">
+				<ul role="list" class="divide-y divide-gray-200">
+					for _, s := range sources {
+						<li>
+							<div class="px-4 py-4 sm:px-6 flex items-center justify-between">
+								<div class="flex items-center">
+									<div class="flex-shrink-0">
+										if s.Type == models.GitSourceTypeGitHub {
+											<svg class="h-8 w-8 text-gray-900" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" /></svg>
+										} else {
+											<svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+										}
+									</div>
+									<div class="ml-4">
+										<p class="text-sm font-medium text-indigo-600 truncate">{ s.Name }</p>
+										<p class="text-sm text-gray-500">{ string(s.Type) }</p>
+									</div>
+								</div>
+								<div class="flex space-x-2">
+									<button hx-delete={ "/settings/git/" + s.ID } hx-confirm="Remove this source?" class="text-gray-400 hover:text-red-600">
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+										</svg>
+									</button>
+								</div>
+							</div>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+	}
+}
+
+templ AddGitSourceModal(csrfToken string) {
+	@components.Modal("Add Git Source") {
+		<form hx-post="/settings/git" hx-swap="none">
+			<input type="hidden" name="csrf_token" value={ csrfToken } />
+			
+			@components.Input("Source Name", "name", "text", "", true)
+			
+			<div class="mb-4">
+				<label class="block text-sm font-medium text-gray-700 mb-1">Source Type</label>
+				<div class="grid grid-cols-2 gap-3">
+					<label class="border rounded-md p-3 flex items-center cursor-pointer hover:bg-gray-50">
+						<input type="radio" name="type" value="github" checked class="h-4 w-4 text-indigo-600" />
+						<span class="ml-2 text-sm text-gray-900">GitHub</span>
+					</label>
+					<label class="border rounded-md p-3 flex items-center cursor-pointer hover:bg-gray-50">
+						<input type="radio" name="type" value="gitlab" class="h-4 w-4 text-indigo-600" />
+						<span class="ml-2 text-sm text-gray-900">GitLab</span>
+					</label>
+				</div>
+			</div>
+
+			@components.Input("API URL (optional)", "api_url", "text", "", false)
+			@components.Input("Access Token", "access_token", "password", "", true)
+
+			<div class="mt-5 flex justify-end space-x-3">
+				<button type="button" onclick="document.getElementById('modal').remove()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+					Cancel
+				</button>
+				@components.Button("Add Source", "primary")
+			</div>
+		</form>
+	}
+}

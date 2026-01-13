@@ -1,0 +1,67 @@
+package pages_services
+
+import (
+	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/web/templates/layouts"
+)
+
+templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceInstance) {
+	@layouts.AppLayout("Services") {
+		<div class="mb-8">
+			<h2 class="text-2xl font-bold text-gray-900">Your Services</h2>
+			if len(instances) == 0 {
+				<div class="mt-4 bg-white shadow rounded-lg p-6 text-center text-gray-500">
+					No services deployed yet. Choose a template below.
+				</div>
+			} else {
+				<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					for _, instance := range instances {
+						<div class="bg-white shadow rounded-lg p-6">
+							<div class="flex items-center justify-between">
+								<h3 class="text-lg font-medium text-gray-900">{ instance.Name }</h3>
+								<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+									templ.KV("bg-green-100 text-green-800", instance.Status == models.ServiceStatusRunning),
+									templ.KV("bg-yellow-100 text-yellow-800", instance.Status == models.ServiceStatusPending),
+									templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed) }>
+									{ string(instance.Status) }
+								</span>
+							</div>
+							<p class="mt-1 text-sm text-gray-500">{ instance.TemplateName }</p>
+						</div>
+					}
+				</div>
+			}
+		</div>
+
+		<div>
+			<h2 class="text-2xl font-bold text-gray-900 mb-4">Service Catalog</h2>
+			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+				for _, tmpl := range templates {
+					<div class="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-200">
+						<div class="p-6">
+							<div class="flex items-center">
+								if tmpl.Icon != "" {
+									// TODO: Render actual icon
+									<div class="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
+										{ string(tmpl.Name[0]) }
+									</div>
+								}
+								<div class="ml-4">
+									<h3 class="text-lg font-medium text-gray-900">{ tmpl.DisplayName }</h3>
+									<span class="text-xs text-gray-500 uppercase">{ tmpl.Category }</span>
+								</div>
+							</div>
+							<p class="mt-4 text-sm text-gray-500 h-10 line-clamp-2">{ tmpl.Description }</p>
+							<div class="mt-6">
+								<a href={ templ.URL("/services/" + tmpl.Name + "/configure") } class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+									Deploy
+								</a>
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+		</div>
+	}
+}

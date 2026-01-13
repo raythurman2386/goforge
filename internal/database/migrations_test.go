@@ -3,7 +3,7 @@ package database
 import (
 	"testing"
 
-	"github.com/user/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/config"
 )
 
 func TestNewMigrator_NilDB(t *testing.T) {
