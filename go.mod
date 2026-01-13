@@ -1,6 +1,6 @@
 module github.com/user/gocool
 
-go 1.25.2
+go 1.25
 
 require (
 	github.com/a-h/templ v0.3.977
