@@ -65,98 +65,98 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ### Phase 1: Project Foundation
 
-- [ ] **1.1** Initialize Go module: `go mod init github.com/raythurman2386/gocool`
-- [ ] **1.2** Create directory structure as specified in Section 4
-- [ ] **1.3** Add core dependencies to go.mod:
+- [x] **1.1** Initialize Go module: `go mod init github.com/raythurman2386/gocool`
+- [x] **1.2** Create directory structure as specified in Section 4
+- [x] **1.3** Add core dependencies to go.mod:
   - `github.com/go-chi/chi/v5` (router)
   - `github.com/a-h/templ` (templating)
   - `github.com/lib/pq` (PostgreSQL)
   - `github.com/golang-migrate/migrate/v4` (migrations)
   - `golang.org/x/crypto` (security)
-- [ ] **1.4** Create `internal/config/config.go` with struct for all configuration options
-- [ ] **1.5** Implement config loading from environment variables with sensible defaults
-- [ ] **1.6** Create `cmd/gocool/main.go` entry point with config loading and graceful shutdown
-- [ ] **1.7** Set up structured logging with `log/slog` in `internal/logger/logger.go`
-- [ ] **1.8** Download TailwindCSS standalone CLI, create build script `scripts/tailwind.sh`
-- [ ] **1.9** Create `tailwind.config.js` with content paths for templ files
-- [ ] **1.10** Create base layout template `internal/web/templates/layouts/base.templ`
-- [ ] **1.11** Add HTMX 2.x to `static/js/htmx.min.js`
-- [ ] **1.12** Create HTTP router in `internal/web/router.go` using chi
-- [ ] **1.13** Add common middleware stack (logging, recovery, request ID)
-- [ ] **1.14** Create health check endpoint `GET /health`
-- [ ] **1.15** Create Makefile with targets: `build`, `dev`, `css`, `templ`, `migrate`
+- [x] **1.4** Create `internal/config/config.go` with struct for all configuration options
+- [x] **1.5** Implement config loading from environment variables with sensible defaults
+- [x] **1.6** Create `cmd/gocool/main.go` entry point with config loading and graceful shutdown
+- [x] **1.7** Set up structured logging with `log/slog` in `internal/logger/logger.go`
+- [x] **1.8** Download TailwindCSS standalone CLI, create build script `scripts/tailwind.sh`
+- [x] **1.9** Create `tailwind.config.js` with content paths for templ files
+- [x] **1.10** Create base layout template `internal/web/templates/layouts/base.templ`
+- [x] **1.11** Add HTMX 2.x to `static/js/htmx.min.js`
+- [x] **1.12** Create HTTP router in `internal/web/router.go` using chi
+- [x] **1.13** Add common middleware stack (logging, recovery, request ID)
+- [x] **1.14** Create health check endpoint `GET /health`
+- [x] **1.15** Create Makefile with targets: `build`, `dev`, `css`, `templ`, `migrate`
 
 ### Phase 2: Database & Models
 
-- [ ] **2.1** Create `internal/database/database.go` with PostgreSQL connection pool
-- [ ] **2.2** Implement connection retry logic with exponential backoff
-- [ ] **2.3** Set up golang-migrate in `internal/database/migrations.go`
-- [ ] **2.4** Create migration `001_create_users.up.sql` and `.down.sql`
-- [ ] **2.5** Create migration `002_create_sessions.up.sql` and `.down.sql`
-- [ ] **2.6** Create migration `003_create_git_sources.up.sql` and `.down.sql`
-- [ ] **2.7** Create migration `004_create_projects.up.sql` and `.down.sql`
-- [ ] **2.8** Create migration `005_create_environments.up.sql` and `.down.sql`
-- [ ] **2.9** Create migration `006_create_env_variables.up.sql` and `.down.sql`
-- [ ] **2.10** Create migration `007_create_deployments.up.sql` and `.down.sql`
-- [ ] **2.11** Create migration `008_create_containers.up.sql` and `.down.sql`
-- [ ] **2.12** Create migration `009_create_service_instances.up.sql` and `.down.sql`
-- [ ] **2.13** Create migration `010_create_audit_logs.up.sql` and `.down.sql`
-- [ ] **2.14** Create `internal/models/` package with Go structs matching schema
-- [ ] **2.15** Implement repository pattern in `internal/database/repositories/`
+- [x] **2.1** Create `internal/database/database.go` with PostgreSQL connection pool
+- [x] **2.2** Implement connection retry logic with exponential backoff
+- [x] **2.3** Set up golang-migrate in `internal/database/migrations.go`
+- [x] **2.4** Create migration `001_create_users.up.sql` and `.down.sql`
+- [x] **2.5** Create migration `002_create_sessions.up.sql` and `.down.sql`
+- [x] **2.6** Create migration `003_create_git_sources.up.sql` and `.down.sql`
+- [x] **2.7** Create migration `004_create_projects.up.sql` and `.down.sql`
+- [x] **2.8** Create migration `005_create_environments.up.sql` and `.down.sql`
+- [x] **2.9** Create migration `006_create_env_variables.up.sql` and `.down.sql`
+- [x] **2.10** Create migration `007_create_deployments.up.sql` and `.down.sql`
+- [x] **2.11** Create migration `008_create_containers.up.sql` and `.down.sql`
+- [x] **2.12** Create migration `009_create_service_instances.up.sql` and `.down.sql`
+- [x] **2.13** Create migration `010_create_audit_logs.up.sql` and `.down.sql`
+- [x] **2.14** Create `internal/models/` package with Go structs matching schema
+- [x] **2.15** Implement repository pattern in `internal/database/repositories/`
 
 ### Phase 3: Authentication
 
-- [ ] **3.1** Create `internal/auth/auth.go` with core auth interfaces
-- [ ] **3.2** Implement password hashing with Argon2id in `internal/auth/password.go`
-- [ ] **3.3** Create session management in `internal/auth/session.go`
-- [ ] **3.4** Implement secure cookie handling (HTTP-only, SameSite, Secure)
-- [ ] **3.5** Create CSRF middleware in `internal/auth/csrf.go`
-- [ ] **3.6** Implement GitHub OAuth flow in `internal/auth/github.go`:
+- [x] **3.1** Create `internal/auth/auth.go` with core auth interfaces
+- [x] **3.2** Implement password hashing with Argon2id in `internal/auth/password.go`
+- [x] **3.3** Create session management in `internal/auth/session.go`
+- [x] **3.4** Implement secure cookie handling (HTTP-only, SameSite, Secure)
+- [x] **3.5** Create CSRF middleware in `internal/auth/csrf.go`
+- [x] **3.6** Implement GitHub OAuth flow in `internal/auth/github.go`:
   - Authorization URL generation
   - Token exchange
   - User info fetching
   - Account linking/creation
-- [ ] **3.7** Create auth middleware in `internal/auth/middleware.go`
-- [ ] **3.8** Build login page template `internal/web/templates/pages/login.templ`
-- [ ] **3.9** Create login handler with GitHub OAuth button
-- [ ] **3.10** Implement OAuth callback handler
-- [ ] **3.11** Add local account registration (fallback)
-- [ ] **3.12** Create logout handler with session cleanup
-- [ ] **3.13** Add "remember me" functionality with extended session TTL
+- [x] **3.7** Create auth middleware in `internal/auth/middleware.go`
+- [x] **3.8** Build login page template `internal/web/templates/pages/login.templ`
+- [x] **3.9** Create login handler with GitHub OAuth button
+- [x] **3.10** Implement OAuth callback handler
+- [x] **3.11** Add local account registration (fallback)
+- [x] **3.12** Create logout handler with session cleanup
+- [x] **3.13** Add "remember me" functionality with extended session TTL
 
 ### Phase 4: Core UI Components
 
-- [ ] **4.1** Create navigation component `internal/web/templates/components/nav.templ`
-- [ ] **4.2** Create sidebar component with project list
-- [ ] **4.3** Build notification/toast component for HTMX responses
-- [ ] **4.4** Create modal component (HTMX-driven)
-- [ ] **4.5** Build form components (input, select, checkbox, button)
-- [ ] **4.6** Create table component with sorting support
+- [x] **4.1** Create navigation component `internal/web/templates/components/nav.templ`
+- [x] **4.2** Create sidebar component with project list
+- [x] **4.3** Build notification/toast component for HTMX responses
+- [x] **4.4** Create modal component (HTMX-driven)
+- [x] **4.5** Build form components (input, select, checkbox, button)
+- [x] **4.6** Create table component with sorting support
 - [ ] **4.7** Build pagination component
-- [ ] **4.8** Create loading spinner component
-- [ ] **4.9** Build empty state component
-- [ ] **4.10** Create error page templates (404, 500, 403)
+- [x] **4.8** Create loading spinner component
+- [x] **4.9** Build empty state component
+- [x] **4.10** Create error page templates (404, 500, 403)
 
 ### Phase 5: Project Management
 
-- [ ] **5.1** Create `internal/project/service.go` with project CRUD operations
-- [ ] **5.2** Implement project list handler `GET /projects`
-- [ ] **5.3** Create project list page `internal/web/templates/pages/projects/list.templ`
-- [ ] **5.4** Implement project creation form and handler `POST /projects`
-- [ ] **5.5** Create project detail page with tabbed interface
-- [ ] **5.6** Implement environment service in `internal/project/environment.go`
+- [x] **5.1** Create `internal/project/service.go` with project CRUD operations
+- [x] **5.2** Implement project list handler `GET /projects`
+- [x] **5.3** Create project list page `internal/web/templates/pages/projects/list.templ`
+- [x] **5.4** Implement project creation form and handler `POST /projects`
+- [x] **5.5** Create project detail page with tabbed interface
+- [x] **5.6** Implement environment service in `internal/project/environment.go`
 - [ ] **5.7** Build environment switcher component
-- [ ] **5.8** Create environment creation modal
-- [ ] **5.9** Implement env variable editor with add/edit/delete
+- [x] **5.8** Create environment creation modal
+- [x] **5.9** Implement env variable editor with add/edit/delete
 - [ ] **5.10** Add secret masking toggle for sensitive variables
 - [ ] **5.11** Create project settings page
-- [ ] **5.12** Implement project deletion with confirmation modal
+- [x] **5.12** Implement project deletion with confirmation modal
 - [ ] **5.13** Add project search/filter functionality
 
 ### Phase 6: Git Integration
 
-- [ ] **6.1** Create `internal/git/service.go` with git source interface
-- [ ] **6.2** Implement GitHub API client in `internal/git/github.go`:
+- [x] **6.1** Create `internal/git/service.go` with git source interface
+- [x] **6.2** Implement GitHub API client in `internal/git/github.go`:
   - Repository listing
   - Branch listing
   - Commit fetching
@@ -164,30 +164,30 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [ ] **6.3** Create GitLab API client in `internal/git/gitlab.go`
 - [ ] **6.4** Create Gitea API client in `internal/git/gitea.go`
 - [ ] **6.5** Implement SSH key management in `internal/git/ssh.go`
-- [ ] **6.6** Create git source configuration page
+- [x] **6.6** Create git source configuration page
 - [ ] **6.7** Build repository browser component (HTMX-powered)
 - [ ] **6.8** Create branch/tag selector dropdown
 - [ ] **6.9** Implement webhook receiver in `internal/web/handlers/webhooks.go`
 - [ ] **6.10** Add webhook signature verification (GitHub, GitLab, Gitea)
-- [ ] **6.11** Create git clone/pull operations in `internal/git/operations.go`
+- [x] **6.11** Create git clone/pull operations in `internal/git/operations.go`
 - [ ] **6.12** Implement shallow clone for faster deployments
 
 ### Phase 7: Docker Integration
 
-- [ ] **7.1** Create `internal/docker/client.go` wrapping Docker SDK
+- [x] **7.1** Create `internal/docker/client.go` wrapping Docker SDK
 - [ ] **7.2** Implement connection health check and reconnection
-- [ ] **7.3** Create image builder in `internal/docker/build.go`:
+- [x] **7.3** Create image builder in `internal/docker/build.go`:
   - Dockerfile detection
   - Build context preparation
   - Layer caching configuration
   - Progress streaming
 - [ ] **7.4** Implement docker-compose parser in `internal/docker/compose.go`
-- [ ] **7.5** Create container manager in `internal/docker/container.go`:
+- [x] **7.5** Create container manager in `internal/docker/container.go`:
   - Create, start, stop, restart, remove
   - Environment variable injection
   - Port mapping
   - Volume mounting
-- [ ] **7.6** Implement log streaming in `internal/docker/logs.go`
+- [x] **7.6** Implement log streaming in `internal/docker/logs.go`
 - [ ] **7.7** Create network manager in `internal/docker/network.go`
 - [ ] **7.8** Implement volume manager in `internal/docker/volume.go`
 - [ ] **7.9** Add image cleanup/pruning functionality
@@ -195,14 +195,14 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ### Phase 8: Deployment Pipeline
 
-- [ ] **8.1** Create `internal/deploy/service.go` with deployment orchestration
-- [ ] **8.2** Implement deployment state machine:
+- [x] **8.1** Create `internal/deploy/service.go` with deployment orchestration
+- [x] **8.2** Implement deployment state machine:
   - pending → cloning → building → deploying → running
   - Any state → failed
   - running → rolled_back
-- [ ] **8.3** Create deployment queue in `internal/deploy/queue.go`
-- [ ] **8.4** Implement concurrent deployment limiting (configurable)
-- [ ] **8.5** Create build pipeline in `internal/deploy/pipeline.go`:
+- [x] **8.3** Create deployment queue in `internal/deploy/queue.go`
+- [x] **8.4** Implement concurrent deployment limiting (configurable)
+- [x] **8.5** Create build pipeline in `internal/deploy/pipeline.go`:
   - Clone repository
   - Prepare build context
   - Build image
@@ -219,7 +219,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ### Phase 9: Traefik Integration
 
-- [ ] **9.1** Create `internal/proxy/traefik.go` for Traefik management
+- [x] **9.1** Create `internal/proxy/traefik.go` for Traefik management
 - [ ] **9.2** Implement Docker labels generation for Traefik routing
 - [ ] **9.3** Create Let's Encrypt certificate resolver configuration
 - [ ] **9.4** Implement domain validation
@@ -232,7 +232,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ### Phase 10: Real-Time Features (SSE)
 
-- [ ] **10.1** Create SSE hub in `internal/sse/hub.go`:
+- [x] **10.1** Create SSE hub in `internal/sse/hub.go`:
   - Client connection management
   - Topic-based subscriptions
   - Broadcast functionality
@@ -242,13 +242,13 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [ ] **10.5** Create container log streaming endpoint
 - [ ] **10.6** Add build output streaming
 - [ ] **10.7** Implement real-time deployment status updates
-- [ ] **10.8** Create HTMX SSE extension integration
+- [x] **10.8** Create HTMX SSE extension integration
 - [ ] **10.9** Add reconnection handling with event replay
 - [ ] **10.10** Implement client-side connection status indicator
 
 ### Phase 11: Resource Monitoring
 
-- [ ] **11.1** Create `internal/monitor/stats.go` for Docker stats collection
+- [x] **11.1** Create `internal/monitor/stats.go` for Docker stats collection
 - [ ] **11.2** Implement periodic stats polling per container
 - [ ] **11.3** Create metrics storage schema (time-series in PostgreSQL)
 - [ ] **11.4** Implement metrics retention policy (7-day rolling)
@@ -262,18 +262,18 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ### Phase 12: One-Click Services
 
-- [ ] **12.1** Create `internal/services/catalog.go` for template loading
+- [x] **12.1** Create `internal/services/catalog.go` for template loading
 - [ ] **12.2** Define service template YAML schema
 - [ ] **12.3** Implement template directory watching for hot-reload
-- [ ] **12.4** Create PostgreSQL service template
-- [ ] **12.5** Create Redis service template
+- [x] **12.4** Create PostgreSQL service template
+- [x] **12.5** Create Redis service template
 - [ ] **12.6** Create MySQL/MariaDB service template
 - [ ] **12.7** Create MongoDB service template
 - [ ] **12.8** Create Plausible Analytics service template
 - [ ] **12.9** Create PocketBase service template
-- [ ] **12.10** Build service catalog browser page
-- [ ] **12.11** Create service configuration wizard
-- [ ] **12.12** Implement service instance management in `internal/services/instance.go`
+- [x] **12.10** Build service catalog browser page
+- [x] **12.11** Create service configuration wizard
+- [x] **12.12** Implement service instance management in `internal/services/instance.go`
 - [ ] **12.13** Add connection string exposure to linked projects
 - [ ] **12.14** Create service backup/restore functionality
 
