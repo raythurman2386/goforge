@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 // Repository represents a git repository.

@@ -65,9 +65,9 @@ import (
     "github.com/go-chi/chi/v5"
     "github.com/lib/pq"
 
-    // Local packages (github.com/user/gocool/...)
-    "github.com/user/gocool/internal/config"
-    "github.com/user/gocool/internal/models"
+    // Local packages (github.com/raythurman2386/gocool/...)
+    "github.com/raythurman2386/gocool/internal/config"
+    "github.com/raythurman2386/gocool/internal/models"
 )
 ```
 

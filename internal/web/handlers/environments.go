@@ -6,10 +6,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/user/gocool/internal/auth"
-	"github.com/user/gocool/internal/models"
-	"github.com/user/gocool/internal/project"
-	"github.com/user/gocool/internal/web/templates/components"
+	"github.com/raythurman2386/gocool/internal/auth"
+	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/project"
+	"github.com/raythurman2386/gocool/internal/web/templates/components"
 )
 
 // EnvironmentHandler handles environment related requests.

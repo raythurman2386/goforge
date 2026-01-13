@@ -7,12 +7,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/user/gocool/internal/auth"
-	"github.com/user/gocool/internal/config"
-	"github.com/user/gocool/internal/database/repositories"
-	"github.com/user/gocool/internal/project"
-	"github.com/user/gocool/internal/services"
-	"github.com/user/gocool/internal/web/handlers"
+	"github.com/raythurman2386/gocool/internal/auth"
+	"github.com/raythurman2386/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/project"
+	"github.com/raythurman2386/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/web/handlers"
 )
 
 // NewRouter creates and configures the HTTP router.

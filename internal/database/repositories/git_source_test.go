@@ -7,7 +7,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 func setupGitSourceTestDB(t *testing.T) *sql.DB {

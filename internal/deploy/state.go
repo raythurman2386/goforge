@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 // Transition handles deployment state transitions.

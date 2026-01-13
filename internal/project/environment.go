@@ -4,7 +4,7 @@ package project
 import (
 	"context"
 
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 // ListEnvironments retrieves all environments for a project.

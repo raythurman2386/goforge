@@ -14,7 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 
-	"github.com/user/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/config"
 )
 
 //go:embed migrations/postgres/*.sql

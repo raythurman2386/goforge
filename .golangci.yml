@@ -132,7 +132,7 @@ linters-settings:
       - hugeParam # Too restrictive for struct params
 
   goimports:
-    local-prefixes: github.com/user/gocool
+    local-prefixes: github.com/raythurman2386/gocool
 
   gosec:
     excludes:

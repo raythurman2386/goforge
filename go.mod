@@ -1,4 +1,4 @@
-module github.com/user/gocool
+module github.com/raythurman2386/gocool
 
 go 1.25
 

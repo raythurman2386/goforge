@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/user/gocool/internal/database/repositories"
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 // Service handles project and environment business logic.

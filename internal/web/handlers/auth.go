@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/user/gocool/internal/auth"
-	"github.com/user/gocool/internal/database/repositories"
-	"github.com/user/gocool/internal/models"
-	"github.com/user/gocool/internal/web/templates/pages"
+	"github.com/raythurman2386/gocool/internal/auth"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/web/templates/pages"
 )
 
 const (

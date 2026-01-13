@@ -202,7 +202,7 @@ Include:
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/user/gocool/discussions) for questions
+- Open a [Discussion](https://github.com/raythurman2386/gocool/discussions) for questions
 - Check existing issues before creating new ones
 
 Thank you for contributing!

@@ -8,8 +8,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/user/gocool/internal/config"
-	"github.com/user/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/services"
 )
 
 func setupTestRouterDB(t *testing.T) *sql.DB {

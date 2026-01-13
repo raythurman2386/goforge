@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/user/gocool/internal/database/repositories"
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 func TestAuthMiddleware(t *testing.T) {

@@ -4,7 +4,7 @@ package proxy
 import (
 	"fmt"
 
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 // Labels represents Traefik Docker labels.

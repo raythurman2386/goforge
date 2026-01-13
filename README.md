@@ -24,7 +24,7 @@ GoCool is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/user/gocool.git
+    git clone https://github.com/raythurman2386/gocool.git
     cd gocool
     ```
 

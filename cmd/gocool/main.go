@@ -14,11 +14,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/user/gocool/internal/config"
-	"github.com/user/gocool/internal/database"
-	"github.com/user/gocool/internal/logger"
-	"github.com/user/gocool/internal/services"
-	"github.com/user/gocool/internal/web"
+	"github.com/raythurman2386/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/database"
+	"github.com/raythurman2386/gocool/internal/logger"
+	"github.com/raythurman2386/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/web"
 )
 
 var rootCmd = &cobra.Command{

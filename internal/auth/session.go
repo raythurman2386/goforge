@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/user/gocool/internal/database/repositories"
-	"github.com/user/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 var (

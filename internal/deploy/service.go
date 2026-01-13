@@ -4,11 +4,11 @@ package deploy
 import (
 	"context"
 
-	"github.com/user/gocool/internal/database/repositories"
-	"github.com/user/gocool/internal/docker"
-	"github.com/user/gocool/internal/git"
-	"github.com/user/gocool/internal/models"
-	"github.com/user/gocool/internal/sse"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/docker"
+	"github.com/raythurman2386/gocool/internal/git"
+	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/sse"
 )
 
 // Service handles deployment orchestration.
