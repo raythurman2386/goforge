@@ -1,0 +1,57 @@
+services:
+  gocool:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${GOCOOL_PORT:-8080}:${GOCOOL_PORT:-8080}"
+    environment:
+      - GOCOOL_HOST=${GOCOOL_HOST:-0.0.0.0}
+      - GOCOOL_PORT=${GOCOOL_PORT:-8080}
+      - GOCOOL_DEV_MODE=${GOCOOL_DEV_MODE:-false}
+      - GOCOOL_BASE_URL=${GOCOOL_BASE_URL:-http://localhost:8080}
+      - DATABASE_URL=${DATABASE_URL:-postgres://gocool:password@db:5432/gocool?sslmode=disable}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - CSRF_SECRET=${CSRF_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
+      - TRAEFIK_NETWORK=${TRAEFIK_NETWORK:-traefik}
+      - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+      - TEMPLATES_DIR=${TEMPLATES_DIR:-./templates}
+      - MAX_CONCURRENT_BUILDS=${MAX_CONCURRENT_BUILDS:-2}
+      - BUILD_TIMEOUT=${BUILD_TIMEOUT:-15m}
+      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+      - METRICS_RETENTION=${METRICS_RETENTION:-168h}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - gocool_net
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=gocool
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=gocool
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gocool -d gocool"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gocool_net
+
+volumes:
+  postgres_data:
+
+networks:
+  gocool_net:
