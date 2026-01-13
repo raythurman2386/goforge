@@ -91,19 +91,19 @@ name: "postgres"
 			}
 
 			if tt.createDir {
-				if err := os.MkdirAll(targetDir, 0755); err != nil {
+				if err := os.MkdirAll(targetDir, 0750); err != nil {
 					t.Fatalf("Failed to create test dir: %v", err)
 				}
 
 				for filename, content := range tt.setupFiles {
 					path := filepath.Join(targetDir, filename)
-					if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+					if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 						t.Fatalf("Failed to write file %s: %v", filename, err)
 					}
 				}
 				for _, dirname := range tt.setupDirs {
 					path := filepath.Join(targetDir, dirname)
-					if err := os.Mkdir(path, 0755); err != nil {
+					if err := os.Mkdir(path, 0750); err != nil {
 						t.Fatalf("Failed to create dir %s: %v", dirname, err)
 					}
 				}
