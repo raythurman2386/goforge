@@ -104,12 +104,20 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// ticker implementation ...
 	}()
 
-	for event := range ch {
-		data, err := json.Marshal(event.Data)
-		if err != nil {
-			continue
+	for {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, err := json.Marshal(event.Data)
+			if err != nil {
+				continue
+			}
+			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Topic, data)
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
 		}
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Topic, data)
-		flusher.Flush()
 	}
 }
