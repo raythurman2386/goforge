@@ -60,3 +60,13 @@ func (s *Service) GetDeployment(ctx context.Context, id string) (*models.Deploym
 func (s *Service) UpdateStatus(ctx context.Context, id string, status models.DeploymentStatus, errorMsg *string) error {
 	return s.deploymentRepo.UpdateStatus(ctx, id, status, errorMsg)
 }
+
+// GetLogs retrieves logs for a deployment.
+func (s *Service) GetLogs(ctx context.Context, deploymentID string) ([]*models.DeploymentLog, error) {
+	return s.logRepo.ListByDeploymentID(ctx, deploymentID)
+}
+
+// Cancel cancels an in-progress deployment.
+func (s *Service) Cancel(ctx context.Context, deploymentID, reason string) error {
+	return s.Transition(ctx, deploymentID, models.DeploymentStatusCanceled, &reason)
+}
