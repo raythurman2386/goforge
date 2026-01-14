@@ -40,6 +40,7 @@ func TestHub_Broadcast(t *testing.T) {
 		},
 	}
 
+	t.Parallel()
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
@@ -99,7 +100,7 @@ func TestHub_Concurrency(t *testing.T) {
 	// Launch clients
 	for i := 0; i < clientCount; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func(_ int) {
 			defer wg.Done()
 			ch := make(chan Event, broadcastCount) // buffered to avoid blocking
 
@@ -133,7 +134,7 @@ func TestHub_Concurrency(t *testing.T) {
 			}
 
 			// Drain channel
-			for range ch {
+			for range ch { //nolint:revive // explicit drain
 			}
 		}(i)
 	}

@@ -1,176 +1,155 @@
-# golangci-lint configuration
-# https://golangci-lint.run/usage/configuration/
-
+version: "2"
 run:
-  timeout: 5m
   issues-exit-code: 1
   tests: true
-
-issues:
-  exclude-dirs:
-    - vendor
-    - bin
-    - static
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
-
-  exclude-rules:
-    # Test files can have longer functions
-    - path: _test\.go
-      linters:
-        - gocognit
-        - dupl
-
-    # Allow dot imports for test packages
-    - path: _test\.go
-      linters:
-        - revive
-      text: "dot-imports"
-
-    # Relax linting rules for test files
-    - path: _test\.go
-      linters:
-        - errcheck
-        - errorlint
-        - gocritic
-        - gofmt
-        - misspell
-        - noctx
-
-    # Generated templ files
-    - path: _templ\.go
-      linters:
-        - all
-
-    # Main function is allowed to be long
-    - path: cmd/gocool/main\.go
-      linters:
-        - gocognit
-
-  exclude:
-    # errcheck: Allow not checking errors in defer close
-    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
-
 output:
   formats:
-    - format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
 linters:
   enable:
-    # Default linters
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
+    - bodyclose
+    - contextcheck
+    - durationcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - gocognit
+    - goconst
+    - gocritic
+    - goprintffuncname
+    - gosec
+    - misspell
+    - nakedret
+    - nilerr
+    - noctx
+    - nolintlint
+    - prealloc
+    - predeclared
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
-    - unused
-
-    # Additional linters
-    - bodyclose        # Check HTTP response body is closed
-    - contextcheck     # Check context.Context is passed correctly
-    - durationcheck    # Check duration multiplication
-    - errname          # Check error naming conventions
-    - errorlint        # Find issues with error wrapping
-    - exhaustive       # Check exhaustiveness of enum switch
-    - gocognit         # Cognitive complexity
-    - goconst          # Find repeated strings that could be constants
-    - gocritic         # Opinionated linter
-    - gofmt            # Check formatting
-    - goimports        # Check imports
-    - goprintffuncname # Check printf-like functions are named correctly
-    - gosec            # Security issues
-    - misspell         # Spelling mistakes
-    - nakedret         # Naked returns in large functions
-    - nilerr           # Return nil error after checking err != nil
-    - noctx            # HTTP requests without context
-    - nolintlint       # Check nolint directives
-    - prealloc         # Slice preallocation hints
-    - predeclared      # Shadowing predeclared identifiers
-    - revive           # Replacement for golint
-    - rowserrcheck     # Check sql.Rows.Err is checked
-    - sqlclosecheck    # Check sql.Rows/sql.Stmt is closed
-    - stylecheck       # Style mistakes
-    - tparallel        # Detect t.Parallel() misuse
-    - unconvert        # Unnecessary type conversions
-    - unparam          # Unused function parameters
-    - whitespace       # Whitespace issues
-
+    - tparallel
+    - unconvert
+    - unparam
+    - whitespace
   disable:
-    - dupl             # Acceptable duplication in repositories
-    - funlen           # Function length (too restrictive)
-    - gochecknoglobals # No globals (too restrictive for config)
-    - gochecknoinits   # No init functions (sometimes needed)
-    - lll              # Line length (handled by gofmt)
-    - wsl              # Whitespace linter (too opinionated)
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment # Too noisy
-
-  gocognit:
-    min-complexity: 30
-
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - hugeParam # Too restrictive for struct params
-
-  goimports:
-    local-prefixes: github.com/raythurman2386/gocool
-
-  gosec:
-    excludes:
-      - G104 # Unhandled errors (covered by errcheck)
-      - G304 # File path from variable (intentional in file handling)
-
-  misspell:
-    locale: US
-
-  nakedret:
-    max-func-lines: 30
-
-  revive:
+    - dupl
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - lll
+    - wsl
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    gocognit:
+      min-complexity: 30
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    gosec:
+      excludes:
+        - G104
+        - G304
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    misspell:
+      locale: US
+    nakedret:
+      max-func-lines: 30
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+  exclusions:
+    generated: lax
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unreachable-code
-
-  stylecheck:
-    checks:
-      - all
-      - -ST1000 # Package comments (too strict)
+      - linters:
+          - dupl
+          - gocognit
+        path: _test\.go
+      - linters:
+          - revive
+        path: _test\.go
+        text: dot-imports
+      - linters:
+          - errcheck
+          - errorlint
+          - gocritic
+          - misspell
+          - noctx
+        path: _test\.go
+      - linters:
+          - all
+        path: _templ\.go
+      - linters:
+          - gocognit
+        path: cmd/gocool/main\.go
+      - path: (.+)\.go$
+        text: Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*printf?|os\.(Un)?Setenv). is not checked
+    paths:
+      - vendor
+      - bin
+      - static
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/raythurman2386/gocool
+  exclusions:
+    generated: lax
+    paths:
+      - vendor
+      - bin
+      - static
+      - third_party$
+      - builtin$
+      - examples$
+      - _test\.go

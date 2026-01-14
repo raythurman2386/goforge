@@ -93,7 +93,10 @@ func (h *Hub) ClientCount() int {
 
 // Broadcast sends an event to all subscribed clients.
 func (h *Hub) Broadcast(topic string, data interface{}) {
-	h.broadcast <- Event{Topic: topic, Data: data}
+	select {
+	case h.broadcast <- Event{Topic: topic, Data: data}:
+	case <-h.quit:
+	}
 }
 
 // ServeHTTP handles SSE connections.
