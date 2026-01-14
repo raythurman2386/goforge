@@ -75,8 +75,11 @@ func (h *EnvironmentHandler) GetVariables(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html")
-	_, _ = fmt.Fprintf(w, "<div>Environment %s has %d variables</div>", envID, len(vars))
+	csrfToken := auth.GetCSRFToken(r)
+	component := components.VariableEditor(envID, vars, csrfToken)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, "failed to render variable editor", http.StatusInternalServerError)
+	}
 }
 
 // AddVariable handles adding a new environment variable.

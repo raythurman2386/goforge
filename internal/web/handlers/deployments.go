@@ -5,7 +5,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/raythurman2386/gocool/internal/auth"
 	"github.com/raythurman2386/gocool/internal/deploy"
+	"github.com/raythurman2386/gocool/internal/models"
 	"github.com/raythurman2386/gocool/internal/project"
 	"github.com/raythurman2386/gocool/internal/web/templates/pages/deployments"
 )
@@ -15,15 +17,49 @@ type DeploymentHandler struct {
 	deployService   *deploy.Service
 	projectService  *project.Service
 	rollbackManager *deploy.RollbackManager
+	worker          *deploy.Worker
 }
 
 // NewDeploymentHandler creates a new DeploymentHandler.
-func NewDeploymentHandler(ds *deploy.Service, ps *project.Service, rm *deploy.RollbackManager) *DeploymentHandler {
+func NewDeploymentHandler(ds *deploy.Service, ps *project.Service, rm *deploy.RollbackManager, w *deploy.Worker) *DeploymentHandler {
 	return &DeploymentHandler{
 		deployService:   ds,
 		projectService:  ps,
 		rollbackManager: rm,
+		worker:          w,
 	}
+}
+
+// TriggerDeployment triggers a new deployment.
+func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	envID := r.URL.Query().Get("env_id")
+
+	if envID == "" {
+		// Try to find default environment
+		envs, err := h.projectService.ListEnvironments(r.Context(), projectID)
+		if err != nil || len(envs) == 0 {
+			http.Error(w, "environment not found", http.StatusBadRequest)
+			return
+		}
+		envID = envs[0].ID
+	}
+
+	d := &models.Deployment{
+		EnvironmentID: envID,
+		Status:        models.DeploymentStatusPending,
+		TriggerType:   models.TriggerTypeManual,
+	}
+
+	if err := h.deployService.CreateDeployment(r.Context(), d); err != nil {
+		http.Error(w, "failed to create deployment record", http.StatusInternalServerError)
+		return
+	}
+
+	h.worker.Enqueue(d.ID)
+
+	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments")
+	w.WriteHeader(http.StatusOK)
 }
 
 // GetDeployment renders the deployment detail page.
@@ -62,12 +98,14 @@ func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request
 	// Determine if rollback is possible
 	canRollback := h.rollbackManager != nil && h.rollbackManager.CanRollback(deployment)
 
+	csrfToken := auth.GetCSRFToken(r)
 	props := deployments.DetailProps{
 		Deployment:  deployment,
 		Project:     proj,
 		Environment: env,
 		Logs:        logs,
 		CanRollback: canRollback,
+		CSRFToken:   csrfToken,
 	}
 
 	component := deployments.Detail(props)

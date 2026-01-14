@@ -8,8 +8,13 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/raythurman2386/gocool/internal/auth"
 	"github.com/raythurman2386/gocool/internal/config"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/deploy"
+	"github.com/raythurman2386/gocool/internal/project"
 	"github.com/raythurman2386/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/web/handlers"
 )
 
 func setupTestRouterDB(t *testing.T) *sql.DB {
@@ -21,7 +26,37 @@ func setupTestRouterDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestNewRouter(t *testing.T) {
+func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler {
+	t.Helper()
+
+	// Repos
+	userRepo := repositories.NewUserRepository(db)
+	sessionRepo := repositories.NewSessionRepository(db)
+	projectRepo := repositories.NewProjectRepository(db)
+	envRepo := repositories.NewEnvironmentRepository(db)
+	varRepo := repositories.NewEnvVariableRepository(db)
+	instanceRepo := repositories.NewServiceInstanceRepository(db)
+
+	// Services
+	sm := auth.NewSessionManager(sessionRepo, userRepo)
+	ps := project.NewService(projectRepo, envRepo, varRepo)
+	// We can pass nil for deployService dependencies that aren't used in these tests
+	ds := &deploy.Service{}
+	is := services.NewInstanceService(instanceRepo, nil, nil, nil)
+	cat := services.NewCatalog("./templates")
+
+	// Handlers
+	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil)
+	dbh := handlers.NewDashboardHandler()
+	ph := handlers.NewProjectHandler(ps)
+	eh := handlers.NewEnvironmentHandler(ps)
+	dh := handlers.NewDeploymentHandler(ds, ps, nil, nil)
+	sh := handlers.NewServiceHandler(cat, is)
+	sth := handlers.NewSettingsHandler(nil) // No GitSourceRepo needed for general router tests
+
+	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth)
+}
+func TestRouter(t *testing.T) {
 	cfg := &config.Config{
 		DevMode:  true,
 		Port:     8080,
@@ -29,11 +64,10 @@ func TestNewRouter(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
-	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db, catalog)
+	router := setupTestRouter(t, db, cfg)
 	if router == nil {
-		t.Fatal("NewRouter() returned nil")
+		t.Fatal("Router() returned nil")
 	}
 }
 
@@ -45,9 +79,8 @@ func TestRouter_HealthEndpoint(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
-	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db, catalog)
+	router := setupTestRouter(t, db, cfg)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -70,9 +103,8 @@ func TestRouter_HealthReadyEndpoint(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
-	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db, catalog)
+	router := setupTestRouter(t, db, cfg)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -95,9 +127,8 @@ func TestRouter_IndexRedirect(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
-	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db, catalog)
+	router := setupTestRouter(t, db, cfg)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -132,9 +163,8 @@ func TestRouter_LoginPage(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
-	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db, catalog)
+	router := setupTestRouter(t, db, cfg)
 	server := httptest.NewServer(router)
 	defer server.Close()
 
@@ -157,9 +187,8 @@ func TestRouter_NotFound(t *testing.T) {
 	}
 	db := setupTestRouterDB(t)
 	defer db.Close()
-	catalog := services.NewCatalog("./templates")
 
-	router := NewRouter(cfg, db, catalog)
+	router := setupTestRouter(t, db, cfg)
 	server := httptest.NewServer(router)
 	defer server.Close()
 

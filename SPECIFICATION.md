@@ -145,11 +145,11 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **5.4** Implement project creation form and handler `POST /projects`
 - [x] **5.5** Create project detail page with tabbed interface
 - [x] **5.6** Implement environment service in `internal/project/environment.go`
-- [ ] **5.7** Build environment switcher component
+- [x] **5.7** Build environment switcher component
 - [x] **5.8** Create environment creation modal
 - [x] **5.9** Implement env variable editor with add/edit/delete
-- [ ] **5.10** Add secret masking toggle for sensitive variables
-- [ ] **5.11** Create project settings page
+- [x] **5.10** Add secret masking toggle for sensitive variables
+- [x] **5.11** Create project settings page
 - [x] **5.12** Implement project deletion with confirmation modal
 - [ ] **5.13** Add project search/filter functionality
 
@@ -213,9 +213,9 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [ ] **8.7** Add health check verification with configurable endpoint
 - [ ] **8.8** Create rollback mechanism in `internal/deploy/rollback.go`
 - [ ] **8.9** Implement deployment cleanup (old images, containers)
-- [ ] **8.10** Create deployment history page
-- [ ] **8.11** Build deployment detail view with log viewer
-- [ ] **8.12** Add manual deployment trigger button
+- [x] **8.10** Create deployment history page
+- [x] **8.11** Build deployment detail view with log viewer
+- [x] **8.12** Add manual deployment trigger button
 
 ### Phase 9: Traefik Integration
 
@@ -263,7 +263,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 ### Phase 12: One-Click Services
 
 - [x] **12.1** Create `internal/services/catalog.go` for template loading
-- [ ] **12.2** Define service template YAML schema
+- [x] **12.2** Define service template YAML schema
 - [ ] **12.3** Implement template directory watching for hot-reload
 - [x] **12.4** Create PostgreSQL service template
 - [x] **12.5** Create Redis service template

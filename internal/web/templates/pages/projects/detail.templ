@@ -6,37 +6,43 @@ import (
 	"github.com/raythurman2386/gocool/internal/web/templates/components"
 )
 
-templ Detail(project *models.Project, envs []*models.Environment, activeTab string) {
-	@layouts.AppLayout(project.Name) {
+templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, activeTab string, csrfToken string) {
+	@layouts.AppLayout(project.Name, csrfToken) {
 		<div class="flex items-center justify-between mb-6">
 			<div class="flex items-center space-x-4">
 				<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
 					{ project.Name }
 				</h2>
-				@components.EnvironmentSwitcher(project.ID, envs, "")
+				if currentEnv != nil {
+					@components.EnvironmentSwitcher(project.ID, envs, currentEnv.ID)
+				} else {
+					@components.EnvironmentSwitcher(project.ID, envs, "")
+				}
 			</div>
 			<div class="flex space-x-3">
-				<button hx-post={ "/projects/" + project.ID + "/deployments" } class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
-					Deploy Now
-				</button>
+				if currentEnv != nil {
+					<button hx-post={ "/projects/" + project.ID + "/deployments?env_id=" + currentEnv.ID } class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+						Deploy Now
+					</button>
+				}
 			</div>
 		</div>
 
 		<div class="mb-6 border-b border-gray-200">
 			<nav class="-mb-px flex space-x-8" aria-label="Tabs">
-				<a href={ templ.URL("/projects/" + project.ID) } 
+				<a href={ templ.URL("/projects/" + project.ID + "?env=" + currentEnv.ID) } 
 					class={ "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ", 
 						templ.KV("border-indigo-500 text-indigo-600", activeTab == "overview"),
 						templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300", activeTab != "overview") }>
 					Overview
 				</a>
-				<a href={ templ.URL("/projects/" + project.ID + "/deployments") }
+				<a href={ templ.URL("/projects/" + project.ID + "/deployments?env=" + currentEnv.ID) }
 					class={ "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ",
 						templ.KV("border-indigo-500 text-indigo-600", activeTab == "deployments"),
 						templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300", activeTab != "deployments") }>
 					Deployments
 				</a>
-				<a href={ templ.URL("/projects/" + project.ID + "/settings") }
+				<a href={ templ.URL("/projects/" + project.ID + "/settings?env=" + currentEnv.ID) }
 					class={ "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ",
 						templ.KV("border-indigo-500 text-indigo-600", activeTab == "settings"),
 						templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300", activeTab != "settings") }>
@@ -50,7 +56,7 @@ templ Detail(project *models.Project, envs []*models.Environment, activeTab stri
 		} else if activeTab == "deployments" {
 			@Deployments(project)
 		} else if activeTab == "settings" {
-			@Settings(project)
+			@Settings(project, currentEnv)
 		}
 	}
 }
@@ -71,6 +77,14 @@ templ Overview(project *models.Project) {
 					<dt class="text-sm font-medium text-gray-500">Default Branch</dt>
 					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{ project.DefaultBranch }</dd>
 				</div>
+				<div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+					<dt class="text-sm font-medium text-gray-500">Dockerfile</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{ project.DockerfilePath }</dd>
+				</div>
+				<div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+					<dt class="text-sm font-medium text-gray-500">Build Context</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{ project.BuildContext }</dd>
+				</div>
 			</dl>
 		</div>
 	</div>
@@ -82,7 +96,12 @@ templ Deployments(project *models.Project) {
 	</div>
 }
 
-templ Settings(project *models.Project) {
+templ Settings(project *models.Project, currentEnv *models.Environment) {
+	if currentEnv != nil {
+		<div class="mb-8" hx-get={ "/envs/" + currentEnv.ID + "/variables" } hx-trigger="load">
+			<div class="animate-pulse bg-gray-100 h-64 rounded-lg"></div>
+		</div>
+	}
 	<div class="bg-white shadow sm:rounded-lg">
 		<div class="px-4 py-5 sm:p-6">
 			<h3 class="text-lg font-medium leading-6 text-gray-900">Delete Project</h3>

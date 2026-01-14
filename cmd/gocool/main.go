@@ -14,11 +14,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/raythurman2386/gocool/internal/auth"
 	"github.com/raythurman2386/gocool/internal/config"
 	"github.com/raythurman2386/gocool/internal/database"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/deploy"
+	"github.com/raythurman2386/gocool/internal/docker"
+	"github.com/raythurman2386/gocool/internal/git"
 	"github.com/raythurman2386/gocool/internal/logger"
+	"github.com/raythurman2386/gocool/internal/project"
 	"github.com/raythurman2386/gocool/internal/services"
+	"github.com/raythurman2386/gocool/internal/sse"
 	"github.com/raythurman2386/gocool/internal/web"
+	"github.com/raythurman2386/gocool/internal/web/handlers"
 )
 
 var rootCmd = &cobra.Command{
@@ -191,26 +199,91 @@ func runServer() error {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer func() {
-		if err := db.Close(); err != nil {
-			log.Error("failed to close database", "error", err)
+		if closeErr := db.Close(); closeErr != nil {
+			log.Error("failed to close database", "error", closeErr)
 		}
 	}()
 
 	// Run migrations
 	log.Info("running database migrations")
-	if err := database.MigrateUp(db, cfg); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
+	if migErr := database.MigrateUp(db, cfg); migErr != nil {
+		return fmt.Errorf("failed to run migrations: %w", migErr)
 	}
+
+	// Initialize repositories
+	userRepo := repositories.NewUserRepository(db.DB)
+	sessionRepo := repositories.NewSessionRepository(db.DB)
+	projectRepo := repositories.NewProjectRepository(db.DB)
+	environmentRepo := repositories.NewEnvironmentRepository(db.DB)
+	envVariableRepo := repositories.NewEnvVariableRepository(db.DB)
+	containerRepo := repositories.NewContainerRepository(db.DB)
+	deploymentRepo := repositories.NewDeploymentRepository(db.DB)
+	deploymentLogRepo := repositories.NewDeploymentLogRepository(db.DB)
+	instanceRepo := repositories.NewServiceInstanceRepository(db.DB)
+	gitSourceRepo := repositories.NewGitSourceRepository(db.DB)
+
+	// Initialize clients
+	dockerClient, err := docker.NewClient(cfg.DockerHost)
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer dockerClient.Close()
+
+	gitService := git.NewService()
+	sseHub := sse.NewHub()
+	go sseHub.Run()
+
+	// Initialize services
+	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
+	githubProvider := auth.NewGitHubProvider(cfg)
+	authenticator := auth.NewLocalAuthenticator(userRepo)
+	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo)
+	deployService := deploy.NewService(
+		deploymentRepo,
+		deploymentLogRepo,
+		projectRepo,
+		environmentRepo,
+		containerRepo,
+		gitService,
+		dockerClient,
+		sseHub,
+	)
+
+	// Initialize worker
+	deployWorker := deploy.NewWorker(deployService, cfg.MaxConcurrentBuilds)
+	deployWorker.Start()
+	defer deployWorker.Stop()
+
+	rollbackManager := deploy.NewRollbackManager(deployService)
 
 	// Initialize service catalog
 	catalog := services.NewCatalog(cfg.TemplatesDir)
 	if err := catalog.LoadTemplates(); err != nil {
 		log.Error("failed to load service templates", "error", err)
-		// Continue anyway, maybe templates dir is empty
 	}
+	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog)
+
+	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
+	dashboardHandler := handlers.NewDashboardHandler()
+	projectHandler := handlers.NewProjectHandler(projectService)
+	envHandler := handlers.NewEnvironmentHandler(projectService)
+	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)
+	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo)
 
 	// Create router
-	router := web.NewRouter(cfg, db.DB, catalog)
+	router := web.Router(
+		cfg,
+		sessionManager,
+		authHandler,
+		dashboardHandler,
+		projectHandler,
+		envHandler,
+		deploymentHandler,
+		serviceHandler,
+		settingsHandler,
+	)
 
 	// Configure server
 	srv := &http.Server{

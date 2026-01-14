@@ -6,8 +6,8 @@ import (
 	"github.com/raythurman2386/gocool/internal/web/templates/components"
 )
 
-templ List(projects []*models.Project) {
-	@layouts.AppLayout("Projects") {
+templ List(projects []*models.Project, csrfToken string) {
+	@layouts.AppLayout("Projects", csrfToken) {
 		<div class="md:flex md:items-center md:justify-between mb-6">
 			<div class="flex-1 min-w-0">
 				<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">

@@ -2,45 +2,28 @@
 package web
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/raythurman2386/gocool/internal/auth"
 	"github.com/raythurman2386/gocool/internal/config"
-	"github.com/raythurman2386/gocool/internal/database/repositories"
-	"github.com/raythurman2386/gocool/internal/project"
-	"github.com/raythurman2386/gocool/internal/services"
 	"github.com/raythurman2386/gocool/internal/web/handlers"
 )
 
-// NewRouter creates and configures the HTTP router.
-func NewRouter(cfg *config.Config, db *sql.DB, catalog *services.Catalog) http.Handler {
+// Router creates and configures the HTTP router.
+func Router(
+	cfg *config.Config,
+	sessionManager *auth.SessionManager,
+	authHandler *handlers.AuthHandler,
+	dashboardHandler *handlers.DashboardHandler,
+	projectHandler *handlers.ProjectHandler,
+	envHandler *handlers.EnvironmentHandler,
+	deploymentHandler *handlers.DeploymentHandler,
+	serviceHandler *handlers.ServiceHandler,
+	settingsHandler *handlers.SettingsHandler,
+) http.Handler {
 	r := chi.NewRouter()
-
-	// Initialize repositories
-	userRepo := repositories.NewUserRepository(db)
-	sessionRepo := repositories.NewSessionRepository(db)
-	projectRepo := repositories.NewProjectRepository(db)
-	environmentRepo := repositories.NewEnvironmentRepository(db)
-	envVariableRepo := repositories.NewEnvVariableRepository(db)
-	containerRepo := repositories.NewContainerRepository(db)
-	instanceRepo := repositories.NewServiceInstanceRepository(db)
-
-	// Initialize services
-	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
-	githubProvider := auth.NewGitHubProvider(cfg)
-	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo)
-	authenticator := auth.NewLocalAuthenticator(userRepo)
-	// TODO: Pass docker client
-	instanceService := services.NewInstanceService(instanceRepo, containerRepo, nil, catalog)
-
-	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
-	projectHandler := handlers.NewProjectHandler(projectService)
-	envHandler := handlers.NewEnvironmentHandler(projectService)
-	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
 
 	// Middleware stack
 	r.Use(auth.CSRFMiddleware)
@@ -69,9 +52,7 @@ func NewRouter(cfg *config.Config, db *sql.DB, catalog *services.Catalog) http.H
 	// Authenticated routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth)
-		r.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("Welcome to Dashboard!")) //nolint:errcheck // simple dashboard response for now
-		})
+		r.Get("/dashboard", dashboardHandler.Dashboard)
 		r.Route("/projects", func(r chi.Router) {
 			r.Get("/", projectHandler.ListProjects)
 			r.Get("/new", projectHandler.NewProjectPage)
@@ -81,6 +62,9 @@ func NewRouter(cfg *config.Config, db *sql.DB, catalog *services.Catalog) http.H
 				r.Delete("/", projectHandler.DeleteProject)
 				r.Get("/deployments", projectHandler.GetProject)
 				r.Get("/settings", projectHandler.GetProject)
+
+				// Deployments
+				r.Post("/deployments", deploymentHandler.TriggerDeployment)
 
 				// Environments
 				r.Route("/envs", func(r chi.Router) {
@@ -112,6 +96,16 @@ func NewRouter(cfg *config.Config, db *sql.DB, catalog *services.Catalog) http.H
 				r.Get("/", serviceHandler.Show)
 				r.Delete("/", serviceHandler.Delete)
 				r.Post("/restart", serviceHandler.Restart)
+			})
+		})
+
+		// Settings
+		r.Route("/settings", func(r chi.Router) {
+			r.Route("/git", func(r chi.Router) {
+				r.Get("/", settingsHandler.GitSources)
+				r.Post("/", settingsHandler.CreateGitSource)
+				r.Get("/new", settingsHandler.NewGitSourceModal)
+				r.Delete("/{id}", settingsHandler.DeleteGitSource)
 			})
 		})
 	})

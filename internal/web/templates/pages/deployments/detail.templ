@@ -16,10 +16,11 @@ type DetailProps struct {
 	Environment *models.Environment
 	Logs        []*models.DeploymentLog
 	CanRollback bool
+	CSRFToken   string
 }
 
 templ Detail(props DetailProps) {
-	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID))) {
+	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID)), props.CSRFToken) {
 		<!-- Breadcrumb -->
 		<nav class="flex mb-4" aria-label="Breadcrumb">
 			<ol class="flex items-center space-x-2">

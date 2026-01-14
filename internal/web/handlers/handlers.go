@@ -4,7 +4,34 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/a-h/templ"
+
+	"github.com/raythurman2386/gocool/internal/auth"
+	"github.com/raythurman2386/gocool/internal/web/templates/pages/errors"
 )
+
+// RenderError renders an error page.
+func RenderError(w http.ResponseWriter, r *http.Request, status int, message string) {
+	csrfToken := auth.GetCSRFToken(r)
+	var component templ.Component
+	switch status {
+	case http.StatusNotFound:
+		component = errors.NotFound(csrfToken)
+	case http.StatusForbidden:
+		component = errors.Forbidden(csrfToken)
+	case http.StatusInternalServerError:
+		component = errors.InternalError(csrfToken)
+	default:
+		component = errors.ErrorPage(status, http.StatusText(status), message, csrfToken)
+	}
+
+	w.WriteHeader(status)
+	if err := component.Render(r.Context(), w); err != nil {
+		// Fallback if rendering fails
+		http.Error(w, message, status)
+	}
+}
 
 // Health returns a simple health check response.
 func Health(w http.ResponseWriter, r *http.Request) {

@@ -6,7 +6,7 @@ import (
 )
 
 templ New(csrfToken string) {
-	@layouts.AppLayout("New Project") {
+	@layouts.AppLayout("New Project", csrfToken) {
 		<div class="max-w-2xl mx-auto bg-white shadow sm:rounded-lg">
 			<div class="px-4 py-5 sm:p-6">
 				<h3 class="text-lg font-medium leading-6 text-gray-900">Create a New Project</h3>
@@ -18,6 +18,18 @@ templ New(csrfToken string) {
 					
 					@components.Input("Project Name", "name", "text", "", true)
 					@components.Input("Repository URL", "repository_url", "text", "", true)
+					
+					<div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+						<div class="sm:col-span-2">
+							@components.Input("Default Branch", "default_branch", "text", "main", true)
+						</div>
+						<div class="sm:col-span-2">
+							@components.Input("Dockerfile Path", "dockerfile_path", "text", "Dockerfile", true)
+						</div>
+						<div class="sm:col-span-2">
+							@components.Input("Build Context", "build_context", "text", ".", true)
+						</div>
+					</div>
 					
 					<div class="pt-4 border-t border-gray-200 flex justify-end space-x-3">
 						<a href="/projects" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">

@@ -6,8 +6,8 @@ import (
 	"github.com/raythurman2386/gocool/internal/web/templates/layouts"
 )
 
-templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceInstance) {
-	@layouts.AppLayout("Services") {
+templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceInstance, csrfToken string) {
+	@layouts.AppLayout("Services", csrfToken) {
 		<div class="mb-8">
 			<h2 class="text-2xl font-bold text-gray-900">Your Services</h2>
 			if len(instances) == 0 {

@@ -39,7 +39,8 @@ func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	component := projects.List(list)
+	csrfToken := auth.GetCSRFToken(r)
+	component := projects.List(list, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render projects page", http.StatusInternalServerError)
 	}
@@ -65,11 +66,27 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 	name := r.FormValue("name")
 	repoURL := r.FormValue("repository_url")
+	defaultBranch := r.FormValue("default_branch")
+	dockerfilePath := r.FormValue("dockerfile_path")
+	buildContext := r.FormValue("build_context")
+
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	if dockerfilePath == "" {
+		dockerfilePath = "Dockerfile"
+	}
+	if buildContext == "" {
+		buildContext = "."
+	}
 
 	p := &models.Project{
-		UserID:        user.ID,
-		Name:          name,
-		RepositoryURL: repoURL,
+		UserID:         user.ID,
+		Name:           name,
+		RepositoryURL:  repoURL,
+		DefaultBranch:  defaultBranch,
+		DockerfilePath: dockerfilePath,
+		BuildContext:   buildContext,
 	}
 
 	created, err := h.projectService.CreateProject(r.Context(), p)
@@ -96,6 +113,24 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Determine current environment
+	envID := r.URL.Query().Get("env")
+	var currentEnv *models.Environment
+	if len(envs) > 0 {
+		if envID != "" {
+			for _, e := range envs {
+				if e.ID == envID {
+					currentEnv = e
+					break
+				}
+			}
+		}
+		// If explicit env not found or not provided, default to first (usually production)
+		if currentEnv == nil {
+			currentEnv = envs[0]
+		}
+	}
+
 	tab := "overview"
 	if strings.HasSuffix(r.URL.Path, "/deployments") {
 		tab = "deployments"
@@ -103,7 +138,8 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		tab = "settings"
 	}
 
-	component := projects.Detail(p, envs, tab)
+	csrfToken := auth.GetCSRFToken(r)
+	component := projects.Detail(p, envs, currentEnv, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render project detail page", http.StatusInternalServerError)
 	}

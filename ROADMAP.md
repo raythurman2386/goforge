@@ -19,9 +19,9 @@ This roadmap tracks the development of GoCool towards its MVP release. It is der
 
 ### Phase 5: Project Management
 - [x] Basic CRUD, environments, deletion.
-- [ ] **Environment Switcher** (5.7) - *Medium Priority*
+- [x] **Environment Switcher** (5.7) - Implemented via query params and dropdown
 - [x] **Secret Masking** (5.10) - AES-GCM encryption, auto-detection, log sanitization
-- [ ] **Project Settings Page** (5.11) - *Medium Priority*
+- [x] **Project Settings Page** (5.11) - Implemented with delete and variable management
 - [ ] **Search/Filter** (5.13) - *Low Priority*
 
 ### Phase 6: Git Integration
@@ -46,7 +46,7 @@ This roadmap tracks the development of GoCool towards its MVP release. It is der
 - [x] **Health Check Verification** (8.7) - HTTP/TCP health checks with retry logic
 - [x] **Rollback Mechanism** (8.8) - RollbackManager with validation and container restoration
 - [x] **Deployment History & Detail UI** (8.10, 8.11) - List and detail pages with status badges
-- [ ] **Manual Trigger** (8.12) - *Medium Priority*
+- [x] **Manual Trigger** (8.12) - Implemented via UI button and background worker
 
 ### Phase 9: Traefik Integration
 - [x] Basic Traefik setup.
@@ -73,7 +73,8 @@ This roadmap tracks the development of GoCool towards its MVP release. It is der
 
 ### Phase 12: One-Click Services
 - [x] Catalog, instance management, PostgreSQL/Redis templates.
-- [ ] **Template Schema & Directory Watching** (12.2, 12.3) - *Medium Priority*
+- [x] **Template Schema** (12.2) - Implemented via struct tags and validation
+- [ ] **Directory Watching** (12.3) - *Medium Priority*
 - [ ] **Additional Templates** (MySQL, Mongo, etc.) (12.6 - 12.9) - *Low Priority*
 - [ ] **Connection String Exposure** (12.13) - *High Priority*
 - [ ] **Backup/Restore** (12.14) - *Medium Priority*

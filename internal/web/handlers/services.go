@@ -44,7 +44,8 @@ func (h *ServiceHandler) Catalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	component := pages_services.Index(templates, instances)
+	csrfToken := auth.GetCSRFToken(r)
+	component := pages_services.Index(templates, instances, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render catalog", http.StatusInternalServerError)
 	}
@@ -111,7 +112,8 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 		tmpl = &services.ServiceTemplate{DisplayName: instance.TemplateName}
 	}
 
-	component := pages_services.Detail(instance, tmpl)
+	csrfToken := auth.GetCSRFToken(r)
+	component := pages_services.Detail(instance, tmpl, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render detail page", http.StatusInternalServerError)
 	}

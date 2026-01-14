@@ -5,7 +5,7 @@ import (
 )
 
 templ Login(csrfToken string) {
-	@layouts.AuthLayout("Login") {
+	@layouts.AuthLayout("Login", csrfToken) {
 		<div>
 			<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
 				Sign in to GoCool
