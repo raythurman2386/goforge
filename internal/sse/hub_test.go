@@ -46,12 +46,18 @@ func TestHub_Broadcast(t *testing.T) {
 			t.Parallel()
 			h := NewHub()
 			go h.Run()
+			defer h.Stop()
 
 			// Create a client channel
 			ch := make(chan Event, 1)
 
 			// Register
 			h.register <- clientInfo{ch: ch, topic: tt.clientTopic}
+
+			// Wait for registration
+			if !waitForClients(h, 1) {
+				t.Fatal("timed out waiting for client registration")
+			}
 
 			// Broadcast
 			h.Broadcast(tt.msgTopic, tt.msgData)
@@ -84,6 +90,7 @@ func TestHub_Broadcast(t *testing.T) {
 func TestHub_Concurrency(t *testing.T) {
 	h := NewHub()
 	go h.Run()
+	defer h.Stop()
 
 	var wg sync.WaitGroup
 	clientCount := 50
@@ -106,7 +113,7 @@ func TestHub_Concurrency(t *testing.T) {
 
 			// Receive some messages or wait
 			timer := time.After(100 * time.Millisecond)
-			loop:
+		loop:
 			for {
 				select {
 				case _, ok := <-ch:
@@ -126,7 +133,8 @@ func TestHub_Concurrency(t *testing.T) {
 			}
 
 			// Drain channel
-			for range ch {}
+			for range ch {
+			}
 		}(i)
 	}
 
@@ -148,6 +156,7 @@ func TestHub_Concurrency(t *testing.T) {
 func TestHub_ServeHTTP(t *testing.T) {
 	h := NewHub()
 	go h.Run()
+	defer h.Stop()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // Ensure cleanup if test fails
@@ -161,13 +170,21 @@ func TestHub_ServeHTTP(t *testing.T) {
 		done <- true
 	}()
 
-	// Allow time for registration
-	time.Sleep(50 * time.Millisecond)
+	// Wait for registration
+	if !waitForClients(h, 1) {
+		t.Fatal("timed out waiting for http client registration")
+	}
 
 	msg := "hello http"
 	h.Broadcast("test", msg)
 
-	// Allow time for processing
+	// We need to wait a bit for the message to be processed and written to the response recorder.
+	// Since we don't have a way to peek into the recorder stream in real-time easily without blocking,
+	// we'll rely on a small sleep here or we could continuously check the body?
+	// Checking the body continuously is race-prone on the buffer.
+	// Given we removed the sleep for registration, a small sleep for data propagation
+	// in an integration test is acceptable, OR we can improve this by using a pipe?
+	// For now, let's keep the sleep for propagation but we fixed the registration race.
 	time.Sleep(50 * time.Millisecond)
 
 	// Cancel context to stop ServeHTTP
@@ -186,4 +203,16 @@ func TestHub_ServeHTTP(t *testing.T) {
 	if !strings.Contains(resp, `data: "hello http"`) {
 		t.Errorf("expected response to contain data, got %q", resp)
 	}
+}
+
+// waitForClients polls until the expected number of clients are connected.
+func waitForClients(h *Hub, expected int) bool {
+	deadline := time.Now().Add(1 * time.Second)
+	for time.Now().Before(deadline) {
+		if h.ClientCount() == expected {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
 }

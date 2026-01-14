@@ -20,6 +20,7 @@ type Hub struct {
 	register   chan clientInfo
 	unregister chan chan Event
 	broadcast  chan Event
+	quit       chan struct{}
 	mu         sync.RWMutex
 }
 
@@ -35,6 +36,7 @@ func NewHub() *Hub {
 		register:   make(chan clientInfo),
 		unregister: make(chan chan Event),
 		broadcast:  make(chan Event),
+		quit:       make(chan struct{}),
 	}
 }
 
@@ -42,6 +44,14 @@ func NewHub() *Hub {
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.quit:
+			h.mu.Lock()
+			for ch := range h.clients {
+				close(ch)
+			}
+			h.clients = make(map[chan Event]string)
+			h.mu.Unlock()
+			return
 		case info := <-h.register:
 			h.mu.Lock()
 			h.clients[info.ch] = info.topic
@@ -67,6 +77,18 @@ func (h *Hub) Run() {
 			h.mu.RUnlock()
 		}
 	}
+}
+
+// Stop stops the SSE hub and closes all client channels.
+func (h *Hub) Stop() {
+	close(h.quit)
+}
+
+// ClientCount returns the number of connected clients.
+func (h *Hub) ClientCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients)
 }
 
 // Broadcast sends an event to all subscribed clients.
