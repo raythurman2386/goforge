@@ -228,3 +228,5 @@ Generated `*_templ.go` files are excluded from linting.
 Use Conventional Commits: `type(scope): description`
 - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 - Example: `feat(deploy): add blue-green deployment strategy`
+
+* Go version must NEVER be dropped below the official latest release (currently 1.25).

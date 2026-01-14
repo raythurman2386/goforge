@@ -125,14 +125,11 @@ func Load() (*Config, error) {
 // applyDefaults sets default values, especially for dev mode.
 func (c *Config) applyDefaults() {
 	// Determine database type and set defaults
-	switch {
-	case c.DatabaseURL == "":
+	if c.DatabaseURL == "" {
 		// Default to Postgres in dev
 		c.DatabaseURL = "postgres://gocool:password@localhost:5432/gocool?sslmode=disable"
-		c.DatabaseType = DatabaseTypePostgres
-	default:
-		c.DatabaseType = DatabaseTypePostgres
 	}
+	c.DatabaseType = DatabaseTypePostgres
 
 	// In dev mode, generate random secrets if not provided
 	if c.DevMode {

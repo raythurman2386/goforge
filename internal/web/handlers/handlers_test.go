@@ -130,9 +130,12 @@ func TestHealth_HTTPMethods(t *testing.T) {
 
 			Health(w, req)
 
+			res := w.Result()
+			defer res.Body.Close()
+
 			// Health handler should respond to any method (no method checking)
-			if w.Result().StatusCode != http.StatusOK {
-				t.Errorf("Health() with %s = %d, want %d", method, w.Result().StatusCode, http.StatusOK)
+			if res.StatusCode != http.StatusOK {
+				t.Errorf("Health() with %s = %d, want %d", method, res.StatusCode, http.StatusOK)
 			}
 		})
 	}

@@ -88,3 +88,5 @@ See `.env.example` for the complete list of variables (database URL, encryption 
 *   `SPECIFICATION.md`: Detailed technical design and requirements.
 *   `AGENTS.md`: Specific instructions for AI agents modifying this codebase.
 *   `CONTRIBUTING.md`: General contribution guidelines.
+
+* Go version must NEVER be dropped below the official latest release (currently 1.25).
