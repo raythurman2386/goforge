@@ -1,0 +1,137 @@
+package handlers
+
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/raythurman2386/gocool/internal/deploy"
+	"github.com/raythurman2386/gocool/internal/project"
+	"github.com/raythurman2386/gocool/internal/web/templates/pages/deployments"
+)
+
+// DeploymentHandler handles deployment related requests.
+type DeploymentHandler struct {
+	deployService   *deploy.Service
+	projectService  *project.Service
+	rollbackManager *deploy.RollbackManager
+}
+
+// NewDeploymentHandler creates a new DeploymentHandler.
+func NewDeploymentHandler(ds *deploy.Service, ps *project.Service, rm *deploy.RollbackManager) *DeploymentHandler {
+	return &DeploymentHandler{
+		deployService:   ds,
+		projectService:  ps,
+		rollbackManager: rm,
+	}
+}
+
+// GetDeployment renders the deployment detail page.
+func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+	deploymentID := chi.URLParam(r, "deploymentID")
+
+	// Get the project
+	proj, err := h.projectService.GetProject(r.Context(), projectID)
+	if err != nil {
+		http.Error(w, "project not found", http.StatusNotFound)
+		return
+	}
+
+	// Get the deployment
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return
+	}
+
+	// Get the environment
+	env, err := h.projectService.GetEnvironment(r.Context(), deployment.EnvironmentID)
+	if err != nil {
+		http.Error(w, "environment not found", http.StatusNotFound)
+		return
+	}
+
+	// Get deployment logs
+	logs, err := h.deployService.GetLogs(r.Context(), deploymentID)
+	if err != nil {
+		// Log error but continue - logs might just not exist yet
+		logs = nil
+	}
+
+	// Determine if rollback is possible
+	canRollback := h.rollbackManager != nil && h.rollbackManager.CanRollback(deployment)
+
+	props := deployments.DetailProps{
+		Deployment:  deployment,
+		Project:     proj,
+		Environment: env,
+		Logs:        logs,
+		CanRollback: canRollback,
+	}
+
+	component := deployments.Detail(props)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, "failed to render deployment detail page", http.StatusInternalServerError)
+	}
+}
+
+// RollbackDeployment handles rollback requests.
+func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+	deploymentID := chi.URLParam(r, "deploymentID")
+
+	if h.rollbackManager == nil {
+		http.Error(w, "rollback not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Get the deployment to find the environment
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return
+	}
+
+	// Perform the rollback
+	info, err := h.rollbackManager.Rollback(r.Context(), deployment.EnvironmentID, "manual rollback")
+	if err != nil {
+		http.Error(w, "rollback failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Redirect back to deployment detail page with rollback info
+	_ = info // TODO: Show rollback info in UI via toast
+	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID)
+	w.WriteHeader(http.StatusOK)
+}
+
+// CancelDeployment handles deployment cancellation requests.
+func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+	deploymentID := chi.URLParam(r, "deploymentID")
+
+	// Get the deployment
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if deployment can be canceled
+	if deployment.IsTerminal() {
+		http.Error(w, "deployment is already in a terminal state", http.StatusBadRequest)
+		return
+	}
+
+	// Cancel the deployment
+	errorMsg := "canceled by user"
+	if err := h.deployService.Cancel(r.Context(), deploymentID, errorMsg); err != nil {
+		http.Error(w, "failed to cancel deployment: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Redirect back to deployment detail page
+	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID)
+	w.WriteHeader(http.StatusOK)
+}

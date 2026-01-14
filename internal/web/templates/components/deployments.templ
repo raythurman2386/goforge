@@ -1,0 +1,250 @@
+package components
+
+import (
+	"fmt"
+	"time"
+	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/gocool/internal/pagination"
+)
+
+// DeploymentListProps contains properties for the deployment list component.
+type DeploymentListProps struct {
+	Deployments []*models.Deployment
+	Pagination  *pagination.Pagination
+	ProjectID   string
+	EnvID       string
+}
+
+templ DeploymentList(props DeploymentListProps) {
+	<div class="bg-white shadow overflow-hidden sm:rounded-lg">
+		<div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+			<div>
+				<h3 class="text-lg leading-6 font-medium text-gray-900">Deployment History</h3>
+				<p class="mt-1 max-w-2xl text-sm text-gray-500">Recent deployments for this environment.</p>
+			</div>
+			<div>
+				if props.EnvID != "" {
+					<button 
+						hx-post={ fmt.Sprintf("/projects/%s/environments/%s/deploy", props.ProjectID, props.EnvID) }
+						class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+						<svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+						</svg>
+						Deploy Now
+					</button>
+				}
+			</div>
+		</div>
+		
+		if len(props.Deployments) == 0 {
+			@EmptyState("No deployments yet", "Trigger your first deployment to see it here.", "Deploy Now", fmt.Sprintf("/projects/%s/environments/%s/deploy", props.ProjectID, props.EnvID))
+		} else {
+			<ul class="divide-y divide-gray-200">
+				for _, d := range props.Deployments {
+					@DeploymentRow(d, props.ProjectID)
+				}
+			</ul>
+			
+			if props.Pagination != nil && props.Pagination.ShowPagination() {
+				<div class="px-4 py-3 bg-gray-50 border-t border-gray-200">
+					@Pagination(props.Pagination)
+				</div>
+			}
+		}
+	</div>
+}
+
+templ DeploymentRow(d *models.Deployment, projectID string) {
+	<li class="hover:bg-gray-50">
+		<a href={ templ.URL(fmt.Sprintf("/projects/%s/deployments/%s", projectID, d.ID)) } class="block">
+			<div class="px-4 py-4 sm:px-6">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center">
+						@DeploymentStatusBadge(d.Status)
+						<p class="ml-3 text-sm font-medium text-gray-900 truncate">
+							if d.CommitSHA.Valid {
+								{ truncateCommit(d.CommitSHA.String) }
+							} else {
+								Manual Deploy
+							}
+						</p>
+					</div>
+					<div class="flex items-center space-x-4">
+						@TriggerTypeBadge(d.TriggerType)
+						<div class="text-sm text-gray-500">
+							{ formatDuration(d.Duration()) }
+						</div>
+					</div>
+				</div>
+				<div class="mt-2 sm:flex sm:justify-between">
+					<div class="sm:flex">
+						if d.Branch.Valid {
+							<p class="flex items-center text-sm text-gray-500">
+								<svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+								</svg>
+								{ d.Branch.String }
+							</p>
+						}
+						if d.CommitMessage.Valid {
+							<p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6 truncate max-w-md">
+								{ truncateMessage(d.CommitMessage.String, 60) }
+							</p>
+						}
+					</div>
+					<div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+						<svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+						{ formatTime(d.CreatedAt) }
+					</div>
+				</div>
+			</div>
+		</a>
+	</li>
+}
+
+templ DeploymentStatusBadge(status models.DeploymentStatus) {
+	switch status {
+		case models.DeploymentStatusRunning:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+				<svg class="-ml-0.5 mr-1.5 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
+					<circle cx="4" cy="4" r="3"></circle>
+				</svg>
+				Running
+			</span>
+		case models.DeploymentStatusPending:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+				<svg class="-ml-0.5 mr-1.5 h-2 w-2 text-gray-400" fill="currentColor" viewBox="0 0 8 8">
+					<circle cx="4" cy="4" r="3"></circle>
+				</svg>
+				Pending
+			</span>
+		case models.DeploymentStatusCloning:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+				<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-blue-500" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
+				Cloning
+			</span>
+		case models.DeploymentStatusBuilding:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+				<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-yellow-500" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
+				Building
+			</span>
+		case models.DeploymentStatusDeploying:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+				<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-indigo-500" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
+				Deploying
+			</span>
+		case models.DeploymentStatusFailed:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+				<svg class="-ml-0.5 mr-1.5 h-2 w-2 text-red-400" fill="currentColor" viewBox="0 0 8 8">
+					<circle cx="4" cy="4" r="3"></circle>
+				</svg>
+				Failed
+			</span>
+		case models.DeploymentStatusRolledBack:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+				<svg class="-ml-0.5 mr-1.5 h-4 w-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+				</svg>
+				Rolled Back
+			</span>
+		case models.DeploymentStatusCanceled:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+				<svg class="-ml-0.5 mr-1.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+				</svg>
+				Canceled
+			</span>
+		default:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+				{ string(status) }
+			</span>
+	}
+}
+
+templ TriggerTypeBadge(trigger models.TriggerType) {
+	switch trigger {
+		case models.TriggerTypeManual:
+			<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+				Manual
+			</span>
+		case models.TriggerTypeWebhook:
+			<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-600">
+				Webhook
+			</span>
+		case models.TriggerTypeRollback:
+			<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-600">
+				Rollback
+			</span>
+	}
+}
+
+// Helper functions for formatting
+
+func truncateCommit(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+func truncateMessage(msg string, maxLen int) string {
+	if len(msg) <= maxLen {
+		return msg
+	}
+	return msg[:maxLen-3] + "..."
+}
+
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "-"
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+func formatTime(t time.Time) string {
+	now := time.Now()
+	diff := now.Sub(t)
+	
+	if diff < time.Minute {
+		return "just now"
+	}
+	if diff < time.Hour {
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", mins)
+	}
+	if diff < 24*time.Hour {
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	}
+	if diff < 7*24*time.Hour {
+		days := int(diff.Hours() / 24)
+		if days == 1 {
+			return "yesterday"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	}
+	return t.Format("Jan 2, 2006")
+}
