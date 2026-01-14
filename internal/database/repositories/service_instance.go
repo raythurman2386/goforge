@@ -39,7 +39,7 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 	query := `
 		INSERT INTO service_instances (id, user_id, template_name, name, version, 
 			config, domain, status, connection_info, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		s.ID,
@@ -62,7 +62,7 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
 			domain, status, connection_info, created_at, updated_at
-		FROM service_instances WHERE id = ?`
+		FROM service_instances WHERE id = $1`
 
 	s := &models.ServiceInstance{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -89,7 +89,7 @@ func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID str
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
 			domain, status, connection_info, created_at, updated_at
-		FROM service_instances WHERE user_id = ?
+		FROM service_instances WHERE user_id = $1
 		ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -131,9 +131,9 @@ func (r *ServiceInstanceRepository) Update(ctx context.Context, s *models.Servic
 
 	query := `
 		UPDATE service_instances SET 
-			name = ?, version = ?, config = ?, domain = ?, 
-			status = ?, connection_info = ?, updated_at = ?
-		WHERE id = ?`
+			name = $1, version = $2, config = $3, domain = $4, 
+			status = $5, connection_info = $6, updated_at = $7
+		WHERE id = $8`
 
 	result, err := r.db.ExecContext(ctx, query,
 		s.Name,
@@ -161,7 +161,7 @@ func (r *ServiceInstanceRepository) Update(ctx context.Context, s *models.Servic
 
 // Delete deletes a service instance.
 func (r *ServiceInstanceRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM service_instances WHERE id = ?`
+	query := `DELETE FROM service_instances WHERE id = $1`
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return err

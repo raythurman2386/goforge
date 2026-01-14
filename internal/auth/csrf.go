@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 )
 
@@ -11,6 +12,9 @@ const (
 	CSRFHeaderName = "X-CSRF-Token"
 	// CSRFFieldName is the name of the CSRF form field.
 	CSRFFieldName = "csrf_token"
+
+	// csrfContextKey is the key for the CSRF token in the request context.
+	csrfContextKey contextKey = "csrf_token"
 )
 
 // CSRFMiddleware handles CSRF protection.
@@ -53,12 +57,19 @@ func CSRFMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		next.ServeHTTP(w, r)
+		// Add token to context
+		ctx := context.WithValue(r.Context(), csrfContextKey, token)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // GetCSRFToken retrieves the CSRF token from the request context or cookie.
 func GetCSRFToken(r *http.Request) string {
+	// Check context first
+	if val, ok := r.Context().Value(csrfContextKey).(string); ok {
+		return val
+	}
+
 	cookie, err := r.Cookie(CSRFCookieName)
 	if err != nil {
 		return ""

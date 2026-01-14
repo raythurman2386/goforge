@@ -39,7 +39,7 @@ func (r *ContainerRepository) Create(ctx context.Context, c *models.Container) e
 	query := `
 		INSERT INTO containers (id, deployment_id, service_instance_id, docker_id, 
 			name, image, status, ports, labels, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		c.ID,
@@ -62,7 +62,7 @@ func (r *ContainerRepository) GetByID(ctx context.Context, id string) (*models.C
 	query := `
 		SELECT id, deployment_id, service_instance_id, docker_id, name, image, 
 			status, ports, labels, created_at, updated_at
-		FROM containers WHERE id = ?`
+		FROM containers WHERE id = $1`
 
 	c := &models.Container{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -89,7 +89,7 @@ func (r *ContainerRepository) GetByDockerID(ctx context.Context, dockerID string
 	query := `
 		SELECT id, deployment_id, service_instance_id, docker_id, name, image, 
 			status, ports, labels, created_at, updated_at
-		FROM containers WHERE docker_id = ?`
+		FROM containers WHERE docker_id = $1`
 
 	c := &models.Container{}
 	err := r.db.QueryRowContext(ctx, query, dockerID).Scan(
@@ -116,7 +116,7 @@ func (r *ContainerRepository) ListByDeploymentID(ctx context.Context, deployment
 	query := `
 		SELECT id, deployment_id, service_instance_id, docker_id, name, image, 
 			status, ports, labels, created_at, updated_at
-		FROM containers WHERE deployment_id = ?
+		FROM containers WHERE deployment_id = $1
 		ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, deploymentID)
@@ -154,7 +154,7 @@ func (r *ContainerRepository) ListByDeploymentID(ctx context.Context, deployment
 
 // UpdateStatus updates the status of a container.
 func (r *ContainerRepository) UpdateStatus(ctx context.Context, id string, status models.ContainerStatus) error {
-	query := `UPDATE containers SET status = ?, updated_at = ? WHERE id = ?`
+	query := `UPDATE containers SET status = $1, updated_at = $2 WHERE id = $3`
 	result, err := r.db.ExecContext(ctx, query, status, time.Now(), id)
 	if err != nil {
 		return err
@@ -171,7 +171,7 @@ func (r *ContainerRepository) UpdateStatus(ctx context.Context, id string, statu
 
 // Delete deletes a container.
 func (r *ContainerRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM containers WHERE id = ?`
+	query := `DELETE FROM containers WHERE id = $1`
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return err

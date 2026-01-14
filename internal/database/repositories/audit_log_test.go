@@ -2,45 +2,13 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
 	"testing"
-
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/raythurman2386/gocool/internal/models"
 )
 
-func setupAuditLogTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-
-	db, err := sql.Open("sqlite3", ":memory:?_time_format=sqlite")
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
-
-	// Create audit_logs table
-	_, err = db.Exec(`
-		CREATE TABLE audit_logs (
-			id TEXT PRIMARY KEY,
-			user_id TEXT,
-			action TEXT NOT NULL,
-			resource_type TEXT NOT NULL,
-			resource_id TEXT,
-			details TEXT DEFAULT '{}',
-			ip_address TEXT,
-			user_agent TEXT,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create audit_logs table: %v", err)
-	}
-
-	return db
-}
-
 func TestAuditLogRepository_Create(t *testing.T) {
-	db := setupAuditLogTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewAuditLogRepository(db)
@@ -62,7 +30,7 @@ func TestAuditLogRepository_Create(t *testing.T) {
 }
 
 func TestAuditLogRepository_List(t *testing.T) {
-	db := setupAuditLogTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewAuditLogRepository(db)

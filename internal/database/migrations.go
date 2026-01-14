@@ -10,7 +10,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 
@@ -19,9 +18,6 @@ import (
 
 //go:embed migrations/postgres/*.sql
 var postgresFS embed.FS
-
-//go:embed migrations/sqlite/*.sql
-var sqliteFS embed.FS
 
 // Migrator handles database migrations.
 type Migrator struct {
@@ -65,23 +61,6 @@ func (m *Migrator) init() error {
 		}
 
 		m.migrate, err = migrate.NewWithInstance("iofs", src, "postgres", driver)
-		if err != nil {
-			return fmt.Errorf("failed to create migrator: %w", err)
-		}
-
-	case config.DatabaseTypeSQLite:
-		driver, err = sqlite3.WithInstance(m.db, &sqlite3.Config{})
-		if err != nil {
-			return fmt.Errorf("failed to create sqlite driver: %w", err)
-		}
-		sourceURL = "migrations/sqlite"
-
-		src, err = iofs.New(sqliteFS, sourceURL)
-		if err != nil {
-			return fmt.Errorf("failed to create migration source: %w", err)
-		}
-
-		m.migrate, err = migrate.NewWithInstance("iofs", src, "sqlite3", driver)
 		if err != nil {
 			return fmt.Errorf("failed to create migrator: %w", err)
 		}
@@ -145,7 +124,6 @@ func MigrateUp(db *DB, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	defer migrator.Close()
 
 	return migrator.Up()
 }

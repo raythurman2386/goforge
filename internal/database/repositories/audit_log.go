@@ -36,7 +36,7 @@ func (r *AuditLogRepository) Create(ctx context.Context, l *models.AuditLog) err
 	query := `
 		INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, 
 			details, ip_address, user_agent, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		l.ID,
@@ -59,7 +59,7 @@ func (r *AuditLogRepository) List(ctx context.Context, limit, offset int) ([]*mo
 			details, ip_address, user_agent, created_at
 		FROM audit_logs
 		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?`
+		LIMIT $1 OFFSET $2`
 
 	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
@@ -98,9 +98,9 @@ func (r *AuditLogRepository) ListByResource(ctx context.Context, resourceType, r
 		SELECT id, user_id, action, resource_type, resource_id, 
 			details, ip_address, user_agent, created_at
 		FROM audit_logs
-		WHERE resource_type = ? AND resource_id = ?
+		WHERE resource_type = $1 AND resource_id = $2
 		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?`
+		LIMIT $3 OFFSET $4`
 
 	rows, err := r.db.QueryContext(ctx, query, resourceType, resourceID, limit, offset)
 	if err != nil {

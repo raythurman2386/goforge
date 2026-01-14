@@ -2,67 +2,43 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
 	"testing"
-
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/raythurman2386/gocool/internal/models"
 )
 
-func setupEnvVariableTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-
-	db, err := sql.Open("sqlite3", ":memory:?_time_format=sqlite")
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
-
-	// Create environments table (needed for FK)
-	_, err = db.Exec(`
-		CREATE TABLE environments (
-			id TEXT PRIMARY KEY,
-			project_id TEXT NOT NULL,
-			name TEXT NOT NULL,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create environments table: %v", err)
-	}
-
-	// Create env_variables table
-	_, err = db.Exec(`
-		CREATE TABLE env_variables (
-			id TEXT PRIMARY KEY,
-			environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
-			key TEXT NOT NULL,
-			value TEXT NOT NULL,
-			is_secret BOOLEAN DEFAULT 0,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(environment_id, key)
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create env_variables table: %v", err)
-	}
-
-	return db
-}
-
 func TestEnvVariableRepository_Create(t *testing.T) {
-	db := setupEnvVariableTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewEnvVariableRepository(db)
 	ctx := context.Background()
 
-	// Need an environment first
+	// Create user first
+	userRepo := NewUserRepository(db)
+	user := &models.User{Email: "env-test-user@example.com"}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	// Create project
+	projRepo := NewProjectRepository(db)
+	proj := &models.Project{
+		UserID:        user.ID,
+		Name:          "test-project",
+		RepositoryURL: "https://github.com/test/repo",
+		BuildArgs:     []byte("{}"),
+	}
+	if err := projRepo.Create(ctx, proj); err != nil {
+		t.Fatalf("failed to create project: %v", err)
+	}
+
+	// Create environment
 	envRepo := NewEnvironmentRepository(db)
-	env := &models.Environment{ProjectID: "project-1", Name: "prod"}
-	_ = envRepo.Create(ctx, env)
+	env := &models.Environment{ProjectID: proj.ID, Name: "prod"}
+	if err := envRepo.Create(ctx, env); err != nil {
+		t.Fatalf("failed to create environment: %v", err)
+	}
 
 	v := &models.EnvVariable{
 		EnvironmentID: env.ID,
@@ -82,16 +58,37 @@ func TestEnvVariableRepository_Create(t *testing.T) {
 }
 
 func TestEnvVariableRepository_ListByEnvironmentID(t *testing.T) {
-	db := setupEnvVariableTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewEnvVariableRepository(db)
 	ctx := context.Background()
 
-	// Need an environment first
+	// Create user first
+	userRepo := NewUserRepository(db)
+	user := &models.User{Email: "env-list-test@example.com"}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	// Create project
+	projRepo := NewProjectRepository(db)
+	proj := &models.Project{
+		UserID:        user.ID,
+		Name:          "test-project",
+		RepositoryURL: "https://github.com/test/repo",
+		BuildArgs:     []byte("{}"),
+	}
+	if err := projRepo.Create(ctx, proj); err != nil {
+		t.Fatalf("failed to create project: %v", err)
+	}
+
+	// Create environment
 	envRepo := NewEnvironmentRepository(db)
-	env := &models.Environment{ProjectID: "project-1", Name: "prod"}
-	_ = envRepo.Create(ctx, env)
+	env := &models.Environment{ProjectID: proj.ID, Name: "prod"}
+	if err := envRepo.Create(ctx, env); err != nil {
+		t.Fatalf("failed to create environment: %v", err)
+	}
 
 	vars := []*models.EnvVariable{
 		{EnvironmentID: env.ID, Key: "K1", Value: "V1"},
@@ -113,16 +110,37 @@ func TestEnvVariableRepository_ListByEnvironmentID(t *testing.T) {
 }
 
 func TestEnvVariableRepository_Delete(t *testing.T) {
-	db := setupEnvVariableTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewEnvVariableRepository(db)
 	ctx := context.Background()
 
-	// Need an environment first
+	// Create user first
+	userRepo := NewUserRepository(db)
+	user := &models.User{Email: "env-delete-test@example.com"}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	// Create project
+	projRepo := NewProjectRepository(db)
+	proj := &models.Project{
+		UserID:        user.ID,
+		Name:          "test-project",
+		RepositoryURL: "https://github.com/test/repo",
+		BuildArgs:     []byte("{}"),
+	}
+	if err := projRepo.Create(ctx, proj); err != nil {
+		t.Fatalf("failed to create project: %v", err)
+	}
+
+	// Create environment
 	envRepo := NewEnvironmentRepository(db)
-	env := &models.Environment{ProjectID: "project-1", Name: "prod"}
-	_ = envRepo.Create(ctx, env)
+	env := &models.Environment{ProjectID: proj.ID, Name: "prod"}
+	if err := envRepo.Create(ctx, env); err != nil {
+		t.Fatalf("failed to create environment: %v", err)
+	}
 
 	v := &models.EnvVariable{
 		EnvironmentID: env.ID,

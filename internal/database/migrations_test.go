@@ -45,7 +45,6 @@ func TestDatabaseType_String(t *testing.T) {
 		expected string
 	}{
 		{"postgres type", config.DatabaseTypePostgres, "postgres"},
-		{"sqlite type", config.DatabaseTypeSQLite, "sqlite"},
 	}
 
 	for _, tt := range tests {

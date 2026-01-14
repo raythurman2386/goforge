@@ -2,59 +2,13 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
 	"testing"
-
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/raythurman2386/gocool/internal/models"
 )
 
-func setupGitSourceTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-
-	db, err := sql.Open("sqlite3", ":memory:?_time_format=sqlite")
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
-
-	// Create users table (needed for FK)
-	_, err = db.Exec(`
-		CREATE TABLE users (
-			id TEXT PRIMARY KEY,
-			email TEXT UNIQUE NOT NULL,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create users table: %v", err)
-	}
-
-	// Create git_sources table
-	_, err = db.Exec(`
-		CREATE TABLE git_sources (
-			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			name TEXT NOT NULL,
-			type TEXT NOT NULL,
-			api_url TEXT,
-			access_token TEXT,
-			ssh_private_key TEXT,
-			is_default BOOLEAN DEFAULT 0,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create git_sources table: %v", err)
-	}
-
-	return db
-}
-
 func TestGitSourceRepository_Create(t *testing.T) {
-	db := setupGitSourceTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewGitSourceRepository(db)
@@ -82,7 +36,7 @@ func TestGitSourceRepository_Create(t *testing.T) {
 }
 
 func TestGitSourceRepository_GetByID(t *testing.T) {
-	db := setupGitSourceTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewGitSourceRepository(db)
@@ -111,7 +65,7 @@ func TestGitSourceRepository_GetByID(t *testing.T) {
 }
 
 func TestGitSourceRepository_ListByUserID(t *testing.T) {
-	db := setupGitSourceTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewGitSourceRepository(db)
@@ -142,7 +96,7 @@ func TestGitSourceRepository_ListByUserID(t *testing.T) {
 }
 
 func TestGitSourceRepository_Update(t *testing.T) {
-	db := setupGitSourceTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewGitSourceRepository(db)
@@ -176,7 +130,7 @@ func TestGitSourceRepository_Update(t *testing.T) {
 }
 
 func TestGitSourceRepository_Delete(t *testing.T) {
-	db := setupGitSourceTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewGitSourceRepository(db)

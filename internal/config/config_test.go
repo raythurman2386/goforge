@@ -31,11 +31,6 @@ func TestLoad_DevMode(t *testing.T) {
 		t.Error("expected CSRFSecret to be auto-generated")
 	}
 
-	// Should default to SQLite
-	if cfg.DatabaseType != DatabaseTypeSQLite {
-		t.Errorf("expected SQLite database type, got %s", cfg.DatabaseType)
-	}
-
 	// Should use text logging in dev mode
 	if cfg.LogFormat != "text" {
 		t.Errorf("expected text log format in dev mode, got %s", cfg.LogFormat)
@@ -71,28 +66,6 @@ func TestLoad_AllRequiredFields(t *testing.T) {
 
 	if cfg.DatabaseType != DatabaseTypePostgres {
 		t.Errorf("expected postgres database type, got %s", cfg.DatabaseType)
-	}
-}
-
-func TestLoad_SQLiteURL(t *testing.T) {
-	os.Clearenv()
-	os.Setenv("DATABASE_URL", "sqlite://./test.db")
-	os.Setenv("ENCRYPTION_KEY", "test-key")
-	os.Setenv("SESSION_SECRET", "test-session")
-	os.Setenv("CSRF_SECRET", "test-csrf")
-	defer os.Clearenv()
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if cfg.DatabaseType != DatabaseTypeSQLite {
-		t.Errorf("expected SQLite database type, got %s", cfg.DatabaseType)
-	}
-
-	if cfg.DatabasePath() != "./test.db" {
-		t.Errorf("unexpected database path: %s", cfg.DatabasePath())
 	}
 }
 
@@ -150,29 +123,6 @@ func TestConfig_IsDevelopment(t *testing.T) {
 			cfg := &Config{DevMode: tt.devMode, LogLevel: tt.logLevel}
 			if got := cfg.IsDevelopment(); got != tt.want {
 				t.Errorf("IsDevelopment() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestConfig_DatabasePath(t *testing.T) {
-	tests := []struct {
-		name         string
-		databaseURL  string
-		databaseType DatabaseType
-		want         string
-	}{
-		{"sqlite with prefix", "sqlite://./data/test.db", DatabaseTypeSQLite, "./data/test.db"},
-		{"sqlite with file prefix", "file:./data/test.db", DatabaseTypeSQLite, "./data/test.db"},
-		{"sqlite with query params", "sqlite://./data/test.db?mode=rwc", DatabaseTypeSQLite, "./data/test.db"},
-		{"postgres returns empty", "postgres://localhost/test", DatabaseTypePostgres, ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &Config{DatabaseURL: tt.databaseURL, DatabaseType: tt.databaseType}
-			if got := cfg.DatabasePath(); got != tt.want {
-				t.Errorf("DatabasePath() = %v, want %v", got, tt.want)
 			}
 		})
 	}

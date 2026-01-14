@@ -31,7 +31,7 @@ help:
 
 ## build: Build production binary
 build: templ css
-	$(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/gocool
+	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/gocool
 
 ## dev: Run with hot reload (requires air)
 dev:

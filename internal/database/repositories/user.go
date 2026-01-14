@@ -137,9 +137,9 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 
 	query := `
 		UPDATE users SET 
-			email = ?, password_hash = ?, github_id = ?, github_username = ?,
-			github_access_token = ?, avatar_url = ?, updated_at = ?
-		WHERE id = ?`
+			email = $1, password_hash = $2, github_id = $3, github_username = $4,
+			github_access_token = $5, avatar_url = $6, updated_at = $7
+		WHERE id = $8`
 
 	result, err := r.db.ExecContext(ctx, query,
 		user.Email,

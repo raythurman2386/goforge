@@ -31,7 +31,7 @@ func (r *EnvVariableRepository) Create(ctx context.Context, v *models.EnvVariabl
 
 	query := `
 		INSERT INTO env_variables (id, environment_id, key, value, is_secret, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		v.ID,
@@ -49,7 +49,7 @@ func (r *EnvVariableRepository) Create(ctx context.Context, v *models.EnvVariabl
 func (r *EnvVariableRepository) ListByEnvironmentID(ctx context.Context, envID string) ([]*models.EnvVariable, error) {
 	query := `
 		SELECT id, environment_id, key, value, is_secret, created_at, updated_at
-		FROM env_variables WHERE environment_id = ?
+		FROM env_variables WHERE environment_id = $1
 		ORDER BY key ASC`
 
 	rows, err := r.db.QueryContext(ctx, query, envID)
@@ -87,8 +87,8 @@ func (r *EnvVariableRepository) Update(ctx context.Context, v *models.EnvVariabl
 
 	query := `
 		UPDATE env_variables SET 
-			key = ?, value = ?, is_secret = ?, updated_at = ?
-		WHERE id = ?`
+			key = $1, value = $2, is_secret = $3, updated_at = $4
+		WHERE id = $5`
 
 	result, err := r.db.ExecContext(ctx, query,
 		v.Key,
@@ -113,7 +113,7 @@ func (r *EnvVariableRepository) Update(ctx context.Context, v *models.EnvVariabl
 
 // Delete deletes an environment variable.
 func (r *EnvVariableRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM env_variables WHERE id = ?`
+	query := `DELETE FROM env_variables WHERE id = $1`
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return err

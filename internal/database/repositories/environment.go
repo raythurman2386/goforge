@@ -150,9 +150,9 @@ func (r *EnvironmentRepository) Update(ctx context.Context, env *models.Environm
 
 	query := `
 		UPDATE environments SET
-			name = ?, domain = ?, port = ?, branch = ?, replicas = ?,
-			cpu_limit = ?, memory_limit = ?, auto_deploy = ?, updated_at = ?
-		WHERE id = ?`
+			name = $1, domain = $2, port = $3, branch = $4, replicas = $5,
+			cpu_limit = $6, memory_limit = $7, auto_deploy = $8, updated_at = $9
+		WHERE id = $10`
 
 	result, err := r.db.ExecContext(ctx, query,
 		env.Name,

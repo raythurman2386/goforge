@@ -6,43 +6,11 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/raythurman2386/gocool/internal/models"
 )
 
-// setupTestDB creates an in-memory SQLite database for testing.
-func setupTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-
-	db, err := sql.Open("sqlite3", ":memory:?_time_format=sqlite")
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
-
-	// Create users table
-	_, err = db.Exec(`
-		CREATE TABLE users (
-			id TEXT PRIMARY KEY,
-			email TEXT UNIQUE NOT NULL,
-			password_hash TEXT,
-			github_id INTEGER,
-			github_username TEXT,
-			github_access_token TEXT,
-			avatar_url TEXT,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create users table: %v", err)
-	}
-
-	return db
-}
-
 func TestUserRepository_Create(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
@@ -70,13 +38,13 @@ func TestUserRepository_Create(t *testing.T) {
 }
 
 func TestUserRepository_Create_WithID(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	expectedID := "custom-user-id-123"
+	expectedID := "12345678-1234-5678-1234-567812345678"
 	user := &models.User{
 		ID:    expectedID,
 		Email: "custom@example.com",
@@ -93,7 +61,7 @@ func TestUserRepository_Create_WithID(t *testing.T) {
 }
 
 func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
@@ -113,20 +81,20 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 }
 
 func TestUserRepository_GetByID_NotFound(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	_, err := repo.GetByID(ctx, "nonexistent-id")
+	_, err := repo.GetByID(ctx, "00000000-0000-0000-0000-000000000000")
 	if err != ErrNotFound {
 		t.Errorf("GetByID() error = %v, want ErrNotFound", err)
 	}
 }
 
 func TestUserRepository_GetByEmail_NotFound(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
@@ -139,7 +107,7 @@ func TestUserRepository_GetByEmail_NotFound(t *testing.T) {
 }
 
 func TestUserRepository_GetByGitHubID_NotFound(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
@@ -152,14 +120,14 @@ func TestUserRepository_GetByGitHubID_NotFound(t *testing.T) {
 }
 
 func TestUserRepository_Update_NotFound(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
 	user := &models.User{
-		ID:    "nonexistent-id",
+		ID:    "00000000-0000-0000-0000-000000000000",
 		Email: "update@example.com",
 	}
 
@@ -170,7 +138,7 @@ func TestUserRepository_Update_NotFound(t *testing.T) {
 }
 
 func TestUserRepository_Delete(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
@@ -195,20 +163,20 @@ func TestUserRepository_Delete(t *testing.T) {
 }
 
 func TestUserRepository_Delete_NotFound(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	err := repo.Delete(ctx, "nonexistent-id")
+	err := repo.Delete(ctx, "00000000-0000-0000-0000-000000000000")
 	if err != ErrNotFound {
 		t.Errorf("Delete() error = %v, want ErrNotFound", err)
 	}
 }
 
 func TestUserRepository_ContextCancellation(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
@@ -223,7 +191,7 @@ func TestUserRepository_ContextCancellation(t *testing.T) {
 }
 
 func TestUserRepository_ContextTimeout(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)
@@ -241,7 +209,7 @@ func TestUserRepository_ContextTimeout(t *testing.T) {
 }
 
 func TestNewUserRepository(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupSharedTestDB(t)
 	defer db.Close()
 
 	repo := NewUserRepository(db)

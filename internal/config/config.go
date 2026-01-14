@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -15,8 +14,6 @@ import (
 type DatabaseType string
 
 const (
-	// DatabaseTypeSQLite uses SQLite database.
-	DatabaseTypeSQLite DatabaseType = "sqlite"
 	// DatabaseTypePostgres uses PostgreSQL database.
 	DatabaseTypePostgres DatabaseType = "postgres"
 )
@@ -130,11 +127,9 @@ func (c *Config) applyDefaults() {
 	// Determine database type and set defaults
 	switch {
 	case c.DatabaseURL == "":
-		// Default to SQLite
-		c.DatabaseURL = "sqlite://./data/gocool.db"
-		c.DatabaseType = DatabaseTypeSQLite
-	case strings.HasPrefix(c.DatabaseURL, "sqlite://") || strings.HasPrefix(c.DatabaseURL, "file:"):
-		c.DatabaseType = DatabaseTypeSQLite
+		// Default to Postgres in dev
+		c.DatabaseURL = "postgres://gocool:password@localhost:5432/gocool?sslmode=disable"
+		c.DatabaseType = DatabaseTypePostgres
 	default:
 		c.DatabaseType = DatabaseTypePostgres
 	}
@@ -191,22 +186,6 @@ func (c *Config) Addr() string {
 // IsDevelopment returns true if running in development mode.
 func (c *Config) IsDevelopment() bool {
 	return c.DevMode || c.LogLevel == "debug"
-}
-
-// DatabasePath returns the file path for SQLite databases.
-// Returns empty string for non-SQLite databases.
-func (c *Config) DatabasePath() string {
-	if c.DatabaseType != DatabaseTypeSQLite {
-		return ""
-	}
-	path := c.DatabaseURL
-	path = strings.TrimPrefix(path, "sqlite://")
-	path = strings.TrimPrefix(path, "file:")
-	// Remove query parameters
-	if idx := strings.Index(path, "?"); idx != -1 {
-		path = path[:idx]
-	}
-	return path
 }
 
 // getEnv returns the environment variable value or a default.

@@ -5,13 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq"           // PostgreSQL driver
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	_ "github.com/lib/pq" // PostgreSQL driver
 
 	"github.com/raythurman2386/gocool/internal/config"
 )
@@ -24,18 +21,11 @@ type DB struct {
 
 // New creates a new database connection based on configuration.
 func New(cfg *config.Config) (*DB, error) {
-	var db *sql.DB
-	var err error
-
-	switch cfg.DatabaseType {
-	case config.DatabaseTypeSQLite:
-		db, err = connectSQLite(cfg)
-	case config.DatabaseTypePostgres:
-		db, err = connectPostgres(cfg)
-	default:
-		return nil, fmt.Errorf("unsupported database type: %s", cfg.DatabaseType)
+	if cfg.DatabaseType != config.DatabaseTypePostgres {
+		return nil, fmt.Errorf("only postgres is supported, got: %s", cfg.DatabaseType)
 	}
 
+	db, err := connectPostgres(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -54,45 +44,6 @@ func New(cfg *config.Config) (*DB, error) {
 	}
 
 	return &DB{DB: db, cfg: cfg}, nil
-}
-
-// connectSQLite establishes a SQLite connection.
-func connectSQLite(cfg *config.Config) (*sql.DB, error) {
-	dbPath := cfg.DatabasePath()
-
-	// Ensure directory exists
-	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return nil, fmt.Errorf("failed to create database directory: %w", err)
-	}
-
-	// Build connection string with pragmas for better performance
-	dsn := fmt.Sprintf("file:%s?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL&_cache_size=10000&_foreign_keys=ON",
-		dbPath)
-
-	db, err := sql.Open("sqlite3", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open sqlite: %w", err)
-	}
-
-	// SQLite specific optimizations
-	pragmas := []string{
-		"PRAGMA journal_mode=WAL",
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA synchronous=NORMAL",
-		"PRAGMA cache_size=10000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA temp_store=MEMORY",
-	}
-
-	for _, pragma := range pragmas {
-		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("failed to set pragma: %w", err)
-		}
-	}
-
-	return db, nil
 }
 
 // connectPostgres establishes a PostgreSQL connection with retry logic.
@@ -143,11 +94,6 @@ func (db *DB) Close() error {
 // IsPostgres returns true if using PostgreSQL.
 func (db *DB) IsPostgres() bool {
 	return db.cfg.DatabaseType == config.DatabaseTypePostgres
-}
-
-// IsSQLite returns true if using SQLite.
-func (db *DB) IsSQLite() bool {
-	return db.cfg.DatabaseType == config.DatabaseTypeSQLite
 }
 
 // HealthCheck verifies database connectivity.

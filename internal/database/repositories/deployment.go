@@ -139,14 +139,14 @@ func (r *DeploymentRepository) UpdateStatus(ctx context.Context, id string, stat
 	case status == models.DeploymentStatusFailed || status == models.DeploymentStatusRunning ||
 		status == models.DeploymentStatusRolledBack || status == models.DeploymentStatusCanceled:
 		// Terminal state - set finished_at
-		query = `UPDATE deployments SET status = ?, error_message = ?, finished_at = ? WHERE id = ?`
+		query = `UPDATE deployments SET status = $1, error_message = $2, finished_at = $3 WHERE id = $4`
 		args = []interface{}{status, errorMsg, time.Now(), id}
 	case status == models.DeploymentStatusCloning:
 		// First state - set started_at
-		query = `UPDATE deployments SET status = ?, started_at = ? WHERE id = ?`
+		query = `UPDATE deployments SET status = $1, started_at = $2 WHERE id = $3`
 		args = []interface{}{status, time.Now(), id}
 	default:
-		query = `UPDATE deployments SET status = ? WHERE id = ?`
+		query = `UPDATE deployments SET status = $1 WHERE id = $2`
 		args = []interface{}{status, id}
 	}
 

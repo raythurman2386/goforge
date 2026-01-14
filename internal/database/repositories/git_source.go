@@ -121,9 +121,9 @@ func (r *GitSourceRepository) Update(ctx context.Context, source *models.GitSour
 
 	query := `
 		UPDATE git_sources SET 
-			name = ?, type = ?, api_url = ?, access_token = ?,
-			ssh_private_key = ?, is_default = ?, updated_at = ?
-		WHERE id = ?`
+			name = $1, type = $2, api_url = $3, access_token = $4,
+			ssh_private_key = $5, is_default = $6, updated_at = $7
+		WHERE id = $8`
 
 	result, err := r.db.ExecContext(ctx, query,
 		source.Name,
