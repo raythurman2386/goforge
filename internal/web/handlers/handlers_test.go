@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/raythurman2386/gocool/internal/auth"
+	"github.com/raythurman2386/gocool/internal/database/repositories"
 )
 
 func TestHealth(t *testing.T) {
@@ -72,22 +76,46 @@ func TestHealthReady(t *testing.T) {
 }
 
 func TestIndex(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	w := httptest.NewRecorder()
+	t.Run("unauthenticated", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		w := httptest.NewRecorder()
 
-	Index(w, req)
+		Index(w, req)
 
-	res := w.Result()
-	defer res.Body.Close()
+		res := w.Result()
+		defer res.Body.Close()
 
-	if res.StatusCode != http.StatusSeeOther {
-		t.Errorf("Index() status = %d, want %d", res.StatusCode, http.StatusSeeOther)
-	}
+		if res.StatusCode != http.StatusSeeOther {
+			t.Errorf("Index() status = %d, want %d", res.StatusCode, http.StatusSeeOther)
+		}
 
-	location := res.Header.Get("Location")
-	if location != "/login" {
-		t.Errorf("Index() Location = %q, want %q", location, "/login")
-	}
+		location := res.Header.Get("Location")
+		if location != "/login" {
+			t.Errorf("Index() Location = %q, want %q", location, "/login")
+		}
+	})
+
+	t.Run("authenticated", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		user := &repositories.User{ID: 1, Username: "test"}
+		ctx := context.WithValue(req.Context(), auth.UserContextKey, user)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		Index(w, req)
+
+		res := w.Result()
+		defer res.Body.Close()
+
+		if res.StatusCode != http.StatusSeeOther {
+			t.Errorf("Index() status = %d, want %d", res.StatusCode, http.StatusSeeOther)
+		}
+
+		location := res.Header.Get("Location")
+		if location != "/dashboard" {
+			t.Errorf("Index() Location = %q, want %q", location, "/dashboard")
+		}
+	})
 }
 
 func TestLoginPage(t *testing.T) {
