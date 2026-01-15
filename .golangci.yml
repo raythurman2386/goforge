@@ -21,6 +21,7 @@ issues:
       linters:
         - gocognit
         - dupl
+        - goconst
 
     # Allow dot imports for test packages
     - path: _test\.go

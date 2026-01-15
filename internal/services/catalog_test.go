@@ -177,8 +177,9 @@ func TestCatalog_GetTemplate(t *testing.T) {
 
 func TestCatalog_ListTemplates(t *testing.T) {
 	t.Parallel()
+	redisName := "redis"
 	c := NewCatalog("dummy")
-	c.templates["redis"] = &ServiceTemplate{Name: "redis"}
+	c.templates[redisName] = &ServiceTemplate{Name: redisName}
 	c.templates["postgres"] = &ServiceTemplate{Name: "postgres"}
 
 	list := c.ListTemplates()
@@ -193,7 +194,188 @@ func TestCatalog_ListTemplates(t *testing.T) {
 	}
 	sort.Strings(names)
 
-	if names[0] != "postgres" || names[1] != "redis" {
-		t.Errorf("ListTemplates() returned names %v, want [postgres redis]", names)
+	if names[0] != "postgres" || names[1] != redisName {
+		t.Errorf("ListTemplates() returned names %v, want [postgres %s]", names, redisName)
+	}
+}
+
+func TestCatalog_TemplateParsing(t *testing.T) {
+	t.Parallel()
+
+	fullYAML := `
+name: "redis"
+display_name: "Redis"
+description: "Redis is an open source key-value store."
+icon: "redis-icon"
+category: "database"
+versions:
+  - "7.0"
+  - "6.2"
+default_version: "7.0"
+config:
+  - name: "password"
+    label: "Password"
+    type: "password"
+    required: true
+    generate: true
+    length: 32
+resources:
+  cpu: "1.0"
+  memory: "512MB"
+docker:
+  image: "redis"
+  ports:
+    - container: 6379
+      protocol: "tcp"
+  environment:
+    REDIS_PASSWORD: "${password}"
+  volumes:
+    - name: "data"
+      path: "/data"
+  health_check:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: "10s"
+    timeout: "5s"
+    retries: 3
+connection:
+  internal: "redis://${password}@${host}:6379"
+  external: "redis://${password}@${host}:${port}"
+backup:
+  command: "redis-cli save"
+  extension: ".rdb"
+`
+
+	tests := []struct {
+		name     string
+		yaml     string
+		validate func(*testing.T, *ServiceTemplate)
+		wantErr  bool
+	}{
+		{
+			name: "Full Template",
+			yaml: fullYAML,
+			validate: func(t *testing.T, tmpl *ServiceTemplate) {
+				if tmpl.Name != "redis" {
+					t.Errorf("Name = %q, want %q", tmpl.Name, "redis")
+				}
+				if tmpl.DisplayName != "Redis" {
+					t.Errorf("DisplayName = %q, want %q", tmpl.DisplayName, "Redis")
+				}
+				if len(tmpl.Versions) != 2 {
+					t.Errorf("Versions len = %d, want 2", len(tmpl.Versions))
+				}
+				if tmpl.DefaultVersion != "7.0" {
+					t.Errorf("DefaultVersion = %q, want %q", tmpl.DefaultVersion, "7.0")
+				}
+
+				// Check Config
+				if len(tmpl.Config) != 1 {
+					t.Fatalf("Config len = %d, want 1", len(tmpl.Config))
+				}
+				cfg := tmpl.Config[0]
+				if cfg.Name != "password" || !cfg.Generate || cfg.Length != 32 {
+					t.Errorf("Config[0] mismatch: %+v", cfg)
+				}
+
+				// Check Resources
+				if tmpl.Resources.CPU != "1.0" || tmpl.Resources.Memory != "512MB" {
+					t.Errorf("Resources mismatch: %+v", tmpl.Resources)
+				}
+
+				// Check Docker
+				if tmpl.Docker.Image != "redis" {
+					t.Errorf("Docker.Image = %q, want %q", tmpl.Docker.Image, "redis")
+				}
+				if len(tmpl.Docker.Ports) != 1 {
+					t.Fatalf("Docker.Ports len = %d, want 1", len(tmpl.Docker.Ports))
+				}
+				if tmpl.Docker.Ports[0].Container != 6379 {
+					t.Errorf("Docker.Ports[0].Container = %d, want 6379", tmpl.Docker.Ports[0].Container)
+				}
+				if val, ok := tmpl.Docker.Environment["REDIS_PASSWORD"]; !ok || val != "${password}" {
+					t.Errorf("Docker.Environment mismatch: %v", tmpl.Docker.Environment)
+				}
+				if len(tmpl.Docker.Volumes) != 1 {
+					t.Errorf("Docker.Volumes len = %d, want 1", len(tmpl.Docker.Volumes))
+				}
+				hc := tmpl.Docker.HealthCheck
+				if hc.Interval != "10s" || hc.Retries != 3 {
+					t.Errorf("HealthCheck mismatch: %+v", hc)
+				}
+
+				// Check Connection
+				if tmpl.Connection.Internal != "redis://${password}@${host}:6379" {
+					t.Errorf("Connection.Internal mismatch: %q", tmpl.Connection.Internal)
+				}
+
+				// Check Backup
+				if tmpl.Backup.Command != "redis-cli save" {
+					t.Errorf("Backup.Command mismatch: %q", tmpl.Backup.Command)
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name: "Boundary: Minimal Template",
+			yaml: `name: "minimal"`,
+			validate: func(t *testing.T, tmpl *ServiceTemplate) {
+				if tmpl.Name != "minimal" {
+					t.Errorf("Name = %q, want %q", tmpl.Name, "minimal")
+				}
+				// Verify other fields are zero-valued
+				if tmpl.DisplayName != "" {
+					t.Errorf("DisplayName should be empty, got %q", tmpl.DisplayName)
+				}
+				if len(tmpl.Config) != 0 {
+					t.Errorf("Config should be empty")
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Error: Malformed YAML",
+			yaml:    "name: \"broken\"\n  : invalid",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup temp dir and file
+			tempDir := t.TempDir()
+			filename := "template.yaml"
+			filePath := filepath.Join(tempDir, filename)
+
+			if err := os.WriteFile(filePath, []byte(tt.yaml), 0600); err != nil {
+				t.Fatalf("Failed to write file: %v", err)
+			}
+
+			c := NewCatalog(tempDir)
+			err := c.LoadTemplates()
+
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("LoadTemplates() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				if len(c.templates) != 1 {
+					t.Fatalf("Loaded %d templates, want 1", len(c.templates))
+				}
+
+				// Get the only template
+				var tmpl *ServiceTemplate
+				for _, t := range c.templates {
+					tmpl = t
+					break
+				}
+
+				if tt.validate != nil {
+					tt.validate(t, tmpl)
+				}
+			}
+		})
 	}
 }

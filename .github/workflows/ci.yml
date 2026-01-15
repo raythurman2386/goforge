@@ -78,6 +78,8 @@ jobs:
           version: latest
           args: --timeout=5m
           install-mode: "goinstall"
+        env:
+          GOTOOLCHAIN: local
 
   # Tests
   test:
