@@ -177,8 +177,9 @@ func TestCatalog_GetTemplate(t *testing.T) {
 
 func TestCatalog_ListTemplates(t *testing.T) {
 	t.Parallel()
+	redisName := "redis"
 	c := NewCatalog("dummy")
-	c.templates["redis"] = &ServiceTemplate{Name: "redis"}
+	c.templates[redisName] = &ServiceTemplate{Name: redisName}
 	c.templates["postgres"] = &ServiceTemplate{Name: "postgres"}
 
 	list := c.ListTemplates()
@@ -193,8 +194,8 @@ func TestCatalog_ListTemplates(t *testing.T) {
 	}
 	sort.Strings(names)
 
-	if names[0] != "postgres" || names[1] != "redis" {
-		t.Errorf("ListTemplates() returned names %v, want [postgres redis]", names)
+	if names[0] != "postgres" || names[1] != redisName {
+		t.Errorf("ListTemplates() returned names %v, want [postgres %s]", names, redisName)
 	}
 }
 
