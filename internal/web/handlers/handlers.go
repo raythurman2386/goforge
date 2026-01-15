@@ -65,8 +65,10 @@ func HealthReady(w http.ResponseWriter, r *http.Request) {
 
 // Index handles the root path.
 func Index(w http.ResponseWriter, r *http.Request) {
-	// For now, redirect to login if not authenticated
-	// TODO: Check authentication and redirect to dashboard
+	if user := r.Context().Value(auth.UserContextKey); user != nil {
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
