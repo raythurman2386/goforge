@@ -66,7 +66,7 @@ func HealthReady(w http.ResponseWriter, r *http.Request) {
 // Index handles the root path.
 func Index(w http.ResponseWriter, r *http.Request) {
 	if user := r.Context().Value(auth.UserContextKey); user != nil {
-		http.Redirect(w, r, "/dashboard", http._StatusSeeOther)
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)

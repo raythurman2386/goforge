@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/database/repositories"
+	"github.com/raythurman2386/gocool/internal/models"
 )
 
 func TestHealth(t *testing.T) {
@@ -97,7 +97,7 @@ func TestIndex(t *testing.T) {
 
 	t.Run("authenticated", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		user := &repositories.User{ID: 1, Username: "test"}
+		user := &models.User{ID: "1"}
 		ctx := context.WithValue(req.Context(), auth.UserContextKey, user)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
