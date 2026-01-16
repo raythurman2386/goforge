@@ -106,6 +106,12 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	container, err := h.instanceService.GetContainer(r.Context(), id)
+	if err != nil {
+		// Log error but continue - container might not exist yet
+		container = nil
+	}
+
 	tmpl, err := h.catalog.GetTemplate(instance.TemplateName)
 	if err != nil {
 		// Template might have been removed, handled gracefully in UI
@@ -113,7 +119,7 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages_services.Detail(instance, tmpl, csrfToken)
+	component := pages_services.Detail(instance, container, tmpl, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render detail page", http.StatusInternalServerError)
 	}

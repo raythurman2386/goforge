@@ -22,6 +22,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/git"
 	"github.com/raythurman2386/goforge/internal/logger"
+	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/sse"
@@ -234,6 +235,9 @@ func runServer() error {
 	sseHub := sse.NewHub()
 	go sseHub.Run()
 
+	monitorCollector := monitor.NewCollector(dockerClient, containerRepo)
+	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector)
+
 	// Initialize services
 	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
 	githubProvider := auth.NewGitHubProvider(cfg)
@@ -287,6 +291,7 @@ func runServer() error {
 		serviceHandler,
 		settingsHandler,
 		webhookHandler,
+		sseHandler,
 	)
 
 	// Configure server

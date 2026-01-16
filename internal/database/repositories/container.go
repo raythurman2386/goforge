@@ -111,6 +111,33 @@ func (r *ContainerRepository) GetByDockerID(ctx context.Context, dockerID string
 	return c, err
 }
 
+// GetByServiceInstanceID retrieves a container by Service Instance ID.
+func (r *ContainerRepository) GetByServiceInstanceID(ctx context.Context, serviceInstanceID string) (*models.Container, error) {
+	query := `
+		SELECT id, deployment_id, service_instance_id, docker_id, name, image, 
+			status, ports, labels, created_at, updated_at
+		FROM containers WHERE service_instance_id = $1`
+
+	c := &models.Container{}
+	err := r.db.QueryRowContext(ctx, query, serviceInstanceID).Scan(
+		&c.ID,
+		&c.DeploymentID,
+		&c.ServiceInstanceID,
+		&c.DockerID,
+		&c.Name,
+		&c.Image,
+		&c.Status,
+		&c.Ports,
+		&c.Labels,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return c, err
+}
+
 // ListByDeploymentID retrieves containers for a deployment.
 func (r *ContainerRepository) ListByDeploymentID(ctx context.Context, deploymentID string) ([]*models.Container, error) {
 	query := `

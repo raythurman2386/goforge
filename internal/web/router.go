@@ -24,6 +24,7 @@ func Router(
 	serviceHandler *handlers.ServiceHandler,
 	settingsHandler *handlers.SettingsHandler,
 	webhookHandler *webhook.Handler,
+	sseHandler *handlers.SSEHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -78,6 +79,12 @@ func Router(
 
 					// Deployments
 					r.Post("/deployments", deploymentHandler.TriggerDeployment)
+					r.Route("/deployments/{deploymentID}", func(r chi.Router) {
+						r.Get("/", deploymentHandler.GetDeployment)
+						r.Post("/rollback", deploymentHandler.RollbackDeployment)
+						r.Post("/cancel", deploymentHandler.CancelDeployment)
+						r.Get("/logs", sseHandler.DeploymentLogs)
+					})
 
 					// Environments
 					r.Route("/envs", func(r chi.Router) {
@@ -110,6 +117,12 @@ func Router(
 					r.Delete("/", serviceHandler.Delete)
 					r.Post("/restart", serviceHandler.Restart)
 				})
+			})
+
+			// Containers
+			r.Route("/containers/{id}", func(r chi.Router) {
+				r.Get("/stats", sseHandler.ContainerStats)
+				r.Get("/logs", sseHandler.ContainerLogs)
 			})
 
 			// Settings

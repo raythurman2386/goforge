@@ -104,3 +104,8 @@ func (s *InstanceService) DeleteInstance(ctx context.Context, id string) error {
 func (s *InstanceService) UpdateInstance(ctx context.Context, instance *models.ServiceInstance) error {
 	return s.instanceRepo.Update(ctx, instance)
 }
+
+// GetContainer retrieves the container for a service instance.
+func (s *InstanceService) GetContainer(ctx context.Context, instanceID string) (*models.Container, error) {
+	return s.containerRepo.GetByServiceInstanceID(ctx, instanceID)
+}

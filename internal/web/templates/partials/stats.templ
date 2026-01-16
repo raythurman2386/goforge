@@ -1,0 +1,36 @@
+package partials
+
+import (
+	"fmt"
+	"github.com/raythurman2386/goforge/internal/models"
+)
+
+templ Stats(metrics *models.ContainerMetrics) {
+	<div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+		<div class="px-4 py-5 bg-white shadow rounded-lg overflow-hidden sm:p-6">
+			<dt class="text-sm font-medium text-gray-500 truncate">
+				CPU Usage
+			</dt>
+			<dd class="mt-1 text-3xl font-semibold text-gray-900">
+				{ fmt.Sprintf("%.2f%%", metrics.CPUPercent) }
+			</dd>
+			<div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+				<div class="bg-blue-600 h-2.5 rounded-full" style={ fmt.Sprintf("width: %.2f%%", metrics.CPUPercent) }></div>
+			</div>
+		</div>
+		<div class="px-4 py-5 bg-white shadow rounded-lg overflow-hidden sm:p-6">
+			<dt class="text-sm font-medium text-gray-500 truncate">
+				Memory Usage
+			</dt>
+			<dd class="mt-1 text-3xl font-semibold text-gray-900">
+				{ fmt.Sprintf("%.2f MB", float64(metrics.MemoryUsage)/1024/1024) }
+			</dd>
+			<div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+				<div class="bg-purple-600 h-2.5 rounded-full" style={ fmt.Sprintf("width: %.2f%%", metrics.MemoryPercent) }></div>
+			</div>
+			<dd class="mt-1 text-sm text-gray-500">
+				{ fmt.Sprintf("%.1f%%", metrics.MemoryPercent) } of { fmt.Sprintf("%.0f MB", float64(metrics.MemoryLimit)/1024/1024) }
+			</dd>
+		</div>
+	</div>
+}

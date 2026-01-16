@@ -44,8 +44,15 @@ func (c *Collector) CollectStats(ctx context.Context, dockerID string) (*models.
 }
 
 func (c *Collector) calculateMetrics(dockerID string, v *container.StatsResponse) *models.ContainerMetrics {
-	// Basic calculation logic
+	// Calculate CPU Percent
+	// Formula: (cpuDelta / systemDelta) * numCores * 100.0
 	cpuPercent := 0.0
+	cpuDelta := float64(v.CPUStats.CPUUsage.TotalUsage) - float64(v.PreCPUStats.CPUUsage.TotalUsage)
+	systemDelta := float64(v.CPUStats.SystemUsage) - float64(v.PreCPUStats.SystemUsage)
+
+	if systemDelta > 0.0 && cpuDelta > 0.0 {
+		cpuPercent = (cpuDelta / systemDelta) * float64(len(v.CPUStats.CPUUsage.PercpuUsage)) * 100.0
+	}
 
 	memUsage := int64(v.MemoryStats.Usage) //nolint:gosec // usage fits in int64
 	memLimit := int64(v.MemoryStats.Limit) //nolint:gosec // limit fits in int64
