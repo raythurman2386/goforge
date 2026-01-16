@@ -27,6 +27,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/sse"
 	"github.com/raythurman2386/goforge/internal/web"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/webhook"
 )
 
 var rootCmd = &cobra.Command{
@@ -272,6 +273,7 @@ func runServer() error {
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo)
+	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret)
 
 	// Create router
 	router := web.Router(
@@ -284,6 +286,7 @@ func runServer() error {
 		deploymentHandler,
 		serviceHandler,
 		settingsHandler,
+		webhookHandler,
 	)
 
 	// Configure server

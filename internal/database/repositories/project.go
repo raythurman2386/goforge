@@ -178,6 +178,48 @@ func (r *ProjectRepository) Update(ctx context.Context, project *models.Project)
 	return nil
 }
 
+// ListByRepoURL retrieves all projects matching the repository URL.
+func (r *ProjectRepository) ListByRepoURL(ctx context.Context, repoURL string) ([]*models.Project, error) {
+	query := `
+		SELECT id, user_id, name, description, git_source_id, repository_url, repository_name,
+			default_branch, dockerfile_path, docker_compose_path, build_context, build_args,
+			health_check_path, health_check_interval, auto_deploy, created_at, updated_at
+		FROM projects WHERE repository_url = $1`
+
+	rows, err := r.db.QueryContext(ctx, query, repoURL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []*models.Project
+	for rows.Next() {
+		project := &models.Project{}
+		if err := rows.Scan(
+			&project.ID,
+			&project.UserID,
+			&project.Name,
+			&project.Description,
+			&project.GitSourceID,
+			&project.RepositoryURL,
+			&project.RepositoryName,
+			&project.DefaultBranch,
+			&project.DockerfilePath,
+			&project.DockerComposePath,
+			&project.BuildContext,
+			&project.BuildArgs,
+			&project.HealthCheckPath,
+			&project.HealthCheckInterval,
+			&project.AutoDeploy,
+			&project.CreatedAt,
+			&project.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		projects = append(projects, project)
+	}
+	return projects, rows.Err()
+}
 // Delete deletes a project.
 func (r *ProjectRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM projects WHERE id = $1`

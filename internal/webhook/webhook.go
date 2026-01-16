@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,7 +14,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/deploy"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // Webhook errors.
@@ -42,15 +45,27 @@ func (e *PushEvent) IsBranchPush() bool {
 
 // Handler handles webhook requests from git providers.
 type Handler struct {
-	deployService *deploy.Service
-	webhookSecret string
+	deployService   *deploy.Service
+	projectRepo     *repositories.ProjectRepository
+	environmentRepo *repositories.EnvironmentRepository
+	worker          *deploy.Worker
+	webhookSecret   string
 }
 
 // NewHandler creates a new webhook Handler.
-func NewHandler(ds *deploy.Service, secret string) *Handler {
+func NewHandler(
+	ds *deploy.Service,
+	pr *repositories.ProjectRepository,
+	er *repositories.EnvironmentRepository,
+	w *deploy.Worker,
+	secret string,
+) *Handler {
 	return &Handler{
-		deployService: ds,
-		webhookSecret: secret,
+		deployService:   ds,
+		projectRepo:     pr,
+		environmentRepo: er,
+		worker:          w,
+		webhookSecret:   secret,
 	}
 }
 
@@ -88,7 +103,7 @@ func (h *Handler) HandleGitHub(w http.ResponseWriter, r *http.Request) {
 
 	// Verify signature (skip for ping events)
 	signature := r.Header.Get("X-Hub-Signature-256")
-	if !h.verifyGitHubSignature(signature, body, h.webhookSecret) {
+	if !h.verifySignature(signature, body, h.webhookSecret) {
 		http.Error(w, "Invalid signature", http.StatusUnauthorized)
 		return
 	}
@@ -115,14 +130,23 @@ func (h *Handler) HandleGitHub(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// verifyGitHubSignature verifies the GitHub webhook signature.
-func (h *Handler) verifyGitHubSignature(signature string, payload []byte, secret string) bool {
-	if signature == "" || !strings.HasPrefix(signature, "sha256=") {
+// verifySignature verifies the webhook signature (HMAC-SHA256).
+// Compatible with GitHub and Gitea.
+func (h *Handler) verifySignature(signature string, payload []byte, secret string) bool {
+	if signature == "" {
 		return false
 	}
 
-	// Extract hex signature
-	sigHex := strings.TrimPrefix(signature, "sha256=")
+	// Some providers might prefix with "sha256=", others might not.
+	// GitHub: "sha256=..."
+	// Gitea: "..." (hex string) - wait, Gitea documentation says it sends the hex string directly in X-Gitea-Signature?
+	// Actually, usually Gitea mimics GitHub if configured, but let's be robust.
+
+	sigHex := signature
+	if strings.HasPrefix(signature, "sha256=") {
+		sigHex = strings.TrimPrefix(signature, "sha256=")
+	}
+
 	sig, err := hex.DecodeString(sigHex)
 	if err != nil {
 		return false
@@ -178,38 +202,136 @@ func (h *Handler) parseGitHubPushEvent(payload []byte) (*PushEvent, error) {
 	return event, nil
 }
 
-// shouldTriggerDeploy determines if a push event should trigger a deployment.
-func (h *Handler) shouldTriggerDeploy(event *PushEvent, targetBranch string, autoDeploy bool) bool {
-	// Don't trigger for tags
-	if event.IsTag || event.Branch == "" {
-		return false
+// HandleGitea handles Gitea webhook requests.
+func (h *Handler) HandleGitea(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	// Must have auto-deploy enabled
-	if !autoDeploy {
-		return false
+	eventType := r.Header.Get("X-Gitea-Event")
+	if eventType == "" {
+		// Fallback to GitHub header if Gitea one is missing (some versions)
+		eventType = r.Header.Get("X-GitHub-Event")
 	}
 
-	// Branch must match
-	return event.Branch == targetBranch
+	// Handle ping event
+	if eventType == "ping" {
+		w.WriteHeader(http.StatusOK)
+		writeJSONResponse(w, `{"status": "pong"}`)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Verify signature
+	// Gitea uses X-Gitea-Signature (HMAC-SHA256 of payload with secret)
+	signature := r.Header.Get("X-Gitea-Signature")
+	if signature == "" {
+		// Fallback to GitHub signature
+		signature = r.Header.Get("X-Hub-Signature-256")
+	}
+
+	if !h.verifySignature(signature, body, h.webhookSecret) {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	switch eventType {
+	case "push":
+		// Gitea payload is compatible with GitHub for push events
+		event, err := h.parseGitHubPushEvent(body)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to parse push event: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		h.processPushEvent(r.Context(), event)
+		w.WriteHeader(http.StatusOK)
+		writeJSONResponse(w, `{"status": "accepted"}`)
+
+	default:
+		w.WriteHeader(http.StatusOK)
+		writeJSONResponse(w, `{"status": "ignored"}`)
+	}
 }
 
-// processPushEvent processes a push event and logs it.
-// Future implementation will trigger deployments based on project configuration.
+// processPushEvent processes a push event and triggers deployments.
 func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
-	// Log the event for now - actual deployment triggering would require
-	// looking up the project by repository URL
 	fmt.Printf("Received push event: repo=%s branch=%s commit=%s\n",
 		event.RepositoryName, event.Branch, event.CommitSHA)
 
-	// If deploy service is configured, we can look up projects and trigger deployments
-	if h.deployService != nil {
-		// TODO: Implement deployment triggering:
-		// 1. Look up project by repository URL
-		// 2. Check if auto-deploy is enabled
-		// 3. Check if the branch matches the configured branch
-		// 4. Create a new deployment with TriggerType = webhook
-		_ = ctx // Context would be used for deployment operations
+	if !event.IsBranchPush() {
+		return
+	}
+
+	if h.projectRepo == nil {
+		return
+	}
+
+	// 1. Look up projects by repository URL
+	// We might need to normalize the URL (remove .git suffix, handle http/ssh differences)
+	// For now, we assume exact match or simple normalization if needed.
+	projects, err := h.projectRepo.ListByRepoURL(ctx, event.RepositoryURL)
+	if err != nil {
+		fmt.Printf("Failed to list projects for repo %s: %v\n", event.RepositoryURL, err)
+		return
+	}
+
+	if len(projects) == 0 {
+		fmt.Printf("No projects found for repo %s\n", event.RepositoryURL)
+		return
+	}
+
+	// 2. Iterate projects and their environments
+	for _, proj := range projects {
+		envs, err := h.environmentRepo.ListByProjectID(ctx, proj.ID)
+		if err != nil {
+			fmt.Printf("Failed to list environments for project %s: %v\n", proj.ID, err)
+			continue
+		}
+
+		for _, env := range envs {
+			if !env.AutoDeploy {
+				continue
+			}
+
+			// Determine target branch for this environment
+			targetBranch := proj.DefaultBranch
+			if env.Branch.Valid && env.Branch.String != "" {
+				targetBranch = env.Branch.String
+			}
+
+			if targetBranch != event.Branch {
+				continue
+			}
+
+			// 3. Trigger deployment
+			fmt.Printf("Triggering deployment for project %s env %s\n", proj.Name, env.Name)
+			
+			d := &models.Deployment{
+				EnvironmentID: env.ID,
+				Status:        models.DeploymentStatusPending,
+				TriggerType:   models.TriggerTypeWebhook,
+				CommitSHA:     sql.NullString{String: event.CommitSHA, Valid: true},
+				CommitMessage: sql.NullString{String: event.CommitMessage, Valid: true},
+				CommitAuthor:  sql.NullString{String: event.CommitAuthor, Valid: true},
+				Branch:        sql.NullString{String: event.Branch, Valid: true},
+			}
+
+			if err := h.deployService.CreateDeployment(ctx, d); err != nil {
+				fmt.Printf("Failed to create deployment record: %v\n", err)
+				continue
+			}
+
+			// Enqueue for background processing
+			h.worker.Enqueue(d.ID)
+		}
 	}
 }
 
@@ -220,8 +342,9 @@ type GitLabPushEvent struct {
 	UserName      string `json:"user_name"`
 	ProjectID     int    `json:"project_id"`
 	ProjectPath   string `json:"path_with_namespace"`
-	ProjectURL    string `json:"project_url"`
-	CommitMessage string `json:"-"` // Extracted from commits array
+	Project       struct {
+		WebURL string `json:"web_url"`
+	} `json:"project"`
 }
 
 // HandleGitLab handles GitLab webhook requests.
@@ -255,8 +378,17 @@ func (h *Handler) HandleGitLab(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Printf("GitLab push: project=%s ref=%s sha=%s\n",
-			event.ProjectPath, event.Ref, event.CheckoutSHA)
+		pushEvent := &PushEvent{
+			Ref:            event.Ref,
+			CommitSHA:      event.CheckoutSHA,
+			RepositoryURL:  event.Project.WebURL,
+			RepositoryName: event.ProjectPath,
+		}
+		if strings.HasPrefix(event.Ref, "refs/heads/") {
+			pushEvent.Branch = strings.TrimPrefix(event.Ref, "refs/heads/")
+		}
+
+		h.processPushEvent(r.Context(), pushEvent)
 
 		w.WriteHeader(http.StatusOK)
 		writeJSONResponse(w, `{"status": "accepted"}`)
@@ -274,18 +406,4 @@ func (h *Handler) parseGitLabPushEvent(payload []byte) (*GitLabPushEvent, error)
 		return nil, fmt.Errorf("%w: %w", ErrInvalidPayload, err)
 	}
 	return &event, nil
-}
-
-// Config holds configuration for webhook handling.
-type Config struct {
-	Secret      string
-	AllowedIPs  []string // Optional IP allowlist
-	RateLimitPS int      // Rate limit per second (0 = no limit)
-}
-
-// DefaultConfig returns default webhook configuration.
-func DefaultConfig() Config {
-	return Config{
-		RateLimitPS: 10, // 10 requests per second
-	}
 }

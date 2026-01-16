@@ -33,6 +33,7 @@ type Config struct {
 	EncryptionKey string
 	SessionSecret string
 	CSRFSecret    string
+	WebhookSecret string
 
 	// GitHub OAuth
 	GitHubClientID     string
@@ -81,6 +82,7 @@ func Load() (*Config, error) {
 		EncryptionKey: os.Getenv("ENCRYPTION_KEY"),
 		SessionSecret: os.Getenv("SESSION_SECRET"),
 		CSRFSecret:    os.Getenv("CSRF_SECRET"),
+		WebhookSecret: os.Getenv("WEBHOOK_SECRET"),
 
 		// GitHub OAuth
 		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
@@ -141,6 +143,9 @@ func (c *Config) applyDefaults() {
 		}
 		if c.CSRFSecret == "" {
 			c.CSRFSecret = generateRandomKey(32)
+		}
+		if c.WebhookSecret == "" {
+			c.WebhookSecret = generateRandomKey(32)
 		}
 		// Use text logging in dev mode for readability
 		if os.Getenv("LOG_FORMAT") == "" {

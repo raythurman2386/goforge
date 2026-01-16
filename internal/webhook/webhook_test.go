@@ -48,7 +48,7 @@ func TestWebhookHandler_VerifyGitHubSignature(t *testing.T) {
 			signature: hex.EncodeToString(mac.Sum(nil)),
 			payload:   payload,
 			secret:    secret,
-			wantValid: false,
+			wantValid: true,
 		},
 		{
 			name:      "empty signature",
@@ -72,10 +72,10 @@ func TestWebhookHandler_VerifyGitHubSignature(t *testing.T) {
 			t.Parallel()
 
 			h := &Handler{}
-			valid := h.verifyGitHubSignature(tt.signature, tt.payload, tt.secret)
+			valid := h.verifySignature(tt.signature, tt.payload, tt.secret)
 
 			if valid != tt.wantValid {
-				t.Errorf("verifyGitHubSignature() = %v, want %v", valid, tt.wantValid)
+				t.Errorf("verifySignature() = %v, want %v", valid, tt.wantValid)
 			}
 		})
 	}
@@ -173,69 +173,6 @@ func TestWebhookHandler_ParseGitHubPushEvent(t *testing.T) {
 	}
 }
 
-func TestWebhookHandler_ShouldTriggerDeploy(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name         string
-		event        *PushEvent
-		targetBranch string
-		autoDeploy   bool
-		wantTrigger  bool
-	}{
-		{
-			name: "matching branch with auto deploy",
-			event: &PushEvent{
-				Branch: "main",
-			},
-			targetBranch: "main",
-			autoDeploy:   true,
-			wantTrigger:  true,
-		},
-		{
-			name: "matching branch without auto deploy",
-			event: &PushEvent{
-				Branch: "main",
-			},
-			targetBranch: "main",
-			autoDeploy:   false,
-			wantTrigger:  false,
-		},
-		{
-			name: "non-matching branch",
-			event: &PushEvent{
-				Branch: "develop",
-			},
-			targetBranch: "main",
-			autoDeploy:   true,
-			wantTrigger:  false,
-		},
-		{
-			name: "tag push should not trigger",
-			event: &PushEvent{
-				Branch: "",
-				IsTag:  true,
-			},
-			targetBranch: "main",
-			autoDeploy:   true,
-			wantTrigger:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			h := &Handler{}
-			trigger := h.shouldTriggerDeploy(tt.event, tt.targetBranch, tt.autoDeploy)
-
-			if trigger != tt.wantTrigger {
-				t.Errorf("shouldTriggerDeploy() = %v, want %v", trigger, tt.wantTrigger)
-			}
-		})
-	}
-}
 
 func TestWebhookHandler_HandleGitHub(t *testing.T) {
 	t.Parallel()
@@ -313,7 +250,7 @@ func TestWebhookHandler_HandleGitHub(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			h := NewHandler(nil, secret)
+			h := NewHandler(nil, nil, nil, nil, secret)
 			h.HandleGitHub(w, req)
 
 			if w.Code != tt.wantStatusCode {
@@ -345,6 +282,84 @@ func TestPushEvent_IsBranchPush(t *testing.T) {
 			event := &PushEvent{Ref: tt.ref}
 			if got := event.IsBranchPush(); got != tt.want {
 				t.Errorf("IsBranchPush() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWebhookHandler_HandleGitea(t *testing.T) {
+	t.Parallel()
+
+	secret := "test-secret"
+	payload := map[string]interface{}{
+		"ref":   "refs/heads/main",
+		"after": "abc123",
+		"head_commit": map[string]interface{}{
+			"id":      "abc123",
+			"message": "Test commit",
+		},
+		"repository": map[string]interface{}{
+			"full_name": "owner/repo",
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	// Calculate signature
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	signature := hex.EncodeToString(mac.Sum(nil)) // Gitea sends hex directly usually
+
+	tests := []struct {
+		name           string
+		method         string
+		body           []byte
+		signature      string
+		eventType      string
+		wantStatusCode int
+	}{
+		{
+			name:           "valid push event",
+			method:         http.MethodPost,
+			body:           body,
+			signature:      signature,
+			eventType:      "push",
+			wantStatusCode: http.StatusOK,
+		},
+		{
+			name:           "invalid method",
+			method:         http.MethodGet,
+			body:           body,
+			signature:      signature,
+			eventType:      "push",
+			wantStatusCode: http.StatusMethodNotAllowed,
+		},
+		{
+			name:           "invalid signature",
+			method:         http.MethodPost,
+			body:           body,
+			signature:      "invalid",
+			eventType:      "push",
+			wantStatusCode: http.StatusUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(tt.method, "/webhooks/gitea", bytes.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Gitea-Signature", tt.signature)
+			req.Header.Set("X-Gitea-Event", tt.eventType)
+
+			w := httptest.NewRecorder()
+
+			h := NewHandler(nil, nil, nil, nil, secret)
+			h.HandleGitea(w, req)
+
+			if w.Code != tt.wantStatusCode {
+				t.Errorf("HandleGitea() status = %d, want %d", w.Code, tt.wantStatusCode)
 			}
 		})
 	}
