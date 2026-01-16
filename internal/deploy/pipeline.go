@@ -76,13 +76,14 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	}
 
 	// Generate Traefik labels
-	labels := proxy.GenerateLabels(p, env, "traefik")
+	labels := proxy.GenerateLabels(p, env, s.traefikNetwork)
 
 	containerName := fmt.Sprintf("goforge-%s-%s-%s", p.ID, env.Name, d.ID)
 	containerID, err := s.dockerClient.CreateContainer(ctx, docker.ContainerOptions{
-		Name:   containerName,
-		Image:  imageName,
-		Labels: labels,
+		Name:        containerName,
+		Image:       imageName,
+		Labels:      labels,
+		NetworkName: s.traefikNetwork,
 	})
 	if err != nil {
 		return fmt.Errorf("docker deploy failed: %w", err)

@@ -247,6 +247,7 @@ func runServer() error {
 		gitService,
 		dockerClient,
 		sseHub,
+		cfg.TraefikNetwork,
 	)
 
 	// Initialize worker

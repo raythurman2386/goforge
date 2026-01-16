@@ -21,6 +21,7 @@ type Service struct {
 	gitService      *git.Service
 	dockerClient    *docker.Client
 	sseHub          *sse.Hub
+	traefikNetwork  string
 }
 
 // NewService creates a new deployment Service.
@@ -33,6 +34,7 @@ func NewService(
 	gs *git.Service,
 	dc *docker.Client,
 	sh *sse.Hub,
+	traefikNetwork string,
 ) *Service {
 	return &Service{
 		deploymentRepo:  dr,
@@ -43,6 +45,7 @@ func NewService(
 		gitService:      gs,
 		dockerClient:    dc,
 		sseHub:          sh,
+		traefikNetwork:  traefikNetwork,
 	}
 }
 
