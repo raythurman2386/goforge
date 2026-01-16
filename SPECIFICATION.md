@@ -163,7 +163,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
   - Webhook management
 - [ ] **6.3** Create GitLab API client in `internal/git/gitlab.go`
 - [ ] **6.4** Create Gitea API client in `internal/git/gitea.go`
-- [ ] **6.5** Implement SSH key management in `internal/git/ssh.go`
+- [x] **6.5** Implement SSH key management in `internal/git/ssh.go`
 - [x] **6.6** Create git source configuration page
 - [ ] **6.7** Build repository browser component (HTMX-powered)
 - [ ] **6.8** Create branch/tag selector dropdown
@@ -209,9 +209,9 @@ This checklist is ordered for incremental, testable implementation. Each task is
   - Create container
   - Health check
   - Switch traffic
-- [ ] **8.6** Implement blue-green deployment strategy
-- [ ] **8.7** Add health check verification with configurable endpoint
-- [ ] **8.8** Create rollback mechanism in `internal/deploy/rollback.go`
+- [x] **8.6** Implement blue-green deployment strategy
+- [x] **8.7** Add health check verification with configurable endpoint
+- [x] **8.8** Create rollback mechanism in `internal/deploy/rollback.go`
 - [ ] **8.9** Implement deployment cleanup (old images, containers)
 - [x] **8.10** Create deployment history page
 - [x] **8.11** Build deployment detail view with log viewer
@@ -236,11 +236,11 @@ This checklist is ordered for incremental, testable implementation. Each task is
   - Client connection management
   - Topic-based subscriptions
   - Broadcast functionality
-- [ ] **10.2** Implement SSE client handler in `internal/sse/client.go`
+- [x] **10.2** Implement SSE client handler in `internal/sse/client.go`
 - [ ] **10.3** Create heartbeat mechanism for connection keep-alive
-- [ ] **10.4** Implement deployment log streaming endpoint
-- [ ] **10.5** Create container log streaming endpoint
-- [ ] **10.6** Add build output streaming
+- [x] **10.4** Implement deployment log streaming endpoint
+- [x] **10.5** Create container log streaming endpoint
+- [x] **10.6** Add build output streaming
 - [ ] **10.7** Implement real-time deployment status updates
 - [x] **10.8** Create HTMX SSE extension integration
 - [ ] **10.9** Add reconnection handling with event replay

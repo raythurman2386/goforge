@@ -27,7 +27,7 @@ This roadmap tracks the development of GoForge towards its MVP release. It is de
 ### Phase 6: Git Integration
 - [x] GitHub client, git operations, source config.
 - [ ] **GitLab & Gitea Clients** (6.3, 6.4) - *Medium Priority*
-- [ ] **SSH Key Management** (6.5) - *High Priority*
+- [x] **SSH Key Management** (6.5) - Implemented with Ed25519 key generation and go-git auth
 - [ ] **Repo Browser & Branch Selector** (6.7, 6.8) - *Medium Priority*
 - [x] **Webhook Receiver & Verification** (6.9, 6.10) - Implemented with signature verification
 - [ ] **Shallow Clone** (6.12) - *Low Priority (Optimization)*
@@ -42,7 +42,7 @@ This roadmap tracks the development of GoForge towards its MVP release. It is de
 
 ### Phase 8: Deployment Pipeline
 - [x] Service, state, queue, concurrent limits, basic pipeline.
-- [ ] **Blue-Green Deployment** (8.6) - *High Priority (Reliability)*
+- [x] **Blue-Green Deployment** (8.6) - Implemented with health check verification and auto-rollback
 - [x] **Health Check Verification** (8.7) - HTTP/TCP health checks with retry logic
 - [x] **Rollback Mechanism** (8.8) - RollbackManager with validation and container restoration
 - [x] **Deployment History & Detail UI** (8.10, 8.11) - List and detail pages with status badges
@@ -57,8 +57,8 @@ This roadmap tracks the development of GoForge towards its MVP release. It is de
 
 ### Phase 10: Real-Time Features (SSE)
 - [x] Hub & HTMX integration.
-- [ ] **SSE Client Handler** (10.2) - *High Priority*
-- [ ] **Log Streaming Endpoints** (10.4, 10.5, 10.6) - *High Priority*
+- [x] **SSE Client Handler** (10.2) - Implemented topic-based registration in SSE Hub
+- [x] **Log Streaming Endpoints** (10.4, 10.5, 10.6) - Implemented for deployments, containers, and builds
 - [ ] **Status Updates** (10.7) - *Medium Priority*
 - [ ] **Reconnection Handling** (10.9) - *Medium Priority*
 - [ ] **Connection Status Indicator** (10.10) - *Low Priority*
