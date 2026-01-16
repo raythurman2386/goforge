@@ -11,9 +11,18 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
+// InstanceRepository defines the interface for instance data access.
+type InstanceRepository interface {
+	Create(ctx context.Context, s *models.ServiceInstance) error
+	GetByID(ctx context.Context, id string) (*models.ServiceInstance, error)
+	ListByUserID(ctx context.Context, userID string) ([]*models.ServiceInstance, error)
+	Update(ctx context.Context, s *models.ServiceInstance) error
+	Delete(ctx context.Context, id string) error
+}
+
 // InstanceService handles service instance management.
 type InstanceService struct {
-	instanceRepo  *repositories.ServiceInstanceRepository
+	instanceRepo  InstanceRepository
 	containerRepo *repositories.ContainerRepository
 	dockerClient  *docker.Client
 	catalog       *Catalog
@@ -21,7 +30,7 @@ type InstanceService struct {
 
 // NewInstanceService creates a new instance service.
 func NewInstanceService(
-	ir *repositories.ServiceInstanceRepository,
+	ir InstanceRepository,
 	cr *repositories.ContainerRepository,
 	dc *docker.Client,
 	c *Catalog,
