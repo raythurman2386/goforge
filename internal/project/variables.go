@@ -3,7 +3,7 @@ package project
 import (
 	"context"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // ListEnvVariables retrieves all environment variables for an environment.

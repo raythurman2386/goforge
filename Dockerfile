@@ -40,7 +40,7 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/bin/gocool .
+COPY --from=builder /app/bin/goforge .
 # Copy static files (needed for serving css/js/images)
 COPY --from=builder /app/static ./static
 # Copy templates (needed for service catalog templates)
@@ -50,9 +50,9 @@ COPY --from=builder /app/templates ./templates
 EXPOSE 8080
 
 # Environment variables defaults
-ENV GOCOOL_HOST=0.0.0.0
-ENV GOCOOL_PORT=8080
+ENV GOFORGE_HOST=0.0.0.0
+ENV GOFORGE_PORT=8080
 ENV TEMPLATES_DIR=./templates
 
 # Run the binary
-CMD ["./gocool", "serve"]
+CMD ["./goforge", "serve"]

@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-github/v53/github"
 	"golang.org/x/oauth2"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // HubProvider implements the Provider interface for GitHub.

@@ -8,9 +8,9 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 
-	"github.com/raythurman2386/gocool/internal/database/repositories"
-	"github.com/raythurman2386/gocool/internal/docker"
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/database/repositories"
+	"github.com/raythurman2386/goforge/internal/docker"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // Collector handles container metrics collection.

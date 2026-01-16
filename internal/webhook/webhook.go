@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/raythurman2386/gocool/internal/deploy"
+	"github.com/raythurman2386/goforge/internal/deploy"
 )
 
 // Webhook errors.

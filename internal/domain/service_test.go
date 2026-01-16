@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // mockRepository implements Repository for testing.
@@ -415,7 +415,7 @@ func TestDefaultConfig(t *testing.T) {
 func TestGetVerificationInstructions(t *testing.T) {
 	domain := &models.CustomDomain{
 		Domain:             "example.com",
-		VerificationRecord: "gocool-verify=abc123",
+		VerificationRecord: "goforge-verify=abc123",
 	}
 
 	instructions := GetVerificationInstructions(domain)
@@ -426,10 +426,10 @@ func TestGetVerificationInstructions(t *testing.T) {
 	if !contains(instructions, "example.com") {
 		t.Error("expected instructions to contain domain")
 	}
-	if !contains(instructions, "_gocool-verify.example.com") {
+	if !contains(instructions, "_goforge-verify.example.com") {
 		t.Error("expected instructions to contain verification record name")
 	}
-	if !contains(instructions, "gocool-verify=abc123") {
+	if !contains(instructions, "goforge-verify=abc123") {
 		t.Error("expected instructions to contain verification record value")
 	}
 }

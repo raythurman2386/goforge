@@ -6,10 +6,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/models"
-	"github.com/raythurman2386/gocool/internal/services"
-	pages_services "github.com/raythurman2386/gocool/internal/web/templates/pages/services"
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/services"
+	pages_services "github.com/raythurman2386/goforge/internal/web/templates/pages/services"
 )
 
 // ServiceHandler handles service catalog requests.

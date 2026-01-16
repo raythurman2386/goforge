@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/raythurman2386/gocool/internal/docker"
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/docker"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // Rollback related errors.

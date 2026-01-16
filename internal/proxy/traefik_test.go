@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
-const testRouterName = "gocool-proj-123-production"
+const testRouterName = "goforge-proj-123-production"
 
 func TestGenerateLabels_BasicLabels(t *testing.T) {
 	p := &models.Project{
@@ -25,9 +25,9 @@ func TestGenerateLabels_BasicLabels(t *testing.T) {
 	// Check basic labels
 	assertLabel(t, labels, "traefik.enable", "true")
 	assertLabel(t, labels, "traefik.docker.network", "traefik")
-	assertLabel(t, labels, "gocool.managed", "true")
-	assertLabel(t, labels, "gocool.project.id", "proj-123")
-	assertLabel(t, labels, "gocool.environment.id", "env-456")
+	assertLabel(t, labels, "goforge.managed", "true")
+	assertLabel(t, labels, "goforge.project.id", "proj-123")
+	assertLabel(t, labels, "goforge.environment.id", "env-456")
 }
 
 func TestGenerateLabels_WithDomain(t *testing.T) {
@@ -161,7 +161,7 @@ func TestGenerateLabelsWithOptions_PathPrefix(t *testing.T) {
 
 	labels := GenerateLabelsWithOptions(p, env, "traefik", opts)
 
-	name := "gocool-proj-123-api"
+	name := "goforge-proj-123-api"
 	assertLabel(t, labels, "traefik.http.routers."+name+".rule", "Host(`example.com`) && PathPrefix(`/api/v1`)")
 }
 
@@ -180,7 +180,7 @@ func TestGenerateLabelsWithOptions_StripPrefix(t *testing.T) {
 
 	labels := GenerateLabelsWithOptions(p, env, "traefik", opts)
 
-	name := "gocool-proj-123-api"
+	name := "goforge-proj-123-api"
 	assertLabel(t, labels, "traefik.http.middlewares."+name+"-stripprefix.stripprefix.prefixes", "/api/v1")
 	assertContains(t, labels, "traefik.http.routers."+name+".middlewares", name+"-stripprefix")
 }
@@ -224,7 +224,7 @@ func TestGenerateLabelsWithOptions_BasicAuth(t *testing.T) {
 
 	labels := GenerateLabelsWithOptions(p, env, "traefik", opts)
 
-	name := "gocool-proj-123-staging"
+	name := "goforge-proj-123-staging"
 	assertLabel(t, labels, "traefik.http.middlewares."+name+"-basicauth.basicauth.users", "admin:$apr1$xxx$yyy")
 	assertContains(t, labels, "traefik.http.routers."+name+".middlewares", name+"-basicauth")
 }
@@ -243,7 +243,7 @@ func TestGenerateLabelsWithOptions_IPWhitelist(t *testing.T) {
 
 	labels := GenerateLabelsWithOptions(p, env, "traefik", opts)
 
-	name := "gocool-proj-123-internal"
+	name := "goforge-proj-123-internal"
 	assertLabel(t, labels, "traefik.http.middlewares."+name+"-ipwhitelist.ipwhitelist.sourcerange", "10.0.0.0/8,192.168.1.0/24")
 	assertContains(t, labels, "traefik.http.routers."+name+".middlewares", name+"-ipwhitelist")
 }
@@ -328,7 +328,7 @@ func TestGenerateLabelsWithOptions_NoDomain(t *testing.T) {
 
 	// Should still have basic labels
 	assertLabel(t, labels, "traefik.enable", "true")
-	assertLabel(t, labels, "gocool.managed", "true")
+	assertLabel(t, labels, "goforge.managed", "true")
 
 	// But no routing labels
 	if _, ok := labels["traefik.http.routers."+testRouterName+".rule"]; ok {
@@ -347,7 +347,7 @@ func TestGenerateLabelsWithOptions_Sticky(t *testing.T) {
 
 	opts := LabelOptions{
 		Sticky: &StickyConfig{
-			CookieName: "gocool_session",
+			CookieName: "goforge_session",
 			Secure:     true,
 			HTTPOnly:   true,
 		},
@@ -355,7 +355,7 @@ func TestGenerateLabelsWithOptions_Sticky(t *testing.T) {
 
 	labels := GenerateLabelsWithOptions(p, env, "traefik", opts)
 
-	assertLabel(t, labels, "traefik.http.services."+testRouterName+".loadbalancer.sticky.cookie.name", "gocool_session")
+	assertLabel(t, labels, "traefik.http.services."+testRouterName+".loadbalancer.sticky.cookie.name", "goforge_session")
 	assertLabel(t, labels, "traefik.http.services."+testRouterName+".loadbalancer.sticky.cookie.secure", "true")
 	assertLabel(t, labels, "traefik.http.services."+testRouterName+".loadbalancer.sticky.cookie.httpOnly", "true")
 }
@@ -366,9 +366,9 @@ func TestGenerateName(t *testing.T) {
 		envName   string
 		want      string
 	}{
-		{"proj-123", "production", "gocool-proj-123-production"},
-		{"abc", "dev", "gocool-abc-dev"},
-		{"123-456", "staging-v2", "gocool-123-456-staging-v2"},
+		{"proj-123", "production", "goforge-proj-123-production"},
+		{"abc", "dev", "goforge-abc-dev"},
+		{"123-456", "staging-v2", "goforge-123-456-staging-v2"},
 	}
 
 	for _, tt := range tests {

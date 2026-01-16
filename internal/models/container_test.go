@@ -133,18 +133,18 @@ func TestContainer_GetLabels(t *testing.T) {
 		},
 		{
 			name:    "single label",
-			labels:  json.RawMessage(`{"app": "gocool"}`),
+			labels:  json.RawMessage(`{"app": "goforge"}`),
 			wantLen: 1,
 			wantKey: "app",
-			wantVal: "gocool",
+			wantVal: "goforge",
 			wantErr: false,
 		},
 		{
 			name:    "multiple labels",
-			labels:  json.RawMessage(`{"app": "gocool", "env": "production", "version": "1.0.0"}`),
+			labels:  json.RawMessage(`{"app": "goforge", "env": "production", "version": "1.0.0"}`),
 			wantLen: 3,
 			wantKey: "app",
-			wantVal: "gocool",
+			wantVal: "goforge",
 			wantErr: false,
 		},
 		{

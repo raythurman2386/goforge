@@ -1,8 +1,8 @@
-# GoCool / Coolify-Go — Technical Design Specification
+# GoForge — Technical Design Specification
 
 ## 1. Project Overview
 
-**Summary:** GoCool is a lightweight, self-hosted PaaS built entirely in Go with HTMX + templ for the frontend. It reimplements the core Coolify experience (git-to-deploy, one-click services, databases, SSL, monitoring) with a focus on minimal resource usage, simplicity, and a hypermedia-driven architecture.
+**Summary:** GoForge is a lightweight, self-hosted PaaS built entirely in Go with HTMX + templ for the frontend. It reimplements the core Coolify experience (git-to-deploy, one-click services, databases, SSL, monitoring) with a focus on minimal resource usage, simplicity, and a hypermedia-driven architecture.
 
 **Core Objectives:**
 - Provide git-based deployment workflows for Docker/Compose applications
@@ -65,7 +65,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ### Phase 1: Project Foundation
 
-- [x] **1.1** Initialize Go module: `go mod init github.com/raythurman2386/gocool`
+- [x] **1.1** Initialize Go module: `go mod init github.com/raythurman2386/goforge`
 - [x] **1.2** Create directory structure as specified in Section 4
 - [x] **1.3** Add core dependencies to go.mod:
   - `github.com/go-chi/chi/v5` (router)
@@ -75,7 +75,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
   - `golang.org/x/crypto` (security)
 - [x] **1.4** Create `internal/config/config.go` with struct for all configuration options
 - [x] **1.5** Implement config loading from environment variables with sensible defaults
-- [x] **1.6** Create `cmd/gocool/main.go` entry point with config loading and graceful shutdown
+- [x] **1.6** Create `cmd/goforge/main.go` entry point with config loading and graceful shutdown
 - [x] **1.7** Set up structured logging with `log/slog` in `internal/logger/logger.go`
 - [x] **1.8** Download TailwindCSS standalone CLI, create build script `scripts/tailwind.sh`
 - [x] **1.9** Create `tailwind.config.js` with content paths for templ files
@@ -284,7 +284,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [ ] **13.3** Create comprehensive error handling
 - [ ] **13.4** Implement audit logging
 - [ ] **13.5** Add graceful shutdown handling
-- [ ] **13.6** Create systemd service file `deploy/gocool.service`
+- [ ] **13.6** Create systemd service file `deploy/goforge.service`
 - [ ] **13.7** Write Docker Compose deployment file `deploy/docker-compose.yml`
 - [ ] **13.8** Create backup script for database
 - [ ] **13.9** Implement restore functionality
@@ -302,7 +302,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         GoCool Server                           │
+│                         GoForge Server                          │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │   HTTP/HTMX  │  │   SSE Hub    │  │   Background Workers │  │
@@ -346,7 +346,7 @@ Browser Request
        │
        ▼
 ┌─────────────┐
-│  GoCool     │
+│  GoForge    │
 │  HTTP       │
 │  Router     │
 └──────┬──────┘
@@ -695,9 +695,9 @@ $$ LANGUAGE plpgsql;
 ### File Structure
 
 ```
-gocool/
+goforge/
 ├── cmd/
-│   └── gocool/
+│   └── goforge/
 │       └── main.go                    # Entry point, config loading, server start
 ├── internal/
 │   ├── config/
@@ -844,7 +844,7 @@ gocool/
 ├── deploy/
 │   ├── docker-compose.yml             # Production deployment
 │   ├── docker-compose.dev.yml         # Development
-│   ├── gocool.service                 # systemd service
+│   ├── goforge.service                 # systemd service
 │   └── traefik/
 │       └── traefik.yml                # Traefik base config
 ├── scripts/
@@ -945,9 +945,9 @@ backup:
 // internal/config/config.go
 type Config struct {
     // Server
-    Host            string        `env:"GOCOOL_HOST" default:"0.0.0.0"`
-    Port            int           `env:"GOCOOL_PORT" default:"8080"`
-    BaseURL         string        `env:"GOCOOL_BASE_URL" default:"http://localhost:8080"`
+    Host            string        `env:"GOFORGE_HOST" default:"0.0.0.0"`
+    Port            int           `env:"GOFORGE_PORT" default:"8080"`
+    BaseURL         string        `env:"GOFORGE_BASE_URL" default:"http://localhost:8080"`
     
     // Database
     DatabaseURL     string        `env:"DATABASE_URL" required:"true"`
@@ -1035,11 +1035,11 @@ labels := map[string]string{
     "traefik.http.routers.{name}.tls.certresolver": "letsencrypt",
     "traefik.http.services.{name}.loadbalancer.server.port": "{port}",
     "traefik.docker.network": "{traefik_network}",
-    // GoCool metadata
-    "gocool.managed": "true",
-    "gocool.project.id": "{project_id}",
-    "gocool.environment.id": "{environment_id}",
-    "gocool.deployment.id": "{deployment_id}",
+    // GoForge metadata
+    "goforge.managed": "true",
+    "goforge.project.id": "{project_id}",
+    "goforge.environment.id": "{environment_id}",
+    "goforge.deployment.id": "{deployment_id}",
 }
 ```
 
@@ -1115,7 +1115,7 @@ Metrics (optional):
 
 ```bash
 # Required
-- Go 1.22+
+- Go 1.25+
 - Docker Engine
 - PostgreSQL 15+
 - templ CLI
@@ -1133,7 +1133,7 @@ Metrics (optional):
 
 # Build production binary
 build: css templ
-	go build -o bin/gocool ./cmd/gocool
+	go build -o bin/goforge ./cmd/goforge
 
 # Development with hot reload
 dev:
@@ -1149,7 +1149,7 @@ templ:
 
 # Run migrations
 migrate:
-	go run ./cmd/gocool migrate up
+	go run ./cmd/goforge migrate up
 
 # Run tests
 test:
@@ -1164,13 +1164,13 @@ lint:
 
 ```bash
 # .env.example
-DATABASE_URL=postgres://gocool:password@localhost:5432/gocool?sslmode=disable
+DATABASE_URL=postgres://goforge:password@localhost:5432/goforge?sslmode=disable
 ENCRYPTION_KEY=base64-encoded-32-byte-key
 SESSION_SECRET=random-secret-for-sessions
 CSRF_SECRET=random-secret-for-csrf
 GITHUB_CLIENT_ID=your-github-oauth-client-id
 GITHUB_CLIENT_SECRET=your-github-oauth-client-secret
-GOCOOL_BASE_URL=http://localhost:8080
+GOFORGE_BASE_URL=http://localhost:8080
 TRAEFIK_NETWORK=traefik
 ACME_EMAIL=admin@example.com
 TEMPLATES_DIR=./templates

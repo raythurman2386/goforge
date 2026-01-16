@@ -9,7 +9,7 @@ vendor
 node_modules
 *.log
 coverage.*
-gocool
+goforge
 tests
 scripts
 .golangci.yml

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 func TestUserRepository_Create(t *testing.T) {

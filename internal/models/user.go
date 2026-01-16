@@ -1,4 +1,4 @@
-// Package models contains the domain models for GoCool.
+// Package models contains the domain models for GoForge.
 package models
 
 import (

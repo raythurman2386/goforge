@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 const (
@@ -108,7 +108,7 @@ type StickyConfig struct {
 
 // GenerateName creates a unique router/service name from project and environment.
 func GenerateName(projectID, envName string) string {
-	return fmt.Sprintf("gocool-%s-%s", projectID, envName)
+	return fmt.Sprintf("goforge-%s-%s", projectID, envName)
 }
 
 // GenerateLabels generates Traefik labels for an environment with default options.
@@ -123,9 +123,9 @@ func GenerateLabelsWithOptions(p *models.Project, env *models.Environment, netwo
 	labels := Labels{
 		"traefik.enable":         labelTrue,
 		"traefik.docker.network": network,
-		"gocool.managed":         labelTrue,
-		"gocool.project.id":      p.ID,
-		"gocool.environment.id":  env.ID,
+		"goforge.managed":        labelTrue,
+		"goforge.project.id":     p.ID,
+		"goforge.environment.id": env.ID,
 	}
 
 	// Only add routing labels if domain is set

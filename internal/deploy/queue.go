@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // Worker represents a deployment worker.

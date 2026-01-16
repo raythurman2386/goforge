@@ -1,4 +1,4 @@
-// Package repositories provides data access layer for GoCool.
+// Package repositories provides data access layer for GoForge.
 package repositories
 
 import (
@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // Common errors

@@ -9,8 +9,8 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/raythurman2386/gocool/internal/config"
-	"github.com/raythurman2386/gocool/internal/database"
+	"github.com/raythurman2386/goforge/internal/config"
+	"github.com/raythurman2386/goforge/internal/database"
 )
 
 func setupSharedTestDB(t *testing.T) *sql.DB {
@@ -18,7 +18,7 @@ func setupSharedTestDB(t *testing.T) *sql.DB {
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://gocool:password@localhost:5432/gocool?sslmode=disable"
+		dsn = "postgres://goforge:password@localhost:5432/goforge?sslmode=disable"
 	}
 
 	cfg := &config.Config{
@@ -26,12 +26,12 @@ func setupSharedTestDB(t *testing.T) *sql.DB {
 		DatabaseURL:  dsn,
 	}
 
-	gocoolDB, err := database.New(cfg)
+	goforgeDB, err := database.New(cfg)
 	if err != nil {
 		t.Skipf("skipping test; failed to connect to postgres: %v", err)
 	}
 
-	if err := database.MigrateUp(gocoolDB, cfg); err != nil {
+	if err := database.MigrateUp(goforgeDB, cfg); err != nil {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
 
@@ -43,7 +43,7 @@ func setupSharedTestDB(t *testing.T) *sql.DB {
 	}
 
 	for _, table := range tables {
-		_, err := gocoolDB.ExecContext(context.Background(), fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+		_, err := goforgeDB.ExecContext(context.Background(), fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
 		if err != nil {
 			// Ignore error if table doesn't exist (e.g. before migrations run properly? No, migrations ran.)
 			// But maybe migrations failed silently? No.
@@ -52,5 +52,5 @@ func setupSharedTestDB(t *testing.T) *sql.DB {
 		}
 	}
 
-	return gocoolDB.DB
+	return goforgeDB.DB
 }

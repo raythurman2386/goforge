@@ -89,9 +89,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: gocool
+          POSTGRES_USER: goforge
           POSTGRES_PASSWORD: testpassword
-          POSTGRES_DB: gocool_test
+          POSTGRES_DB: goforge_test
         ports:
           - 5432:5432
         options: >-
@@ -130,7 +130,7 @@ jobs:
 
       - name: Run tests
         env:
-          DATABASE_URL: postgres://gocool:testpassword@localhost:5432/gocool_test?sslmode=disable
+          DATABASE_URL: postgres://goforge:testpassword@localhost:5432/goforge_test?sslmode=disable
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
@@ -160,13 +160,13 @@ jobs:
         run: templ generate
 
       - name: Build binary
-        run: go build -ldflags "-s -w" -o bin/gocool ./cmd/gocool
+        run: go build -ldflags "-s -w" -o bin/goforge ./cmd/goforge
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gocool-linux-amd64
-          path: bin/gocool
+          name: goforge-linux-amd64
+          path: bin/goforge
 
   # Security scan
   security:

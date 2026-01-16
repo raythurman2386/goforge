@@ -7,8 +7,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/raythurman2386/gocool/internal/database/repositories"
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/database/repositories"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 func setupSessionTestDB(t *testing.T) *sql.DB {

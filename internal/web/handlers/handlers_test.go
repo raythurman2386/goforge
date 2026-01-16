@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 func TestHealth(t *testing.T) {
@@ -137,8 +137,8 @@ func TestLoginPage(t *testing.T) {
 	}
 
 	body := w.Body.String()
-	if !strings.Contains(body, "GoCool") {
-		t.Error("LoginPage() missing GoCool title")
+	if !strings.Contains(body, "GoForge") {
+		t.Error("LoginPage() missing GoForge title")
 	}
 	if !strings.Contains(body, "/auth/github") {
 		t.Error("LoginPage() missing GitHub auth link")

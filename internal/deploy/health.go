@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/raythurman2386/gocool/internal/docker"
+	"github.com/raythurman2386/goforge/internal/docker"
 )
 
 // Health check related errors.
@@ -102,7 +102,7 @@ func (h *HealthChecker) Check(ctx context.Context, baseURL, path string) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "GoCool-HealthCheck/1.0")
+	req.Header.Set("User-Agent", "GoForge-HealthCheck/1.0")
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {

@@ -1,6 +1,6 @@
-# GoCool
+# GoForge
 
-GoCool is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
+GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
 ## Features
 
@@ -24,8 +24,8 @@ GoCool is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/raythurman2386/gocool.git
-    cd gocool
+    git clone https://github.com/raythurman2386/goforge.git
+    cd goforge
     ```
 
 2.  **Install dependencies:**
@@ -36,7 +36,7 @@ GoCool is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 3.  **Configure environment:**
     Create a `.env` file or use environment variables. In development mode, secrets are generated automatically.
     ```bash
-    export GOCOOL_DEV_MODE=true
+    export GOFORGE_DEV_MODE=true
     ```
 
 4.  **Run migrations:**
@@ -60,7 +60,7 @@ GoCool is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
 ## Architecture
 
-GoCool follows a clean architecture with:
+GoForge follows a clean architecture with:
 - **Cmd:** Entry point and CLI commands.
 - **Internal:** Core logic separated into `auth`, `project`, `docker`, `git`, `deploy`, `proxy`, `sse`, and `monitor`.
 - **Web:** HTMX + Templ frontend with a RESTful-ish backend.

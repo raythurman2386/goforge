@@ -7,7 +7,7 @@ GOTEST=$(GOCMD) test
 GOVET=$(GOCMD) vet
 GOFMT=gofmt
 GOMOD=$(GOCMD) mod
-BINARY_NAME=gocool
+BINARY_NAME=goforge
 BINARY_PATH=bin/$(BINARY_NAME)
 
 # Tools
@@ -31,15 +31,15 @@ help:
 
 ## build: Build production binary
 build: templ css
-	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/gocool
+	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/goforge
 
 ## dev: Run with hot reload (requires air)
 dev:
-	GOCOOL_DEV_MODE=true $(AIR)
+	GOFORGE_DEV_MODE=true $(AIR)
 
 ## run: Run the server directly
 run: templ
-	GOCOOL_DEV_MODE=true $(GOCMD) run ./cmd/gocool
+	GOFORGE_DEV_MODE=true $(GOCMD) run ./cmd/goforge
 
 ## test: Run all tests
 test:
@@ -89,20 +89,20 @@ css-watch:
 
 ## migrate: Run database migrations up
 migrate:
-	$(GOCMD) run ./cmd/gocool migrate up
+	$(GOCMD) run ./cmd/goforge migrate up
 
 ## migrate-down: Rollback last migration
 migrate-down:
-	$(GOCMD) run ./cmd/gocool migrate down 1
+	$(GOCMD) run ./cmd/goforge migrate down 1
 
 ## migrate-status: Show migration status
 migrate-status:
-	$(GOCMD) run ./cmd/gocool migrate status
+	$(GOCMD) run ./cmd/goforge migrate status
 
 ## migrate-create: Create new migration (usage: make migrate-create name=create_users)
 migrate-create:
 	@test -n "$(name)" || (echo "Usage: make migrate-create name=migration_name" && exit 1)
-	$(GOCMD) run ./cmd/gocool migrate create $(name)
+	$(GOCMD) run ./cmd/goforge migrate create $(name)
 
 ## tidy: Tidy and verify dependencies
 tidy:
@@ -131,11 +131,11 @@ install-tools:
 
 ## docker-build: Build Docker image
 docker-build:
-	docker build -t gocool:latest .
+	docker build -t goforge:latest .
 
 ## docker-run: Run in Docker
 docker-run:
-	docker run --rm -p 8080:8080 --env-file .env gocool:latest
+	docker run --rm -p 8080:8080 --env-file .env goforge:latest
 
 ## check: Run all checks (fmt, vet, lint, test)
 check: fmt-check vet lint test

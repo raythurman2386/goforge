@@ -66,13 +66,13 @@ type Config struct {
 
 // Load reads configuration from environment variables with sensible defaults.
 func Load() (*Config, error) {
-	devMode := getEnvBool("GOCOOL_DEV_MODE", false)
+	devMode := getEnvBool("GOFORGE_DEV_MODE", false)
 
 	cfg := &Config{
 		// Server defaults
-		Host:    getEnv("GOCOOL_HOST", "0.0.0.0"),
-		Port:    getEnvInt("GOCOOL_PORT", 8080),
-		BaseURL: getEnv("GOCOOL_BASE_URL", "http://localhost:8080"),
+		Host:    getEnv("GOFORGE_HOST", "0.0.0.0"),
+		Port:    getEnvInt("GOFORGE_PORT", 8080),
+		BaseURL: getEnv("GOFORGE_BASE_URL", "http://localhost:8080"),
 
 		// Database - defaults to SQLite in dev mode
 		DatabaseURL: getEnv("DATABASE_URL", ""),
@@ -127,7 +127,7 @@ func (c *Config) applyDefaults() {
 	// Determine database type and set defaults
 	if c.DatabaseURL == "" {
 		// Default to Postgres in dev
-		c.DatabaseURL = "postgres://gocool:password@localhost:5432/gocool?sslmode=disable"
+		c.DatabaseURL = "postgres://goforge:password@localhost:5432/goforge?sslmode=disable"
 	}
 	c.DatabaseType = DatabaseTypePostgres
 
