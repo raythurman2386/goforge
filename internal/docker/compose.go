@@ -24,6 +24,9 @@ type ServiceConfig struct {
 	Volumes     []string    `yaml:"volumes"`
 	Networks    []string    `yaml:"networks"`
 	DependsOn   []string    `yaml:"depends_on"`
+	Labels      Labels      `yaml:"labels"`
+	Restart     string      `yaml:"restart"`
+	HealthCheck HealthCheck `yaml:"healthcheck"`
 }
 
 // BuildConfig represents the build configuration for a service.
@@ -81,6 +84,72 @@ func (e *Environment) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	return fmt.Errorf("unsupported type for environment: %v", value.Kind)
+}
+
+// Labels represents container labels, handling both map and list formats.
+type Labels map[string]string
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface for Labels.
+func (l *Labels) UnmarshalYAML(value *yaml.Node) error {
+	if *l == nil {
+		*l = make(Labels)
+	}
+
+	if value.Kind == yaml.MappingNode {
+		var m map[string]string
+		if err := value.Decode(&m); err != nil {
+			return err
+		}
+		for k, v := range m {
+			(*l)[k] = v
+		}
+		return nil
+	}
+
+	if value.Kind == yaml.SequenceNode {
+		var s []string
+		if err := value.Decode(&s); err != nil {
+			return err
+		}
+		for _, item := range s {
+			parts := strings.SplitN(item, "=", 2)
+			if len(parts) == 2 {
+				(*l)[parts[0]] = parts[1]
+			} else {
+				(*l)[parts[0]] = ""
+			}
+		}
+		return nil
+	}
+
+	return fmt.Errorf("unsupported type for labels: %v", value.Kind)
+}
+
+// HealthCheck represents a health check configuration.
+type HealthCheck struct {
+	Test        []string `yaml:"test"`
+	Interval    string   `yaml:"interval"`
+	Timeout     string   `yaml:"timeout"`
+	Retries     int      `yaml:"retries"`
+	StartPeriod string   `yaml:"start_period"`
+	Disable     bool     `yaml:"disable"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface for HealthCheck.
+func (h *HealthCheck) UnmarshalYAML(value *yaml.Node) error {
+	type plain HealthCheck
+	if err := value.Decode((*plain)(h)); err == nil {
+		return nil
+	}
+	
+	// Handle case where test is a single string
+	var testCmd string
+	if err := value.Decode(&testCmd); err == nil {
+		h.Test = []string{"CMD-SHELL", testCmd}
+		return nil
+	}
+
+	return fmt.Errorf("failed to unmarshal healthcheck")
 }
 
 // ParseCompose parses a Docker Compose YAML file.

@@ -102,5 +102,18 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	}
 
 	// 5. Transition to Running
-	return s.Transition(ctx, d.ID, models.DeploymentStatusRunning, nil)
+	if err := s.Transition(ctx, d.ID, models.DeploymentStatusRunning, nil); err != nil {
+		return err
+	}
+
+	// 6. Cleanup old deployments (async)
+	go func() {
+		// Create a new context for cleanup as the request context might be cancelled
+		cleanupCtx := context.Background()
+		if err := s.CleanupOldDeployments(cleanupCtx, d.EnvironmentID, d.ID); err != nil {
+			fmt.Printf("failed to cleanup old deployments: %v\n", err)
+		}
+	}()
+
+	return nil
 }
