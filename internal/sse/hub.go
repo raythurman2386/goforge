@@ -99,6 +99,22 @@ func (h *Hub) Broadcast(topic string, data interface{}) {
 	}
 }
 
+// RegisterClient registers a client channel for a specific topic.
+func (h *Hub) RegisterClient(ch chan Event, topic string) {
+	select {
+	case h.register <- clientInfo{ch: ch, topic: topic}:
+	case <-h.quit:
+	}
+}
+
+// UnregisterClient unregisters a client channel.
+func (h *Hub) UnregisterClient(ch chan Event) {
+	select {
+	case h.unregister <- ch:
+	case <-h.quit:
+	}
+}
+
 // ServeHTTP handles SSE connections.
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
