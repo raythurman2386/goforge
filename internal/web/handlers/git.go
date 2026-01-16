@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/raythurman2386/goforge/internal/auth"
@@ -30,7 +29,7 @@ func NewGitHandler(gsr *repositories.GitSourceRepository, gs *git.Service) *GitH
 func (h *GitHandler) ListRepositories(w http.ResponseWriter, r *http.Request) {
 	sourceID := r.URL.Query().Get("source_id")
 	if sourceID == "" {
-		// Return empty or manual input indicator if needed, 
+		// Return empty or manual input indicator if needed,
 		// but here we likely just want to return nothing or handle it gracefully
 		return
 	}
@@ -69,7 +68,7 @@ func (h *GitHandler) ListRepositories(w http.ResponseWriter, r *http.Request) {
 func (h *GitHandler) ListBranches(w http.ResponseWriter, r *http.Request) {
 	sourceID := r.URL.Query().Get("source_id")
 	repoURL := r.URL.Query().Get("repository_url")
-	
+
 	if sourceID == "" || repoURL == "" {
 		return
 	}
@@ -116,35 +115,30 @@ func (h *GitHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 	// Logic similar to ListBranches, implemented if UI switches to tags
 	// For now, let's assume branches are primary.
 	// If needed, we can add a toggle in UI to call this.
-	return
 }
 
-func parseOwnerRepo(repoURL string) (string, string) {
-	// Handle git@...:owner/repo.git or https://.../owner/repo.git or .../owner/repo
-	
-	// Simple parsing for standard HTTPS URLs
-	u, err := url.Parse(repoURL)
-	if err == nil && u.Scheme != "" {
-		path := strings.Trim(u.Path, "/")
-		path = strings.TrimSuffix(path, ".git")
-		parts := strings.Split(path, "/")
+func parseOwnerRepo(repoURL string) (owner, repo string) {
+	// Simple heuristic for common git URLs
+	// https://github.com/owner/repo.git
+	// git@github.com:owner/repo.git
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+	repoURL = strings.TrimSuffix(repoURL, "/")
+
+	if strings.HasPrefix(repoURL, "http") {
+		parts := strings.Split(repoURL, "/")
 		if len(parts) >= 2 {
 			return parts[len(parts)-2], parts[len(parts)-1]
 		}
-	}
-
-	// Fallback/SSH (simplified)
-	// git@github.com:raythurman2386/goforge.git
-	if strings.Contains(repoURL, ":") {
+	} else if strings.Contains(repoURL, ":") {
+		// SSH format
 		parts := strings.Split(repoURL, ":")
 		if len(parts) == 2 {
-			path := strings.TrimSuffix(parts[1], ".git")
-			subParts := strings.Split(path, "/")
-			if len(subParts) == 2 {
-				return subParts[0], subParts[1]
+			parts = strings.Split(parts[1], "/")
+			if len(parts) == 2 {
+				return parts[0], parts[1]
 			}
 		}
 	}
-	
+
 	return "", ""
 }

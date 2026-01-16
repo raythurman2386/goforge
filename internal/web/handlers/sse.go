@@ -154,13 +154,13 @@ func (h *SSEHandler) ContainerStats(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			
+
 			var buf bytes.Buffer
 			if err := partials.Stats(stats).Render(r.Context(), &buf); err != nil {
 				continue
 			}
 			writeRawEvent(w, flusher, "stats", buf.Bytes())
-			
+
 		case <-r.Context().Done():
 			return
 		}

@@ -141,7 +141,7 @@ func (h *HealthCheck) UnmarshalYAML(value *yaml.Node) error {
 	if err := value.Decode((*plain)(h)); err == nil {
 		return nil
 	}
-	
+
 	// Handle case where test is a single string
 	var testCmd string
 	if err := value.Decode(&testCmd); err == nil {

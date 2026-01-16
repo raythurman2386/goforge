@@ -220,6 +220,7 @@ func (r *ProjectRepository) ListByRepoURL(ctx context.Context, repoURL string) (
 	}
 	return projects, rows.Err()
 }
+
 // Delete deletes a project.
 func (r *ProjectRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM projects WHERE id = $1`

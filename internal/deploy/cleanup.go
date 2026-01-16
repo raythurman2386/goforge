@@ -8,7 +8,7 @@ import (
 )
 
 // CleanupOldDeployments stops containers from previous deployments of the same environment.
-func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID string, currentDeploymentID string) error {
+func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, currentDeploymentID string) error {
 	// 1. List recent deployments for the environment
 	deployments, err := s.deploymentRepo.ListByEnvironmentID(ctx, environmentID, 10)
 	if err != nil {
@@ -48,7 +48,7 @@ func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID strin
 			}
 		}
 	}
-	
+
 	// Prune dangling images (optional, maybe run this async or periodically, but for now we do it here)
 	// We don't error out if pruning fails
 	if _, err := s.dockerClient.PruneImages(ctx); err != nil {

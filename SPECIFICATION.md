@@ -93,14 +93,14 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **2.3** Set up golang-migrate in `internal/database/migrations.go`
 - [x] **2.4** Create migration `001_create_users.up.sql` and `.down.sql`
 - [x] **2.5** Create migration `002_create_sessions.up.sql` and `.down.sql`
-- [x] **2.6** Create migration `003_create_git_sources.up.sql` and `.down.sql`
-- [x] **2.7** Create migration `004_create_projects.up.sql` and `.down.sql`
-- [x] **2.8** Create migration `005_create_environments.up.sql` and `.down.sql`
-- [x] **2.9** Create migration `006_create_env_variables.up.sql` and `.down.sql`
-- [x] **2.10** Create migration `007_create_deployments.up.sql` and `.down.sql`
-- [x] **2.11** Create migration `008_create_containers.up.sql` and `.down.sql`
-- [x] **2.12** Create migration `009_create_service_instances.up.sql` and `.down.sql`
-- [x] **2.13** Create migration `010_create_audit_logs.up.sql` and `.down.sql`
+- [x] **2.6** Create migration `003_create_git_sources.up.sql" and ".down.sql`
+- [x] **2.7** Create migration `004_create_projects.up.sql" and ".down.sql`
+- [x] **2.8** Create migration `005_create_environments.up.sql" and ".down.sql`
+- [x] **2.9** Create migration `006_create_env_variables.up.sql" and ".down.sql`
+- [x] **2.10** Create migration `007_create_deployments.up.sql" and ".down.sql`
+- [x] **2.11** Create migration `008_create_containers.up.sql" and ".down.sql`
+- [x] **2.12** Create migration `009_create_service_instances.up.sql" and ".down.sql`
+- [x] **2.13** Create migration `010_create_audit_logs.up.sql" and ".down.sql`
 - [x] **2.14** Create `internal/models/` package with Go structs matching schema
 - [x] **2.15** Implement repository pattern in `internal/database/repositories/`
 
@@ -132,7 +132,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **4.4** Create modal component (HTMX-driven)
 - [x] **4.5** Build form components (input, select, checkbox, button)
 - [x] **4.6** Create table component with sorting support
-- [ ] **4.7** Build pagination component
+- [x] **4.7** Build pagination component
 - [x] **4.8** Create loading spinner component
 - [x] **4.9** Build empty state component
 - [x] **4.10** Create error page templates (404, 500, 403)
@@ -151,7 +151,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **5.10** Add secret masking toggle for sensitive variables
 - [x] **5.11** Create project settings page
 - [x] **5.12** Implement project deletion with confirmation modal
-- [ ] **5.13** Add project search/filter functionality
+- [x] **5.13** Add project search/filter functionality
 
 ### Phase 6: Git Integration
 
@@ -161,37 +161,37 @@ This checklist is ordered for incremental, testable implementation. Each task is
   - Branch listing
   - Commit fetching
   - Webhook management
-- [ ] **6.3** Create GitLab API client in `internal/git/gitlab.go`
-- [ ] **6.4** Create Gitea API client in `internal/git/gitea.go`
+- [x] **6.3** Create GitLab API client in `internal/git/gitlab.go`
+- [x] **6.4** Create Gitea API client in `internal/git/gitea.go`
 - [x] **6.5** Implement SSH key management in `internal/git/ssh.go`
 - [x] **6.6** Create git source configuration page
-- [ ] **6.7** Build repository browser component (HTMX-powered)
-- [ ] **6.8** Create branch/tag selector dropdown
-- [ ] **6.9** Implement webhook receiver in `internal/web/handlers/webhooks.go`
-- [ ] **6.10** Add webhook signature verification (GitHub, GitLab, Gitea)
+- [x] **6.7** Build repository browser component (HTMX-powered)
+- [x] **6.8** Create branch/tag selector dropdown
+- [x] **6.9** Implement webhook receiver in `internal/web/handlers/webhooks.go`
+- [x] **6.10** Add webhook signature verification (GitHub, GitLab, Gitea)
 - [x] **6.11** Create git clone/pull operations in `internal/git/operations.go`
-- [ ] **6.12** Implement shallow clone for faster deployments
+- [x] **6.12** Implement shallow clone for faster deployments
 
 ### Phase 7: Docker Integration
 
 - [x] **7.1** Create `internal/docker/client.go` wrapping Docker SDK
-- [ ] **7.2** Implement connection health check and reconnection
+- [x] **7.2** Implement connection health check and reconnection
 - [x] **7.3** Create image builder in `internal/docker/build.go`:
   - Dockerfile detection
   - Build context preparation
   - Layer caching configuration
   - Progress streaming
-- [ ] **7.4** Implement docker-compose parser in `internal/docker/compose.go`
+- [x] **7.4** Implement docker-compose parser in `internal/docker/compose.go`
 - [x] **7.5** Create container manager in `internal/docker/container.go`:
   - Create, start, stop, restart, remove
   - Environment variable injection
   - Port mapping
   - Volume mounting
 - [x] **7.6** Implement log streaming in `internal/docker/logs.go`
-- [ ] **7.7** Create network manager in `internal/docker/network.go`
-- [ ] **7.8** Implement volume manager in `internal/docker/volume.go`
-- [ ] **7.9** Add image cleanup/pruning functionality
-- [ ] **7.10** Create Docker event listener for container state changes
+- [x] **7.7** Create network manager in `internal/docker/network.go`
+- [x] **7.8** Implement volume manager in `internal/docker/volume.go`
+- [x] **7.9** Add image cleanup/pruning functionality
+- [x] **7.10** Create Docker event listener for container state changes
 
 ### Phase 8: Deployment Pipeline
 
@@ -212,7 +212,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **8.6** Implement blue-green deployment strategy
 - [x] **8.7** Add health check verification with configurable endpoint
 - [x] **8.8** Create rollback mechanism in `internal/deploy/rollback.go`
-- [ ] **8.9** Implement deployment cleanup (old images, containers)
+- [x] **8.9** Implement deployment cleanup (old images, containers)
 - [x] **8.10** Create deployment history page
 - [x] **8.11** Build deployment detail view with log viewer
 - [x] **8.12** Add manual deployment trigger button
@@ -220,15 +220,15 @@ This checklist is ordered for incremental, testable implementation. Each task is
 ### Phase 9: Traefik Integration
 
 - [x] **9.1** Create `internal/proxy/traefik.go` for Traefik management
-- [ ] **9.2** Implement Docker labels generation for Traefik routing
-- [ ] **9.3** Create Let's Encrypt certificate resolver configuration
-- [ ] **9.4** Implement domain validation
-- [ ] **9.5** Add custom domain management UI
-- [ ] **9.6** Create SSL certificate status checking
-- [ ] **9.7** Implement Traefik dashboard proxy (optional, secured)
-- [ ] **9.8** Add HTTP to HTTPS redirect configuration
-- [ ] **9.9** Create middleware configuration (rate limiting, headers)
-- [ ] **9.10** Implement wildcard subdomain support
+- [x] **9.2** Implement Docker labels generation for Traefik routing
+- [x] **9.3** Create Let's Encrypt certificate resolver configuration
+- [x] **9.4** Implement domain validation
+- [x] **9.5** Add custom domain management UI
+- [x] **9.6** Create SSL certificate status checking
+- [x] **9.7** Implement Traefik dashboard proxy (optional, secured)
+- [x] **9.8** Add HTTP to HTTPS redirect configuration
+- [x] **9.9** Create middleware configuration (rate limiting, headers)
+- [x] **9.10** Implement wildcard subdomain support
 
 ### Phase 10: Real-Time Features (SSE)
 
@@ -237,62 +237,62 @@ This checklist is ordered for incremental, testable implementation. Each task is
   - Topic-based subscriptions
   - Broadcast functionality
 - [x] **10.2** Implement SSE client handler in `internal/sse/client.go`
-- [ ] **10.3** Create heartbeat mechanism for connection keep-alive
+- [x] **10.3** Create heartbeat mechanism for connection keep-alive
 - [x] **10.4** Implement deployment log streaming endpoint
 - [x] **10.5** Create container log streaming endpoint
 - [x] **10.6** Add build output streaming
-- [ ] **10.7** Implement real-time deployment status updates
+- [x] **10.7** Implement real-time deployment status updates
 - [x] **10.8** Create HTMX SSE extension integration
-- [ ] **10.9** Add reconnection handling with event replay
-- [ ] **10.10** Implement client-side connection status indicator
+- [x] **10.9** Add reconnection handling with event replay
+- [x] **10.10** Implement client-side connection status indicator
 
 ### Phase 11: Resource Monitoring
 
 - [x] **11.1** Create `internal/monitor/stats.go` for Docker stats collection
-- [ ] **11.2** Implement periodic stats polling per container
-- [ ] **11.3** Create metrics storage schema (time-series in PostgreSQL)
-- [ ] **11.4** Implement metrics retention policy (7-day rolling)
-- [ ] **11.5** Build CPU usage chart component (server-rendered SVG)
-- [ ] **11.6** Build memory usage chart component
-- [ ] **11.7** Create disk usage display
-- [ ] **11.8** Implement container health status indicators
-- [ ] **11.9** Add resource usage alerts (configurable thresholds)
-- [ ] **11.10** Create dashboard overview with aggregate stats
-- [ ] **11.11** Implement per-container detail view
+- [x] **11.2** Implement periodic stats polling per container
+- [x] **11.3** Create metrics storage schema (time-series in PostgreSQL)
+- [x] **11.4** Implement metrics retention policy (7-day rolling)
+- [x] **11.5** Build CPU usage chart component (server-rendered SVG)
+- [x] **11.6** Build memory usage chart component
+- [x] **11.7** Create disk usage display
+- [x] **11.8** Implement container health status indicators
+- [x] **11.9** Add resource usage alerts (configurable thresholds)
+- [x] **11.10** Create dashboard overview with aggregate stats
+- [x] **11.11** Implement per-container detail view
 
 ### Phase 12: One-Click Services
 
 - [x] **12.1** Create `internal/services/catalog.go` for template loading
 - [x] **12.2** Define service template YAML schema
-- [ ] **12.3** Implement template directory watching for hot-reload
+- [x] **12.3** Implement template directory watching for hot-reload
 - [x] **12.4** Create PostgreSQL service template
 - [x] **12.5** Create Redis service template
-- [ ] **12.6** Create MySQL/MariaDB service template
-- [ ] **12.7** Create MongoDB service template
-- [ ] **12.8** Create Plausible Analytics service template
-- [ ] **12.9** Create PocketBase service template
+- [x] **12.6** Create MySQL/MariaDB service template
+- [x] **12.7** Create MongoDB service template
+- [x] **12.8** Create Plausible Analytics service template
+- [x] **12.9** Create PocketBase service template
 - [x] **12.10** Build service catalog browser page
 - [x] **12.11** Create service configuration wizard
 - [x] **12.12** Implement service instance management in `internal/services/instance.go`
-- [ ] **12.13** Add connection string exposure to linked projects
-- [ ] **12.14** Create service backup/restore functionality
+- [x] **12.13** Add connection string exposure to linked projects
+- [x] **12.14** Create service backup/restore functionality
 
 ### Phase 13: Polish & Production Readiness
 
-- [ ] **13.1** Implement rate limiting middleware
-- [ ] **13.2** Add request validation and sanitization
-- [ ] **13.3** Create comprehensive error handling
-- [ ] **13.4** Implement audit logging
-- [ ] **13.5** Add graceful shutdown handling
-- [ ] **13.6** Create systemd service file `deploy/goforge.service`
-- [ ] **13.7** Write Docker Compose deployment file `deploy/docker-compose.yml`
-- [ ] **13.8** Create backup script for database
-- [ ] **13.9** Implement restore functionality
-- [ ] **13.10** Add Prometheus metrics endpoint (optional)
-- [ ] **13.11** Create readiness endpoint `GET /health/ready`
-- [ ] **13.12** Write integration tests for critical paths
-- [ ] **13.13** Add E2E tests with Playwright
-- [ ] **13.14** Create user documentation
+- [x] **13.1** Implement rate limiting middleware
+- [x] **13.2** Add request validation and sanitization
+- [x] **13.3** Create comprehensive error handling
+- [x] **13.4** Implement audit logging
+- [x] **13.5** Add graceful shutdown handling
+- [x] **13.6** Create systemd service file `deploy/goforge.service`
+- [x] **13.7** Write Docker Compose deployment file `deploy/docker-compose.yml`
+- [x] **13.8** Create backup script for database
+- [x] **13.9** Implement restore functionality
+- [x] **13.10** Add Prometheus metrics endpoint (optional)
+- [x] **13.11** Create readiness endpoint `GET /health/ready`
+- [x] **13.12** Write integration tests for critical paths
+- [x] **13.13** Add E2E tests with Playwright
+- [x] **13.14** Create user documentation
 
 ---
 

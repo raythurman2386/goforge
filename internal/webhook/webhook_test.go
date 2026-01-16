@@ -173,7 +173,6 @@ func TestWebhookHandler_ParseGitHubPushEvent(t *testing.T) {
 	}
 }
 
-
 func TestWebhookHandler_HandleGitHub(t *testing.T) {
 	t.Parallel()
 

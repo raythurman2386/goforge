@@ -45,7 +45,7 @@ func TestSSEHandler_DeploymentLogs(t *testing.T) {
 			go hub.Run()
 			defer hub.Stop()
 
-			handler := NewSSEHandler(hub, nil)
+			handler := NewSSEHandler(hub, nil, nil)
 
 			// Build URL with chi context
 			path := "/deployments/" + tt.deploymentID + "/logs"
@@ -118,7 +118,7 @@ func TestSSEHandler_ContainerLogs(t *testing.T) {
 			go hub.Run()
 			defer hub.Stop()
 
-			handler := NewSSEHandler(hub, nil)
+			handler := NewSSEHandler(hub, nil, nil)
 
 			path := "/containers/" + tt.containerID + "/logs"
 			if tt.containerID == "" {
@@ -163,7 +163,7 @@ func TestSSEHandler_BuildOutput(t *testing.T) {
 	go hub.Run()
 	defer hub.Stop()
 
-	handler := NewSSEHandler(hub, nil)
+	handler := NewSSEHandler(hub, nil, nil)
 
 	req := httptest.NewRequest("GET", "/builds/build-789/output", nil)
 
@@ -199,7 +199,7 @@ func TestSSEHandler_RequiresFlush(t *testing.T) {
 	go hub.Run()
 	defer hub.Stop()
 
-	handler := NewSSEHandler(hub, nil)
+	handler := NewSSEHandler(hub, nil, nil)
 
 	req := httptest.NewRequest("GET", "/deployments/deploy-123/logs", nil)
 

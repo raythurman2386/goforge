@@ -15,6 +15,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/webhook"
 )
 
 func setupTestRouterDB(t *testing.T) *sql.DB {
@@ -48,13 +49,16 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	// Handlers
 	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil)
 	dbh := handlers.NewDashboardHandler()
-	ph := handlers.NewProjectHandler(ps)
+	ph := handlers.NewProjectHandler(ps, nil)
 	eh := handlers.NewEnvironmentHandler(ps)
 	dh := handlers.NewDeploymentHandler(ds, ps, nil, nil)
 	sh := handlers.NewServiceHandler(cat, is)
 	sth := handlers.NewSettingsHandler(nil) // No GitSourceRepo needed for general router tests
+	gh := handlers.NewGitHandler(nil, nil)
+	wh := &webhook.Handler{}
+	sseh := handlers.NewSSEHandler(nil, nil, nil)
 
-	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth)
+	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh)
 }
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{

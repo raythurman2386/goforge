@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/git"
@@ -107,13 +108,15 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	}
 
 	// 6. Cleanup old deployments (async)
-	go func() {
-		// Create a new context for cleanup as the request context might be cancelled
-		cleanupCtx := context.Background()
-		if err := s.CleanupOldDeployments(cleanupCtx, d.EnvironmentID, d.ID); err != nil {
+	//nolint:contextcheck // cleanup is background task
+	go func(envID, deployID string) {
+		// Create a new context for cleanup as the request context might be canceled
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		if err := s.CleanupOldDeployments(cleanupCtx, envID, deployID); err != nil {
 			fmt.Printf("failed to cleanup old deployments: %v\n", err)
 		}
-	}()
+	}(d.EnvironmentID, d.ID)
 
 	return nil
 }

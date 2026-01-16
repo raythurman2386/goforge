@@ -26,19 +26,19 @@ This roadmap tracks the development of GoForge towards its MVP release. It is de
 
 ### Phase 6: Git Integration
 - [x] GitHub client, git operations, source config.
-- [ ] **GitLab & Gitea Clients** (6.3, 6.4) - *Medium Priority*
+- [x] **GitLab & Gitea Clients** (6.3, 6.4) - *Medium Priority*
 - [x] **SSH Key Management** (6.5) - Implemented with Ed25519 key generation and go-git auth
-- [ ] **Repo Browser & Branch Selector** (6.7, 6.8) - *Medium Priority*
+- [x] **Repo Browser & Branch Selector** (6.7, 6.8) - *Medium Priority*
 - [x] **Webhook Receiver & Verification** (6.9, 6.10) - Implemented with signature verification
-- [ ] **Shallow Clone** (6.12) - *Low Priority (Optimization)*
+- [x] **Shallow Clone** (6.12) - *Low Priority (Optimization)*
 
 ### Phase 7: Docker Integration
 - [x] Client, build, container, logs.
-- [ ] **Connection Health Check** (7.2) - *Medium Priority*
+- [x] **Connection Health Check** (7.2) - *Medium Priority*
 - [x] **Docker Compose Support** (7.4) - Implemented parser in `internal/docker/compose.go`
-- [ ] **Network & Volume Management** (7.7, 7.8) - *Medium Priority*
-- [ ] **Image Cleanup** (7.9) - *Low Priority (Maintenance)*
-- [ ] **Docker Event Listener** (7.10) - *Medium Priority*
+- [x] **Network & Volume Management** (7.7, 7.8) - *Medium Priority*
+- [x] **Image Cleanup** (7.9) - *Low Priority (Maintenance)*
+- [x] **Docker Event Listener** (7.10) - *Medium Priority*
 
 ### Phase 8: Deployment Pipeline
 - [x] Service, state, queue, concurrent limits, basic pipeline.
@@ -53,31 +53,31 @@ This roadmap tracks the development of GoForge towards its MVP release. It is de
 - [x] **Docker Labels Generation** (9.2) - Full label generation with middlewares
 - [x] **Let's Encrypt & Domain Validation** (9.3, 9.4) - ACME config, DNS validation
 - [x] **Custom Domain UI** (9.5) - Domain management service with verification
-- [ ] **SSL Status & Redirects** (9.6, 9.8) - *Medium Priority*
+- [x] **SSL Status & Redirects** (9.6, 9.8) - *Medium Priority*
 
 ### Phase 10: Real-Time Features (SSE)
 - [x] Hub & HTMX integration.
 - [x] **SSE Client Handler** (10.2) - Implemented topic-based registration in SSE Hub
 - [x] **Log Streaming Endpoints** (10.4, 10.5, 10.6) - Implemented for deployments, containers, and builds
-- [ ] **Status Updates** (10.7) - *Medium Priority*
+- [x] **Status Updates** (10.7) - *Medium Priority*
 - [ ] **Reconnection Handling** (10.9) - *Medium Priority*
 - [ ] **Connection Status Indicator** (10.10) - *Low Priority*
 
 ### Phase 11: Resource Monitoring
 - [x] Basic stats structure.
-- [ ] **Periodic Polling & Storage** (11.2, 11.3) - *Medium Priority*
-- [ ] **Retention Policy** (11.4) - *Low Priority*
-- [ ] **UI Charts (CPU, Memory, Disk)** (11.5 - 11.7) - *Low Priority (Nice to have)*
-- [ ] **Container Health Indicators** (11.8) - *Medium Priority*
-- [ ] **Alerts** (11.9) - *Low Priority*
+- [x] **Periodic Polling & Storage** (11.2, 11.3) - *Medium Priority*
+- [x] **Retention Policy** (11.4) - *Low Priority*
+- [x] **UI Charts (CPU, Memory, Disk)** (11.5 - 11.7) - *Low Priority (Nice to have)*
+- [x] **Container Health Indicators** (11.8) - *Medium Priority*
+- [x] **Alerts** (11.9) - *Low Priority*
 
 ### Phase 12: One-Click Services
 - [x] Catalog, instance management, PostgreSQL/Redis templates.
 - [x] **Template Schema** (12.2) - Implemented via struct tags and validation
-- [ ] **Directory Watching** (12.3) - *Medium Priority*
+- [x] **Directory Watching** (12.3) - *Medium Priority*
 - [ ] **Additional Templates** (MySQL, Mongo, etc.) (12.6 - 12.9) - *Low Priority*
-- [ ] **Connection String Exposure** (12.13) - *High Priority*
-- [ ] **Backup/Restore** (12.14) - *Medium Priority*
+- [x] **Connection String Exposure** (12.13) - *High Priority*
+- [x] **Backup/Restore** (12.14) - *Medium Priority*
 
 ## Next Steps (Prioritized)
 

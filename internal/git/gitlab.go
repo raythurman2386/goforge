@@ -11,12 +11,12 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-// GitLabProvider implements the Provider interface for GitLab.
-type GitLabProvider struct{}
+// LabProvider implements the Provider interface for GitLab.
+type LabProvider struct{}
 
-// NewGitLabProvider creates a new GitLabProvider.
-func NewGitLabProvider() *GitLabProvider {
-	return &GitLabProvider{}
+// NewGitLabProvider creates a new LabProvider.
+func NewGitLabProvider() Provider {
+	return &LabProvider{}
 }
 
 type gitlabProject struct {
@@ -34,7 +34,7 @@ type gitlabBranch struct {
 	Name string `json:"name"`
 }
 
-func (p *GitLabProvider) doRequest(ctx context.Context, source *models.GitSource, method, path string) (*http.Response, error) {
+func (p *LabProvider) doRequest(ctx context.Context, source *models.GitSource, method, path string) (*http.Response, error) {
 	apiURL := "https://gitlab.com/api/v4"
 	if source.APIURL.Valid && source.APIURL.String != "" {
 		apiURL = source.APIURL.String
@@ -42,14 +42,6 @@ func (p *GitLabProvider) doRequest(ctx context.Context, source *models.GitSource
 		if apiURL[len(apiURL)-1] == '/' {
 			apiURL = apiURL[:len(apiURL)-1]
 		}
-		// If user didn't append /api/v4, we might need to (but standard practice is user provides full base API URL or just host)
-		// For safety, let's assume user provides base URL like https://gitlab.example.com
-		// We should check if it ends with /api/v4
-		// Actually, let's just assume the user puts the base URL (e.g. https://gitlab.com) and we append /api/v4
-		// But if they provided full path, we respect it?
-		// To be safe/simple: Assume input is "https://gitlab.example.com"
-		// If it doesn't contain /api/v4, we append it.
-		// Wait, commonly people just put the instance URL.
 		u, err := url.Parse(apiURL)
 		if err == nil {
 			if u.Path == "" || u.Path == "/" {
@@ -64,7 +56,7 @@ func (p *GitLabProvider) doRequest(ctx context.Context, source *models.GitSource
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, nil)
+	req, err := http.NewRequestWithContext(ctx, method, fullURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +70,7 @@ func (p *GitLabProvider) doRequest(ctx context.Context, source *models.GitSource
 }
 
 // ListRepositories retrieves repositories from GitLab.
-func (p *GitLabProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
+func (p *LabProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
 	// membership=true gets projects user is a member of
 	resp, err := p.doRequest(ctx, source, "GET", "/projects?membership=true&simple=true&per_page=100&order_by=last_activity_at")
 	if err != nil {
@@ -96,7 +88,8 @@ func (p *GitLabProvider) ListRepositories(ctx context.Context, source *models.Gi
 	}
 
 	repos := make([]*Repository, 0, len(glProjects))
-	for _, r := range glProjects {
+	for i := range glProjects {
+		r := &glProjects[i]
 		repos = append(repos, &Repository{
 			Name:          r.Name,
 			FullName:      r.PathWithNamespace,
@@ -111,7 +104,7 @@ func (p *GitLabProvider) ListRepositories(ctx context.Context, source *models.Gi
 }
 
 // ListBranches retrieves branches for a repository from GitLab.
-func (p *GitLabProvider) ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
+func (p *LabProvider) ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
 	// Project ID in GitLab API can be "namespace/project_name" URL-encoded
 	projectID := url.QueryEscape(fmt.Sprintf("%s/%s", owner, repo))
 	path := fmt.Sprintf("/projects/%s/repository/branches", projectID)
@@ -132,7 +125,8 @@ func (p *GitLabProvider) ListBranches(ctx context.Context, source *models.GitSou
 	}
 
 	branches := make([]*Branch, 0, len(glBranches))
-	for _, b := range glBranches {
+	for i := range glBranches {
+		b := &glBranches[i]
 		branches = append(branches, &Branch{
 			Name: b.Name,
 		})
@@ -142,7 +136,7 @@ func (p *GitLabProvider) ListBranches(ctx context.Context, source *models.GitSou
 }
 
 // ListTags retrieves tags for a repository from GitLab.
-func (p *GitLabProvider) ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
+func (p *LabProvider) ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
 	projectID := url.QueryEscape(fmt.Sprintf("%s/%s", owner, repo))
 	path := fmt.Sprintf("/projects/%s/repository/tags", projectID)
 
@@ -162,7 +156,8 @@ func (p *GitLabProvider) ListTags(ctx context.Context, source *models.GitSource,
 	}
 
 	tags := make([]*Branch, 0, len(glTags))
-	for _, t := range glTags {
+	for i := range glTags {
+		t := &glTags[i]
 		tags = append(tags, &Branch{
 			Name: t.Name,
 		})

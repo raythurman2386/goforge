@@ -11,12 +11,12 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-// GiteaProvider implements the Provider interface for Gitea.
-type GiteaProvider struct{}
+// TeaProvider implements the Provider interface for Gitea.
+type TeaProvider struct{}
 
-// NewGiteaProvider creates a new GiteaProvider.
-func NewGiteaProvider() *GiteaProvider {
-	return &GiteaProvider{}
+// NewGiteaProvider creates a new TeaProvider.
+func NewGiteaProvider() Provider {
+	return &TeaProvider{}
 }
 
 type giteaRepository struct {
@@ -32,7 +32,7 @@ type giteaBranch struct {
 	Name string `json:"name"`
 }
 
-func (p *GiteaProvider) doRequest(ctx context.Context, source *models.GitSource, method, path string) (*http.Response, error) {
+func (p *TeaProvider) doRequest(ctx context.Context, source *models.GitSource, method, path string) (*http.Response, error) {
 	apiURL := "https://gitea.com/api/v1" // Default, though rarely used without custom URL
 	if source.APIURL.Valid && source.APIURL.String != "" {
 		apiURL = source.APIURL.String
@@ -51,7 +51,7 @@ func (p *GiteaProvider) doRequest(ctx context.Context, source *models.GitSource,
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, nil)
+	req, err := http.NewRequestWithContext(ctx, method, fullURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (p *GiteaProvider) doRequest(ctx context.Context, source *models.GitSource,
 }
 
 // ListRepositories retrieves repositories from Gitea.
-func (p *GiteaProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
+func (p *TeaProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
 	resp, err := p.doRequest(ctx, source, "GET", "/user/repos?limit=100&sort=updated")
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (p *GiteaProvider) ListRepositories(ctx context.Context, source *models.Git
 }
 
 // ListBranches retrieves branches for a repository from Gitea.
-func (p *GiteaProvider) ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
+func (p *TeaProvider) ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
 	path := fmt.Sprintf("/repos/%s/%s/branches", owner, repo)
 	resp, err := p.doRequest(ctx, source, "GET", path)
 	if err != nil {
@@ -126,7 +126,7 @@ func (p *GiteaProvider) ListBranches(ctx context.Context, source *models.GitSour
 }
 
 // ListTags retrieves tags for a repository from Gitea.
-func (p *GiteaProvider) ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
+func (p *TeaProvider) ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
 	path := fmt.Sprintf("/repos/%s/%s/tags", owner, repo)
 	resp, err := p.doRequest(ctx, source, "GET", path)
 	if err != nil {

@@ -313,7 +313,7 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 
 			// 3. Trigger deployment
 			fmt.Printf("Triggering deployment for project %s env %s\n", proj.Name, env.Name)
-			
+
 			d := &models.Deployment{
 				EnvironmentID: env.ID,
 				Status:        models.DeploymentStatusPending,
@@ -337,12 +337,12 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 
 // GitLabPushEvent represents a push event from GitLab.
 type GitLabPushEvent struct {
-	Ref           string `json:"ref"`
-	CheckoutSHA   string `json:"checkout_sha"`
-	UserName      string `json:"user_name"`
-	ProjectID     int    `json:"project_id"`
-	ProjectPath   string `json:"path_with_namespace"`
-	Project       struct {
+	Ref         string `json:"ref"`
+	CheckoutSHA string `json:"checkout_sha"`
+	UserName    string `json:"user_name"`
+	ProjectID   int    `json:"project_id"`
+	ProjectPath string `json:"path_with_namespace"`
+	Project     struct {
 		WebURL string `json:"web_url"`
 	} `json:"project"`
 }

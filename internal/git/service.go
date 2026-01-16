@@ -44,7 +44,7 @@ func NewService() *Service {
 		providers: map[models.GitSourceType]Provider{
 			models.GitSourceTypeGitHub: NewGitHubProvider(),
 			models.GitSourceTypeGitLab: NewGitLabProvider(),
-			models.GitSourceTypeGitea: NewGiteaProvider(),
+			models.GitSourceTypeGitea:  NewGiteaProvider(),
 		},
 	}
 }
