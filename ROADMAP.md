@@ -1,91 +1,51 @@
 # Roadmap
 
-This roadmap tracks the development of GoForge towards its MVP release. It is derived from the Technical Design Specification.
+This roadmap tracks the development of GoForge.
 
-## Completed Phases
+## ✅ V1.0 Release (Completed)
 
-- [x] **Phase 1: Project Foundation**
-  - Fully initialized with config, logger, router, and basic structure.
-- [x] **Phase 2: Database & Models**
-  - PostgreSQL connection, migrations, and repositories implemented.
-- [x] **Phase 3: Authentication**
-  - GitHub OAuth, local auth, sessions, and middleware complete.
+**Core Foundation & Deployment**
+- [x] **Project Foundation:** Config, logger, router, Postgres DB, Migrations.
+- [x] **Authentication:** GitHub OAuth & Local Auth (Argon2id).
+- [x] **Git Integration:** GitHub, GitLab, Gitea, SSH Keys, Webhooks (Verified).
+- [x] **Docker Engine:** Build pipeline, Container management, Docker Compose parsing.
+- [x] **Traefik Proxy:** Automatic SSL (Let's Encrypt), Custom Domains, Label generation.
 
-## In Progress / Partial Completion
+**Features & UX**
+- [x] **Dashboard:** HTMX-driven UI, Project/Environment management.
+- [x] **Deployments:** Blue-Green strategy, Rollbacks, Manual triggers.
+- [x] **Monitoring:** Real-time stats (CPU/RAM) via SSE, Container logs.
+- [x] **Services:** One-click catalog (Postgres, Redis), Template schema.
+- [x] **System:** Rate limiting, Systemd service, Graceful shutdown.
 
-### Phase 4: Core UI Components
-- [x] Basic components (nav, sidebar, toast, modal, form, table, loading, empty, errors)
-- [x] **Pagination Component** (4.7) - Implemented with full navigation, page ranges, per-page selector
+---
 
-### Phase 5: Project Management
-- [x] Basic CRUD, environments, deletion.
-- [x] **Environment Switcher** (5.7) - Implemented via query params and dropdown
-- [x] **Secret Masking** (5.10) - AES-GCM encryption, auto-detection, log sanitization
-- [x] **Project Settings Page** (5.11) - Implemented with delete and variable management
-- [ ] **Search/Filter** (5.13) - *Low Priority*
+## 🚀 V1.1: Resilience & Scale (Next Steps)
 
-### Phase 6: Git Integration
-- [x] GitHub client, git operations, source config.
-- [x] **GitLab & Gitea Clients** (6.3, 6.4) - *Medium Priority*
-- [x] **SSH Key Management** (6.5) - Implemented with Ed25519 key generation and go-git auth
-- [x] **Repo Browser & Branch Selector** (6.7, 6.8) - *Medium Priority*
-- [x] **Webhook Receiver & Verification** (6.9, 6.10) - Implemented with signature verification
-- [x] **Shallow Clone** (6.12) - *Low Priority (Optimization)*
+The focus for the next release is hardening the platform and improving the developer experience for power users.
 
-### Phase 7: Docker Integration
-- [x] Client, build, container, logs.
-- [x] **Connection Health Check** (7.2) - *Medium Priority*
-- [x] **Docker Compose Support** (7.4) - Implemented parser in `internal/docker/compose.go`
-- [x] **Network & Volume Management** (7.7, 7.8) - *Medium Priority*
-- [x] **Image Cleanup** (7.9) - *Low Priority (Maintenance)*
-- [x] **Docker Event Listener** (7.10) - *Medium Priority*
+### 1. Advanced Observability
+- [ ] **Log Persistence:** Store logs in database/files for historical viewing (currently memory/stream only).
+- [ ] **Alerting System:** Email/Slack notifications for failed deployments or high resource usage.
+- [ ] **Status Page:** Public-facing status page for services.
 
-### Phase 8: Deployment Pipeline
-- [x] Service, state, queue, concurrent limits, basic pipeline.
-- [x] **Blue-Green Deployment** (8.6) - Implemented with health check verification and auto-rollback
-- [x] **Health Check Verification** (8.7) - HTTP/TCP health checks with retry logic
-- [x] **Rollback Mechanism** (8.8) - RollbackManager with validation and container restoration
-- [x] **Deployment History & Detail UI** (8.10, 8.11) - List and detail pages with status badges
-- [x] **Manual Trigger** (8.12) - Implemented via UI button and background worker
+### 2. Enhanced Services
+- [ ] **Database Backups:** Automated nightly backups to S3/MinIO.
+- [ ] **More Templates:** MySQL, MongoDB, MinIO, Plausible, PocketBase.
+- [ ] **Service Networking:** Private internal networking between projects and services.
 
-### Phase 9: Traefik Integration
-- [x] Basic Traefik setup.
-- [x] **Docker Labels Generation** (9.2) - Full label generation with middlewares
-- [x] **Let's Encrypt & Domain Validation** (9.3, 9.4) - ACME config, DNS validation
-- [x] **Custom Domain UI** (9.5) - Domain management service with verification
-- [x] **SSL Status & Redirects** (9.6, 9.8) - *Medium Priority*
+### 3. Team & Security
+- [ ] **Team Management:** Invite users, Role-based Access Control (RBAC).
+- [ ] **Audit Logs:** Track who did what and when (13.4).
+- [ ] **2FA:** Two-factor authentication for local accounts.
 
-### Phase 10: Real-Time Features (SSE)
-- [x] Hub & HTMX integration.
-- [x] **SSE Client Handler** (10.2) - Implemented topic-based registration in SSE Hub
-- [x] **Log Streaming Endpoints** (10.4, 10.5, 10.6) - Implemented for deployments, containers, and builds
-- [x] **Status Updates** (10.7) - *Medium Priority*
-- [ ] **Reconnection Handling** (10.9) - *Medium Priority*
-- [ ] **Connection Status Indicator** (10.10) - *Low Priority*
+### 4. Developer Experience
+- [ ] **CLI Tool:** `goforge` CLI for deploying from terminal.
+- [ ] **API Tokens:** Personal Access Tokens for external integrations.
+- [ ] **Build Caching:** S3/Local cache for faster Docker builds.
 
-### Phase 11: Resource Monitoring
-- [x] Basic stats structure.
-- [x] **Periodic Polling & Storage** (11.2, 11.3) - *Medium Priority*
-- [x] **Retention Policy** (11.4) - *Low Priority*
-- [x] **UI Charts (CPU, Memory, Disk)** (11.5 - 11.7) - *Low Priority (Nice to have)*
-- [x] **Container Health Indicators** (11.8) - *Medium Priority*
-- [x] **Alerts** (11.9) - *Low Priority*
+## 🔮 V2.0: Multi-Server (Future)
 
-### Phase 12: One-Click Services
-- [x] Catalog, instance management, PostgreSQL/Redis templates.
-- [x] **Template Schema** (12.2) - Implemented via struct tags and validation
-- [x] **Directory Watching** (12.3) - *Medium Priority*
-- [ ] **Additional Templates** (MySQL, Mongo, etc.) (12.6 - 12.9) - *Low Priority*
-- [x] **Connection String Exposure** (12.13) - *High Priority*
-- [x] **Backup/Restore** (12.14) - *Medium Priority*
-
-## Next Steps (Prioritized)
-
-1.  **SSE Log Streaming:** Implement log streaming endpoints (10.4, 10.5, 10.6) for real-time deployment logs.
-2.  **Blue-Green Deployment:** Implement zero-downtime deployments (8.6).
-3.  **SSH Key Management:** Enable private repo cloning (6.5).
-4.  **Docker Compose Support:** Parse and deploy multi-container apps (7.4).
-5.  **Connection String Exposure:** Expose service connection details to apps (12.13).
-
-## Phase 13: Polish & Production Readiness (Upcoming)
-- Rate limiting, audit logging, systemd files, backups, E2E tests.
+- [ ] **Remote Agents:** Deploy to multiple servers via SSH/Agent.
+- [ ] **Cluster Management:** Simple orchestration across nodes.
+- [ ] **Load Balancing:** Distributed traffic handling.
