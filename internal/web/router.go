@@ -9,6 +9,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/web/middleware"
 	"github.com/raythurman2386/goforge/internal/webhook"
 )
 
@@ -30,6 +31,8 @@ func Router(
 	r := chi.NewRouter()
 
 	// Middleware stack
+	// Rate limiting: 30 rps, burst 60
+	r.Use(middleware.RateLimit(30, 60))
 	// Session middleware is safe for all routes (just populates context)
 	r.Use(auth.Middleware(sessionManager))
 

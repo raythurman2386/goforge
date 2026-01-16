@@ -1,0 +1,21 @@
+[Unit]
+Description=GoForge PaaS
+After=network.target postgresql.service docker.service
+Requires=postgresql.service docker.service
+
+[Service]
+Type=simple
+# User=goforge
+# Group=docker
+# Run as root by default for Docker access, or use a user in the docker group.
+User=root
+WorkingDirectory=/opt/goforge
+ExecStart=/opt/goforge/goforge
+Restart=always
+RestartSec=5
+EnvironmentFile=/opt/goforge/.env
+# Increase open file limit if necessary
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

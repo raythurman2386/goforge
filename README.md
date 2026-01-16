@@ -58,6 +58,31 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 - `make lint`: Run golangci-lint.
 - `make templ`: Generate templ templates.
 
+## Production Deployment
+
+To run GoForge in production using Systemd:
+
+1.  **Build the binary:**
+    ```bash
+    make build
+    ```
+
+2.  **Prepare the directory:**
+    ```bash
+    sudo mkdir -p /opt/goforge
+    sudo cp bin/goforge /opt/goforge/
+    sudo cp -r static /opt/goforge/
+    sudo cp .env.example /opt/goforge/.env
+    # Edit /opt/goforge/.env with your production secrets
+    ```
+
+3.  **Install the Service:**
+    ```bash
+    sudo cp deploy/goforge.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now goforge
+    ```
+
 ## Architecture
 
 GoForge follows a clean architecture with:
