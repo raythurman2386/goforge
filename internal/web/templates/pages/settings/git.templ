@@ -72,7 +72,7 @@ templ AddGitSourceModal(csrfToken string) {
 			
 			<div class="mb-4">
 				<label class="block text-sm font-medium text-gray-700 mb-1">Source Type</label>
-				<div class="grid grid-cols-2 gap-3">
+				<div class="grid grid-cols-3 gap-3">
 					<label class="border rounded-md p-3 flex items-center cursor-pointer hover:bg-gray-50">
 						<input type="radio" name="type" value="github" checked class="h-4 w-4 text-indigo-600" />
 						<span class="ml-2 text-sm text-gray-900">GitHub</span>
@@ -80,6 +80,10 @@ templ AddGitSourceModal(csrfToken string) {
 					<label class="border rounded-md p-3 flex items-center cursor-pointer hover:bg-gray-50">
 						<input type="radio" name="type" value="gitlab" class="h-4 w-4 text-indigo-600" />
 						<span class="ml-2 text-sm text-gray-900">GitLab</span>
+					</label>
+					<label class="border rounded-md p-3 flex items-center cursor-pointer hover:bg-gray-50">
+						<input type="radio" name="type" value="gitea" class="h-4 w-4 text-indigo-600" />
+						<span class="ml-2 text-sm text-gray-900">Gitea</span>
 					</label>
 				</div>
 			</div>

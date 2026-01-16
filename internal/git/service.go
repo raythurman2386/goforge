@@ -29,6 +29,8 @@ type Provider interface {
 	ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error)
 	// ListBranches retrieves branches for a repository.
 	ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error)
+	// ListTags retrieves tags for a repository.
+	ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error)
 }
 
 // Service handles git-related business logic.
@@ -41,6 +43,8 @@ func NewService() *Service {
 	return &Service{
 		providers: map[models.GitSourceType]Provider{
 			models.GitSourceTypeGitHub: NewGitHubProvider(),
+			models.GitSourceTypeGitLab: NewGitLabProvider(),
+			models.GitSourceTypeGitea: NewGiteaProvider(),
 		},
 	}
 }
@@ -67,4 +71,19 @@ func (s *Service) ListBranches(ctx context.Context, source *models.GitSource, fu
 	}
 
 	return provider.ListBranches(ctx, source, parts[0], parts[1])
+}
+
+// ListTags retrieves tags for a repository from the specified source.
+func (s *Service) ListTags(ctx context.Context, source *models.GitSource, fullName string) ([]*Branch, error) {
+	provider, ok := s.providers[source.Type]
+	if !ok {
+		return nil, fmt.Errorf("unsupported git source type: %s", source.Type)
+	}
+
+	parts := strings.Split(fullName, "/")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid repository full name: %s", fullName)
+	}
+
+	return provider.ListTags(ctx, source, parts[0], parts[1])
 }

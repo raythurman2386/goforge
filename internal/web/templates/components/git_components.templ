@@ -1,0 +1,22 @@
+package components
+
+import (
+	"github.com/raythurman2386/goforge/internal/git"
+)
+
+templ RepoOptions(repos []*git.Repository) {
+	<option value="">Select a repository</option>
+	for _, r := range repos {
+		<option value={ r.URL } data-default-branch={ r.DefaultBranch }>{ r.FullName }</option>
+	}
+}
+
+templ BranchOptions(branches []*git.Branch, defaultBranch string) {
+	for _, b := range branches {
+		if b.Name == defaultBranch {
+			<option value={ b.Name } selected>{ b.Name }</option>
+		} else {
+			<option value={ b.Name }>{ b.Name }</option>
+		}
+	}
+}

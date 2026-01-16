@@ -1,0 +1,70 @@
+package components
+
+import (
+	"github.com/raythurman2386/goforge/internal/models"
+)
+
+templ GitRepositoryBrowser(sources []*models.GitSource) {
+	<div class="mb-4">
+		<label class="block text-sm font-medium text-gray-700 mb-1">Git Source</label>
+		<select name="git_source_id" 
+			class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+			hx-get="/api/git/repos"
+			hx-target="#repository_url_select"
+			hx-trigger="change"
+			hx-include="[name='git_source_id']"
+			onchange="toggleRepoInput(this.value)"
+			>
+			<option value="">Manual / Public</option>
+			for _, s := range sources {
+				<option value={ s.ID }>{ s.Name } ({ string(s.Type) })</option>
+			}
+		</select>
+	</div>
+
+	<div id="manual-repo-input">
+		@Input("Repository URL", "repository_url_manual", "text", "", false)
+	</div>
+
+	<div id="repo-select-container" style="display:none;" class="mb-4">
+		<label class="block text-sm font-medium text-gray-700 mb-1">Repository</label>
+		<select id="repository_url_select"
+			class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+			hx-get="/api/git/branches"
+			hx-target="#default_branch"
+			hx-trigger="change"
+			hx-include="[name='git_source_id'],[name='repository_url']"
+			>
+			<option value="">Select Source first</option>
+		</select>
+	</div>
+	
+	<script>
+		function toggleRepoInput(val) {
+			const manualInput = document.querySelector('input[name="repository_url_manual"]');
+			const repoSelect = document.getElementById('repository_url_select');
+			const manualContainer = document.getElementById('manual-repo-input');
+			const selectContainer = document.getElementById('repo-select-container');
+			
+			if (val === "") {
+				manualContainer.style.display = 'block';
+				selectContainer.style.display = 'none';
+				manualInput.setAttribute('name', 'repository_url');
+				manualInput.setAttribute('required', 'true');
+				repoSelect.removeAttribute('name');
+				repoSelect.removeAttribute('required');
+			} else {
+				manualContainer.style.display = 'none';
+				selectContainer.style.display = 'block';
+				manualInput.removeAttribute('name');
+				manualInput.removeAttribute('required');
+				repoSelect.setAttribute('name', 'repository_url');
+				repoSelect.setAttribute('required', 'true');
+			}
+		}
+		// Init
+		document.addEventListener("DOMContentLoaded", function() {
+			toggleRepoInput("");
+		});
+	</script>
+}

@@ -86,3 +86,26 @@ func (p *HubProvider) ListBranches(ctx context.Context, source *models.GitSource
 
 	return branches, nil
 }
+
+// ListTags retrieves tags for a repository from GitHub.
+func (p *HubProvider) ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
+	client := p.getClient(ctx, source)
+
+	opts := &github.ListOptions{
+		PerPage: 100,
+	}
+
+	ghTags, _, err := client.Repositories.ListTags(ctx, owner, repo, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	tags := make([]*Branch, 0, len(ghTags))
+	for _, t := range ghTags {
+		tags = append(tags, &Branch{
+			Name: t.GetName(),
+		})
+	}
+
+	return tags, nil
+}

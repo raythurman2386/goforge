@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/projects"
@@ -15,12 +16,14 @@ import (
 // ProjectHandler handles project related requests.
 type ProjectHandler struct {
 	projectService *project.Service
+	gitSourceRepo  *repositories.GitSourceRepository
 }
 
 // NewProjectHandler creates a new ProjectHandler.
-func NewProjectHandler(ps *project.Service) *ProjectHandler {
+func NewProjectHandler(ps *project.Service, gsr *repositories.GitSourceRepository) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: ps,
+		gitSourceRepo:  gsr,
 	}
 }
 
@@ -48,8 +51,21 @@ func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
 // NewProjectPage renders the form to create a new project.
 func (h *ProjectHandler) NewProjectPage(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	sources, err := h.gitSourceRepo.ListByUserID(r.Context(), user.ID)
+	if err != nil {
+		http.Error(w, "failed to list git sources", http.StatusInternalServerError)
+		return
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
-	component := projects.New(csrfToken)
+	component := projects.New(sources, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render new project page", http.StatusInternalServerError)
 	}

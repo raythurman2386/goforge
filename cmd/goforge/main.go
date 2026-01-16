@@ -272,11 +272,12 @@ func runServer() error {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
 	dashboardHandler := handlers.NewDashboardHandler()
-	projectHandler := handlers.NewProjectHandler(projectService)
+	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo)
 	envHandler := handlers.NewEnvironmentHandler(projectService)
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo)
+	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService)
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret)
 
 	// Create router
@@ -290,6 +291,7 @@ func runServer() error {
 		deploymentHandler,
 		serviceHandler,
 		settingsHandler,
+		gitHandler,
 		webhookHandler,
 		sseHandler,
 	)

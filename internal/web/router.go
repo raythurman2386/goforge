@@ -23,6 +23,7 @@ func Router(
 	deploymentHandler *handlers.DeploymentHandler,
 	serviceHandler *handlers.ServiceHandler,
 	settingsHandler *handlers.SettingsHandler,
+	gitHandler *handlers.GitHandler,
 	webhookHandler *webhook.Handler,
 	sseHandler *handlers.SSEHandler,
 ) http.Handler {
@@ -67,6 +68,14 @@ func Router(
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth)
 			r.Get("/dashboard", dashboardHandler.Dashboard)
+
+			// Git API
+			r.Route("/api/git", func(r chi.Router) {
+				r.Get("/sources/{sourceId}/repos", gitHandler.ListRepositories)
+				r.Get("/sources/{sourceId}/repos/{owner}/{repo}/branches", gitHandler.ListBranches)
+				r.Get("/sources/{sourceId}/repos/{owner}/{repo}/tags", gitHandler.ListTags)
+			})
+
 			r.Route("/projects", func(r chi.Router) {
 				r.Get("/", projectHandler.ListProjects)
 				r.Get("/new", projectHandler.NewProjectPage)
