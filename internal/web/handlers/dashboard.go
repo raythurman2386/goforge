@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/web/templates/pages"
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/web/templates/pages"
 )
 
 // DashboardHandler handles dashboard related requests.

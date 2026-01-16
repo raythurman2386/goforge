@@ -8,7 +8,7 @@ import (
 	"golang.org/x/oauth2"
 	githuboauth "golang.org/x/oauth2/github"
 
-	"github.com/raythurman2386/gocool/internal/config"
+	"github.com/raythurman2386/goforge/internal/config"
 )
 
 // GitHubProvider handles GitHub OAuth.

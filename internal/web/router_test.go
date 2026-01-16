@@ -8,13 +8,13 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/config"
-	"github.com/raythurman2386/gocool/internal/database/repositories"
-	"github.com/raythurman2386/gocool/internal/deploy"
-	"github.com/raythurman2386/gocool/internal/project"
-	"github.com/raythurman2386/gocool/internal/services"
-	"github.com/raythurman2386/gocool/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/config"
+	"github.com/raythurman2386/goforge/internal/database/repositories"
+	"github.com/raythurman2386/goforge/internal/deploy"
+	"github.com/raythurman2386/goforge/internal/project"
+	"github.com/raythurman2386/goforge/internal/services"
+	"github.com/raythurman2386/goforge/internal/web/handlers"
 )
 
 func setupTestRouterDB(t *testing.T) *sql.DB {

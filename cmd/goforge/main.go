@@ -1,4 +1,4 @@
-// Package main is the entry point for the GoCool application.
+// Package main is the entry point for the GoForge application.
 package main
 
 import (
@@ -14,24 +14,24 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/config"
-	"github.com/raythurman2386/gocool/internal/database"
-	"github.com/raythurman2386/gocool/internal/database/repositories"
-	"github.com/raythurman2386/gocool/internal/deploy"
-	"github.com/raythurman2386/gocool/internal/docker"
-	"github.com/raythurman2386/gocool/internal/git"
-	"github.com/raythurman2386/gocool/internal/logger"
-	"github.com/raythurman2386/gocool/internal/project"
-	"github.com/raythurman2386/gocool/internal/services"
-	"github.com/raythurman2386/gocool/internal/sse"
-	"github.com/raythurman2386/gocool/internal/web"
-	"github.com/raythurman2386/gocool/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/config"
+	"github.com/raythurman2386/goforge/internal/database"
+	"github.com/raythurman2386/goforge/internal/database/repositories"
+	"github.com/raythurman2386/goforge/internal/deploy"
+	"github.com/raythurman2386/goforge/internal/docker"
+	"github.com/raythurman2386/goforge/internal/git"
+	"github.com/raythurman2386/goforge/internal/logger"
+	"github.com/raythurman2386/goforge/internal/project"
+	"github.com/raythurman2386/goforge/internal/services"
+	"github.com/raythurman2386/goforge/internal/sse"
+	"github.com/raythurman2386/goforge/internal/web"
+	"github.com/raythurman2386/goforge/internal/web/handlers"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gocool",
-	Short: "GoCool is a lightweight self-hosted PaaS",
+	Use:   "goforge",
+	Short: "GoForge is a lightweight self-hosted PaaS",
 }
 
 var serveCmd = &cobra.Command{
@@ -187,7 +187,7 @@ func runServer() error {
 
 	// Initialize logger
 	log := logger.Setup(cfg.LogLevel, cfg.LogFormat)
-	log.Info("starting GoCool",
+	log.Info("starting GoForge",
 		"version", "0.1.0",
 		"env", cfg.DevMode,
 		"addr", cfg.Addr(),

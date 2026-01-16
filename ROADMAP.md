@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap tracks the development of GoCool towards its MVP release. It is derived from the Technical Design Specification.
+This roadmap tracks the development of GoForge towards its MVP release. It is derived from the Technical Design Specification.
 
 ## Completed Phases
 

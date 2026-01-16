@@ -1,4 +1,4 @@
-// Package domain provides custom domain management for GoCool.
+// Package domain provides custom domain management for GoForge.
 package domain
 
 import (
@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raythurman2386/gocool/internal/models"
-	"github.com/raythurman2386/gocool/internal/proxy"
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/proxy"
 )
 
 // Service errors.
@@ -110,7 +110,7 @@ func (s *Service) AddDomain(ctx context.Context, envID, domainName string) (*mod
 		Status:             models.DomainStatusPending,
 		SSLStatus:          models.SSLStatusNone,
 		VerificationToken:  token,
-		VerificationRecord: fmt.Sprintf("gocool-verify=%s", token),
+		VerificationRecord: fmt.Sprintf("goforge-verify=%s", token),
 		ForceHTTPS:         true, // Default to forcing HTTPS
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),

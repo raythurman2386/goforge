@@ -1,13 +1,13 @@
 services:
-  gocool:
+  goforge:
     build: .
     restart: unless-stopped
     environment:
-      - GOCOOL_HOST=${GOCOOL_HOST:-0.0.0.0}
-      - GOCOOL_PORT=${GOCOOL_PORT:-8080}
-      - GOCOOL_DEV_MODE=${GOCOOL_DEV_MODE:-false}
-      - GOCOOL_BASE_URL=${GOCOOL_BASE_URL:-http://localhost:8080}
-      - DATABASE_URL=${DATABASE_URL:-postgres://gocool:password@db:5432/gocool?sslmode=disable}
+      - GOFORGE_HOST=${GOFORGE_HOST:-0.0.0.0}
+      - GOFORGE_PORT=${GOFORGE_PORT:-8080}
+      - GOFORGE_DEV_MODE=${GOFORGE_DEV_MODE:-false}
+      - GOFORGE_BASE_URL=${GOFORGE_BASE_URL:-http://localhost:8080}
+      - DATABASE_URL=${DATABASE_URL:-postgres://goforge:password@db:5432/goforge?sslmode=disable}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SESSION_SECRET=${SESSION_SECRET}
       - CSRF_SECRET=${CSRF_SECRET}
@@ -25,7 +25,7 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-json}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - gocool_data:/app/data
+      - goforge_data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -33,39 +33,39 @@ services:
         condition: service_started
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gocool.rule=Host(`${GOCOOL_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.gocool.entrypoints=websecure"
-      - "traefik.http.routers.gocool.tls.certresolver=letsencrypt"
-      - "traefik.http.services.gocool.loadbalancer.server.port=${GOCOOL_PORT:-8080}"
+      - "traefik.http.routers.goforge.rule=Host(`${GOFORGE_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.goforge.entrypoints=websecure"
+      - "traefik.http.routers.goforge.tls.certresolver=letsencrypt"
+      - "traefik.http.services.goforge.loadbalancer.server.port=${GOFORGE_PORT:-8080}"
       # HTTP to HTTPS redirect
-      - "traefik.http.routers.gocool-http.rule=Host(`${GOCOOL_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.gocool-http.entrypoints=web"
-      - "traefik.http.routers.gocool-http.middlewares=redirect-to-https"
+      - "traefik.http.routers.goforge-http.rule=Host(`${GOFORGE_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.goforge-http.entrypoints=web"
+      - "traefik.http.routers.goforge-http.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
     ports:
-      - "${GOCOOL_PORT:-8080}:${GOCOOL_PORT:-8080}"
+      - "${GOFORGE_PORT:-8080}:${GOFORGE_PORT:-8080}"
     networks:
-      - gocool_net
+      - goforge_net
       - traefik
 
   db:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-gocool}
+      - POSTGRES_USER=${POSTGRES_USER:-goforge}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
-      - POSTGRES_DB=${POSTGRES_DB:-gocool}
+      - POSTGRES_DB=${POSTGRES_DB:-goforge}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gocool} -d ${POSTGRES_DB:-gocool}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-goforge} -d ${POSTGRES_DB:-goforge}" ]
       interval: 5s
       timeout: 5s
       retries: 5
     ports:
       - "5432:5432"
     networks:
-      - gocool_net
+      - goforge_net
 
   traefik:
     image: traefik:v3.0
@@ -99,7 +99,7 @@ services:
     labels:
       # Dashboard routing (optional, requires auth in production)
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${GOCOOL_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${GOFORGE_DOMAIN:-localhost}`)"
       - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
       - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
@@ -119,16 +119,16 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - gocool_net
+      - goforge_net
 
 volumes:
   postgres_data:
-  gocool_data:
+  goforge_data:
   traefik_letsencrypt:
   redis_data:
 
 
 networks:
-  gocool_net:
+  goforge_net:
   traefik:
     name: traefik

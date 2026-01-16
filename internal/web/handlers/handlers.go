@@ -7,8 +7,8 @@ import (
 
 	"github.com/a-h/templ"
 
-	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/web/templates/pages/errors"
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/web/templates/pages/errors"
 )
 
 // RenderError renders an error page.
@@ -79,12 +79,12 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write([]byte(`<!DOCTYPE html>
 <html>
 <head>
-    <title>GoCool - Login</title>
+    <title>GoForge - Login</title>
     <link rel="stylesheet" href="/static/css/output.css">
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
     <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 class="text-2xl font-bold text-center mb-6">GoCool</h1>
+        <h1 class="text-2xl font-bold text-center mb-6">GoForge</h1>
         <p class="text-gray-600 text-center mb-6">Sign in to deploy your applications</p>
         <a href="/auth/github" class="w-full bg-gray-900 text-white py-2 px-4 rounded hover:bg-gray-800 flex items-center justify-center">
             Sign in with GitHub

@@ -183,7 +183,7 @@ func TestCustomDomain_CanRetryVerification(t *testing.T) {
 
 func TestCustomDomain_GetVerificationDNSRecord(t *testing.T) {
 	d := CustomDomain{Domain: "example.com"}
-	want := "_gocool-verify.example.com"
+	want := "_goforge-verify.example.com"
 	if got := d.GetVerificationDNSRecord(); got != want {
 		t.Errorf("GetVerificationDNSRecord() = %v, want %v", got, want)
 	}

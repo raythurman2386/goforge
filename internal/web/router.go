@@ -6,9 +6,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/raythurman2386/gocool/internal/auth"
-	"github.com/raythurman2386/gocool/internal/config"
-	"github.com/raythurman2386/gocool/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/config"
+	"github.com/raythurman2386/goforge/internal/web/handlers"
 )
 
 // Router creates and configures the HTTP router.

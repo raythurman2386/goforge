@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // AuditLogRepository handles audit log data access.

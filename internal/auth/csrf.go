@@ -7,7 +7,7 @@ import (
 
 const (
 	// CSRFCookieName is the name of the CSRF cookie.
-	CSRFCookieName = "gocool_csrf"
+	CSRFCookieName = "goforge_csrf"
 	// CSRFHeaderName is the name of the CSRF header.
 	CSRFHeaderName = "X-CSRF-Token"
 	// CSRFFieldName is the name of the CSRF form field.

@@ -7,7 +7,7 @@ import (
 
 const (
 	// SessionCookieName is the name of the session cookie.
-	SessionCookieName = "gocool_session"
+	SessionCookieName = "goforge_session"
 )
 
 // SetSessionCookie sets the session cookie on the response.

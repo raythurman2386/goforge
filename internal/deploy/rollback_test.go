@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 func TestRollbackManager_CanRollback(t *testing.T) {
@@ -358,7 +358,7 @@ func TestRollbackManager_CreateRollbackDeployment(t *testing.T) {
 		CommitMessage: toNullString("Initial commit"),
 		CommitAuthor:  toNullString("test@example.com"),
 		Branch:        toNullString("main"),
-		ImageTag:      toNullString("gocool-proj:deploy-1"),
+		ImageTag:      toNullString("goforge-proj:deploy-1"),
 	}
 
 	rm := NewRollbackManager(nil)

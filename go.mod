@@ -1,4 +1,4 @@
-module github.com/raythurman2386/gocool
+module github.com/raythurman2386/goforge
 
 go 1.25.0
 

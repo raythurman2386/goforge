@@ -8,10 +8,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/raythurman2386/gocool/internal/docker"
-	"github.com/raythurman2386/gocool/internal/git"
-	"github.com/raythurman2386/gocool/internal/models"
-	"github.com/raythurman2386/gocool/internal/proxy"
+	"github.com/raythurman2386/goforge/internal/docker"
+	"github.com/raythurman2386/goforge/internal/git"
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/proxy"
 )
 
 // RunPipeline executes the full deployment pipeline.
@@ -36,7 +36,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 		return tErr
 	}
 
-	workDir := filepath.Join(os.TempDir(), "gocool-builds", d.ID)
+	workDir := filepath.Join(os.TempDir(), "goforge-builds", d.ID)
 	if mErr := os.MkdirAll(workDir, 0o700); mErr != nil {
 		return mErr
 	}
@@ -61,7 +61,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 		return tErr
 	}
 
-	imageName := fmt.Sprintf("gocool-%s:%s", p.ID, d.ID)
+	imageName := fmt.Sprintf("goforge-%s:%s", p.ID, d.ID)
 	if bErr := s.dockerClient.BuildImage(ctx, docker.BuildOptions{
 		ImageName:  imageName,
 		Dockerfile: p.DockerfilePath,
@@ -78,7 +78,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	// Generate Traefik labels
 	labels := proxy.GenerateLabels(p, env, "traefik")
 
-	containerName := fmt.Sprintf("gocool-%s-%s-%s", p.ID, env.Name, d.ID)
+	containerName := fmt.Sprintf("goforge-%s-%s-%s", p.ID, env.Name, d.ID)
 	containerID, err := s.dockerClient.CreateContainer(ctx, docker.ContainerOptions{
 		Name:   containerName,
 		Image:  imageName,

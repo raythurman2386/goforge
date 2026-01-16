@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/raythurman2386/gocool/internal/models"
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // Common secret key patterns that should be auto-detected.

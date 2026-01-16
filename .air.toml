@@ -6,7 +6,7 @@ tmp_dir = "tmp"
 
 [build]
   # Build command
-  cmd = "make templ && go build -o ./tmp/main ./cmd/gocool"
+  cmd = "make templ && go build -o ./tmp/main ./cmd/goforge"
   # Binary output
   bin = "./tmp/main"
   # Arguments to pass to the binary

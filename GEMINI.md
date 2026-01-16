@@ -1,8 +1,8 @@
-# GoCool Project Context
+# GoForge Project Context
 
 ## Project Overview
 
-**GoCool** is a lightweight, self-hosted Platform as a Service (PaaS) built in Go. It effectively reimplements the core developer experience of [Coolify](https://coolify.io) (git-to-deploy, one-click services, automatic SSL) but focuses on being lightweight and simple.
+**GoForge** is a lightweight, self-hosted Platform as a Service (PaaS) built in Go. It effectively reimplements the core developer experience of [Coolify](https://coolify.io) (git-to-deploy, one-click services, automatic SSL) but focuses on being lightweight and simple.
 
 **Key Features:**
 *   **Git-based deployments:** Deploy from GitHub, GitLab, Gitea, or raw SSH.
@@ -23,7 +23,7 @@
 
 ## Directory Structure
 
-*   `cmd/gocool/`: Application entry point (`main.go`).
+*   `cmd/goforge/`: Application entry point (`main.go`).
 *   `internal/`: Core application logic.
     *   `auth/`: Authentication (GitHub OAuth, sessions).
     *   `config/`: Configuration loading.
@@ -69,7 +69,7 @@ See `.env.example` for the complete list of variables (database URL, encryption 
 **Refer to `AGENTS.md` for strict guidelines.** Key points:
 
 *   **Formatting:** Standard `gofmt`.
-*   **Imports:** Grouped: Standard Lib -> Third Party -> Local (`github.com/raythurman2386/gocool/...`).
+*   **Imports:** Grouped: Standard Lib -> Third Party -> Local (`github.com/raythurman2386/goforge/...`).
 *   **Errors:** Always wrap errors: `fmt.Errorf("failed to x: %w", err)`. Use sentinel errors (`ErrNotFound`) where appropriate.
 *   **Context:** Pass `context.Context` as the first argument to functions performing I/O.
 *   **Frontend:**

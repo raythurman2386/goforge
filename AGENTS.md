@@ -1,12 +1,12 @@
 # AGENTS.md - AI Coding Agent Guidelines
 
-This document provides guidelines for AI coding agents working in the GoCool codebase.
+This document provides guidelines for AI coding agents working in the GoForge codebase.
 
 ## Project Overview
 
-GoCool is a lightweight, self-hosted PaaS built in Go with HTMX + templ. It provides
+GoForge is a lightweight, self-hosted PaaS built in Go with HTMX + templ. It provides
 git-to-deploy workflows, one-click services, automatic SSL via Traefik, and real-time
-monitoring. Tech stack: Go 1.22+, PostgreSQL, Docker, HTMX 2, templ, TailwindCSS.
+monitoring. Tech stack: Go 1.25+, PostgreSQL, Docker, HTMX 2, templ, TailwindCSS.
 
 ## Build, Lint, and Test Commands
 
@@ -65,9 +65,9 @@ import (
     "github.com/go-chi/chi/v5"
     "github.com/lib/pq"
 
-    // Local packages (github.com/raythurman2386/gocool/...)
-    "github.com/raythurman2386/gocool/internal/config"
-    "github.com/raythurman2386/gocool/internal/models"
+    // Local packages (github.com/raythurman2386/goforge/...)
+    "github.com/raythurman2386/goforge/internal/config"
+    "github.com/raythurman2386/goforge/internal/models"
 )
 ```
 
@@ -160,7 +160,7 @@ func TestDeploymentService_CreateDeployment(t *testing.T) {
 ## Project Structure
 
 ```
-cmd/gocool/              # Entry point (main.go)
+cmd/goforge/              # Entry point (main.go)
 internal/
   auth/                  # Authentication (GitHub OAuth, sessions, CSRF)
   config/                # Configuration loading from env

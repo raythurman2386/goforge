@@ -102,7 +102,7 @@ func (d *CustomDomain) CanRetryVerification(maxAttempts int) bool {
 
 // GetVerificationDNSRecord returns the expected DNS TXT record for verification.
 func (d *CustomDomain) GetVerificationDNSRecord() string {
-	return "_gocool-verify." + d.Domain
+	return "_goforge-verify." + d.Domain
 }
 
 // RedirectsWWW returns true if this domain redirects www subdomain.

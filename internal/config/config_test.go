@@ -8,7 +8,7 @@ import (
 
 func TestLoad_DevMode(t *testing.T) {
 	os.Clearenv()
-	os.Setenv("GOCOOL_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_MODE", "true")
 	defer os.Clearenv()
 
 	cfg, err := Load()
@@ -71,7 +71,7 @@ func TestLoad_AllRequiredFields(t *testing.T) {
 
 func TestLoad_Defaults(t *testing.T) {
 	os.Clearenv()
-	os.Setenv("GOCOOL_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_MODE", "true")
 	defer os.Clearenv()
 
 	cfg, err := Load()

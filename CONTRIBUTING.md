@@ -1,6 +1,6 @@
-# Contributing to GoCool
+# Contributing to GoForge
 
-Thank you for your interest in contributing to GoCool! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to GoForge! This document provides guidelines and information for contributors.
 
 ## Code of Conduct
 
@@ -10,7 +10,7 @@ Be respectful, inclusive, and constructive. We're all here to build something us
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.25+
 - Docker Engine 24+
 - PostgreSQL 15+
 - templ CLI
@@ -104,7 +104,7 @@ All checks must pass. The CI will verify this automatically.
 ## Project Structure
 
 ```
-cmd/gocool/          # Application entry point
+cmd/goforge/         # Application entry point
 internal/
   auth/              # Authentication (GitHub OAuth, sessions)
   config/            # Configuration loading
@@ -202,7 +202,7 @@ Include:
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/raythurman2386/gocool/discussions) for questions
+- Open a [Discussion](https://github.com/raythurman2386/goforge/discussions) for questions
 - Check existing issues before creating new ones
 
 Thank you for contributing!
