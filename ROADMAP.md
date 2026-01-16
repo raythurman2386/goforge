@@ -35,7 +35,7 @@ This roadmap tracks the development of GoForge towards its MVP release. It is de
 ### Phase 7: Docker Integration
 - [x] Client, build, container, logs.
 - [ ] **Connection Health Check** (7.2) - *Medium Priority*
-- [ ] **Docker Compose Support** (7.4) - *High Priority*
+- [x] **Docker Compose Support** (7.4) - Implemented parser in `internal/docker/compose.go`
 - [ ] **Network & Volume Management** (7.7, 7.8) - *Medium Priority*
 - [ ] **Image Cleanup** (7.9) - *Low Priority (Maintenance)*
 - [ ] **Docker Event Listener** (7.10) - *Medium Priority*
