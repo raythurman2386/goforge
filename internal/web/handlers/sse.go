@@ -13,7 +13,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/sse"
-	"github.com/raythurman2386/goforge/internal/web/templates/partials"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
 )
 
 // SSEHandler handles Server-Sent Events for log streaming.
@@ -156,7 +156,7 @@ func (h *SSEHandler) ContainerStats(w http.ResponseWriter, r *http.Request) {
 			}
 
 			var buf bytes.Buffer
-			if err := partials.Stats(stats).Render(r.Context(), &buf); err != nil {
+			if err := components.Stats(stats).Render(r.Context(), &buf); err != nil {
 				continue
 			}
 			writeRawEvent(w, flusher, "stats", buf.Bytes())
