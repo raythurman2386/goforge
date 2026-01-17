@@ -4,14 +4,19 @@ import (
 	"context"
 	"testing"
 
+	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/secrets"
 )
 
 func TestGitSourceRepository_Create(t *testing.T) {
 	db := setupSharedTestDB(t)
 	defer db.Close()
 
-	repo := NewGitSourceRepository(db)
+	key, _ := secrets.GenerateKeyString(32)
+	cfg := &config.Config{EncryptionKey: key}
+	secretService, _ := secrets.NewEncryptionService(cfg)
+	repo := NewGitSourceRepository(db, secretService)
 	ctx := context.Background()
 
 	// Need a user first
@@ -39,7 +44,10 @@ func TestGitSourceRepository_GetByID(t *testing.T) {
 	db := setupSharedTestDB(t)
 	defer db.Close()
 
-	repo := NewGitSourceRepository(db)
+	key, _ := secrets.GenerateKeyString(32)
+	cfg := &config.Config{EncryptionKey: key}
+	secretService, _ := secrets.NewEncryptionService(cfg)
+	repo := NewGitSourceRepository(db, secretService)
 	ctx := context.Background()
 
 	// Need a user first
@@ -68,7 +76,10 @@ func TestGitSourceRepository_ListByUserID(t *testing.T) {
 	db := setupSharedTestDB(t)
 	defer db.Close()
 
-	repo := NewGitSourceRepository(db)
+	key, _ := secrets.GenerateKeyString(32)
+	cfg := &config.Config{EncryptionKey: key}
+	secretService, _ := secrets.NewEncryptionService(cfg)
+	repo := NewGitSourceRepository(db, secretService)
 	ctx := context.Background()
 
 	// Need a user first
@@ -99,7 +110,10 @@ func TestGitSourceRepository_Update(t *testing.T) {
 	db := setupSharedTestDB(t)
 	defer db.Close()
 
-	repo := NewGitSourceRepository(db)
+	key, _ := secrets.GenerateKeyString(32)
+	cfg := &config.Config{EncryptionKey: key}
+	secretService, _ := secrets.NewEncryptionService(cfg)
+	repo := NewGitSourceRepository(db, secretService)
 	ctx := context.Background()
 
 	// Need a user first
@@ -133,7 +147,10 @@ func TestGitSourceRepository_Delete(t *testing.T) {
 	db := setupSharedTestDB(t)
 	defer db.Close()
 
-	repo := NewGitSourceRepository(db)
+	key, _ := secrets.GenerateKeyString(32)
+	cfg := &config.Config{EncryptionKey: key}
+	secretService, _ := secrets.NewEncryptionService(cfg)
+	repo := NewGitSourceRepository(db, secretService)
 	ctx := context.Background()
 
 	// Need a user first

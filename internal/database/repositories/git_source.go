@@ -8,20 +8,27 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/secrets"
 )
 
 // GitSourceRepository handles git source data access.
 type GitSourceRepository struct {
 	db *sql.DB
+	// encryption service
+	secrets *secrets.EncryptionService
 }
 
 // NewGitSourceRepository creates a new GitSourceRepository.
-func NewGitSourceRepository(db *sql.DB) *GitSourceRepository {
-	return &GitSourceRepository{db: db}
+func NewGitSourceRepository(db *sql.DB, secrets *secrets.EncryptionService) *GitSourceRepository {
+	return &GitSourceRepository{db: db, secrets: secrets}
 }
 
 // Create creates a new git source.
 func (r *GitSourceRepository) Create(ctx context.Context, source *models.GitSource) error {
+	if err := r.encrypt(source); err != nil {
+		return err
+	}
+
 	if source.ID == "" {
 		source.ID = uuid.New().String()
 	}
@@ -72,7 +79,12 @@ func (r *GitSourceRepository) GetByID(ctx context.Context, id string) (*models.G
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return source, err
+	if err != nil {
+		return nil, err
+	}
+
+	r.decrypt(source)
+	return source, nil
 }
 
 // ListByUserID retrieves all git sources for a user.
@@ -107,6 +119,7 @@ func (r *GitSourceRepository) ListByUserID(ctx context.Context, userID string) (
 		if err != nil {
 			return nil, err
 		}
+		r.decrypt(source)
 		sources = append(sources, source)
 	}
 	if err := rows.Err(); err != nil {
@@ -117,6 +130,9 @@ func (r *GitSourceRepository) ListByUserID(ctx context.Context, userID string) (
 
 // Update updates a git source.
 func (r *GitSourceRepository) Update(ctx context.Context, source *models.GitSource) error {
+	if err := r.encrypt(source); err != nil {
+		return err
+	}
 	source.UpdatedAt = time.Now()
 
 	query := `
@@ -147,6 +163,45 @@ func (r *GitSourceRepository) Update(ctx context.Context, source *models.GitSour
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (r *GitSourceRepository) encrypt(source *models.GitSource) error {
+	if source.AccessToken.Valid && source.AccessToken.String != "" {
+		encrypted, err := r.secrets.Encrypt(source.AccessToken.String)
+		if err != nil {
+			return err
+		}
+		source.AccessToken.String = encrypted
+	}
+
+	if source.SSHPrivateKey.Valid && source.SSHPrivateKey.String != "" {
+		encrypted, err := r.secrets.Encrypt(source.SSHPrivateKey.String)
+		if err != nil {
+			return err
+		}
+		source.SSHPrivateKey.String = encrypted
+	}
+	return nil
+}
+
+func (r *GitSourceRepository) decrypt(source *models.GitSource) {
+	if source.AccessToken.Valid && source.AccessToken.String != "" {
+		decrypted, err := r.secrets.Decrypt(source.AccessToken.String)
+		if err == nil {
+			source.AccessToken.String = decrypted
+		}
+		// If decryption fails, assume it's a plaintext token from a previous version.
+		// The token will be encrypted on the next update.
+	}
+
+	if source.SSHPrivateKey.Valid && source.SSHPrivateKey.String != "" {
+		decrypted, err := r.secrets.Decrypt(source.SSHPrivateKey.String)
+		if err == nil {
+			source.SSHPrivateKey.String = decrypted
+		}
+		// If decryption fails, assume it's a plaintext key from a previous version.
+		// The key will be encrypted on the next update.
+	}
 }
 
 // Delete deletes a git source.
