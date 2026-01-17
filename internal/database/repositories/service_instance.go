@@ -175,3 +175,11 @@ func (r *ServiceInstanceRepository) Delete(ctx context.Context, id string) error
 	}
 	return nil
 }
+
+// CountByUserID counts the number of service instances for a user.
+func (r *ServiceInstanceRepository) CountByUserID(ctx context.Context, userID string) (int, error) {
+	query := `SELECT COUNT(*) FROM service_instances WHERE user_id = $1`
+	var count int
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
+	return count, err
+}

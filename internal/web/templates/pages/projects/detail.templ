@@ -222,6 +222,29 @@ templ Deployments(project *models.Project) {
 }
 
 templ Settings(project *models.Project, currentEnv *models.Environment) {
+	<div class="card mb-8">
+		<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-4">Project Configuration</h3>
+		<form hx-put={ "/projects/" + project.ID } hx-swap="none">
+			<div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+				<div class="sm:col-span-4">
+					<label for="custom_domain" class="block text-sm font-medium text-gray-700">Custom Domain</label>
+					<div class="mt-1">
+						<input type="text" name="custom_domain" id="custom_domain" 
+							value={ project.CustomDomain.String }
+							class="input-text" 
+							placeholder="example.com" />
+					</div>
+					<p class="mt-2 text-sm text-gray-500">
+						This domain will be used as a default for your deployments. Ensure your DNS points to this server.
+					</p>
+				</div>
+				<div class="sm:col-span-6">
+					<button type="submit" class="btn-primary">Save Changes</button>
+				</div>
+			</div>
+		</form>
+	</div>
+
 	if currentEnv != nil {
 		<div class="mb-8" hx-get={ "/envs/" + currentEnv.ID + "/variables" } hx-trigger="load">
 			<div class="animate-pulse bg-gray-100 h-64 rounded-lg"></div>

@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"net/http"
+
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 type contextKey string
@@ -13,6 +15,14 @@ const (
 	// SessionContextKey is the key for the session in the request context.
 	SessionContextKey contextKey = "session"
 )
+
+// GetUserFromContext retrieves the user from the context.
+func GetUserFromContext(ctx context.Context) *models.User {
+	if user, ok := ctx.Value(UserContextKey).(*models.User); ok {
+		return user
+	}
+	return nil
+}
 
 // Middleware handles authentication by checking the session cookie.
 func Middleware(manager *SessionManager) func(http.Handler) http.Handler {

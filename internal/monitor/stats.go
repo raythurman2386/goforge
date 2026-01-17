@@ -15,16 +15,43 @@ import (
 
 // Collector handles container metrics collection.
 type Collector struct {
-	dockerClient  *docker.Client
-	containerRepo *repositories.ContainerRepository
+	dockerClient        *docker.Client
+	containerRepo       *repositories.ContainerRepository
+	projectRepo         *repositories.ProjectRepository
+	serviceInstanceRepo *repositories.ServiceInstanceRepository
 }
 
 // NewCollector creates a new metrics collector.
-func NewCollector(dc *docker.Client, cr *repositories.ContainerRepository) *Collector {
+func NewCollector(
+	dc *docker.Client,
+	cr *repositories.ContainerRepository,
+	pr *repositories.ProjectRepository,
+	sr *repositories.ServiceInstanceRepository,
+) *Collector {
 	return &Collector{
-		dockerClient:  dc,
-		containerRepo: cr,
+		dockerClient:        dc,
+		containerRepo:       cr,
+		projectRepo:         pr,
+		serviceInstanceRepo: sr,
 	}
+}
+
+// CollectSystemStats collects high-level system stats for a user.
+func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*models.SystemStats, error) {
+	projects, err := c.projectRepo.CountByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	services, err := c.serviceInstanceRepo.CountByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.SystemStats{
+		TotalProjects: projects,
+		TotalServices: services,
+	}, nil
 }
 
 // CollectStats collects stats for a container once.

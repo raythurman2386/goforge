@@ -95,6 +95,7 @@ func Router(
 				r.Post("/", projectHandler.CreateProject)
 				r.Route("/{id}", func(r chi.Router) {
 					r.Get("/", projectHandler.GetProject)
+					r.Put("/", projectHandler.UpdateProject)
 					r.Delete("/", projectHandler.DeleteProject)
 					r.Get("/deployments", projectHandler.GetProject)
 					r.Get("/settings", projectHandler.GetProject)

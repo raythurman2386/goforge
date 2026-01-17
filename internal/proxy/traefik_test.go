@@ -360,6 +360,40 @@ func TestGenerateLabelsWithOptions_Sticky(t *testing.T) {
 	assertLabel(t, labels, "traefik.http.services."+testRouterName+".loadbalancer.sticky.cookie.httpOnly", "true")
 }
 
+func TestGenerateLabels_WithProjectDomain(t *testing.T) {
+	p := &models.Project{
+		ID:           "proj-123",
+		Name:         "test-project",
+		CustomDomain: sql.NullString{String: "project.com", Valid: true},
+	}
+	env := &models.Environment{
+		ID:   "env-456",
+		Name: "production",
+		// No env domain set
+	}
+
+	labels := GenerateLabels(p, env, "traefik")
+
+	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".rule", "Host(`project.com`)")
+}
+
+func TestGenerateLabels_WithProjectDomainOverride(t *testing.T) {
+	p := &models.Project{
+		ID:           "proj-123",
+		Name:         "test-project",
+		CustomDomain: sql.NullString{String: "project.com", Valid: true},
+	}
+	env := &models.Environment{
+		ID:     "env-456",
+		Name:   "production",
+		Domain: sql.NullString{String: "env.com", Valid: true},
+	}
+
+	labels := GenerateLabels(p, env, "traefik")
+
+	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".rule", "Host(`env.com`)")
+}
+
 func TestGenerateName(t *testing.T) {
 	tests := []struct {
 		projectID string

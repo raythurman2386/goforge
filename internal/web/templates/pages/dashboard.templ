@@ -1,15 +1,30 @@
 package pages
 
 import (
+	"fmt"
+	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-templ Dashboard(csrfToken string) {
+templ Dashboard(csrfToken string, stats *models.SystemStats) {
 	@layouts.AppLayout("Dashboard", csrfToken) {
 		<div class="max-w-4xl">
 			<h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">Dashboard</h1>
 			<p class="mt-2 text-sm text-gray-500">Overview of your Platform as a Service.</p>
 			
+			if stats != nil {
+				<div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+					<div class="card">
+						<dt class="text-sm font-medium text-gray-500 truncate">Total Projects</dt>
+						<dd class="mt-1 text-3xl font-semibold text-gray-900">{ fmt.Sprintf("%d", stats.TotalProjects) }</dd>
+					</div>
+					<div class="card">
+						<dt class="text-sm font-medium text-gray-500 truncate">Active Services</dt>
+						<dd class="mt-1 text-3xl font-semibold text-gray-900">{ fmt.Sprintf("%d", stats.TotalServices) }</dd>
+					</div>
+				</div>
+			}
+
 			<div class="mt-8">
 				<div class="card bg-gradient-to-br from-white to-gray-50/50">
 					<div class="sm:flex sm:items-start sm:justify-between">

@@ -128,12 +128,18 @@ func GenerateLabelsWithOptions(p *models.Project, env *models.Environment, netwo
 		"goforge.environment.id": env.ID,
 	}
 
-	// Only add routing labels if domain is set
-	if !env.Domain.Valid || env.Domain.String == "" {
-		return labels
+	// Determine domain: Environment domain takes precedence, then Project Custom Domain
+	domain := ""
+	if env.Domain.Valid && env.Domain.String != "" {
+		domain = env.Domain.String
+	} else if p.CustomDomain.Valid && p.CustomDomain.String != "" {
+		domain = p.CustomDomain.String
 	}
 
-	domain := env.Domain.String
+	// Only add routing labels if domain is set
+	if domain == "" {
+		return labels
+	}
 
 	// Build the routing rule
 	rule := buildRoutingRule(domain, opts.PathPrefix)

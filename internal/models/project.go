@@ -23,6 +23,7 @@ type Project struct {
 	HealthCheckPath     string
 	HealthCheckInterval int // seconds
 	AutoDeploy          bool
+	CustomDomain        sql.NullString
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
