@@ -8,7 +8,7 @@ templ GitRepositoryBrowser(sources []*models.GitSource) {
 	<div class="mb-4">
 		<label class="block text-sm font-medium text-gray-700 mb-1">Git Source</label>
 		<select name="git_source_id" 
-			class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+			class="select"
 			hx-get="/api/git/repos"
 			hx-target="#repository_url_select"
 			hx-trigger="change"
@@ -29,7 +29,7 @@ templ GitRepositoryBrowser(sources []*models.GitSource) {
 	<div id="repo-select-container" style="display:none;" class="mb-4">
 		<label class="block text-sm font-medium text-gray-700 mb-1">Repository</label>
 		<select id="repository_url_select"
-			class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+			class="select"
 			hx-get="/api/git/branches"
 			hx-target="#default_branch"
 			hx-trigger="change"

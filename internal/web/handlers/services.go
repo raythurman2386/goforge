@@ -40,14 +40,14 @@ func (h *ServiceHandler) Catalog(w http.ResponseWriter, r *http.Request) {
 
 	instances, err := h.instanceService.ListInstances(r.Context(), user.ID)
 	if err != nil {
-		http.Error(w, "failed to list instances", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to list instances")
 		return
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
 	component := pages_services.Index(templates, instances, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render catalog", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render catalog")
 	}
 }
 
@@ -56,14 +56,14 @@ func (h *ServiceHandler) Configure(w http.ResponseWriter, r *http.Request) {
 	templateName := chi.URLParam(r, "template")
 	tmpl, err := h.catalog.GetTemplate(templateName)
 	if err != nil {
-		http.Error(w, "template not found", http.StatusNotFound)
+		RenderError(w, r, http.StatusNotFound, "template not found")
 		return
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
 	component := pages_services.Configure(tmpl, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render configuration page", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render configuration page")
 	}
 }
 
@@ -80,7 +80,7 @@ func (h *ServiceHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	// Parse form data into config map
 	config := make(map[string]interface{})
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid form data", http.StatusBadRequest)
+		RenderError(w, r, http.StatusBadRequest, "invalid form data")
 		return
 	}
 	for key, values := range r.Form {
@@ -90,7 +90,7 @@ func (h *ServiceHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.instanceService.DeployInstance(r.Context(), user.ID, templateName, config); err != nil {
-		http.Error(w, fmt.Sprintf("failed to deploy service: %v", err), http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to deploy service: %v", err))
 		return
 	}
 
@@ -102,7 +102,7 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	instance, err := h.instanceService.GetInstance(r.Context(), id)
 	if err != nil {
-		http.Error(w, "service instance not found", http.StatusNotFound)
+		RenderError(w, r, http.StatusNotFound, "service instance not found")
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	csrfToken := auth.GetCSRFToken(r)
 	component := pages_services.Detail(instance, container, tmpl, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render detail page", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render detail page")
 	}
 }
 

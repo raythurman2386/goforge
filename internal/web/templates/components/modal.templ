@@ -1,19 +1,20 @@
 package components
 
 templ Modal(title string) {
-	<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-		<div class="bg-white rounded-lg shadow-xl max-w-lg w-full" hx-on::after-request="if(event.detail.successful) this.remove()">
-			<div class="flex justify-between items-center px-6 py-4 border-b">
-				<h3 class="text-lg font-medium text-gray-900">{ title }</h3>
-				<button onclick="document.getElementById('modal').remove()" class="text-gray-400 hover:text-gray-500">
+	<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300">
+		<div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full transform transition-all border border-gray-200" hx-on::after-request="if(event.detail.successful) this.remove()">
+			<div class="flex justify-between items-center px-6 py-4 border-b border-gray-100">
+				<h3 class="text-xl font-bold text-gray-900 tracking-tight">{ title }</h3>
+				<button onclick="document.getElementById('modal').remove()" class="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
 					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
 					</svg>
 				</button>
 			</div>
-			<div class="px-6 py-4">
+			<div class="px-6 py-6">
 				{ children... }
 			</div>
 		</div>
 	</div>
 }
+

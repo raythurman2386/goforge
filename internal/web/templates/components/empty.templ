@@ -1,16 +1,18 @@
 package components
 
 templ EmptyState(title, description, buttonText, buttonURL string) {
-	<div class="text-center py-12">
-		<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-3m-9 0H3m9 9v1m0-4v1m0-4v1"></path>
-		</svg>
-		<h3 class="mt-2 text-sm font-medium text-gray-900">{ title }</h3>
-		<p class="mt-1 text-sm text-gray-500">{ description }</p>
+	<div class="text-center py-20 card bg-gray-50/30 border-dashed border-2 border-gray-200 shadow-none">
+		<div class="w-20 h-20 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto mb-6">
+			<svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-3m-9 0H3m9 9v1m0-4v1m0-4v1"></path>
+			</svg>
+		</div>
+		<h3 class="text-xl font-bold text-gray-900 tracking-tight">{ title }</h3>
+		<p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">{ description }</p>
 		if buttonText != "" {
-			<div class="mt-6">
-				<a href={ templ.URL(buttonURL) } class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-					<svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<div class="mt-8">
+				<a href={ templ.URL(buttonURL) } class="btn-primary">
+					<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 					</svg>
 					{ buttonText }
@@ -19,3 +21,4 @@ templ EmptyState(title, description, buttonText, buttonURL string) {
 		}
 	</div>
 }
+

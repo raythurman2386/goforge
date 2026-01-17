@@ -33,6 +33,16 @@ func RenderError(w http.ResponseWriter, r *http.Request, status int, message str
 	}
 }
 
+// NotFoundHandler handles 404 errors.
+func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	RenderError(w, r, http.StatusNotFound, "Page not found")
+}
+
+// MethodNotAllowedHandler handles 405 errors.
+func MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request) {
+	RenderError(w, r, http.StatusMethodNotAllowed, "Method not allowed")
+}
+
 // Health returns a simple health check response.
 func Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

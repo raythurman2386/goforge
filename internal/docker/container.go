@@ -17,18 +17,22 @@ type ContainerOptions struct {
 	Labels       map[string]string
 	PortMappings map[string]string // container_port -> host_port
 	NetworkName  string
+	Binds        []string
+	HealthCheck  *container.HealthConfig
 }
 
 // CreateContainer creates and starts a new container.
 func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (string, error) {
 	config := &container.Config{
-		Image:  opts.Image,
-		Env:    opts.Env,
-		Labels: opts.Labels,
+		Image:       opts.Image,
+		Env:         opts.Env,
+		Labels:      opts.Labels,
+		Healthcheck: opts.HealthCheck,
 	}
 
 	hostConfig := &container.HostConfig{
 		PortBindings: make(nat.PortMap),
+		Binds:        opts.Binds,
 	}
 
 	for containerPort, hostPort := range opts.PortMappings {

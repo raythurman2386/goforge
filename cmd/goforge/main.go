@@ -267,7 +267,7 @@ func runServer() error {
 	if err := catalog.LoadTemplates(); err != nil {
 		log.Error("failed to load service templates", "error", err)
 	}
-	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog)
+	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog, cfg.TraefikNetwork)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)

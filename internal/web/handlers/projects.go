@@ -38,14 +38,14 @@ func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
 	list, err := h.projectService.ListProjects(r.Context(), user.ID)
 	if err != nil {
-		http.Error(w, "failed to list projects", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to list projects")
 		return
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
 	component := projects.List(list, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render projects page", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render projects page")
 	}
 }
 
@@ -60,14 +60,14 @@ func (h *ProjectHandler) NewProjectPage(w http.ResponseWriter, r *http.Request) 
 
 	sources, err := h.gitSourceRepo.ListByUserID(r.Context(), user.ID)
 	if err != nil {
-		http.Error(w, "failed to list git sources", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to list git sources")
 		return
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
 	component := projects.New(sources, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render new project page", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render new project page")
 	}
 }
 
@@ -107,7 +107,7 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 	created, err := h.projectService.CreateProject(r.Context(), p)
 	if err != nil {
-		http.Error(w, "failed to create project", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to create project")
 		return
 	}
 
@@ -119,13 +119,13 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	p, err := h.projectService.GetProject(r.Context(), id)
 	if err != nil {
-		http.Error(w, "project not found", http.StatusNotFound)
+		RenderError(w, r, http.StatusNotFound, "project not found")
 		return
 	}
 
 	envs, err := h.projectService.ListEnvironments(r.Context(), id)
 	if err != nil {
-		http.Error(w, "failed to list environments", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to list environments")
 		return
 	}
 
@@ -157,7 +157,7 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	csrfToken := auth.GetCSRFToken(r)
 	component := projects.Detail(p, envs, currentEnv, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render project detail page", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render project detail page")
 	}
 }
 

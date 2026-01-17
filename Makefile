@@ -81,7 +81,11 @@ templ-watch:
 
 ## css: Compile TailwindCSS
 css:
-	@command -v $(TAILWIND) >/dev/null 2>&1 && $(TAILWIND) -i ./static/css/input.css -o ./static/css/output.css --minify || echo "tailwindcss not installed, using placeholder CSS"
+	@if command -v $(TAILWIND) >/dev/null 2>&1; then \
+		$(TAILWIND) -i ./static/css/input.css -o ./static/css/output.css --minify; \
+	else \
+		echo "tailwindcss not installed, using placeholder CSS"; \
+	fi
 
 ## css-watch: Watch and compile TailwindCSS
 css-watch:
