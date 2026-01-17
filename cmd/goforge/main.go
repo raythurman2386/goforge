@@ -249,6 +249,7 @@ func runServer() error {
 		projectRepo,
 		environmentRepo,
 		containerRepo,
+		gitSourceRepo,
 		gitService,
 		dockerClient,
 		sseHub,
@@ -272,7 +273,7 @@ func runServer() error {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
 	dashboardHandler := handlers.NewDashboardHandler()
-	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo)
+	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo)
 	envHandler := handlers.NewEnvironmentHandler(projectService)
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)

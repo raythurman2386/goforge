@@ -97,7 +97,7 @@ func (h *SettingsHandler) CreateGitSource(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("HX-Refresh", "true")
+	w.Header().Set("HX-Redirect", "/settings/git")
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -109,6 +109,6 @@ func (h *SettingsHandler) DeleteGitSource(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("HX-Refresh", "true")
+	w.Header().Set("HX-Redirect", "/settings/git")
 	w.WriteHeader(http.StatusOK)
 }

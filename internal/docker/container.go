@@ -23,6 +23,11 @@ type ContainerOptions struct {
 
 // CreateContainer creates and starts a new container.
 func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (string, error) {
+	// Ensure the image exists locally, pull if needed
+	if err := c.EnsureImage(ctx, opts.Image); err != nil {
+		return "", fmt.Errorf("failed to ensure image: %w", err)
+	}
+
 	config := &container.Config{
 		Image:       opts.Image,
 		Env:         opts.Env,

@@ -29,6 +29,11 @@ func (r *ProjectRepository) Create(ctx context.Context, project *models.Project)
 	project.CreatedAt = now
 	project.UpdatedAt = now
 
+	// Ensure BuildArgs is valid JSON (default to empty object)
+	if len(project.BuildArgs) == 0 {
+		project.BuildArgs = []byte("{}")
+	}
+
 	query := `
 		INSERT INTO projects (id, user_id, name, description, git_source_id, repository_url,
 			repository_name, default_branch, dockerfile_path, docker_compose_path, build_context,

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
@@ -17,13 +18,15 @@ import (
 type ProjectHandler struct {
 	projectService *project.Service
 	gitSourceRepo  *repositories.GitSourceRepository
+	deploymentRepo *repositories.DeploymentRepository
 }
 
 // NewProjectHandler creates a new ProjectHandler.
-func NewProjectHandler(ps *project.Service, gsr *repositories.GitSourceRepository) *ProjectHandler {
+func NewProjectHandler(ps *project.Service, gsr *repositories.GitSourceRepository, dr *repositories.DeploymentRepository) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: ps,
 		gitSourceRepo:  gsr,
+		deploymentRepo: dr,
 	}
 }
 
@@ -82,6 +85,7 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 	name := r.FormValue("name")
 	repoURL := r.FormValue("repository_url")
+	gitSourceID := r.FormValue("git_source_id")
 	defaultBranch := r.FormValue("default_branch")
 	dockerfilePath := r.FormValue("dockerfile_path")
 	buildContext := r.FormValue("build_context")
@@ -103,6 +107,11 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		DefaultBranch:  defaultBranch,
 		DockerfilePath: dockerfilePath,
 		BuildContext:   buildContext,
+	}
+
+	// Set GitSourceID if provided
+	if gitSourceID != "" {
+		p.GitSourceID = sql.NullString{String: gitSourceID, Valid: true}
 	}
 
 	created, err := h.projectService.CreateProject(r.Context(), p)
@@ -147,6 +156,16 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get latest deployment for the current environment
+	var latestDeployment *models.Deployment
+	if currentEnv != nil {
+		// Ignore error - it's ok if there's no deployment yet
+		latestDeployment, err = h.deploymentRepo.GetLatestByEnvironmentID(r.Context(), currentEnv.ID)
+		if err != nil {
+			latestDeployment = nil
+		}
+	}
+
 	tab := "overview"
 	if strings.HasSuffix(r.URL.Path, "/deployments") {
 		tab = "deployments"
@@ -155,7 +174,7 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := projects.Detail(p, envs, currentEnv, tab, csrfToken)
+	component := projects.Detail(p, envs, currentEnv, latestDeployment, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render project detail page")
 	}

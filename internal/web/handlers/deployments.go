@@ -10,6 +10,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/deployments"
+	"github.com/raythurman2386/goforge/internal/web/templates/pages/projects"
 )
 
 // DeploymentHandler handles deployment related requests.
@@ -172,4 +173,32 @@ func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Requ
 	// Redirect back to deployment detail page
 	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID)
 	w.WriteHeader(http.StatusOK)
+}
+
+// GetDeploymentStatus returns the current deployment status for HTMX polling.
+// When the deployment is no longer active, it returns an empty div to stop the banner.
+func (h *DeploymentHandler) GetDeploymentStatus(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+	deploymentID := chi.URLParam(r, "deploymentID")
+
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return
+	}
+
+	// If deployment is in a terminal state, return an empty div that doesn't poll
+	if deployment.IsTerminal() {
+		w.Header().Set("Content-Type", "text/html")
+		if _, err := w.Write([]byte(`<div id="deployment-status-banner"></div>`)); err != nil {
+			http.Error(w, "failed to write response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Return updated banner component
+	component := projects.DeploymentStatusBanner(projectID, deployment)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, "failed to render deployment status", http.StatusInternalServerError)
+	}
 }

@@ -32,6 +32,18 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 		return fmt.Errorf("failed to get project: %w", err)
 	}
 
+	// Fetch git source for authentication if project has one
+	var accessToken string
+	if p.GitSourceID.Valid {
+		gitSource, gsErr := s.gitSourceRepo.GetByID(ctx, p.GitSourceID.String)
+		if gsErr != nil {
+			return fmt.Errorf("failed to get git source: %w", gsErr)
+		}
+		if gitSource.AccessToken.Valid {
+			accessToken = gitSource.AccessToken.String
+		}
+	}
+
 	// 1. Transition to Cloning
 	if tErr := s.Transition(ctx, d.ID, models.DeploymentStatusCloning, nil); tErr != nil {
 		return tErr
@@ -49,10 +61,11 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	}
 
 	if cErr := s.gitService.Clone(ctx, git.CloneOptions{
-		URL:    p.RepositoryURL,
-		Branch: branch,
-		Path:   workDir,
-		Depth:  1,
+		URL:         p.RepositoryURL,
+		Branch:      branch,
+		Path:        workDir,
+		Depth:       1,
+		AccessToken: accessToken,
 	}); cErr != nil {
 		return fmt.Errorf("git clone failed: %w", cErr)
 	}

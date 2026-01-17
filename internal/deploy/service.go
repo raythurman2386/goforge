@@ -18,6 +18,7 @@ type Service struct {
 	projectRepo     *repositories.ProjectRepository
 	environmentRepo *repositories.EnvironmentRepository
 	containerRepo   *repositories.ContainerRepository
+	gitSourceRepo   *repositories.GitSourceRepository
 	gitService      *git.Service
 	dockerClient    *docker.Client
 	sseHub          *sse.Hub
@@ -31,6 +32,7 @@ func NewService(
 	pr *repositories.ProjectRepository,
 	er *repositories.EnvironmentRepository,
 	cr *repositories.ContainerRepository,
+	gsr *repositories.GitSourceRepository,
 	gs *git.Service,
 	dc *docker.Client,
 	sh *sse.Hub,
@@ -42,6 +44,7 @@ func NewService(
 		projectRepo:     pr,
 		environmentRepo: er,
 		containerRepo:   cr,
+		gitSourceRepo:   gsr,
 		gitService:      gs,
 		dockerClient:    dc,
 		sseHub:          sh,

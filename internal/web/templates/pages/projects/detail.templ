@@ -1,12 +1,14 @@
 package projects
 
 import (
+	"time"
+
 	"github.com/raythurman2386/goforge/internal/models"
-	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, activeTab string, csrfToken string) {
+templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, activeTab string, csrfToken string) {
 	@layouts.AppLayout(project.Name, csrfToken) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
@@ -33,6 +35,11 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 			</div>
 		</div>
 
+		// Show deployment status banner if there's an active deployment
+		if latestDeployment != nil && isActiveDeployment(latestDeployment.Status) {
+			@DeploymentStatusBanner(project.ID, latestDeployment)
+		}
+
 		<div class="mb-8 border-b border-gray-200/60">
 			<nav class="-mb-px flex space-x-8" aria-label="Tabs">
 				<a href={ templ.URL("/projects/" + project.ID + "?env=" + currentEnv.ID) } 
@@ -57,7 +64,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 		</div>
 
 		if activeTab == "overview" {
-			@Overview(project)
+			@Overview(project, latestDeployment)
 		} else if activeTab == "deployments" {
 			@Deployments(project)
 		} else if activeTab == "settings" {
@@ -66,31 +73,146 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 	}
 }
 
-templ Overview(project *models.Project) {
-	<div class="card overflow-hidden !p-0">
-		<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30">
-			<h3 class="text-lg font-bold text-gray-900 tracking-tight">Project Overview</h3>
-			<p class="mt-1 text-sm text-gray-500">Details and configuration for the current environment.</p>
-		</div>
-		<div class="divide-y divide-gray-100">
-			<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-				<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Repository</dt>
-				<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-gray-50 p-2 rounded-md border border-gray-100">{ project.RepositoryURL }</dd>
+func isActiveDeployment(status models.DeploymentStatus) bool {
+	return status == models.DeploymentStatusPending ||
+		status == models.DeploymentStatusCloning ||
+		status == models.DeploymentStatusBuilding ||
+		status == models.DeploymentStatusDeploying
+}
+
+func getStatusColor(status models.DeploymentStatus) string {
+	switch status {
+	case models.DeploymentStatusRunning:
+		return "bg-green-100 text-green-800 border-green-200"
+	case models.DeploymentStatusFailed:
+		return "bg-red-100 text-red-800 border-red-200"
+	case models.DeploymentStatusPending, models.DeploymentStatusCloning, 
+		models.DeploymentStatusBuilding, models.DeploymentStatusDeploying:
+		return "bg-yellow-100 text-yellow-800 border-yellow-200"
+	case models.DeploymentStatusCanceled, models.DeploymentStatusRolledBack:
+		return "bg-gray-100 text-gray-800 border-gray-200"
+	default:
+		return "bg-gray-100 text-gray-800 border-gray-200"
+	}
+}
+
+templ DeploymentStatusBanner(projectID string, deployment *models.Deployment) {
+	<div 
+		id="deployment-status-banner"
+		class="mb-6 p-4 rounded-lg border bg-blue-50 border-blue-200"
+		hx-get={ "/projects/" + projectID + "/deployments/" + deployment.ID + "/status" }
+		hx-trigger="every 3s"
+		hx-swap="outerHTML"
+	>
+		<div class="flex items-center">
+			<div class="flex-shrink-0">
+				<svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
 			</div>
-			<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-				<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Default Branch</dt>
-				<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-medium">{ project.DefaultBranch }</dd>
+			<div class="ml-3">
+				<p class="text-sm font-medium text-blue-800">
+					Deployment in progress: 
+					<span class="font-bold">{ string(deployment.Status) }</span>
+				</p>
 			</div>
-			<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-				<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Dockerfile</dt>
-				<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">{ project.DockerfilePath }</dd>
-			</div>
-			<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-				<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Build Context</dt>
-				<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">{ project.BuildContext }</dd>
+			<div class="ml-auto">
+				<a href={ templ.URL("/projects/" + projectID + "/deployments/" + deployment.ID) } class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+					View Logs
+				</a>
 			</div>
 		</div>
 	</div>
+}
+
+templ Overview(project *models.Project, latestDeployment *models.Deployment) {
+	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+		// Main info card
+		<div class="lg:col-span-2 card overflow-hidden !p-0">
+			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30">
+				<h3 class="text-lg font-bold text-gray-900 tracking-tight">Project Overview</h3>
+				<p class="mt-1 text-sm text-gray-500">Details and configuration for the current environment.</p>
+			</div>
+			<div class="divide-y divide-gray-100">
+				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Repository</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-gray-50 p-2 rounded-md border border-gray-100">{ project.RepositoryURL }</dd>
+				</div>
+				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Default Branch</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-medium">{ project.DefaultBranch }</dd>
+				</div>
+				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Dockerfile</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">{ project.DockerfilePath }</dd>
+				</div>
+				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider">Build Context</dt>
+					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">{ project.BuildContext }</dd>
+				</div>
+			</div>
+		</div>
+
+		// Latest deployment card
+		<div class="card overflow-hidden !p-0">
+			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30">
+				<h3 class="text-lg font-bold text-gray-900 tracking-tight">Latest Deployment</h3>
+			</div>
+			<div class="p-6">
+				if latestDeployment != nil {
+					<div class="space-y-4">
+						<div class="flex items-center justify-between">
+							<span class="text-sm text-gray-500">Status</span>
+							<span class={ "px-2.5 py-0.5 rounded-full text-xs font-medium border", getStatusColor(latestDeployment.Status) }>
+								{ string(latestDeployment.Status) }
+							</span>
+						</div>
+						if latestDeployment.Branch.Valid {
+							<div class="flex items-center justify-between">
+								<span class="text-sm text-gray-500">Branch</span>
+								<span class="text-sm font-mono text-gray-900">{ latestDeployment.Branch.String }</span>
+							</div>
+						}
+						if latestDeployment.CommitSHA.Valid && latestDeployment.CommitSHA.String != "" {
+							<div class="flex items-center justify-between">
+								<span class="text-sm text-gray-500">Commit</span>
+								<span class="text-sm font-mono text-gray-900">{ truncateCommit(latestDeployment.CommitSHA.String) }</span>
+							</div>
+						}
+						<div class="flex items-center justify-between">
+							<span class="text-sm text-gray-500">Started</span>
+							<span class="text-sm text-gray-900">{ formatTime(latestDeployment.CreatedAt) }</span>
+						</div>
+						if latestDeployment.ErrorMessage.Valid && latestDeployment.ErrorMessage.String != "" {
+							<div class="mt-4 p-3 bg-red-50 rounded-md border border-red-100">
+								<p class="text-sm text-red-700">{ latestDeployment.ErrorMessage.String }</p>
+							</div>
+						}
+					</div>
+				} else {
+					<div class="text-center py-8">
+						<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+						</svg>
+						<p class="mt-2 text-sm text-gray-500">No deployments yet</p>
+						<p class="text-xs text-gray-400">Click "Deploy Now" to get started</p>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+func truncateCommit(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+func formatTime(t time.Time) string {
+	return t.Format("Jan 2, 15:04")
 }
 
 templ Deployments(project *models.Project) {
