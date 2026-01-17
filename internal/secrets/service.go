@@ -160,7 +160,7 @@ func (s *Service) ToEnvFormat(ctx context.Context, vars []*models.EnvVariable) (
 			}
 			value = decrypted
 		}
-		result = append(result, fmt.Sprintf("%s=%s", v.Key, value))
+		result = append(result, v.Key+"="+value)
 	}
 	return result, nil
 }

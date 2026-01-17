@@ -109,7 +109,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		if interpErr != nil {
 			return nil, fmt.Errorf("failed to interpolate env %s: %w", k, interpErr)
 		}
-		envVars = append(envVars, fmt.Sprintf("%s=%s", k, val))
+		envVars = append(envVars, k+"="+val)
 	}
 
 	// Create container
