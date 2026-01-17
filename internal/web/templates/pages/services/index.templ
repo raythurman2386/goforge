@@ -17,18 +17,20 @@ templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceIn
 			} else {
 				<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					for _, instance := range instances {
-						<div class="bg-white shadow rounded-lg p-6">
-							<div class="flex items-center justify-between">
-								<h3 class="text-lg font-medium text-gray-900">{ instance.Name }</h3>
-								<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-									templ.KV("bg-green-100 text-green-800", instance.Status == models.ServiceStatusRunning),
-									templ.KV("bg-yellow-100 text-yellow-800", instance.Status == models.ServiceStatusPending),
-									templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed) }>
-									{ string(instance.Status) }
-								</span>
+						<a href={ templ.URL("/services/" + instance.ID) } class="block">
+							<div class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow duration-200">
+								<div class="flex items-center justify-between">
+									<h3 class="text-lg font-medium text-gray-900">{ instance.Name }</h3>
+									<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+										templ.KV("bg-green-100 text-green-800", instance.Status == models.ServiceStatusRunning),
+										templ.KV("bg-yellow-100 text-yellow-800", instance.Status == models.ServiceStatusPending),
+										templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed) }>
+										{ string(instance.Status) }
+									</span>
+								</div>
+								<p class="mt-1 text-sm text-gray-500">{ instance.TemplateName }</p>
 							</div>
-							<p class="mt-1 text-sm text-gray-500">{ instance.TemplateName }</p>
-						</div>
+						</a>
 					}
 				</div>
 			}
