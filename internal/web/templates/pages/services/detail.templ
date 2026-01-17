@@ -1,6 +1,7 @@
 package pages_services
 
 import (
+	"fmt"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
@@ -48,13 +49,26 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 			</div>
 			<div class="border-t border-gray-200">
 				<dl>
-					// TODO: Decrypt and parse connection info
-					<div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-gray-500">Internal Connection</dt>
-						<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono select-all">
-							postgres://user:pass@host:5432/db
-						</dd>
-					</div>
+					if config, err := instance.GetConfig(); err == nil {
+						for k, v := range config {
+							<div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+								<dt class="text-sm font-medium text-gray-500">{ k }</dt>
+								<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono select-all">
+									{ fmt.Sprintf("%v", v) }
+								</dd>
+							</div>
+						}
+					}
+					if info, err := instance.GetConnectionInfo(); err == nil {
+						for k, v := range info {
+							<div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+								<dt class="text-sm font-medium text-gray-500">{ k }</dt>
+								<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono select-all">
+									{ v }
+								</dd>
+							</div>
+						}
+					}
 				</dl>
 			</div>
 		</div>
