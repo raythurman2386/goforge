@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -22,11 +21,23 @@ type InstanceRepository interface {
 	Delete(ctx context.Context, id string) error
 }
 
+// ContainerRepository defines the interface for container data access.
+type ContainerRepository interface {
+	Create(ctx context.Context, c *models.Container) error
+	GetByServiceInstanceID(ctx context.Context, instanceID string) (*models.Container, error)
+}
+
+// DockerClient defines the interface for Docker operations.
+type DockerClient interface {
+	CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error)
+	StopContainer(ctx context.Context, id string) error
+}
+
 // InstanceService handles service instance management.
 type InstanceService struct {
 	instanceRepo   InstanceRepository
-	containerRepo  *repositories.ContainerRepository
-	dockerClient   *docker.Client
+	containerRepo  ContainerRepository
+	dockerClient   DockerClient
 	catalog        *Catalog
 	traefikNetwork string
 }
@@ -34,8 +45,8 @@ type InstanceService struct {
 // NewInstanceService creates a new instance service.
 func NewInstanceService(
 	ir InstanceRepository,
-	cr *repositories.ContainerRepository,
-	dc *docker.Client,
+	cr ContainerRepository,
+	dc DockerClient,
 	c *Catalog,
 	traefikNetwork string,
 ) *InstanceService {

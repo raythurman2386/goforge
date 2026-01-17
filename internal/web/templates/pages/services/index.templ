@@ -8,27 +8,39 @@ import (
 
 templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceInstance, csrfToken string) {
 	@layouts.AppLayout("Services", csrfToken) {
-		<div class="mb-8">
-			<h2 class="text-2xl font-bold text-gray-900">Your Services</h2>
+		<div class="mb-12">
+			<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">Your Services</h2>
+			<p class="mt-2 text-sm text-gray-500">Currently active and pending instances.</p>
 			if len(instances) == 0 {
-				<div class="mt-4 bg-white shadow rounded-lg p-6 text-center text-gray-500">
-					No services deployed yet. Choose a template below.
+				<div class="mt-6 card p-12 text-center">
+					<div class="flex flex-col items-center">
+						<div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+							<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+							</svg>
+						</div>
+						<h3 class="text-lg font-bold text-gray-900">No services yet</h3>
+						<p class="mt-1 text-sm text-gray-500">Choose a template from the catalog below to get started.</p>
+					</div>
 				</div>
 			} else {
-				<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				<div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 					for _, instance := range instances {
-						<a href={ templ.URL("/services/" + instance.ID) } class="block">
-							<div class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow duration-200">
-								<div class="flex items-center justify-between">
-									<h3 class="text-lg font-medium text-gray-900">{ instance.Name }</h3>
-									<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-										templ.KV("bg-green-100 text-green-800", instance.Status == models.ServiceStatusRunning),
-										templ.KV("bg-yellow-100 text-yellow-800", instance.Status == models.ServiceStatusPending),
-										templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed) }>
-										{ string(instance.Status) }
-									</span>
+						<a href={ templ.URL("/services/" + instance.ID) } class="card hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group">
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-bold text-gray-900 tracking-tight">{ instance.Name }</h3>
+								<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+									templ.KV("bg-emerald-100 text-emerald-800", instance.Status == models.ServiceStatusRunning),
+									templ.KV("bg-amber-100 text-amber-800", instance.Status == models.ServiceStatusPending),
+									templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed) }>
+									{ string(instance.Status) }
+								</span>
+							</div>
+							<div class="flex items-center text-sm text-gray-500">
+								<div class="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold mr-2">
+									{ string(instance.TemplateName[0]) }
 								</div>
-								<p class="mt-1 text-sm text-gray-500">{ instance.TemplateName }</p>
+								{ instance.TemplateName }
 							</div>
 						</a>
 					}
@@ -36,30 +48,37 @@ templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceIn
 			}
 		</div>
 
-		<div>
-			<h2 class="text-2xl font-bold text-gray-900 mb-4">Service Catalog</h2>
+		<div class="pt-12 border-t border-gray-200/60">
+			<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl mb-2">Service Catalog</h2>
+			<p class="mb-8 text-sm text-gray-500">Ready-to-deploy application and database templates.</p>
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				for _, tmpl := range templates {
-					<div class="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-200">
-						<div class="p-6">
-							<div class="flex items-center">
+					<div class="card hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 flex flex-col group">
+						<div class="flex items-center mb-6">
+							<div class="h-12 w-12 bg-primary-50 rounded-xl flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm">
 								if tmpl.Icon != "" {
-									// TODO: Render actual icon
-									<div class="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
-										{ string(tmpl.Name[0]) }
-									</div>
+									<span class="text-xl font-bold">{ string(tmpl.DisplayName[0]) }</span>
+								} else {
+									<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+									</svg>
 								}
-								<div class="ml-4">
-									<h3 class="text-lg font-medium text-gray-900">{ tmpl.DisplayName }</h3>
-									<span class="text-xs text-gray-500 uppercase">{ tmpl.Category }</span>
-								</div>
 							</div>
-							<p class="mt-4 text-sm text-gray-500 h-10 line-clamp-2">{ tmpl.Description }</p>
-							<div class="mt-6">
-								<a href={ templ.URL("/services/" + tmpl.Name + "/configure") } class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-									Deploy
-								</a>
+							<div class="ml-4">
+								<h3 class="text-lg font-bold text-gray-900 tracking-tight">{ tmpl.DisplayName }</h3>
+								<span class="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">
+									{ tmpl.Category }
+								</span>
 							</div>
+						</div>
+						<p class="text-sm text-gray-500 leading-relaxed flex-1 line-clamp-2">{ tmpl.Description }</p>
+						<div class="mt-8">
+							<a href={ templ.URL("/services/" + tmpl.Name + "/configure") } class="btn-primary w-full group">
+								Deploy
+								<svg class="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7-7 7"></path>
+								</svg>
+							</a>
 						</div>
 					</div>
 				}

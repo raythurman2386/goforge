@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/settings"
 )
 
@@ -50,8 +52,19 @@ func (h *SettingsHandler) GitSources(w http.ResponseWriter, r *http.Request) {
 func (h *SettingsHandler) NewGitSourceModal(w http.ResponseWriter, r *http.Request) {
 	csrfToken := auth.GetCSRFToken(r)
 	component := settings.AddGitSourceModal(csrfToken)
-	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render modal", http.StatusInternalServerError)
+
+	if r.Header.Get("HX-Request") == "true" {
+		if err := component.Render(r.Context(), w); err != nil {
+			http.Error(w, "failed to render modal", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// For direct access, wrap in AppLayout
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	layout := layouts.AppLayout("Add Git Source", csrfToken)
+	if err := layout.Render(templ.WithChildren(r.Context(), component), w); err != nil {
+		http.Error(w, "failed to render page", http.StatusInternalServerError)
 	}
 }
 

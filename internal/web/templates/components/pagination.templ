@@ -110,7 +110,7 @@ templ PaginationFull(p *pagination.Pagination) {
 					for _, pageNum := range p.PageRange(5) {
 						if pageNum == p.Page {
 							<span
-								class="relative z-10 inline-flex items-center bg-indigo-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 rounded-md"
+								class="relative z-10 inline-flex items-center bg-primary-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 rounded-md"
 								aria-current="page"
 							>
 								{ strconv.Itoa(pageNum) }
@@ -188,7 +188,7 @@ templ PerPageSelector(p *pagination.Pagination, options []int) {
 		<select
 			id="per_page"
 			name="per_page"
-			class="rounded-md border-gray-300 py-1.5 pl-3 pr-8 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+			class="rounded-md border-gray-300 py-1.5 pl-3 pr-8 text-sm focus:border-primary-500 focus:ring-primary-500"
 			hx-get={ p.BaseURL }
 			hx-target="#content"
 			hx-push-url="true"

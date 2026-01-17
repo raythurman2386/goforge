@@ -44,9 +44,9 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages.Login(csrfToken)
+	component := pages.Login(csrfToken, "")
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render login page", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render login page")
 	}
 }
 
@@ -58,14 +58,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.authenticator.Authenticate(r.Context(), email, password)
 	if err != nil {
-		http.Error(w, "invalid email or password", http.StatusUnauthorized)
+		csrfToken := auth.GetCSRFToken(r)
+		component := pages.Login(csrfToken, "Invalid email or password")
+		w.WriteHeader(http.StatusUnauthorized)
+		if renderErr := component.Render(r.Context(), w); renderErr != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to render login page")
+		}
 		return
 	}
 
 	// Create session
 	session, sessionToken, err := h.sessionManager.CreateSession(r.Context(), user.ID, rememberMe)
 	if err != nil {
-		http.Error(w, "failed to create session", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to create session")
 		return
 	}
 
@@ -76,9 +81,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // RegisterPage renders the registration page.
 func (h *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages.Register(csrfToken)
+	component := pages.Register(csrfToken, "")
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render register page", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to render register page")
 	}
 }
 
@@ -89,14 +94,24 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	confirmPassword := r.FormValue("confirm_password")
 
 	if password != confirmPassword {
-		http.Error(w, "passwords do not match", http.StatusBadRequest)
+		csrfToken := auth.GetCSRFToken(r)
+		component := pages.Register(csrfToken, "Passwords do not match")
+		w.WriteHeader(http.StatusBadRequest)
+		if err := component.Render(r.Context(), w); err != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to render register page")
+		}
 		return
 	}
 
 	// Check if user already exists
 	_, err := h.userRepo.GetByEmail(r.Context(), email)
 	if err == nil {
-		http.Error(w, "user already exists", http.StatusBadRequest)
+		csrfToken := auth.GetCSRFToken(r)
+		component := pages.Register(csrfToken, "User already exists")
+		w.WriteHeader(http.StatusBadRequest)
+		if renderErr := component.Render(r.Context(), w); renderErr != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to render register page")
+		}
 		return
 	}
 
@@ -112,7 +127,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dbErr := h.userRepo.Create(r.Context(), user); dbErr != nil {
-		http.Error(w, "failed to create user", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to create user")
 		return
 	}
 
