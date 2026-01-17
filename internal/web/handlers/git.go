@@ -80,6 +80,11 @@ func (h *GitHandler) ListBranches(w http.ResponseWriter, r *http.Request) {
 	repoURL := r.URL.Query().Get("repository_url")
 
 	if sourceID == "" || repoURL == "" {
+		// Return a meaningful empty state instead of nothing
+		component := components.BranchOptions(nil, "main")
+		if err := component.Render(r.Context(), w); err != nil {
+			http.Error(w, "Failed to render", http.StatusInternalServerError)
+		}
 		return
 	}
 

@@ -12,11 +12,15 @@ templ RepoOptions(repos []*git.Repository) {
 }
 
 templ BranchOptions(branches []*git.Branch, defaultBranch string) {
-	for _, b := range branches {
-		if b.Name == defaultBranch {
-			<option value={ b.Name } selected>{ b.Name }</option>
-		} else {
-			<option value={ b.Name }>{ b.Name }</option>
+	if len(branches) == 0 {
+		<option value="">No branches found</option>
+	} else {
+		for _, b := range branches {
+			if b.Name == defaultBranch {
+				<option value={ b.Name } selected>{ b.Name }</option>
+			} else {
+				<option value={ b.Name }>{ b.Name }</option>
+			}
 		}
 	}
 }

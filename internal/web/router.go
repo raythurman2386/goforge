@@ -103,6 +103,7 @@ func Router(
 					r.Post("/deployments", deploymentHandler.TriggerDeployment)
 					r.Route("/deployments/{deploymentID}", func(r chi.Router) {
 						r.Get("/", deploymentHandler.GetDeployment)
+						r.Get("/status", deploymentHandler.GetDeploymentStatus)
 						r.Post("/rollback", deploymentHandler.RollbackDeployment)
 						r.Post("/cancel", deploymentHandler.CancelDeployment)
 						r.Get("/logs", sseHandler.DeploymentLogs)

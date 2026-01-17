@@ -8,14 +8,16 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
 // CloneOptions represents options for cloning a repository.
 type CloneOptions struct {
-	URL    string
-	Branch string
-	Path   string
-	Depth  int
+	URL         string
+	Branch      string
+	Path        string
+	Depth       int
+	AccessToken string // OAuth token for authentication
 }
 
 // Clone clones a repository to the specified path.
@@ -29,6 +31,14 @@ func (s *Service) Clone(ctx context.Context, opts CloneOptions) error {
 
 	if opts.Depth > 0 {
 		cloneOpts.Depth = opts.Depth
+	}
+
+	// Add authentication if access token is provided
+	if opts.AccessToken != "" {
+		cloneOpts.Auth = &http.BasicAuth{
+			Username: "x-access-token", // GitHub uses this for token auth
+			Password: opts.AccessToken,
+		}
 	}
 
 	_, err := git.PlainCloneContext(ctx, opts.Path, false, cloneOpts)
