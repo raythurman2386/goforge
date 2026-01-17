@@ -83,7 +83,8 @@ func (r *GitSourceRepository) GetByID(ctx context.Context, id string) (*models.G
 		return nil, err
 	}
 
-	return source, r.decrypt(source)
+	r.decrypt(source)
+	return source, nil
 }
 
 // ListByUserID retrieves all git sources for a user.
@@ -118,9 +119,7 @@ func (r *GitSourceRepository) ListByUserID(ctx context.Context, userID string) (
 		if err != nil {
 			return nil, err
 		}
-		if err := r.decrypt(source); err != nil {
-			return nil, err
-		}
+		r.decrypt(source)
 		sources = append(sources, source)
 	}
 	if err := rows.Err(); err != nil {
@@ -185,27 +184,24 @@ func (r *GitSourceRepository) encrypt(source *models.GitSource) error {
 	return nil
 }
 
-func (r *GitSourceRepository) decrypt(source *models.GitSource) error {
+func (r *GitSourceRepository) decrypt(source *models.GitSource) {
 	if source.AccessToken.Valid && source.AccessToken.String != "" {
 		decrypted, err := r.secrets.Decrypt(source.AccessToken.String)
-		if err != nil {
-			// If decryption fails, assume it's a plaintext token from a previous version.
-			// The token will be encrypted on the next update.
-		} else {
+		if err == nil {
 			source.AccessToken.String = decrypted
 		}
+		// If decryption fails, assume it's a plaintext token from a previous version.
+		// The token will be encrypted on the next update.
 	}
 
 	if source.SSHPrivateKey.Valid && source.SSHPrivateKey.String != "" {
 		decrypted, err := r.secrets.Decrypt(source.SSHPrivateKey.String)
-		if err != nil {
-			// If decryption fails, assume it's a plaintext key from a previous version.
-			// The key will be encrypted on the next update.
-		} else {
+		if err == nil {
 			source.SSHPrivateKey.String = decrypted
 		}
+		// If decryption fails, assume it's a plaintext key from a previous version.
+		// The key will be encrypted on the next update.
 	}
-	return nil
 }
 
 // Delete deletes a git source.

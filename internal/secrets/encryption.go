@@ -77,7 +77,6 @@ func (s *EncryptionService) Decrypt(ciphertextB64 string) (string, error) {
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt: %w", err)
-
 	}
 
 	return string(plaintext), nil

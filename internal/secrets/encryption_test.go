@@ -11,8 +11,8 @@ import (
 )
 
 func TestEncryptionService(t *testing.T) {
-	key := make([]byte, 32)
-	_, err := base64.StdEncoding.DecodeString("YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=")
+	// key := make([]byte, 32) // Unused
+	key, err := base64.StdEncoding.DecodeString("YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=")
 	require.NoError(t, err)
 
 	cfg := &config.Config{
@@ -35,8 +35,8 @@ func TestEncryptionService(t *testing.T) {
 	})
 
 	t.Run("Fails with wrong key", func(t *testing.T) {
-		wrongKey := make([]byte, 32)
-		_, err := base64.StdEncoding.DecodeString("NjU0MzIxegB4d3Z1dHNycXBvbm1sa2ppaGdmZWRjYmE=")
+		// wrongKey := make([]byte, 32) // Unused
+		wrongKey, err := base64.StdEncoding.DecodeString("NjU0MzIxegB4d3Z1dHNycXBvbm1sa2ppaGdmZWRjYmE=")
 		require.NoError(t, err)
 		wrongCfg := &config.Config{
 			EncryptionKey: base64.StdEncoding.EncodeToString(wrongKey),

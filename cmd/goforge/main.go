@@ -25,8 +25,6 @@ import (
 	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/secrets"
-	"github.com/raythurman2386/goforge/internal/secrets"
-	"github.com/raythurman2386/goforge/internal/secrets"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/sse"
 	"github.com/raythurman2386/goforge/internal/web"
