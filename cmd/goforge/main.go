@@ -241,7 +241,7 @@ func runServer() error {
 	sseHub := sse.NewHub()
 	go sseHub.Run()
 
-	monitorCollector := monitor.NewCollector(dockerClient, containerRepo)
+	monitorCollector := monitor.NewCollector(dockerClient, containerRepo, projectRepo, instanceRepo)
 	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector)
 
 	// Initialize services
@@ -278,7 +278,7 @@ func runServer() error {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
-	dashboardHandler := handlers.NewDashboardHandler()
+	dashboardHandler := handlers.NewDashboardHandler(monitorCollector)
 	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo)
 	envHandler := handlers.NewEnvironmentHandler(projectService)
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)

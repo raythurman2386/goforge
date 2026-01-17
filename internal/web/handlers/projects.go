@@ -191,3 +191,23 @@ func (h *ProjectHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Redirect", "/projects")
 	w.WriteHeader(http.StatusOK)
 }
+
+// UpdateProject handles project updates.
+func (h *ProjectHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	p, err := h.projectService.GetProject(r.Context(), id)
+	if err != nil {
+		RenderError(w, r, http.StatusNotFound, "project not found")
+		return
+	}
+
+	customDomain := r.FormValue("custom_domain")
+	p.CustomDomain = sql.NullString{String: customDomain, Valid: customDomain != ""}
+
+	if err := h.projectService.UpdateProject(r.Context(), p); err != nil {
+		http.Error(w, "failed to update project", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}

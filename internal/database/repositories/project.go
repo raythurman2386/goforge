@@ -37,8 +37,8 @@ func (r *ProjectRepository) Create(ctx context.Context, project *models.Project)
 	query := `
 		INSERT INTO projects (id, user_id, name, description, git_source_id, repository_url,
 			repository_name, default_branch, dockerfile_path, docker_compose_path, build_context,
-			build_args, health_check_path, health_check_interval, auto_deploy, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
+			build_args, health_check_path, health_check_interval, auto_deploy, custom_domain, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		project.ID,
@@ -56,6 +56,7 @@ func (r *ProjectRepository) Create(ctx context.Context, project *models.Project)
 		project.HealthCheckPath,
 		project.HealthCheckInterval,
 		project.AutoDeploy,
+		project.CustomDomain,
 		project.CreatedAt,
 		project.UpdatedAt,
 	)
@@ -67,7 +68,7 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id string) (*models.Pro
 	query := `
 		SELECT id, user_id, name, description, git_source_id, repository_url, repository_name,
 			default_branch, dockerfile_path, docker_compose_path, build_context, build_args,
-			health_check_path, health_check_interval, auto_deploy, created_at, updated_at
+			health_check_path, health_check_interval, auto_deploy, custom_domain, created_at, updated_at
 		FROM projects WHERE id = $1`
 
 	project := &models.Project{}
@@ -87,6 +88,7 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id string) (*models.Pro
 		&project.HealthCheckPath,
 		&project.HealthCheckInterval,
 		&project.AutoDeploy,
+		&project.CustomDomain,
 		&project.CreatedAt,
 		&project.UpdatedAt,
 	)
@@ -101,7 +103,7 @@ func (r *ProjectRepository) ListByUserID(ctx context.Context, userID string) ([]
 	query := `
 		SELECT id, user_id, name, description, git_source_id, repository_url, repository_name,
 			default_branch, dockerfile_path, docker_compose_path, build_context, build_args,
-			health_check_path, health_check_interval, auto_deploy, created_at, updated_at
+			health_check_path, health_check_interval, auto_deploy, custom_domain, created_at, updated_at
 		FROM projects WHERE user_id = $1 ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -129,6 +131,7 @@ func (r *ProjectRepository) ListByUserID(ctx context.Context, userID string) ([]
 			&project.HealthCheckPath,
 			&project.HealthCheckInterval,
 			&project.AutoDeploy,
+			&project.CustomDomain,
 			&project.CreatedAt,
 			&project.UpdatedAt,
 		); err != nil {
@@ -149,8 +152,8 @@ func (r *ProjectRepository) Update(ctx context.Context, project *models.Project)
 			repository_name = $5, default_branch = $6, dockerfile_path = $7,
 			docker_compose_path = $8, build_context = $9, build_args = $10,
 			health_check_path = $11, health_check_interval = $12, auto_deploy = $13,
-			updated_at = $14
-		WHERE id = $15`
+			custom_domain = $14, updated_at = $15
+		WHERE id = $16`
 
 	result, err := r.db.ExecContext(ctx, query,
 		project.Name,
@@ -166,6 +169,7 @@ func (r *ProjectRepository) Update(ctx context.Context, project *models.Project)
 		project.HealthCheckPath,
 		project.HealthCheckInterval,
 		project.AutoDeploy,
+		project.CustomDomain,
 		project.UpdatedAt,
 		project.ID,
 	)
@@ -188,7 +192,7 @@ func (r *ProjectRepository) ListByRepoURL(ctx context.Context, repoURL string) (
 	query := `
 		SELECT id, user_id, name, description, git_source_id, repository_url, repository_name,
 			default_branch, dockerfile_path, docker_compose_path, build_context, build_args,
-			health_check_path, health_check_interval, auto_deploy, created_at, updated_at
+			health_check_path, health_check_interval, auto_deploy, custom_domain, created_at, updated_at
 		FROM projects WHERE repository_url = $1`
 
 	rows, err := r.db.QueryContext(ctx, query, repoURL)
@@ -216,6 +220,7 @@ func (r *ProjectRepository) ListByRepoURL(ctx context.Context, repoURL string) (
 			&project.HealthCheckPath,
 			&project.HealthCheckInterval,
 			&project.AutoDeploy,
+			&project.CustomDomain,
 			&project.CreatedAt,
 			&project.UpdatedAt,
 		); err != nil {
@@ -242,4 +247,12 @@ func (r *ProjectRepository) Delete(ctx context.Context, id string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// CountByUserID counts the number of projects for a user.
+func (r *ProjectRepository) CountByUserID(ctx context.Context, userID string) (int, error) {
+	query := `SELECT COUNT(*) FROM projects WHERE user_id = $1`
+	var count int
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
+	return count, err
 }

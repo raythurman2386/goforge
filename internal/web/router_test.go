@@ -12,6 +12,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/deploy"
+	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
@@ -46,9 +47,12 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	is := services.NewInstanceService(instanceRepo, nil, nil, nil, "goforge_net")
 	cat := services.NewCatalog("./templates")
 
+	// Monitor
+	mon := monitor.NewCollector(nil, nil, projectRepo, instanceRepo)
+
 	// Handlers
 	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil)
-	dbh := handlers.NewDashboardHandler()
+	dbh := handlers.NewDashboardHandler(mon)
 	ph := handlers.NewProjectHandler(ps, nil, nil)
 	eh := handlers.NewEnvironmentHandler(ps)
 	dh := handlers.NewDeploymentHandler(ds, ps, nil, nil)
