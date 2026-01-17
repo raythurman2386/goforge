@@ -20,6 +20,8 @@ const (
 )
 
 // GitSource represents a configured git provider.
+// NOTE: AccessToken and SSHPrivateKey are encrypted in the database.
+// A migration script will be needed to encrypt existing plaintext tokens.
 type GitSource struct {
 	ID            string
 	UserID        string

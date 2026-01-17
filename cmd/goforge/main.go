@@ -24,6 +24,9 @@ import (
 	"github.com/raythurman2386/goforge/internal/logger"
 	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/project"
+	"github.com/raythurman2386/goforge/internal/secrets"
+	"github.com/raythurman2386/goforge/internal/secrets"
+	"github.com/raythurman2386/goforge/internal/secrets"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/sse"
 	"github.com/raythurman2386/goforge/internal/web"
@@ -222,7 +225,12 @@ func runServer() error {
 	deploymentRepo := repositories.NewDeploymentRepository(db.DB)
 	deploymentLogRepo := repositories.NewDeploymentLogRepository(db.DB)
 	instanceRepo := repositories.NewServiceInstanceRepository(db.DB)
-	gitSourceRepo := repositories.NewGitSourceRepository(db.DB)
+	secretService, err := secrets.NewEncryptionService(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create encryption service: %w", err)
+	}
+
+	gitSourceRepo := repositories.NewGitSourceRepository(db.DB, secretService)
 
 	// Initialize clients
 	dockerClient, err := docker.NewClient(cfg.DockerHost)
