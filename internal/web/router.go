@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	chi_middleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/config"
@@ -31,10 +32,15 @@ func Router(
 	r := chi.NewRouter()
 
 	// Middleware stack
+	r.Use(chi_middleware.Recoverer)
 	// Rate limiting: 30 rps, burst 60
 	r.Use(middleware.RateLimit(30, 60))
 	// Session middleware is safe for all routes (just populates context)
 	r.Use(auth.Middleware(sessionManager))
+
+	// Global error handlers
+	r.NotFound(handlers.NotFoundHandler)
+	r.MethodNotAllowed(handlers.MethodNotAllowedHandler)
 
 	// Webhooks (No CSRF protection needed/wanted as they are machine-to-machine)
 	r.Route("/webhooks", func(r chi.Router) {
@@ -124,7 +130,7 @@ func Router(
 				r.Post("/{template}", serviceHandler.Deploy)
 
 				// Instance management
-				r.Route("/{id}", func(r chi.Router) {
+				r.Route("/{id:[a-f0-9-]{36}}", func(r chi.Router) {
 					r.Get("/", serviceHandler.Show)
 					r.Delete("/", serviceHandler.Delete)
 					r.Post("/restart", serviceHandler.Restart)

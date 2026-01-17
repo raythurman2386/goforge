@@ -151,7 +151,7 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 				tt.setupMock(mockRepo)
 			}
 
-			svc := NewInstanceService(mockRepo, nil, nil, catalog)
+			svc := NewInstanceService(mockRepo, nil, nil, catalog, "goforge_net")
 
 			got, err := svc.DeployInstance(context.Background(), tt.userID, tt.tmplName, tt.config)
 			if (err != nil) != tt.wantErr {
@@ -210,7 +210,7 @@ func TestInstanceService_ListInstances(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockRepo)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil)
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
 			got, err := svc.ListInstances(context.Background(), tt.userID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ListInstances() error = %v, wantErr %v", err, tt.wantErr)
@@ -262,7 +262,7 @@ func TestInstanceService_GetInstance(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockRepo)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil)
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
 			got, err := svc.GetInstance(context.Background(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetInstance() error = %v, wantErr %v", err, tt.wantErr)
@@ -312,7 +312,7 @@ func TestInstanceService_DeleteInstance(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockRepo)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil)
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
 			err := svc.DeleteInstance(context.Background(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteInstance() error = %v, wantErr %v", err, tt.wantErr)
@@ -359,7 +359,7 @@ func TestInstanceService_UpdateInstance(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockRepo)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil)
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
 			err := svc.UpdateInstance(context.Background(), tt.instance)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateInstance() error = %v, wantErr %v", err, tt.wantErr)
