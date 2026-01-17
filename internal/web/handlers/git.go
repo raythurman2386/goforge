@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/git"
@@ -27,7 +29,11 @@ func NewGitHandler(gsr *repositories.GitSourceRepository, gs *git.Service) *GitH
 
 // ListRepositories lists repositories for a git source.
 func (h *GitHandler) ListRepositories(w http.ResponseWriter, r *http.Request) {
-	sourceID := r.URL.Query().Get("source_id")
+	// Support both query param (from HTMX) and path param (from direct API)
+	sourceID := r.URL.Query().Get("git_source_id")
+	if sourceID == "" {
+		sourceID = chi.URLParam(r, "sourceId")
+	}
 	if sourceID == "" {
 		// Return empty or manual input indicator if needed,
 		// but here we likely just want to return nothing or handle it gracefully
@@ -66,7 +72,11 @@ func (h *GitHandler) ListRepositories(w http.ResponseWriter, r *http.Request) {
 
 // ListBranches lists branches for a repository.
 func (h *GitHandler) ListBranches(w http.ResponseWriter, r *http.Request) {
-	sourceID := r.URL.Query().Get("source_id")
+	// Support both query param (from HTMX) and path param (from direct API)
+	sourceID := r.URL.Query().Get("git_source_id")
+	if sourceID == "" {
+		sourceID = chi.URLParam(r, "sourceId")
+	}
 	repoURL := r.URL.Query().Get("repository_url")
 
 	if sourceID == "" || repoURL == "" {

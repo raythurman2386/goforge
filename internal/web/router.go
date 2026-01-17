@@ -80,6 +80,10 @@ func Router(
 
 			// Git API
 			r.Route("/api/git", func(r chi.Router) {
+				// Query-param based routes for HTMX components
+				r.Get("/repos", gitHandler.ListRepositories)
+				r.Get("/branches", gitHandler.ListBranches)
+				// Path-param based routes (legacy/direct API)
 				r.Get("/sources/{sourceId}/repos", gitHandler.ListRepositories)
 				r.Get("/sources/{sourceId}/repos/{owner}/{repo}/branches", gitHandler.ListBranches)
 				r.Get("/sources/{sourceId}/repos/{owner}/{repo}/tags", gitHandler.ListTags)
