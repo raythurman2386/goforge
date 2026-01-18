@@ -8,41 +8,39 @@ import (
 )
 
 func TestEnvVariableRepository_Create(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewEnvVariableRepository(db)
 	ctx := context.Background()
 
-	// Create user first
+	// Create user, project, environment
 	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "env-test-user@example.com"}
+	user := &models.User{Email: uniqueEmail("envvar-create")}
 	if err := userRepo.Create(ctx, user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
 
-	// Create project
 	projRepo := NewProjectRepository(db)
 	proj := &models.Project{
 		UserID:        user.ID,
-		Name:          "test-project",
-		RepositoryURL: "https://github.com/test/repo",
+		Name:          "test-project-" + uniqueID(),
+		RepositoryURL: "https://github.com/test/repo-" + uniqueID(),
 		BuildArgs:     []byte("{}"),
 	}
 	if err := projRepo.Create(ctx, proj); err != nil {
 		t.Fatalf("failed to create project: %v", err)
 	}
 
-	// Create environment
 	envRepo := NewEnvironmentRepository(db)
-	env := &models.Environment{ProjectID: proj.ID, Name: "prod"}
+	env := &models.Environment{ProjectID: proj.ID, Name: "prod-" + uniqueID()}
 	if err := envRepo.Create(ctx, env); err != nil {
 		t.Fatalf("failed to create environment: %v", err)
 	}
 
 	v := &models.EnvVariable{
 		EnvironmentID: env.ID,
-		Key:           "DATABASE_URL",
+		Key:           "DATABASE_URL_" + uniqueID(),
 		Value:         "postgres://localhost",
 		IsSecret:      true,
 	}
@@ -58,45 +56,45 @@ func TestEnvVariableRepository_Create(t *testing.T) {
 }
 
 func TestEnvVariableRepository_ListByEnvironmentID(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewEnvVariableRepository(db)
 	ctx := context.Background()
 
-	// Create user first
+	// Create user, project, environment
 	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "env-list-test@example.com"}
+	user := &models.User{Email: uniqueEmail("envvar-list")}
 	if err := userRepo.Create(ctx, user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
 
-	// Create project
 	projRepo := NewProjectRepository(db)
 	proj := &models.Project{
 		UserID:        user.ID,
-		Name:          "test-project",
-		RepositoryURL: "https://github.com/test/repo",
+		Name:          "test-project-" + uniqueID(),
+		RepositoryURL: "https://github.com/test/repo-" + uniqueID(),
 		BuildArgs:     []byte("{}"),
 	}
 	if err := projRepo.Create(ctx, proj); err != nil {
 		t.Fatalf("failed to create project: %v", err)
 	}
 
-	// Create environment
 	envRepo := NewEnvironmentRepository(db)
-	env := &models.Environment{ProjectID: proj.ID, Name: "prod"}
+	env := &models.Environment{ProjectID: proj.ID, Name: "prod-" + uniqueID()}
 	if err := envRepo.Create(ctx, env); err != nil {
 		t.Fatalf("failed to create environment: %v", err)
 	}
 
 	vars := []*models.EnvVariable{
-		{EnvironmentID: env.ID, Key: "K1", Value: "V1"},
-		{EnvironmentID: env.ID, Key: "K2", Value: "V2"},
+		{EnvironmentID: env.ID, Key: "K1_" + uniqueID(), Value: "V1"},
+		{EnvironmentID: env.ID, Key: "K2_" + uniqueID(), Value: "V2"},
 	}
 
 	for _, v := range vars {
-		_ = repo.Create(ctx, v)
+		if err := repo.Create(ctx, v); err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
 	}
 
 	list, err := repo.ListByEnvironmentID(ctx, env.ID)
@@ -110,52 +108,55 @@ func TestEnvVariableRepository_ListByEnvironmentID(t *testing.T) {
 }
 
 func TestEnvVariableRepository_Delete(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewEnvVariableRepository(db)
 	ctx := context.Background()
 
-	// Create user first
+	// Create user, project, environment
 	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "env-delete-test@example.com"}
+	user := &models.User{Email: uniqueEmail("envvar-delete")}
 	if err := userRepo.Create(ctx, user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
 
-	// Create project
 	projRepo := NewProjectRepository(db)
 	proj := &models.Project{
 		UserID:        user.ID,
-		Name:          "test-project",
-		RepositoryURL: "https://github.com/test/repo",
+		Name:          "test-project-" + uniqueID(),
+		RepositoryURL: "https://github.com/test/repo-" + uniqueID(),
 		BuildArgs:     []byte("{}"),
 	}
 	if err := projRepo.Create(ctx, proj); err != nil {
 		t.Fatalf("failed to create project: %v", err)
 	}
 
-	// Create environment
 	envRepo := NewEnvironmentRepository(db)
-	env := &models.Environment{ProjectID: proj.ID, Name: "prod"}
+	env := &models.Environment{ProjectID: proj.ID, Name: "prod-" + uniqueID()}
 	if err := envRepo.Create(ctx, env); err != nil {
 		t.Fatalf("failed to create environment: %v", err)
 	}
 
 	v := &models.EnvVariable{
 		EnvironmentID: env.ID,
-		Key:           "DELETE_ME",
+		Key:           "DELETE_ME_" + uniqueID(),
 		Value:         "VALUE",
 	}
-	_ = repo.Create(ctx, v)
+	if err := repo.Create(ctx, v); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
 
 	err := repo.Delete(ctx, v.ID)
 	if err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
+	// Verify by trying to get the variable by ID - list would include other vars
 	list, _ := repo.ListByEnvironmentID(ctx, env.ID)
-	if len(list) != 0 {
-		t.Errorf("ListByEnvironmentID() len = %d, want 0", len(list))
+	for _, item := range list {
+		if item.ID == v.ID {
+			t.Error("Delete() did not remove the variable")
+		}
 	}
 }

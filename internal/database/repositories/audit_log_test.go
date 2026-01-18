@@ -8,8 +8,8 @@ import (
 )
 
 func TestAuditLogRepository_Create(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewAuditLogRepository(db)
 	ctx := context.Background()
@@ -17,6 +17,7 @@ func TestAuditLogRepository_Create(t *testing.T) {
 	l := &models.AuditLog{
 		Action:       models.AuditActionLogin,
 		ResourceType: models.ResourceTypeUser,
+		// ResourceID is UUID type, leave null for simplicity
 	}
 
 	err := repo.Create(ctx, l)
@@ -30,21 +31,55 @@ func TestAuditLogRepository_Create(t *testing.T) {
 }
 
 func TestAuditLogRepository_List(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewAuditLogRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &models.AuditLog{Action: "A1", ResourceType: "R1"})
-	_ = repo.Create(ctx, &models.AuditLog{Action: "A2", ResourceType: "R2"})
+	// Create unique action names for this test to identify our entries
+	action1 := "test-action-" + uniqueID()
+	action2 := "test-action-" + uniqueID()
 
-	list, err := repo.List(ctx, 10, 0)
+	err1 := repo.Create(ctx, &models.AuditLog{Action: action1, ResourceType: "R1"})
+	err2 := repo.Create(ctx, &models.AuditLog{Action: action2, ResourceType: "R2"})
+	if err1 != nil || err2 != nil {
+		t.Fatalf("Create() errors: %v, %v", err1, err2)
+	}
+
+	// List returns all audit logs, we verify the call works
+	list, err := repo.List(ctx, 100, 0)
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
 
-	if len(list) != 2 {
-		t.Errorf("List() len = %d, want 2", len(list))
+	// Count our test entries
+	var count int
+	for _, log := range list {
+		if log.Action == action1 || log.Action == action2 {
+			count++
+		}
+	}
+
+	if count != 2 {
+		t.Errorf("List() found %d of our test logs, want 2", count)
+	}
+}
+
+func TestAuditLogRepository_List_Pagination(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+
+	repo := NewAuditLogRepository(db)
+	ctx := context.Background()
+
+	// Test pagination with limit
+	list, err := repo.List(ctx, 2, 0)
+	if err != nil {
+		t.Fatalf("List() with limit error = %v", err)
+	}
+
+	if len(list) > 2 {
+		t.Errorf("List() with limit=2 returned %d items, want <= 2", len(list))
 	}
 }

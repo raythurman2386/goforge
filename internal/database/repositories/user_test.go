@@ -10,14 +10,14 @@ import (
 )
 
 func TestUserRepository_Create(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
 	user := &models.User{
-		Email:     "test@example.com",
+		Email:     uniqueEmail("create"),
 		AvatarURL: sql.NullString{String: "https://example.com/avatar.png", Valid: true},
 	}
 
@@ -38,8 +38,8 @@ func TestUserRepository_Create(t *testing.T) {
 }
 
 func TestUserRepository_Create_WithID(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
@@ -47,7 +47,7 @@ func TestUserRepository_Create_WithID(t *testing.T) {
 	expectedID := "12345678-1234-5678-1234-567812345678"
 	user := &models.User{
 		ID:    expectedID,
-		Email: "custom@example.com",
+		Email: uniqueEmail("custom-id"),
 	}
 
 	err := repo.Create(ctx, user)
@@ -58,22 +58,26 @@ func TestUserRepository_Create_WithID(t *testing.T) {
 	if user.ID != expectedID {
 		t.Errorf("Create() ID = %q, want %q", user.ID, expectedID)
 	}
+
+	// Cleanup: delete the user to avoid conflict on re-run
+	_ = repo.Delete(ctx, user.ID)
 }
 
 func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	user1 := &models.User{Email: "duplicate@example.com"}
+	email := uniqueEmail("duplicate")
+	user1 := &models.User{Email: email}
 	err := repo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("Create() first user error = %v", err)
 	}
 
-	user2 := &models.User{Email: "duplicate@example.com"}
+	user2 := &models.User{Email: email}
 	err = repo.Create(ctx, user2)
 	if err == nil {
 		t.Error("Create() expected error for duplicate email, got nil")
@@ -81,8 +85,8 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 }
 
 func TestUserRepository_GetByID_NotFound(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
@@ -94,41 +98,41 @@ func TestUserRepository_GetByID_NotFound(t *testing.T) {
 }
 
 func TestUserRepository_GetByEmail_NotFound(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	_, err := repo.GetByEmail(ctx, "nonexistent@example.com")
+	_, err := repo.GetByEmail(ctx, "nonexistent-"+uniqueID()+"@example.com")
 	if err != ErrNotFound {
 		t.Errorf("GetByEmail() error = %v, want ErrNotFound", err)
 	}
 }
 
 func TestUserRepository_GetByGitHubID_NotFound(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	_, err := repo.GetByGitHubID(ctx, 99999)
+	_, err := repo.GetByGitHubID(ctx, 99999999)
 	if err != ErrNotFound {
 		t.Errorf("GetByGitHubID() error = %v, want ErrNotFound", err)
 	}
 }
 
 func TestUserRepository_Update_NotFound(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
 	user := &models.User{
-		ID:    "00000000-0000-0000-0000-000000000000",
-		Email: "update@example.com",
+		ID:    "00000000-0000-0000-0000-000000000001",
+		Email: uniqueEmail("update-notfound"),
 	}
 
 	err := repo.Update(ctx, user)
@@ -138,13 +142,13 @@ func TestUserRepository_Update_NotFound(t *testing.T) {
 }
 
 func TestUserRepository_Delete(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	user := &models.User{Email: "delete@example.com"}
+	user := &models.User{Email: uniqueEmail("delete")}
 	err := repo.Create(ctx, user)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -163,27 +167,27 @@ func TestUserRepository_Delete(t *testing.T) {
 }
 
 func TestUserRepository_Delete_NotFound(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	err := repo.Delete(ctx, "00000000-0000-0000-0000-000000000000")
+	err := repo.Delete(ctx, "00000000-0000-0000-0000-000000000002")
 	if err != ErrNotFound {
 		t.Errorf("Delete() error = %v, want ErrNotFound", err)
 	}
 }
 
 func TestUserRepository_ContextCancellation(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	user := &models.User{Email: "cancelled@example.com"}
+	user := &models.User{Email: uniqueEmail("cancelled")}
 	err := repo.Create(ctx, user)
 	if err == nil {
 		t.Error("Create() with cancelled context expected error, got nil")
@@ -191,8 +195,8 @@ func TestUserRepository_ContextCancellation(t *testing.T) {
 }
 
 func TestUserRepository_ContextTimeout(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -201,7 +205,7 @@ func TestUserRepository_ContextTimeout(t *testing.T) {
 	// Give time for the timeout to expire
 	time.Sleep(10 * time.Millisecond)
 
-	user := &models.User{Email: "timeout@example.com"}
+	user := &models.User{Email: uniqueEmail("timeout")}
 	err := repo.Create(ctx, user)
 	if err == nil {
 		t.Error("Create() with expired context expected error, got nil")
@@ -209,8 +213,8 @@ func TestUserRepository_ContextTimeout(t *testing.T) {
 }
 
 func TestNewUserRepository(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewUserRepository(db)
 	if repo == nil {

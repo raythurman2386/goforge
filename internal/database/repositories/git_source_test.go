@@ -4,29 +4,27 @@ import (
 	"context"
 	"testing"
 
-	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/models"
-	"github.com/raythurman2386/goforge/internal/secrets"
 )
 
 func TestGitSourceRepository_Create(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
-	key, _ := secrets.GenerateKeyString(32)
-	cfg := &config.Config{EncryptionKey: key}
-	secretService, _ := secrets.NewEncryptionService(cfg)
+	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
+	userRepo := NewUserRepository(db)
 	ctx := context.Background()
 
-	// Need a user first
-	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "test@example.com"}
-	_ = userRepo.Create(ctx, user)
+	// Create unique user for this test
+	user := &models.User{Email: uniqueEmail("gitsource-create")}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	source := &models.GitSource{
 		UserID: user.ID,
-		Name:   "GitHub",
+		Name:   "GitHub-" + uniqueID(),
 		Type:   models.GitSourceTypeGitHub,
 	}
 
@@ -41,26 +39,28 @@ func TestGitSourceRepository_Create(t *testing.T) {
 }
 
 func TestGitSourceRepository_GetByID(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
-	key, _ := secrets.GenerateKeyString(32)
-	cfg := &config.Config{EncryptionKey: key}
-	secretService, _ := secrets.NewEncryptionService(cfg)
+	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
+	userRepo := NewUserRepository(db)
 	ctx := context.Background()
 
-	// Need a user first
-	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "test@example.com"}
-	_ = userRepo.Create(ctx, user)
+	// Create unique user for this test
+	user := &models.User{Email: uniqueEmail("gitsource-getbyid")}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	source := &models.GitSource{
 		UserID: user.ID,
-		Name:   "GitHub",
+		Name:   "GitHub-" + uniqueID(),
 		Type:   models.GitSourceTypeGitHub,
 	}
-	_ = repo.Create(ctx, source)
+	if err := repo.Create(ctx, source); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
 
 	found, err := repo.GetByID(ctx, source.ID)
 	if err != nil {
@@ -72,28 +72,44 @@ func TestGitSourceRepository_GetByID(t *testing.T) {
 	}
 }
 
-func TestGitSourceRepository_ListByUserID(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+func TestGitSourceRepository_GetByID_NotFound(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
 
-	key, _ := secrets.GenerateKeyString(32)
-	cfg := &config.Config{EncryptionKey: key}
-	secretService, _ := secrets.NewEncryptionService(cfg)
+	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
 	ctx := context.Background()
 
-	// Need a user first
+	_, err := repo.GetByID(ctx, "00000000-0000-0000-0000-000000000000")
+	if err != ErrNotFound {
+		t.Errorf("GetByID() error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestGitSourceRepository_ListByUserID(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+
+	secretService := getTestSecretService(t)
+	repo := NewGitSourceRepository(db, secretService)
 	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "test@example.com"}
-	_ = userRepo.Create(ctx, user)
+	ctx := context.Background()
+
+	// Create unique user for this test
+	user := &models.User{Email: uniqueEmail("gitsource-list")}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	sources := []*models.GitSource{
-		{UserID: user.ID, Name: "GitHub", Type: models.GitSourceTypeGitHub},
-		{UserID: user.ID, Name: "GitLab", Type: models.GitSourceTypeGitLab},
+		{UserID: user.ID, Name: "GitHub-" + uniqueID(), Type: models.GitSourceTypeGitHub},
+		{UserID: user.ID, Name: "GitLab-" + uniqueID(), Type: models.GitSourceTypeGitLab},
 	}
 
 	for _, s := range sources {
-		_ = repo.Create(ctx, s)
+		if err := repo.Create(ctx, s); err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
 	}
 
 	list, err := repo.ListByUserID(ctx, user.ID)
@@ -107,63 +123,65 @@ func TestGitSourceRepository_ListByUserID(t *testing.T) {
 }
 
 func TestGitSourceRepository_Update(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
-	key, _ := secrets.GenerateKeyString(32)
-	cfg := &config.Config{EncryptionKey: key}
-	secretService, _ := secrets.NewEncryptionService(cfg)
+	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
+	userRepo := NewUserRepository(db)
 	ctx := context.Background()
 
-	// Need a user first
-	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "test@example.com"}
-	_ = userRepo.Create(ctx, user)
+	// Create unique user for this test
+	user := &models.User{Email: uniqueEmail("gitsource-update")}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	source := &models.GitSource{
 		UserID: user.ID,
-		Name:   "GitHub",
+		Name:   "GitHub-" + uniqueID(),
 		Type:   models.GitSourceTypeGitHub,
 	}
-	err := repo.Create(ctx, source)
-	if err != nil {
+	if err := repo.Create(ctx, source); err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	source.Name = "Updated GitHub"
-	err = repo.Update(ctx, source)
+	updatedName := "Updated-GitHub-" + uniqueID()
+	source.Name = updatedName
+	err := repo.Update(ctx, source)
 	if err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 
 	found, _ := repo.GetByID(ctx, source.ID)
-	if found.Name != "Updated GitHub" {
-		t.Errorf("Update() Name = %q, want %q", found.Name, "Updated GitHub")
+	if found.Name != updatedName {
+		t.Errorf("Update() Name = %q, want %q", found.Name, updatedName)
 	}
 }
 
 func TestGitSourceRepository_Delete(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
-	key, _ := secrets.GenerateKeyString(32)
-	cfg := &config.Config{EncryptionKey: key}
-	secretService, _ := secrets.NewEncryptionService(cfg)
+	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
+	userRepo := NewUserRepository(db)
 	ctx := context.Background()
 
-	// Need a user first
-	userRepo := NewUserRepository(db)
-	user := &models.User{Email: "test@example.com"}
-	_ = userRepo.Create(ctx, user)
+	// Create unique user for this test
+	user := &models.User{Email: uniqueEmail("gitsource-delete")}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	source := &models.GitSource{
 		UserID: user.ID,
-		Name:   "GitHub",
+		Name:   "GitHub-" + uniqueID(),
 		Type:   models.GitSourceTypeGitHub,
 	}
-	_ = repo.Create(ctx, source)
+	if err := repo.Create(ctx, source); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
 
 	err := repo.Delete(ctx, source.ID)
 	if err != nil {
