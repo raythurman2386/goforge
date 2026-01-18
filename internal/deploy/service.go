@@ -14,18 +14,19 @@ import (
 
 // Service handles deployment orchestration.
 type Service struct {
-	deploymentRepo  *repositories.DeploymentRepository
-	logRepo         *repositories.DeploymentLogRepository
-	projectRepo     *repositories.ProjectRepository
-	environmentRepo *repositories.EnvironmentRepository
-	containerRepo   *repositories.ContainerRepository
-	gitSourceRepo   *repositories.GitSourceRepository
-	gitService      *git.Service
-	dockerClient    *docker.Client
-	sseHub          *sse.Hub
-	traefikNetwork  string
-	buildDir        string
-	logger          *slog.Logger
+	deploymentRepo      *repositories.DeploymentRepository
+	logRepo             *repositories.DeploymentLogRepository
+	projectRepo         *repositories.ProjectRepository
+	environmentRepo     *repositories.EnvironmentRepository
+	containerRepo       *repositories.ContainerRepository
+	gitSourceRepo       *repositories.GitSourceRepository
+	gitService          *git.Service
+	dockerClient        *docker.Client
+	sseHub              *sse.Hub
+	traefikNetwork      string
+	cloudflareProxyMode bool
+	buildDir            string
+	logger              *slog.Logger
 }
 
 // NewService creates a new deployment Service.
@@ -40,22 +41,24 @@ func NewService(
 	dc *docker.Client,
 	sh *sse.Hub,
 	traefikNetwork string,
+	cloudflareProxyMode bool,
 	buildDir string,
 	logger *slog.Logger,
 ) *Service {
 	return &Service{
-		deploymentRepo:  dr,
-		logRepo:         lr,
-		projectRepo:     pr,
-		environmentRepo: er,
-		containerRepo:   cr,
-		gitSourceRepo:   gsr,
-		gitService:      gs,
-		dockerClient:    dc,
-		sseHub:          sh,
-		traefikNetwork:  traefikNetwork,
-		buildDir:        buildDir,
-		logger:          logger,
+		deploymentRepo:      dr,
+		logRepo:             lr,
+		projectRepo:         pr,
+		environmentRepo:     er,
+		containerRepo:       cr,
+		gitSourceRepo:       gsr,
+		gitService:          gs,
+		dockerClient:        dc,
+		sseHub:              sh,
+		traefikNetwork:      traefikNetwork,
+		cloudflareProxyMode: cloudflareProxyMode,
+		buildDir:            buildDir,
+		logger:              logger,
 	}
 }
 
