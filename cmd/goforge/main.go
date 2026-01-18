@@ -287,7 +287,7 @@ func runServer() error {
 	envHandler := handlers.NewEnvironmentHandler(projectService)
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
-	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo)
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService)
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret)
 

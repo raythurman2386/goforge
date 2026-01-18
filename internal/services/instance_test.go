@@ -81,6 +81,7 @@ type mockDockerClient struct {
 	startContainerFunc   func(ctx context.Context, id string) error
 	stopContainerFunc    func(ctx context.Context, id string) error
 	restartContainerFunc func(ctx context.Context, id string) error
+	cleanupSystemFunc    func(ctx context.Context) error
 }
 
 func (m *mockDockerClient) CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error) {
@@ -107,6 +108,13 @@ func (m *mockDockerClient) StopContainer(ctx context.Context, id string) error {
 func (m *mockDockerClient) RestartContainer(ctx context.Context, id string) error {
 	if m.restartContainerFunc != nil {
 		return m.restartContainerFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockDockerClient) CleanupSystem(ctx context.Context) error {
+	if m.cleanupSystemFunc != nil {
+		return m.cleanupSystemFunc(ctx)
 	}
 	return nil
 }
@@ -572,6 +580,54 @@ func TestInstanceService_Lifecycle(t *testing.T) {
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("%sInstance() error = %v, wantErr %v", tt.operation, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestInstanceService_PruneSystem(t *testing.T) {
+	t.Parallel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	tests := []struct {
+		name      string
+		setupMock func(*mockDockerClient)
+		wantErr   bool
+	}{
+		{
+			name: "Success",
+			setupMock: func(md *mockDockerClient) {
+				md.cleanupSystemFunc = func(ctx context.Context) error {
+					return nil
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name: "Error",
+			setupMock: func(md *mockDockerClient) {
+				md.cleanupSystemFunc = func(ctx context.Context) error {
+					return errors.New("docker error")
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mockDocker := &mockDockerClient{}
+			if tt.setupMock != nil {
+				tt.setupMock(mockDocker)
+			}
+
+			svc := NewInstanceService(nil, nil, mockDocker, nil, "goforge_net", logger)
+
+			err := svc.PruneSystem(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PruneSystem() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

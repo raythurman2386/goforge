@@ -151,6 +151,7 @@ func Router(
 
 			// Settings
 			r.Route("/settings", func(r chi.Router) {
+				r.Post("/prune", settingsHandler.PruneSystem)
 				r.Route("/git", func(r chi.Router) {
 					r.Get("/", settingsHandler.GitSources)
 					r.Post("/", settingsHandler.CreateGitSource)

@@ -61,7 +61,7 @@ The focus for the next release is hardening the platform and improving the devel
     - [ ] Add graceful shutdown for deployment workers.
 - [ ] **Service Management:**
     - [x] Implement `StopInstance` and `RestartInstance` functionality (currently missing).
-    - [ ] Fix orphaned containers: Ensure Docker containers are removed when a Service Instance is deleted.
+    - [x] Fix orphaned containers: Ensure Docker containers are removed when a Service Instance is deleted.
 - [ ] **Security & Error Handling:**
     - [ ] **Information Leakage:** Stop returning raw error strings to valid users in `auth.go` (e.g. `GitHubCallback`).
     - [x] **Structured Logging:** Replace `fmt.Printf` with the structural logger in critical paths (`deploy/queue.go`, `services/instance.go`).

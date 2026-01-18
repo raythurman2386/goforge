@@ -10,19 +10,22 @@ import (
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/settings"
 )
 
 // SettingsHandler handles settings related requests.
 type SettingsHandler struct {
-	gitSourceRepo *repositories.GitSourceRepository
+	gitSourceRepo   *repositories.GitSourceRepository
+	instanceService *services.InstanceService
 }
 
 // NewSettingsHandler creates a new SettingsHandler.
-func NewSettingsHandler(gsr *repositories.GitSourceRepository) *SettingsHandler {
+func NewSettingsHandler(gsr *repositories.GitSourceRepository, is *services.InstanceService) *SettingsHandler {
 	return &SettingsHandler{
-		gitSourceRepo: gsr,
+		gitSourceRepo:   gsr,
+		instanceService: is,
 	}
 }
 
@@ -111,4 +114,15 @@ func (h *SettingsHandler) DeleteGitSource(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("HX-Redirect", "/settings/git")
 	w.WriteHeader(http.StatusOK)
+}
+
+// PruneSystem triggers a system prune.
+func (h *SettingsHandler) PruneSystem(w http.ResponseWriter, r *http.Request) {
+	if err := h.instanceService.PruneSystem(r.Context()); err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to prune system")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	// TODO: Return a toast or success message if possible
 }

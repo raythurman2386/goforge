@@ -34,6 +34,7 @@ type DockerClient interface {
 	StartContainer(ctx context.Context, id string) error
 	StopContainer(ctx context.Context, id string) error
 	RestartContainer(ctx context.Context, id string) error
+	CleanupSystem(ctx context.Context) error
 }
 
 // InstanceService handles service instance management.
@@ -246,6 +247,14 @@ func (s *InstanceService) RestartInstance(ctx context.Context, id string) error 
 
 	instance.Status = models.ServiceStatusRunning
 	return s.instanceRepo.Update(ctx, instance)
+}
+
+// PruneSystem cleans up unused containers and images.
+func (s *InstanceService) PruneSystem(ctx context.Context) error {
+	if err := s.dockerClient.CleanupSystem(ctx); err != nil {
+		return fmt.Errorf("failed to prune system: %w", err)
+	}
+	return nil
 }
 
 // DeleteInstance stops and removes a service instance.
