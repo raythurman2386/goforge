@@ -394,6 +394,74 @@ func TestGenerateLabels_WithProjectDomainOverride(t *testing.T) {
 	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".rule", "Host(`env.com`)")
 }
 
+func TestGenerateLabelsWithOptions_CloudflareProxyMode(t *testing.T) {
+	p := &models.Project{ID: "proj-123"}
+	env := &models.Environment{
+		ID:     "env-456",
+		Name:   "production",
+		Domain: sql.NullString{String: "example.com", Valid: true},
+		Port:   sql.NullInt32{Int32: 3000, Valid: true},
+	}
+
+	opts := LabelOptions{
+		CloudflareProxyMode: true,
+	}
+
+	labels := GenerateLabelsWithOptions(p, env, "traefik", opts)
+
+	// Should use HTTP entrypoint (Cloudflare handles SSL)
+	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".rule", "Host(`example.com`)")
+	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".entrypoints", "web")
+	assertLabel(t, labels, "traefik.http.services."+testRouterName+".loadbalancer.server.port", "3000")
+
+	// Should NOT have TLS/certresolver labels
+	if _, ok := labels["traefik.http.routers."+testRouterName+".tls.certresolver"]; ok {
+		t.Error("expected no TLS certresolver in Cloudflare mode")
+	}
+}
+
+func TestGenerateLabelsWithOptions_CloudflareProxyMode_SkipsHTTPRedirect(t *testing.T) {
+	p := &models.Project{ID: "proj-123"}
+	env := &models.Environment{
+		ID:     "env-456",
+		Name:   "production",
+		Domain: sql.NullString{String: "example.com", Valid: true},
+	}
+
+	opts := LabelOptions{
+		CloudflareProxyMode: true,
+		EnableHTTPRedirect:  true, // Should be ignored in Cloudflare mode
+	}
+
+	labels := GenerateLabelsWithOptions(p, env, "traefik", opts)
+
+	// Should NOT have HTTP redirect router (Cloudflare enforces HTTPS)
+	if _, ok := labels["traefik.http.routers."+testRouterName+"-http.rule"]; ok {
+		t.Error("expected no HTTP redirect router in Cloudflare mode")
+	}
+	if _, ok := labels["traefik.http.middlewares."+testRouterName+"-redirect.redirectscheme.scheme"]; ok {
+		t.Error("expected no redirect middleware in Cloudflare mode")
+	}
+}
+
+func TestGenerateLabelsForCloudflare(t *testing.T) {
+	p := &models.Project{ID: "proj-123"}
+	env := &models.Environment{
+		ID:     "env-456",
+		Name:   "production",
+		Domain: sql.NullString{String: "example.com", Valid: true},
+	}
+
+	// Test with cloudflare mode enabled
+	labels := GenerateLabelsForCloudflare(p, env, "traefik", true)
+	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".entrypoints", "web")
+
+	// Test with cloudflare mode disabled (standard mode)
+	labels = GenerateLabelsForCloudflare(p, env, "traefik", false)
+	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".entrypoints", "websecure")
+	assertLabel(t, labels, "traefik.http.routers."+testRouterName+".tls.certresolver", "letsencrypt")
+}
+
 func TestGenerateName(t *testing.T) {
 	tests := []struct {
 		projectID string

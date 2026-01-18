@@ -10,6 +10,10 @@ import (
 
 const (
 	labelTrue = "true"
+
+	// Traefik entrypoint names.
+	entrypointHTTP  = "web"
+	entrypointHTTPS = "websecure"
 )
 
 // Labels represents Traefik Docker labels.
@@ -33,7 +37,13 @@ func (l Labels) ToMap() map[string]string {
 
 // LabelOptions contains configuration options for generating Traefik labels.
 type LabelOptions struct {
+	// CloudflareProxyMode indicates traffic comes through Cloudflare Tunnel.
+	// When true, uses HTTP entrypoint and skips TLS/cert configuration
+	// since Cloudflare handles SSL termination at the edge.
+	CloudflareProxyMode bool
+
 	// EnableHTTPRedirect adds HTTP to HTTPS redirect middleware.
+	// Ignored when CloudflareProxyMode is true.
 	EnableHTTPRedirect bool
 
 	// PathPrefix adds path-based routing rule (e.g., "/api/v1").
@@ -116,6 +126,15 @@ func GenerateLabels(p *models.Project, env *models.Environment, network string) 
 	return GenerateLabelsWithOptions(p, env, network, LabelOptions{})
 }
 
+// GenerateLabelsForCloudflare generates Traefik labels optimized for Cloudflare Tunnel.
+// When cloudflareMode is true, labels are configured for HTTP entrypoint since
+// Cloudflare handles SSL termination at the edge.
+func GenerateLabelsForCloudflare(p *models.Project, env *models.Environment, network string, cloudflareMode bool) Labels {
+	return GenerateLabelsWithOptions(p, env, network, LabelOptions{
+		CloudflareProxyMode: cloudflareMode,
+	})
+}
+
 // GenerateLabelsWithOptions generates Traefik labels with custom options.
 func GenerateLabelsWithOptions(p *models.Project, env *models.Environment, network string, opts LabelOptions) Labels {
 	name := GenerateName(p.ID, env.Name)
@@ -144,15 +163,23 @@ func GenerateLabelsWithOptions(p *models.Project, env *models.Environment, netwo
 	// Build the routing rule
 	rule := buildRoutingRule(domain, opts.PathPrefix)
 
-	// HTTPS router (main)
-	labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
-	labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = "websecure"
+	// Configure router based on proxy mode
+	if opts.CloudflareProxyMode {
+		// Cloudflare Tunnel mode: traffic arrives as HTTP after Cloudflare terminates SSL
+		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
+		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTP
+		// No TLS config needed - Cloudflare handles SSL at the edge
+	} else {
+		// Standard mode: Traefik handles TLS with Let's Encrypt
+		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
+		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTPS
 
-	certResolver := "letsencrypt"
-	if opts.CertResolver != "" {
-		certResolver = opts.CertResolver
+		certResolver := "letsencrypt"
+		if opts.CertResolver != "" {
+			certResolver = opts.CertResolver
+		}
+		labels[fmt.Sprintf("traefik.http.routers.%s.tls.certresolver", name)] = certResolver
 	}
-	labels[fmt.Sprintf("traefik.http.routers.%s.tls.certresolver", name)] = certResolver
 
 	// Service port configuration
 	port := 80
@@ -169,8 +196,8 @@ func GenerateLabelsWithOptions(p *models.Project, env *models.Environment, netwo
 	// Collect middlewares for the main router
 	var middlewares []string
 
-	// HTTP to HTTPS redirect
-	if opts.EnableHTTPRedirect {
+	// HTTP to HTTPS redirect (skip in Cloudflare mode - SSL is handled at edge)
+	if opts.EnableHTTPRedirect && !opts.CloudflareProxyMode {
 		addHTTPRedirectLabels(labels, name, domain, opts.PathPrefix)
 	}
 
@@ -248,7 +275,7 @@ func addHTTPRedirectLabels(labels Labels, name, domain, pathPrefix string) {
 
 	// HTTP router that redirects to HTTPS
 	labels[fmt.Sprintf("traefik.http.routers.%s.rule", httpRouterName)] = rule
-	labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", httpRouterName)] = "web"
+	labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", httpRouterName)] = entrypointHTTP
 	labels[fmt.Sprintf("traefik.http.routers.%s.middlewares", httpRouterName)] = redirectMiddleware
 
 	// Redirect scheme middleware

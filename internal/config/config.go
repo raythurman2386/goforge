@@ -46,6 +46,9 @@ type Config struct {
 	TraefikNetwork string
 	AcmeEmail      string
 
+	// Cloudflare Tunnel
+	CloudflareProxyMode bool
+
 	// Service Templates
 	TemplatesDir string
 
@@ -97,6 +100,9 @@ func Load() (*Config, error) {
 		// Traefik
 		TraefikNetwork: getEnv("TRAEFIK_NETWORK", "traefik"),
 		AcmeEmail:      os.Getenv("ACME_EMAIL"),
+
+		// Cloudflare Tunnel
+		CloudflareProxyMode: getEnvBool("CLOUDFLARE_PROXY_MODE", false),
 
 		// Service Templates
 		TemplatesDir: getEnv("TEMPLATES_DIR", "./templates"),

@@ -8,15 +8,16 @@ import (
 )
 
 func TestContainerRepository_Create(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewContainerRepository(db)
 	ctx := context.Background()
 
+	dockerID := "docker-" + uniqueID()
 	c := &models.Container{
-		DockerID: "docker-123",
-		Name:     "web-app",
+		DockerID: dockerID,
+		Name:     "web-app-" + uniqueID(),
 		Image:    "nginx:latest",
 		Status:   models.ContainerStatusRunning,
 	}
@@ -32,27 +33,43 @@ func TestContainerRepository_Create(t *testing.T) {
 }
 
 func TestContainerRepository_GetByDockerID(t *testing.T) {
-	db := setupSharedTestDB(t)
-	defer db.Close()
+	t.Parallel()
+	db := getTestDB(t)
 
 	repo := NewContainerRepository(db)
 	ctx := context.Background()
 
+	dockerID := "docker-" + uniqueID()
 	c := &models.Container{
-		DockerID: "docker-123",
-		Name:     "web-app",
+		DockerID: dockerID,
+		Name:     "web-app-" + uniqueID(),
 		Image:    "nginx:latest",
 		Status:   models.ContainerStatusRunning,
 	}
-	_ = repo.Create(ctx, c)
+	if err := repo.Create(ctx, c); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
 
-	found, err := repo.GetByDockerID(ctx, "docker-123")
+	found, err := repo.GetByDockerID(ctx, dockerID)
 	if err != nil {
 		t.Fatalf("GetByDockerID() error = %v", err)
 	}
 
 	if found.Name != c.Name {
 		t.Errorf("GetByDockerID() Name = %q, want %q", found.Name, c.Name)
+	}
+}
+
+func TestContainerRepository_GetByDockerID_NotFound(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+
+	repo := NewContainerRepository(db)
+	ctx := context.Background()
+
+	_, err := repo.GetByDockerID(ctx, "nonexistent-docker-"+uniqueID())
+	if err != ErrNotFound {
+		t.Errorf("GetByDockerID() error = %v, want ErrNotFound", err)
 	}
 }
 

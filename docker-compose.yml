@@ -16,6 +16,7 @@ services:
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
       - TRAEFIK_NETWORK=${TRAEFIK_NETWORK:-traefik}
       - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+      - CLOUDFLARE_PROXY_MODE=${CLOUDFLARE_PROXY_MODE:-false}
       - TEMPLATES_DIR=${TEMPLATES_DIR:-./templates}
       - MAX_CONCURRENT_BUILDS=${MAX_CONCURRENT_BUILDS:-2}
       - BUILD_TIMEOUT=${BUILD_TIMEOUT:-15m}
@@ -106,6 +107,24 @@ services:
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
     networks:
       - traefik
+
+  # Cloudflare Tunnel for secure domain management (optional)
+  # To use: set CLOUDFLARE_TUNNEL_TOKEN in your environment
+  # Get a token from: https://one.dash.cloudflare.com/ -> Zero Trust -> Networks -> Tunnels
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - goforge
+      - traefik
+    networks:
+      - goforge_net
+      - traefik
+    profiles:
+      - cloudflare
 
   # Redis for session storage and caching (optional but recommended)
   redis:

@@ -262,6 +262,7 @@ func runServer() error {
 		dockerClient,
 		sseHub,
 		cfg.TraefikNetwork,
+		cfg.CloudflareProxyMode,
 		cfg.BuildDir,
 		logger.WithComponent(log, "deploy"),
 	)
