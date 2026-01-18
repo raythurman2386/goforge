@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages"
 )
 
@@ -23,15 +25,19 @@ type AuthHandler struct {
 	userRepo       *repositories.UserRepository
 	githubProvider *auth.GitHubProvider
 	authenticator  auth.Authenticator
+	auditService   *services.AuditService
+	logger         *slog.Logger
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(sm *auth.SessionManager, ur *repositories.UserRepository, gp *auth.GitHubProvider, a auth.Authenticator) *AuthHandler {
+func NewAuthHandler(sm *auth.SessionManager, ur *repositories.UserRepository, gp *auth.GitHubProvider, a auth.Authenticator, as *services.AuditService, logger *slog.Logger) *AuthHandler {
 	return &AuthHandler{
 		sessionManager: sm,
 		userRepo:       ur,
 		githubProvider: gp,
 		authenticator:  a,
+		auditService:   as,
+		logger:         logger,
 	}
 }
 
@@ -75,6 +81,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
+
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
+
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -138,6 +147,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionCreate, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
+
 	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
@@ -169,13 +181,15 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	token, err := h.githubProvider.Exchange(r.Context(), code)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to exchange token: %v", err), http.StatusInternalServerError)
+		h.logger.Error("failed to exchange token", "error", err)
+		http.Error(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
 		return
 	}
 
 	ghUser, err := h.githubProvider.GetUser(r.Context(), token)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to get user info: %v", err), http.StatusInternalServerError)
+		h.logger.Error("failed to get user info from GitHub", "error", err)
+		http.Error(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
 		return
 	}
 
@@ -199,7 +213,8 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		// user.GitHubAccessToken = sql.NullString{String: token.AccessToken, Valid: true}
 
 		if dbErr := h.userRepo.Create(r.Context(), user); dbErr != nil {
-			http.Error(w, fmt.Sprintf("failed to create user: %v", dbErr), http.StatusInternalServerError)
+			h.logger.Error("failed to create user from GitHub login", "error", dbErr)
+			http.Error(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -211,6 +226,8 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, map[string]interface{}{"provider": "github"}, r.RemoteAddr, r.UserAgent())
+
 	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
@@ -221,7 +238,13 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if token != "" {
 		if err := h.sessionManager.DestroySession(r.Context(), token); err != nil {
 			// Log error but continue with clearing cookie
-			fmt.Printf("failed to destroy session: %v\n", err)
+			h.logger.Error("failed to destroy session", "error", err)
+		} else {
+			// Try to get user from context if possible, but context might not have it if middleware failed?
+			// Actually middleware puts it there.
+			if user := auth.GetUserFromContext(r.Context()); user != nil {
+				h.auditService.Record(r.Context(), user.ID, models.AuditActionLogout, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
+			}
 		}
 	}
 	auth.ClearSessionCookie(w)

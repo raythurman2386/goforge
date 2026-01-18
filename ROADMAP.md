@@ -60,13 +60,13 @@ The focus for the next release is hardening the platform and improving the devel
     - [ ] Implement a persistent deployment queue (Redis/Postgres) to survive restarts (currently in-memory).
     - [ ] Add graceful shutdown for deployment workers.
 - [ ] **Service Management:**
-    - [ ] Implement `StopInstance` and `RestartInstance` functionality (currently missing).
+    - [x] Implement `StopInstance` and `RestartInstance` functionality (currently missing).
     - [ ] Fix orphaned containers: Ensure Docker containers are removed when a Service Instance is deleted.
 - [ ] **Security & Error Handling:**
     - [ ] **Information Leakage:** Stop returning raw error strings to valid users in `auth.go` (e.g. `GitHubCallback`).
-    - [ ] **Structured Logging:** Replace `fmt.Printf` with the structural logger in critical paths (`deploy/queue.go`, `services/instance.go`).
+    - [x] **Structured Logging:** Replace `fmt.Printf` with the structural logger in critical paths (`deploy/queue.go`, `services/instance.go`).
 - [ ] **Configuration:**
-    - [ ] Replace hardcoded `/tmp` paths in build pipeline with configured directories.
+    - [x] Replace hardcoded `/tmp` paths in build pipeline with configured directories.
 
 ## 🔮 V2.0: Multi-Server (Future)
 

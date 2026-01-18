@@ -50,11 +50,16 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	is := services.NewInstanceService(instanceRepo, nil, nil, nil, "goforge_net", logger)
 	cat := services.NewCatalog("./templates")
 
+	// Audit Service (mocking repo implicitly by passing nil? No, NewAuditService takes interface, but we need concrete impl or mock.
+	// For now, let's create a repo with the test DB since we have it.)
+	auditRepo := repositories.NewAuditLogRepository(db)
+	as := services.NewAuditService(auditRepo, logger)
+
 	// Monitor
 	mon := monitor.NewCollector(nil, nil, projectRepo, instanceRepo)
 
 	// Handlers
-	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil)
+	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil, as, logger)
 	dbh := handlers.NewDashboardHandler(mon)
 	ph := handlers.NewProjectHandler(ps, nil, nil)
 	eh := handlers.NewEnvironmentHandler(ps)

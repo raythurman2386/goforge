@@ -223,6 +223,7 @@ func runServer() error {
 	deploymentRepo := repositories.NewDeploymentRepository(db.DB)
 	deploymentLogRepo := repositories.NewDeploymentLogRepository(db.DB)
 	instanceRepo := repositories.NewServiceInstanceRepository(db.DB)
+	auditLogRepo := repositories.NewAuditLogRepository(db.DB)
 	secretService, err := secrets.NewEncryptionService(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create encryption service: %w", err)
@@ -245,6 +246,7 @@ func runServer() error {
 	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector)
 
 	// Initialize services
+	auditService := services.NewAuditService(auditLogRepo, logger.WithComponent(log, "audit"))
 	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
 	githubProvider := auth.NewGitHubProvider(cfg)
 	authenticator := auth.NewLocalAuthenticator(userRepo)
@@ -279,7 +281,7 @@ func runServer() error {
 	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog, cfg.TraefikNetwork, logger.WithComponent(log, "instance"))
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator)
+	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, logger.WithComponent(log, "auth"))
 	dashboardHandler := handlers.NewDashboardHandler(monitorCollector)
 	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo)
 	envHandler := handlers.NewEnvironmentHandler(projectService)
