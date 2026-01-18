@@ -31,6 +31,8 @@ type Provider interface {
 	ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error)
 	// ListTags retrieves tags for a repository.
 	ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error)
+	// GetFileContent retrieves the content of a file from the repository.
+	GetFileContent(ctx context.Context, source *models.GitSource, owner, repo, ref, path string) (string, error)
 }
 
 // Service handles git-related business logic.
@@ -86,4 +88,19 @@ func (s *Service) ListTags(ctx context.Context, source *models.GitSource, fullNa
 	}
 
 	return provider.ListTags(ctx, source, parts[0], parts[1])
+}
+
+// GetFileContent retrieves the content of a file from the specified source.
+func (s *Service) GetFileContent(ctx context.Context, source *models.GitSource, fullName, ref, path string) (string, error) {
+	provider, ok := s.providers[source.Type]
+	if !ok {
+		return "", fmt.Errorf("unsupported git source type: %s", source.Type)
+	}
+
+	parts := strings.Split(fullName, "/")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid repository full name: %s", fullName)
+	}
+
+	return provider.GetFileContent(ctx, source, parts[0], parts[1], ref, path)
 }

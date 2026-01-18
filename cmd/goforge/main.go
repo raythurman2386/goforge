@@ -250,7 +250,7 @@ func runServer() error {
 	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
 	githubProvider := auth.NewGitHubProvider(cfg)
 	authenticator := auth.NewLocalAuthenticator(userRepo)
-	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo)
+	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo, deploymentRepo, containerRepo, gitSourceRepo, gitService, dockerClient)
 	deployService := deploy.NewService(
 		deploymentRepo,
 		deploymentLogRepo,

@@ -65,7 +65,7 @@ func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Req
 
 // GetDeployment renders the deployment detail page.
 func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
 
 	// Get the project
@@ -117,7 +117,7 @@ func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request
 
 // RollbackDeployment handles rollback requests.
 func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
 
 	if h.rollbackManager == nil {
@@ -147,7 +147,7 @@ func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Re
 
 // CancelDeployment handles deployment cancellation requests.
 func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
 
 	// Get the deployment
@@ -178,7 +178,7 @@ func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Requ
 // GetDeploymentStatus returns the current deployment status for HTMX polling.
 // When the deployment is no longer active, it returns an empty div to stop the banner.
 func (h *DeploymentHandler) GetDeploymentStatus(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
 
 	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)

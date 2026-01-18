@@ -70,16 +70,19 @@ func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (st
 	return resp.ID, nil
 }
 
-// StopContainer stops and removes a container.
+// StopContainer stops a container.
 func (c *Client) StopContainer(ctx context.Context, id string) error {
 	if err := c.docker.ContainerStop(ctx, id, container.StopOptions{}); err != nil {
 		return fmt.Errorf("failed to stop container: %w", err)
 	}
+	return nil
+}
 
-	if err := c.docker.ContainerRemove(ctx, id, container.RemoveOptions{Force: true}); err != nil {
+// RemoveContainer removes a container.
+func (c *Client) RemoveContainer(ctx context.Context, id string) error {
+	if err := c.docker.ContainerRemove(ctx, id, container.RemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
 		return fmt.Errorf("failed to remove container: %w", err)
 	}
-
 	return nil
 }
 
