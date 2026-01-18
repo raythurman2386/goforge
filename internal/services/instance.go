@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"text/template"
 
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -30,7 +31,9 @@ type ContainerRepository interface {
 // DockerClient defines the interface for Docker operations.
 type DockerClient interface {
 	CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error)
+	StartContainer(ctx context.Context, id string) error
 	StopContainer(ctx context.Context, id string) error
+	RestartContainer(ctx context.Context, id string) error
 }
 
 // InstanceService handles service instance management.
@@ -40,6 +43,7 @@ type InstanceService struct {
 	dockerClient   DockerClient
 	catalog        *Catalog
 	traefikNetwork string
+	logger         *slog.Logger
 }
 
 // NewInstanceService creates a new instance service.
@@ -49,6 +53,7 @@ func NewInstanceService(
 	dc DockerClient,
 	c *Catalog,
 	traefikNetwork string,
+	logger *slog.Logger,
 ) *InstanceService {
 	return &InstanceService{
 		instanceRepo:   ir,
@@ -56,6 +61,7 @@ func NewInstanceService(
 		dockerClient:   dc,
 		catalog:        c,
 		traefikNetwork: traefikNetwork,
+		logger:         logger,
 	}
 }
 
@@ -134,7 +140,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		if updateErr := s.instanceRepo.Update(ctx, instance); updateErr != nil {
 			// Using blank identifier for fmt to explicitly ignore it if needed,
 			// but logging is better.
-			fmt.Printf("failed to update instance status to failed: %v\n", updateErr)
+			s.logger.Error("failed to update instance status to failed", "error", updateErr, "instance_id", instance.ID)
 		}
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
@@ -147,7 +153,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		Image:             image,
 		Status:            models.ContainerStatusRunning,
 	}); err != nil {
-		fmt.Printf("failed to record container in DB: %v\n", err)
+		s.logger.Error("failed to record container in DB", "error", err, "instance_id", instance.ID)
 	}
 
 	instance.Status = models.ServiceStatusRunning
@@ -180,10 +186,83 @@ func (s *InstanceService) GetInstance(ctx context.Context, id string) (*models.S
 	return s.instanceRepo.GetByID(ctx, id)
 }
 
+// StopInstance stops the service instance.
+func (s *InstanceService) StopInstance(ctx context.Context, id string) error {
+	instance, err := s.instanceRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	container, err := s.containerRepo.GetByServiceInstanceID(ctx, id)
+	if err != nil {
+		// If no container, just update status
+		instance.Status = models.ServiceStatusStopped
+		return s.instanceRepo.Update(ctx, instance)
+	}
+
+	if err := s.dockerClient.StopContainer(ctx, container.DockerID); err != nil {
+		return fmt.Errorf("failed to stop container: %w", err)
+	}
+
+	instance.Status = models.ServiceStatusStopped
+	return s.instanceRepo.Update(ctx, instance)
+}
+
+// StartInstance starts the service instance.
+func (s *InstanceService) StartInstance(ctx context.Context, id string) error {
+	instance, err := s.instanceRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	container, err := s.containerRepo.GetByServiceInstanceID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("container not found: %w", err)
+	}
+
+	if err := s.dockerClient.StartContainer(ctx, container.DockerID); err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+
+	instance.Status = models.ServiceStatusRunning
+	return s.instanceRepo.Update(ctx, instance)
+}
+
+// RestartInstance restarts the service instance.
+func (s *InstanceService) RestartInstance(ctx context.Context, id string) error {
+	instance, err := s.instanceRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	container, err := s.containerRepo.GetByServiceInstanceID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("container not found: %w", err)
+	}
+
+	if err := s.dockerClient.RestartContainer(ctx, container.DockerID); err != nil {
+		return fmt.Errorf("failed to restart container: %w", err)
+	}
+
+	instance.Status = models.ServiceStatusRunning
+	return s.instanceRepo.Update(ctx, instance)
+}
+
 // DeleteInstance stops and removes a service instance.
 func (s *InstanceService) DeleteInstance(ctx context.Context, id string) error {
-	// TODO: Get associated container and stop it
-	// For now, just delete the record
+	// Attempt to stop and remove container first
+	container, err := s.containerRepo.GetByServiceInstanceID(ctx, id)
+	if err == nil && container != nil {
+		if stopErr := s.dockerClient.StopContainer(ctx, container.DockerID); stopErr != nil {
+			// Log error but continue with DB deletion?
+			// Ideally we want to ensure cleanup, but if container is gone/invalid, we should proceed.
+			// For now, let's return error if we can't clean up, or maybe log it.
+			// Since we don't have logger yet, we'll return error wrapped.
+			// But wait, StopContainer tries to stop AND remove.
+			s.logger.Warn("failed to stop/remove container", "docker_id", container.DockerID, "error", stopErr)
+		}
+	}
+
 	return s.instanceRepo.Delete(ctx, id)
 }
 

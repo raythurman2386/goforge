@@ -49,6 +49,9 @@ type Config struct {
 	// Service Templates
 	TemplatesDir string
 
+	// Build Directory
+	BuildDir string
+
 	// Deployment Limits
 	MaxConcurrentBuilds int
 	BuildTimeout        time.Duration
@@ -97,6 +100,9 @@ func Load() (*Config, error) {
 
 		// Service Templates
 		TemplatesDir: getEnv("TEMPLATES_DIR", "./templates"),
+
+		// Build Directory
+		BuildDir: getEnv("GOFORGE_BUILD_DIR", os.TempDir()),
 
 		// Deployment Limits
 		MaxConcurrentBuilds: getEnvInt("MAX_CONCURRENT_BUILDS", 2),

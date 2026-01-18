@@ -3,6 +3,7 @@ package deploy
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -23,6 +24,8 @@ type Service struct {
 	dockerClient    *docker.Client
 	sseHub          *sse.Hub
 	traefikNetwork  string
+	buildDir        string
+	logger          *slog.Logger
 }
 
 // NewService creates a new deployment Service.
@@ -37,6 +40,8 @@ func NewService(
 	dc *docker.Client,
 	sh *sse.Hub,
 	traefikNetwork string,
+	buildDir string,
+	logger *slog.Logger,
 ) *Service {
 	return &Service{
 		deploymentRepo:  dr,
@@ -49,6 +54,8 @@ func NewService(
 		dockerClient:    dc,
 		sseHub:          sh,
 		traefikNetwork:  traefikNetwork,
+		buildDir:        buildDir,
+		logger:          logger,
 	}
 }
 

@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -75,8 +77,10 @@ func (m *mockContainerRepository) GetByServiceInstanceID(ctx context.Context, in
 
 // mockDockerClient implements DockerClient for testing.
 type mockDockerClient struct {
-	createContainerFunc func(ctx context.Context, opts docker.ContainerOptions) (string, error)
-	stopContainerFunc   func(ctx context.Context, id string) error
+	createContainerFunc  func(ctx context.Context, opts docker.ContainerOptions) (string, error)
+	startContainerFunc   func(ctx context.Context, id string) error
+	stopContainerFunc    func(ctx context.Context, id string) error
+	restartContainerFunc func(ctx context.Context, id string) error
 }
 
 func (m *mockDockerClient) CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error) {
@@ -86,9 +90,23 @@ func (m *mockDockerClient) CreateContainer(ctx context.Context, opts docker.Cont
 	return "mock-docker-id", nil
 }
 
+func (m *mockDockerClient) StartContainer(ctx context.Context, id string) error {
+	if m.startContainerFunc != nil {
+		return m.startContainerFunc(ctx, id)
+	}
+	return nil
+}
+
 func (m *mockDockerClient) StopContainer(ctx context.Context, id string) error {
 	if m.stopContainerFunc != nil {
 		return m.stopContainerFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockDockerClient) RestartContainer(ctx context.Context, id string) error {
+	if m.restartContainerFunc != nil {
+		return m.restartContainerFunc(ctx, id)
 	}
 	return nil
 }
@@ -219,7 +237,7 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 				tt.setupMock(mockRepo, mockContainerRepo, mockDocker)
 			}
 
-			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, catalog, "goforge_net")
+			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, catalog, "goforge_net", slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 			got, err := svc.DeployInstance(context.Background(), tt.userID, tt.tmplName, tt.config)
 			if (err != nil) != tt.wantErr {
@@ -278,7 +296,8 @@ func TestInstanceService_ListInstances(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockRepo)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", logger)
 			got, err := svc.ListInstances(context.Background(), tt.userID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ListInstances() error = %v, wantErr %v", err, tt.wantErr)
@@ -330,7 +349,8 @@ func TestInstanceService_GetInstance(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockRepo)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", logger)
 			got, err := svc.GetInstance(context.Background(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetInstance() error = %v, wantErr %v", err, tt.wantErr)
@@ -347,13 +367,19 @@ func TestInstanceService_DeleteInstance(t *testing.T) {
 	tests := []struct {
 		name      string
 		id        string
-		setupMock func(*mockInstanceRepository)
+		setupMock func(*mockInstanceRepository, *mockContainerRepository, *mockDockerClient)
 		wantErr   bool
 	}{
 		{
 			name: "Success",
 			id:   "inst-1",
-			setupMock: func(m *mockInstanceRepository) {
+			setupMock: func(m *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+				mc.getByServiceInstanceIDFunc = func(ctx context.Context, instanceID string) (*models.Container, error) {
+					return &models.Container{DockerID: "docker-1"}, nil
+				}
+				md.stopContainerFunc = func(ctx context.Context, id string) error {
+					return nil
+				}
 				m.deleteFunc = func(ctx context.Context, id string) error {
 					return nil
 				}
@@ -363,7 +389,10 @@ func TestInstanceService_DeleteInstance(t *testing.T) {
 		{
 			name: "Error",
 			id:   "inst-1",
-			setupMock: func(m *mockInstanceRepository) {
+			setupMock: func(m *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+				mc.getByServiceInstanceIDFunc = func(ctx context.Context, instanceID string) (*models.Container, error) {
+					return nil, errors.New("not found")
+				}
 				m.deleteFunc = func(ctx context.Context, id string) error {
 					return errors.New("db error")
 				}
@@ -377,10 +406,13 @@ func TestInstanceService_DeleteInstance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			mockRepo := &mockInstanceRepository{}
+			mockContainerRepo := &mockContainerRepository{}
+			mockDocker := &mockDockerClient{}
 			if tt.setupMock != nil {
-				tt.setupMock(mockRepo)
+				tt.setupMock(mockRepo, mockContainerRepo, mockDocker)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, nil, "goforge_net", logger)
 			err := svc.DeleteInstance(context.Background(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteInstance() error = %v, wantErr %v", err, tt.wantErr)
@@ -427,10 +459,119 @@ func TestInstanceService_UpdateInstance(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockRepo)
 			}
-			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net")
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", logger)
 			err := svc.UpdateInstance(context.Background(), tt.instance)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateInstance() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestInstanceService_Lifecycle(t *testing.T) {
+	t.Parallel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	tests := []struct {
+		name      string
+		operation string // "stop", "start", "restart"
+		setupMock func(*mockInstanceRepository, *mockContainerRepository, *mockDockerClient)
+		wantErr   bool
+	}{
+		{
+			name:      "Stop Success",
+			operation: "stop",
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusRunning}, nil
+				}
+				mc.getByServiceInstanceIDFunc = func(ctx context.Context, instanceID string) (*models.Container, error) {
+					return &models.Container{DockerID: "docker-1"}, nil
+				}
+				md.stopContainerFunc = func(ctx context.Context, id string) error {
+					return nil
+				}
+				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					if s.Status != models.ServiceStatusStopped {
+						return errors.New("wrong status")
+					}
+					return nil
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:      "Start Success",
+			operation: "start",
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusStopped}, nil
+				}
+				mc.getByServiceInstanceIDFunc = func(ctx context.Context, instanceID string) (*models.Container, error) {
+					return &models.Container{DockerID: "docker-1"}, nil
+				}
+				md.startContainerFunc = func(ctx context.Context, id string) error {
+					return nil
+				}
+				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					if s.Status != models.ServiceStatusRunning {
+						return errors.New("wrong status")
+					}
+					return nil
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:      "Restart Success",
+			operation: "restart",
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusRunning}, nil
+				}
+				mc.getByServiceInstanceIDFunc = func(ctx context.Context, instanceID string) (*models.Container, error) {
+					return &models.Container{DockerID: "docker-1"}, nil
+				}
+				md.restartContainerFunc = func(ctx context.Context, id string) error {
+					return nil
+				}
+				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					if s.Status != models.ServiceStatusRunning {
+						return errors.New("wrong status")
+					}
+					return nil
+				}
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mockRepo := &mockInstanceRepository{}
+			mockContainerRepo := &mockContainerRepository{}
+			mockDocker := &mockDockerClient{}
+			if tt.setupMock != nil {
+				tt.setupMock(mockRepo, mockContainerRepo, mockDocker)
+			}
+
+			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, nil, "goforge_net", logger)
+
+			var err error
+			switch tt.operation {
+			case "stop":
+				err = svc.StopInstance(context.Background(), "inst-1")
+			case "start":
+				err = svc.StartInstance(context.Background(), "inst-1")
+			case "restart":
+				err = svc.RestartInstance(context.Background(), "inst-1")
+			}
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("%sInstance() error = %v, wantErr %v", tt.operation, err, tt.wantErr)
 			}
 		})
 	}

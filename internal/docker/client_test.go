@@ -17,20 +17,21 @@ import (
 
 // mockDockerAPI implements dockerAPI for testing.
 type mockDockerAPI struct {
-	imageInspectFunc    func(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
-	imagePullFunc       func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
-	imageBuildFunc      func(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error)
-	imagesPruneFunc     func(ctx context.Context, pruneFilters filters.Args) (image.PruneReport, error)
-	imageRemoveFunc     func(ctx context.Context, imageID string, options image.RemoveOptions) ([]image.DeleteResponse, error)
-	containerCreateFunc func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
-	containerStartFunc  func(ctx context.Context, containerID string, options container.StartOptions) error
-	containerStopFunc   func(ctx context.Context, containerID string, options container.StopOptions) error
-	containerRemoveFunc func(ctx context.Context, containerID string, options container.RemoveOptions) error
-	containerStatsFunc  func(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
-	containerLogsFunc   func(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
-	containersPrune     func(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
-	pingFunc            func(ctx context.Context) (types.Ping, error)
-	closeFunc           func() error
+	imageInspectFunc     func(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
+	imagePullFunc        func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
+	imageBuildFunc       func(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error)
+	imagesPruneFunc      func(ctx context.Context, pruneFilters filters.Args) (image.PruneReport, error)
+	imageRemoveFunc      func(ctx context.Context, imageID string, options image.RemoveOptions) ([]image.DeleteResponse, error)
+	containerCreateFunc  func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
+	containerStartFunc   func(ctx context.Context, containerID string, options container.StartOptions) error
+	containerRestartFunc func(ctx context.Context, containerID string, options container.StopOptions) error
+	containerStopFunc    func(ctx context.Context, containerID string, options container.StopOptions) error
+	containerRemoveFunc  func(ctx context.Context, containerID string, options container.RemoveOptions) error
+	containerStatsFunc   func(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
+	containerLogsFunc    func(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
+	containersPrune      func(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
+	pingFunc             func(ctx context.Context) (types.Ping, error)
+	closeFunc            func() error
 }
 
 func (m *mockDockerAPI) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
@@ -78,6 +79,13 @@ func (m *mockDockerAPI) ContainerCreate(ctx context.Context, config *container.C
 func (m *mockDockerAPI) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
 	if m.containerStartFunc != nil {
 		return m.containerStartFunc(ctx, containerID, options)
+	}
+	return nil
+}
+
+func (m *mockDockerAPI) ContainerRestart(ctx context.Context, containerID string, options container.StopOptions) error {
+	if m.containerRestartFunc != nil {
+		return m.containerRestartFunc(ctx, containerID, options)
 	}
 	return nil
 }

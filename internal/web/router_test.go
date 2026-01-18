@@ -2,6 +2,8 @@ package web
 
 import (
 	"database/sql"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,7 +46,8 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	ps := project.NewService(projectRepo, envRepo, varRepo)
 	// We can pass nil for deployService dependencies that aren't used in these tests
 	ds := &deploy.Service{}
-	is := services.NewInstanceService(instanceRepo, nil, nil, nil, "goforge_net")
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	is := services.NewInstanceService(instanceRepo, nil, nil, nil, "goforge_net", logger)
 	cat := services.NewCatalog("./templates")
 
 	// Monitor

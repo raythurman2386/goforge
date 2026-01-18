@@ -49,7 +49,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 		return tErr
 	}
 
-	workDir := filepath.Join(os.TempDir(), "goforge-builds", d.ID)
+	workDir := filepath.Join(s.buildDir, "goforge-builds", d.ID)
 	if mErr := os.MkdirAll(workDir, 0o700); mErr != nil {
 		return mErr
 	}
@@ -112,7 +112,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 		Status:       models.ContainerStatusRunning,
 	}); err != nil {
 		// Log but don't fail deployment record
-		fmt.Printf("failed to record container in DB: %v\n", err)
+		s.logger.Error("failed to record container in DB", "error", err, "deployment_id", d.ID)
 	}
 
 	// 5. Transition to Running
@@ -127,7 +127,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 		if err := s.CleanupOldDeployments(cleanupCtx, envID, deployID); err != nil {
-			fmt.Printf("failed to cleanup old deployments: %v\n", err)
+			s.logger.Error("failed to cleanup old deployments", "error", err, "environment_id", envID)
 		}
 	}(d.EnvironmentID, d.ID)
 

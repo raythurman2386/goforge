@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/raythurman2386/goforge/internal/models"
@@ -57,10 +56,10 @@ func (w *Worker) process(id string) {
 
 	err := w.service.RunPipeline(ctx, id)
 	if err != nil {
-		fmt.Printf("deployment %s failed: %v\n", id, err)
+		w.service.logger.Error("deployment failed", "deployment_id", id, "error", err)
 		msg := err.Error()
 		if transitionErr := w.service.Transition(ctx, id, models.DeploymentStatusFailed, &msg); transitionErr != nil {
-			fmt.Printf("failed to transition deployment %s to failed: %v\n", id, transitionErr)
+			w.service.logger.Error("failed to transition deployment to failed", "deployment_id", id, "error", transitionErr)
 		}
 	}
 }

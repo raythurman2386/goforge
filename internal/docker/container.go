@@ -82,3 +82,19 @@ func (c *Client) StopContainer(ctx context.Context, id string) error {
 
 	return nil
 }
+
+// StartContainer starts an existing container.
+func (c *Client) StartContainer(ctx context.Context, id string) error {
+	if err := c.docker.ContainerStart(ctx, id, container.StartOptions{}); err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+	return nil
+}
+
+// RestartContainer restarts a container.
+func (c *Client) RestartContainer(ctx context.Context, id string) error {
+	if err := c.docker.ContainerRestart(ctx, id, container.StopOptions{}); err != nil {
+		return fmt.Errorf("failed to restart container: %w", err)
+	}
+	return nil
+}
