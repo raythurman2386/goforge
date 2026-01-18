@@ -43,7 +43,7 @@ func setSSEHeaders(w http.ResponseWriter) {
 // DeploymentLogs streams deployment logs via SSE.
 // GET /deployments/{id}/logs
 func (h *SSEHandler) DeploymentLogs(w http.ResponseWriter, r *http.Request) {
-	deploymentID := chi.URLParam(r, "id")
+	deploymentID := chi.URLParam(r, "deploymentID")
 	if deploymentID == "" {
 		http.Error(w, "deployment ID is required", http.StatusBadRequest)
 		return

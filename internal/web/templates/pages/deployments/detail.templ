@@ -239,7 +239,7 @@ templ Detail(props DetailProps) {
 					class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto"
 					if !props.Deployment.IsTerminal() {
 						hx-ext="sse"
-						sse-connect={ fmt.Sprintf("/api/deployments/%s/logs/stream", props.Deployment.ID) }
+						sse-connect={ fmt.Sprintf("/projects/%s/deployments/%s/logs", props.Project.ID, props.Deployment.ID) }
 						sse-swap="log"
 						hx-swap="beforeend"
 					}

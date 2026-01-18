@@ -1,6 +1,7 @@
 package projects
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
@@ -8,7 +9,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, activeTab string, csrfToken string) {
+templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeTab string, csrfToken string) {
 	@layouts.AppLayout(project.Name, csrfToken) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
@@ -66,7 +67,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 		if activeTab == "overview" {
 			@Overview(project, latestDeployment)
 		} else if activeTab == "deployments" {
-			@Deployments(project)
+			@Deployments(project, deployments)
 		} else if activeTab == "settings" {
 			@Settings(project, currentEnv)
 		}
@@ -220,41 +221,182 @@ func formatTime(t time.Time) string {
 	return t.Format("Jan 2, 15:04")
 }
 
-templ Deployments(project *models.Project) {
-	<div class="text-center py-12">
-		<p class="text-gray-500 italic">Deployment history will appear here.</p>
-	</div>
+templ Deployments(project *models.Project, deployments []*models.Deployment) {
+	if len(deployments) == 0 {
+		<div class="text-center py-12">
+			<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+			</svg>
+			<h3 class="mt-2 text-sm font-medium text-gray-900">No deployments</h3>
+			<p class="mt-1 text-sm text-gray-500">Get started by triggering a new deployment.</p>
+		</div>
+	} else {
+		<div class="flex flex-col">
+			<div class="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+				<div class="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+					<div class="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+										Status
+									</th>
+									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+										Branch / Commit
+									</th>
+									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+										Date
+									</th>
+									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+										Duration
+									</th>
+									<th scope="col" class="relative px-6 py-3">
+										<span class="sr-only">View</span>
+									</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200">
+								for _, d := range deployments {
+									<tr>
+										<td class="px-6 py-4 whitespace-nowrap">
+											<span class={ "px-2 inline-flex text-xs leading-5 font-semibold rounded-full border", getStatusColor(d.Status) }>
+												{ string(d.Status) }
+											</span>
+										</td>
+										<td class="px-6 py-4 whitespace-nowrap">
+											<div class="text-sm text-gray-900">{ d.Branch.String }</div>
+											<div class="text-sm text-gray-500 font-mono">{ truncateCommit(d.CommitSHA.String) }</div>
+										</td>
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+											{ formatTime(d.CreatedAt) }
+										</td>
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+											if d.FinishedAt.Valid {
+												{ formatDuration(d.FinishedAt.Time.Sub(d.StartedAt.Time)) }
+											} else if isActiveDeployment(d.Status) {
+												<span class="animate-pulse">Running...</span>
+											} else {
+												-
+											}
+										</td>
+										<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+											<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + d.ID) } class="text-blue-600 hover:text-blue-900">View Logs</a>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return "less than 1s"
+	}
+	d = d.Round(time.Second)
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+	if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
 }
 
 templ Settings(project *models.Project, currentEnv *models.Environment) {
-	<div class="card mb-8">
-		<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-4">Project Configuration</h3>
-		<form hx-put={ "/projects/" + project.ID } hx-swap="none">
-			<div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-				<div class="sm:col-span-4">
-					<label for="custom_domain" class="block text-sm font-medium text-gray-700">Custom Domain</label>
-					<div class="mt-1">
-						<input type="text" name="custom_domain" id="custom_domain" 
-							value={ project.CustomDomain.String }
-							class="input-text" 
-							placeholder="example.com" />
-					</div>
-					<p class="mt-2 text-sm text-gray-500">
-						This domain will be used as a default for your deployments. Ensure your DNS points to this server.
-					</p>
-				</div>
-				<div class="sm:col-span-6">
-					<button type="submit" class="btn-primary">Save Changes</button>
-				</div>
-			</div>
-		</form>
-	</div>
-
 	if currentEnv != nil {
-		<div class="mb-8" hx-get={ "/envs/" + currentEnv.ID + "/variables" } hx-trigger="load">
-			<div class="animate-pulse bg-gray-100 h-64 rounded-lg"></div>
+		<div class="card mb-8">
+			<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6">Configuration</h3>
+			
+			<form hx-put={ "/projects/" + project.ID + "/settings" } hx-swap="none">
+				<input type="hidden" name="env_id" value={ currentEnv.ID } />
+				
+				<div class="space-y-8 divide-y divide-gray-100">
+					<!-- Project Defaults Section -->
+					<div class="grid grid-cols-1 gap-y-6 sm:grid-cols-6">
+						<div class="sm:col-span-6">
+							<h4 class="text-xs font-semibold text-primary-600 uppercase tracking-wider mb-2">Global Defaults</h4>
+							<p class="text-sm text-gray-500">Settings applied to all environments unless overridden.</p>
+						</div>
+
+						<div class="sm:col-span-4">
+							<label for="custom_domain" class="block text-sm font-medium text-gray-700">Default Domain</label>
+							<div class="mt-1">
+								<input type="text" name="custom_domain" id="custom_domain" 
+									value={ project.CustomDomain.String }
+									class="input-text text-sm" 
+									placeholder="example.com" />
+							</div>
+						</div>
+					</div>
+
+					<!-- Environment Overrides Section -->
+					<div class="pt-8 grid grid-cols-1 gap-y-6 sm:grid-cols-6">
+						<div class="sm:col-span-6">
+							<div class="flex items-center space-x-2 mb-2">
+								<h4 class="text-xs font-semibold text-primary-600 uppercase tracking-wider">Environment Overrides</h4>
+								<span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+									{ currentEnv.Name }
+								</span>
+							</div>
+							<p class="text-sm text-gray-500">Specific settings for this environment.</p>
+						</div>
+
+						<div class="sm:col-span-3">
+							<label for="domain" class="block text-sm font-medium text-gray-700">Domain</label>
+							<div class="mt-1">
+								<input type="text" name="domain" id="domain" 
+									value={ currentEnv.Domain.String }
+									class="input-text text-sm" 
+									placeholder="env.example.com" />
+							</div>
+							<p class="mt-1 text-xs text-gray-500">
+								Overrides global default.
+							</p>
+						</div>
+
+						<div class="sm:col-span-3">
+							<label for="port" class="block text-sm font-medium text-gray-700">Application Port</label>
+							<div class="mt-1">
+								<input type="number" name="port" id="port" 
+									value={ getPort(currentEnv) }
+									class="input-text text-sm" 
+									placeholder="80" />
+							</div>
+							<p class="mt-1 text-xs text-gray-500">
+								Internal port (e.g., 3000). Default: 80.
+							</p>
+						</div>
+
+						<div class="sm:col-span-6">
+							<label for="branch" class="block text-sm font-medium text-gray-700">Git Branch</label>
+							<div class="mt-1">
+								<input type="text" name="branch" id="branch" 
+									value={ currentEnv.Branch.String }
+									class="input-text text-sm" 
+									placeholder={ project.DefaultBranch } />
+							</div>
+							<p class="mt-1 text-xs text-gray-500">
+								Deploys from { project.DefaultBranch } when empty.
+							</p>
+						</div>
+
+						<div class="sm:col-span-6 flex items-center justify-between pt-4">
+							<div class="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+								Changes to port require redeployment.
+							</div>
+							<button type="submit" class="btn-primary">Save Changes</button>
+						</div>
+					</div>
+				</div>
+			</form>
 		</div>
 	}
+
 	<div class="card border-red-100 bg-red-50/30">
 		<div class="sm:flex sm:items-start sm:justify-between">
 			<div>
@@ -274,3 +416,5 @@ templ Settings(project *models.Project, currentEnv *models.Environment) {
 		</div>
 	</div>
 }
+
+

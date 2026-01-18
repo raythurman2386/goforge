@@ -57,7 +57,7 @@ func TestSSEHandler_DeploymentLogs(t *testing.T) {
 
 			// Add chi URL params
 			rctx := chi.NewRouteContext()
-			rctx.URLParams.Add("id", tt.deploymentID)
+			rctx.URLParams.Add("deploymentID", tt.deploymentID)
 			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 			// Use a cancellable context to end the SSE stream
@@ -204,7 +204,7 @@ func TestSSEHandler_RequiresFlush(t *testing.T) {
 	req := httptest.NewRequest("GET", "/deployments/deploy-123/logs", nil)
 
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "deploy-123")
+	rctx.URLParams.Add("deploymentID", "deploy-123")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)

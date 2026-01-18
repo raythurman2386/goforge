@@ -165,3 +165,9 @@ func (p *LabProvider) ListTags(ctx context.Context, source *models.GitSource, ow
 
 	return tags, nil
 }
+
+// GetFileContent retrieves the content of a file from GitLab.
+func (p *LabProvider) GetFileContent(ctx context.Context, source *models.GitSource, owner, repo, ref, path string) (string, error) {
+	// TODO: Implement GitLab file content retrieval
+	return "", fmt.Errorf("backend not implemented for GitLab")
+}

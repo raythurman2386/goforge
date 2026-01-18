@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -54,6 +55,47 @@ func (h *EnvironmentHandler) CreateEnvironment(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusCreated)
+}
+
+// UpdateEnvironment handles environment updates.
+func (h *EnvironmentHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Request) {
+	envID := chi.URLParam(r, "envId")
+
+	env, err := h.projectService.GetEnvironment(r.Context(), envID)
+	if err != nil {
+		http.Error(w, "environment not found", http.StatusNotFound)
+		return
+	}
+
+	if domain := r.FormValue("domain"); domain != "" {
+		env.Domain.String = domain
+		env.Domain.Valid = true
+	} else {
+		env.Domain.Valid = false
+	}
+
+	if branch := r.FormValue("branch"); branch != "" {
+		env.Branch.String = branch
+		env.Branch.Valid = true
+	} else {
+		env.Branch.Valid = false
+	}
+
+	if portStr := r.FormValue("port"); portStr != "" {
+		port, err := strconv.Atoi(portStr)
+		if err == nil && port > 0 && port < 65536 {
+			env.Port.Int32 = int32(port) //nolint:gosec // port checked to be within valid range
+			env.Port.Valid = true
+		}
+	}
+
+	if err := h.projectService.UpdateEnvironment(r.Context(), env); err != nil {
+		http.Error(w, "failed to update environment", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusOK)
 }
 
 // NewEnvironmentModal renders the modal to create a new environment.

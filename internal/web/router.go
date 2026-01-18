@@ -96,6 +96,7 @@ func Router(
 				r.Route("/{id}", func(r chi.Router) {
 					r.Get("/", projectHandler.GetProject)
 					r.Put("/", projectHandler.UpdateProject)
+					r.Put("/settings", projectHandler.UpdateSettings)
 					r.Delete("/", projectHandler.DeleteProject)
 					r.Get("/deployments", projectHandler.GetProject)
 					r.Get("/settings", projectHandler.GetProject)
@@ -114,6 +115,7 @@ func Router(
 					r.Route("/envs", func(r chi.Router) {
 						r.Get("/", envHandler.ListEnvironments)
 						r.Post("/", envHandler.CreateEnvironment)
+						r.Put("/{envId}", envHandler.UpdateEnvironment)
 						r.Get("/new", envHandler.NewEnvironmentModal)
 					})
 				})

@@ -109,3 +109,24 @@ func (p *HubProvider) ListTags(ctx context.Context, source *models.GitSource, ow
 
 	return tags, nil
 }
+
+// GetFileContent retrieves the content of a file from GitHub.
+func (p *HubProvider) GetFileContent(ctx context.Context, source *models.GitSource, owner, repo, ref, path string) (string, error) {
+	client := p.getClient(ctx, source)
+
+	opts := &github.RepositoryContentGetOptions{
+		Ref: ref,
+	}
+
+	fileContent, _, _, err := client.Repositories.GetContents(ctx, owner, repo, path, opts)
+	if err != nil {
+		return "", err
+	}
+
+	content, err := fileContent.GetContent()
+	if err != nil {
+		return "", err
+	}
+
+	return content, nil
+}

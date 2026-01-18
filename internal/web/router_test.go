@@ -43,7 +43,7 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 
 	// Services
 	sm := auth.NewSessionManager(sessionRepo, userRepo)
-	ps := project.NewService(projectRepo, envRepo, varRepo)
+	ps := project.NewService(projectRepo, envRepo, varRepo, nil, nil, nil, nil, nil)
 	// We can pass nil for deployService dependencies that aren't used in these tests
 	ds := &deploy.Service{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))

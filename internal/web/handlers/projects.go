@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -173,8 +174,18 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		tab = "settings"
 	}
 
+	var deployments []*models.Deployment
+	if tab == "deployments" && currentEnv != nil {
+		var err error
+		deployments, err = h.deploymentRepo.ListByEnvironmentID(r.Context(), currentEnv.ID, 50)
+		if err != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to list deployments")
+			return
+		}
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
-	component := projects.Detail(p, envs, currentEnv, latestDeployment, tab, csrfToken)
+	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render project detail page")
 	}
@@ -209,5 +220,66 @@ func (h *ProjectHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+}
+
+// UpdateSettings handles unified updates for project and environment settings.
+func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	envID := r.FormValue("env_id")
+
+	// Update Project
+	p, err := h.projectService.GetProject(r.Context(), projectID)
+	if err != nil {
+		RenderError(w, r, http.StatusNotFound, "project not found")
+		return
+	}
+
+	customDomain := r.FormValue("custom_domain")
+	// Only update if present in form (it will be, but safe check)
+	p.CustomDomain = sql.NullString{String: customDomain, Valid: customDomain != ""}
+
+	if err := h.projectService.UpdateProject(r.Context(), p); err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "failed to update project settings")
+		return
+	}
+
+	// Update Environment if ID provided
+	if envID != "" {
+		env, err := h.projectService.GetEnvironment(r.Context(), envID)
+		if err != nil {
+			RenderError(w, r, http.StatusNotFound, "environment not found")
+			return
+		}
+
+		if domain := r.FormValue("domain"); domain != "" {
+			env.Domain.String = domain
+			env.Domain.Valid = true
+		} else {
+			env.Domain.Valid = false
+		}
+
+		if branch := r.FormValue("branch"); branch != "" {
+			env.Branch.String = branch
+			env.Branch.Valid = true
+		} else {
+			env.Branch.Valid = false
+		}
+
+		if portStr := r.FormValue("port"); portStr != "" {
+			port, err := strconv.Atoi(portStr)
+			if err == nil && port > 0 && port < 65536 {
+				env.Port.Int32 = int32(port) //nolint:gosec // port checked to be within valid range
+				env.Port.Valid = true
+			}
+		}
+
+		if err := h.projectService.UpdateEnvironment(r.Context(), env); err != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to update environment settings")
+			return
+		}
+	}
+
+	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusOK)
 }
