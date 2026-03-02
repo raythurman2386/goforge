@@ -13,7 +13,7 @@ func TestGitSourceRepository_Create(t *testing.T) {
 
 	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	ctx := context.Background()
 
 	// Create unique user for this test
@@ -44,7 +44,7 @@ func TestGitSourceRepository_GetByID(t *testing.T) {
 
 	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	ctx := context.Background()
 
 	// Create unique user for this test
@@ -92,7 +92,7 @@ func TestGitSourceRepository_ListByUserID(t *testing.T) {
 
 	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	ctx := context.Background()
 
 	// Create unique user for this test
@@ -128,7 +128,7 @@ func TestGitSourceRepository_Update(t *testing.T) {
 
 	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	ctx := context.Background()
 
 	// Create unique user for this test
@@ -165,7 +165,7 @@ func TestGitSourceRepository_Delete(t *testing.T) {
 
 	secretService := getTestSecretService(t)
 	repo := NewGitSourceRepository(db, secretService)
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	ctx := context.Background()
 
 	// Create unique user for this test

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -72,9 +73,12 @@ type BlueGreenResult struct {
 
 // BlueGreenDeployer handles blue-green deployment strategy.
 type BlueGreenDeployer struct {
-	dockerClient *docker.Client
-	httpClient   *http.Client
-	config       BlueGreenConfig
+	dockerClient  *docker.Client
+	httpClient    *http.Client
+	config        BlueGreenConfig
+	cleanupWg     sync.WaitGroup
+	cleanupCtx    context.Context
+	cleanupCancel context.CancelFunc
 }
 
 // NewBlueGreenDeployer creates a new blue-green deployer.
@@ -87,11 +91,20 @@ func NewBlueGreenDeployer(dc *docker.Client, hc *http.Client, config BlueGreenCo
 			},
 		}
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	return &BlueGreenDeployer{
-		dockerClient: dc,
-		httpClient:   hc,
-		config:       config,
+		dockerClient:  dc,
+		httpClient:    hc,
+		config:        config,
+		cleanupCtx:    ctx,
+		cleanupCancel: cancel,
 	}
+}
+
+// Stop gracefully shuts down the deployer, waiting for all cleanup goroutines to complete.
+func (d *BlueGreenDeployer) Stop() {
+	d.cleanupCancel()
+	d.cleanupWg.Wait()
 }
 
 // Deploy performs a blue-green deployment with health check verification.
@@ -156,8 +169,9 @@ func (d *BlueGreenDeployer) Deploy(ctx context.Context, req BlueGreenRequest) (*
 
 	// 3. Schedule old container cleanup (in background, non-blocking)
 	if req.OldContainerID != "" {
-		//nolint:contextcheck // Intentionally using a new context as cleanup runs after deployment completes
-		go d.scheduleCleanup(req.OldContainerID, d.config.GracePeriod)
+		d.cleanupWg.Add(1)
+		//nolint:contextcheck // Intentionally using stored context as cleanup runs after deployment completes
+		go d.scheduleCleanup(d.cleanupCtx, req.OldContainerID, d.config.GracePeriod)
 	}
 
 	return result, nil
@@ -188,15 +202,24 @@ func (d *BlueGreenDeployer) healthCheck(ctx context.Context, baseURL, path strin
 }
 
 // scheduleCleanup schedules the removal of the old container after the grace period.
-func (d *BlueGreenDeployer) scheduleCleanup(containerID string, gracePeriod time.Duration) {
-	time.Sleep(gracePeriod)
+// It listens for cancellation on the provided context to allow graceful shutdown.
+func (d *BlueGreenDeployer) scheduleCleanup(ctx context.Context, containerID string, gracePeriod time.Duration) {
+	defer d.cleanupWg.Done()
+
+	select {
+	case <-ctx.Done():
+		// Context canceled, abort cleanup
+		return
+	case <-time.After(gracePeriod):
+		// Grace period elapsed, proceed with cleanup
+	}
 
 	if d.dockerClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		// Best effort cleanup - don't fail if container is already gone
-		//nolint:errcheck // Intentional: best effort cleanup, container may already be gone
-		_ = d.dockerClient.StopContainer(ctx, containerID)
+		//nolint:errcheck,contextcheck // Intentional: best effort cleanup with independent timeout context
+		_ = d.dockerClient.StopContainer(cleanupCtx, containerID)
 	}
 }

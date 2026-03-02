@@ -15,7 +15,7 @@ func TestServiceInstanceRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a user to satisfy FK constraint
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	user := &models.User{Email: uniqueEmail("svc-instance-create")}
 	if err := userRepo.Create(ctx, user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
@@ -46,7 +46,7 @@ func TestServiceInstanceRepository_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a user to satisfy FK constraint
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	user := &models.User{Email: uniqueEmail("svc-instance-getbyid")}
 	if err := userRepo.Create(ctx, user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
@@ -93,7 +93,7 @@ func TestServiceInstanceRepository_ListByUserID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a user to satisfy FK constraint
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	user := &models.User{Email: uniqueEmail("svc-instance-list")}
 	if err := userRepo.Create(ctx, user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
@@ -128,7 +128,7 @@ func TestServiceInstanceRepository_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a user to satisfy FK constraint
-	userRepo := NewUserRepository(db)
+	userRepo := NewUserRepository(db, nil)
 	user := &models.User{Email: uniqueEmail("svc-instance-delete")}
 	if err := userRepo.Create(ctx, user); err != nil {
 		t.Fatalf("failed to create user: %v", err)
