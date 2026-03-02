@@ -12,14 +12,14 @@ func (s *Service) ListEnvVariables(ctx context.Context, envID string) ([]*models
 }
 
 // AddEnvVariable adds a new environment variable.
+// Note: Encryption is handled automatically by the repository if IsSecret is true.
 func (s *Service) AddEnvVariable(ctx context.Context, v *models.EnvVariable) error {
-	// TODO: Encrypt value if v.IsSecret
 	return s.envVariableRepo.Create(ctx, v)
 }
 
 // UpdateEnvVariable updates an environment variable.
+// Note: Encryption is handled automatically by the repository if IsSecret is true.
 func (s *Service) UpdateEnvVariable(ctx context.Context, v *models.EnvVariable) error {
-	// TODO: Encrypt value if v.IsSecret
 	return s.envVariableRepo.Update(ctx, v)
 }
 

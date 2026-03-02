@@ -203,14 +203,12 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		}
 
 		user = &models.User{
-			Email:          email,
-			GitHubID:       sql.NullInt64{Int64: ghUser.GetID(), Valid: true},
-			GitHubUsername: sql.NullString{String: ghUser.GetLogin(), Valid: true},
-			AvatarURL:      sql.NullString{String: ghUser.GetAvatarURL(), Valid: true},
+			Email:             email,
+			GitHubID:          sql.NullInt64{Int64: ghUser.GetID(), Valid: true},
+			GitHubUsername:    sql.NullString{String: ghUser.GetLogin(), Valid: true},
+			AvatarURL:         sql.NullString{String: ghUser.GetAvatarURL(), Valid: true},
+			GitHubAccessToken: sql.NullString{String: token.AccessToken, Valid: true},
 		}
-
-		// TODO: Encrypt access token before storing
-		// user.GitHubAccessToken = sql.NullString{String: token.AccessToken, Valid: true}
 
 		if dbErr := h.userRepo.Create(r.Context(), user); dbErr != nil {
 			h.logger.Error("failed to create user from GitHub login", "error", dbErr)

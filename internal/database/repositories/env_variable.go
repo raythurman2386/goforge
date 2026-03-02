@@ -8,20 +8,26 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/secrets"
 )
 
 // EnvVariableRepository handles environment variable data access.
 type EnvVariableRepository struct {
-	db *sql.DB
+	db      *sql.DB
+	secrets *secrets.EncryptionService
 }
 
 // NewEnvVariableRepository creates a new EnvVariableRepository.
-func NewEnvVariableRepository(db *sql.DB) *EnvVariableRepository {
-	return &EnvVariableRepository{db: db}
+func NewEnvVariableRepository(db *sql.DB, secrets *secrets.EncryptionService) *EnvVariableRepository {
+	return &EnvVariableRepository{db: db, secrets: secrets}
 }
 
 // Create creates a new environment variable.
 func (r *EnvVariableRepository) Create(ctx context.Context, v *models.EnvVariable) error {
+	if err := r.encrypt(v); err != nil {
+		return err
+	}
+
 	if v.ID == "" {
 		v.ID = uuid.New().String()
 	}
@@ -73,6 +79,7 @@ func (r *EnvVariableRepository) ListByEnvironmentID(ctx context.Context, envID s
 		if err != nil {
 			return nil, err
 		}
+		r.decrypt(v)
 		variables = append(variables, v)
 	}
 	if err := rows.Err(); err != nil {
@@ -83,6 +90,10 @@ func (r *EnvVariableRepository) ListByEnvironmentID(ctx context.Context, envID s
 
 // Update updates an environment variable.
 func (r *EnvVariableRepository) Update(ctx context.Context, v *models.EnvVariable) error {
+	if err := r.encrypt(v); err != nil {
+		return err
+	}
+
 	v.UpdatedAt = time.Now()
 
 	query := `
@@ -127,4 +138,40 @@ func (r *EnvVariableRepository) Delete(ctx context.Context, id string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// encrypt encrypts the value if it's a secret.
+func (r *EnvVariableRepository) encrypt(v *models.EnvVariable) error {
+	if !v.IsSecret || r.secrets == nil {
+		return nil
+	}
+
+	if v.Value == "" {
+		return nil
+	}
+
+	encrypted, err := r.secrets.Encrypt(v.Value)
+	if err != nil {
+		return err
+	}
+	v.Value = encrypted
+	return nil
+}
+
+// decrypt decrypts the value if it's a secret.
+func (r *EnvVariableRepository) decrypt(v *models.EnvVariable) {
+	if !v.IsSecret || r.secrets == nil {
+		return
+	}
+
+	if v.Value == "" {
+		return
+	}
+
+	decrypted, err := r.secrets.Decrypt(v.Value)
+	if err == nil {
+		v.Value = decrypted
+	}
+	// If decryption fails, assume it's a plaintext value from a previous version.
+	// It will be encrypted on the next update.
 }
