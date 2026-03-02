@@ -45,7 +45,7 @@ issues:
         - all
 
     # Main function is allowed to be long
-    - path: cmd/gocool/main\.go
+    - path: cmd/goforge/main\.go
       linters:
         - gocognit
 
@@ -133,7 +133,7 @@ linters-settings:
       - hugeParam # Too restrictive for struct params
 
   goimports:
-    local-prefixes: github.com/raythurman2386/gocool
+    local-prefixes: github.com/raythurman2386/goforge
 
   gosec:
     excludes:

@@ -3,6 +3,7 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -38,6 +39,34 @@ func (c *Client) BuildImage(ctx context.Context, opts BuildOptions, output io.Wr
 	}
 	defer res.Body.Close()
 
-	_, err = io.Copy(output, res.Body)
-	return err
+	type buildMessage struct {
+		Stream      string `json:"stream"`
+		Error       string `json:"error"`
+		ErrorDetail struct {
+			Message string `json:"message"`
+		} `json:"errorDetail"`
+	}
+
+	decoder := json.NewDecoder(res.Body)
+	for {
+		var msg buildMessage
+		if err := decoder.Decode(&msg); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("failed to decode build output: %w", err)
+		}
+
+		if msg.Error != "" {
+			return fmt.Errorf("docker build failed: %s", msg.Error)
+		}
+
+		if msg.Stream != "" {
+			if _, err := output.Write([]byte(msg.Stream)); err != nil {
+				return fmt.Errorf("failed to write build output: %w", err)
+			}
+		}
+	}
+
+	return nil
 }

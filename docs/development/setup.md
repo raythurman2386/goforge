@@ -7,7 +7,7 @@ Set up a local GoForge development environment.
 - Go 1.25+
 - Docker Engine
 - PostgreSQL (local or Docker)
-- templ CLI
+- templ (managed via `go tool templ`)
 - air (for hot reload)
 
 See [Prerequisites](../getting-started/prerequisites.md) for installation instructions.
@@ -27,7 +27,13 @@ cd goforge
 go mod download
 ```
 
-### 3. Install Development Tools
+### 3. Generate Templates
+
+```bash
+make templ
+```
+
+### 4. Install Other Development Tools
 
 ```bash
 make install-tools
@@ -35,9 +41,10 @@ make install-tools
 
 This installs:
 
-- `templ` -- Template code generation
 - `golangci-lint` -- Linter suite
 - `air` -- Hot reload
+
+Note: `templ` is managed via `go tool` and doesn't need manual installation if you use `make templ`.
 
 ### 4. Start PostgreSQL
 

@@ -19,7 +19,7 @@ This document consolidates findings from a comprehensive code review of the GoFo
 
 ## Critical Security Issues
 
-### 1. CSRF Token Timing Attack
+### ~~1. CSRF Token Timing Attack~~ (Resolved)
 
 **File**: `internal/auth/csrf.go:54`
 
@@ -130,7 +130,7 @@ The HTTP server's `WriteTimeout: 15s` applies to all connections, including SSE 
 
 ## Critical Bugs
 
-### 10. Docker Build Errors Not Detected
+### ~~10. Docker Build Errors Not Detected~~ (Resolved)
 
 **File**: `internal/docker/build.go`
 
