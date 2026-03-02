@@ -3,7 +3,7 @@ module github.com/raythurman2386/goforge
 go 1.25.0
 
 require (
-	github.com/a-h/templ v0.3.977
+	github.com/a-h/templ v0.3.1001
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/go-chi/chi/v5 v5.2.3
@@ -90,3 +90,5 @@ require (
 )
 
 replace github.com/docker/docker => github.com/docker/docker v27.3.1+incompatible
+
+tool github.com/a-h/templ/cmd/templ
