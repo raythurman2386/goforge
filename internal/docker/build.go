@@ -62,7 +62,9 @@ func (c *Client) BuildImage(ctx context.Context, opts BuildOptions, output io.Wr
 		}
 
 		if msg.Stream != "" {
-			_, _ = output.Write([]byte(msg.Stream))
+			if _, err := output.Write([]byte(msg.Stream)); err != nil {
+				return fmt.Errorf("failed to write build output: %w", err)
+			}
 		}
 	}
 

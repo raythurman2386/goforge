@@ -11,10 +11,10 @@ BINARY_NAME=goforge
 BINARY_PATH=bin/$(BINARY_NAME)
 
 # Tools
-TEMPL=templ
+TEMPL=go tool templ
 TAILWIND=tailwindcss
 AIR=air
-GOLINT=golangci-lint
+GOLINT=go tool golangci-lint
 
 # Build flags
 LDFLAGS=-ldflags "-s -w"
@@ -73,7 +73,7 @@ fmt-check:
 
 ## templ: Generate templ templates
 templ:
-	@command -v $(TEMPL) >/dev/null 2>&1 && $(TEMPL) generate || echo "templ not installed, skipping template generation"
+	$(TEMPL) generate
 
 ## templ-watch: Watch and regenerate templ files
 templ-watch:
@@ -126,9 +126,10 @@ clean:
 
 ## install-tools: Install development tools
 install-tools:
-	go install github.com/a-h/templ/cmd/templ@latest
 	go install github.com/air-verse/air@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@echo "Tools (templ, golangci-lint) are managed via go.mod and 'go tool'."
+	@echo "Run 'go mod download' to ensure they are available."
+	@echo ""
 	@echo "TailwindCSS must be installed manually:"
 	@echo "  curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64"
 	@echo "  chmod +x tailwindcss-linux-x64 && sudo mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss"

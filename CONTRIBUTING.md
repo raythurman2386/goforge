@@ -13,7 +13,7 @@ Be respectful, inclusive, and constructive. We're all here to build something us
 - Go 1.25+
 - Docker Engine 24+
 - PostgreSQL 15+
-- templ CLI
+- templ (managed via `go tool templ`)
 - golangci-lint
 
 ### Setup
@@ -22,18 +22,21 @@ Be respectful, inclusive, and constructive. We're all here to build something us
 2. Install dependencies:
    ```bash
    go mod download
-   go install github.com/a-h/templ/cmd/templ@latest
    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
    ```
 3. Copy environment file:
    ```bash
    cp .env.example .env
    ```
-4. Start PostgreSQL and run migrations:
+4. Generate templates:
+   ```bash
+   make templ
+   ```
+5. Start PostgreSQL and run migrations:
    ```bash
    make migrate
    ```
-5. Run the development server:
+6. Run the development server:
    ```bash
    make dev
    ```
