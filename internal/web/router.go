@@ -28,6 +28,7 @@ func Router(
 	gitHandler *handlers.GitHandler,
 	webhookHandler *webhook.Handler,
 	sseHandler *handlers.SSEHandler,
+	healthHandler *handlers.HealthHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -58,8 +59,8 @@ func Router(
 		r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 
 		// Health check endpoints
-		r.Get("/health", handlers.Health)
-		r.Get("/health/ready", handlers.HealthReady)
+		r.Get("/health", healthHandler.Health)
+		r.Get("/health/ready", healthHandler.HealthReady)
 
 		// Public routes
 		r.Group(func(r chi.Router) {
