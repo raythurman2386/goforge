@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/secrets"
@@ -422,7 +423,7 @@ func TestEnvVariableRepository_PlaintextFallback(t *testing.T) {
 	_, execErr := db.ExecContext(ctx,
 		`INSERT INTO env_variables (id, environment_id, key, value, is_secret, created_at, updated_at) 
 		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-		"test-id-123", env.ID, "PLAIN_KEY", plaintextValue, true)
+		uuid.New().String(), env.ID, "PLAIN_KEY", plaintextValue, true)
 	if execErr != nil {
 		t.Fatalf("Failed to insert plaintext secret: %v", execErr)
 	}
