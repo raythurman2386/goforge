@@ -3,9 +3,13 @@ package deploy
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
+
+// DefaultDeploymentTimeout is the maximum time allowed for a deployment (10 minutes).
+const DefaultDeploymentTimeout = 10 * time.Minute
 
 // Worker represents a deployment worker.
 type Worker struct {
@@ -13,14 +17,19 @@ type Worker struct {
 	queue   chan string // deployment IDs
 	wg      sync.WaitGroup
 	quit    chan struct{}
+	timeout time.Duration // deployment timeout
 }
 
 // NewWorker creates a new deployment worker.
-func NewWorker(s *Service, bufferSize int) *Worker {
+func NewWorker(s *Service, bufferSize int, timeout time.Duration) *Worker {
+	if timeout <= 0 {
+		timeout = DefaultDeploymentTimeout
+	}
 	return &Worker{
 		service: s,
 		queue:   make(chan string, bufferSize),
 		quit:    make(chan struct{}),
+		timeout: timeout,
 	}
 }
 
@@ -40,7 +49,7 @@ func (w *Worker) Start() {
 	}()
 }
 
-// Stop stops the deployment worker.
+// Stop stops the deployment worker gracefully.
 func (w *Worker) Stop() {
 	close(w.quit)
 	w.wg.Wait()
@@ -51,11 +60,24 @@ func (w *Worker) Enqueue(id string) {
 	w.queue <- id
 }
 
+// process handles a single deployment with proper context and timeout.
 func (w *Worker) process(id string) {
-	ctx := context.Background() // Use background context for long-running deployments
+	// Create context with timeout for this deployment
+	ctx, cancel := context.WithTimeout(context.Background(), w.timeout)
+	defer cancel()
 
 	err := w.service.RunPipeline(ctx, id)
 	if err != nil {
+		// Check if it was a timeout
+		if ctx.Err() == context.DeadlineExceeded {
+			w.service.logger.Error("deployment timed out", "deployment_id", id, "timeout", w.timeout)
+			msg := "deployment timed out after " + w.timeout.String()
+			if transitionErr := w.service.Transition(ctx, id, models.DeploymentStatusFailed, &msg); transitionErr != nil {
+				w.service.logger.Error("failed to transition deployment to failed", "deployment_id", id, "error", transitionErr)
+			}
+			return
+		}
+
 		w.service.logger.Error("deployment failed", "deployment_id", id, "error", err)
 		msg := err.Error()
 		if transitionErr := w.service.Transition(ctx, id, models.DeploymentStatusFailed, &msg); transitionErr != nil {

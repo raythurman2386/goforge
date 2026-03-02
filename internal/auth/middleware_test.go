@@ -14,9 +14,9 @@ func TestAuthMiddleware(t *testing.T) {
 	db := setupSessionTestDB(t)
 	defer db.Close()
 
-	userRepo := repositories.NewUserRepository(db)
+	userRepo := repositories.NewUserRepository(db, nil)
 	sessionRepo := repositories.NewSessionRepository(db)
-	manager := NewSessionManager(sessionRepo, userRepo)
+	manager := NewSessionManager(sessionRepo, userRepo, nil)
 
 	middleware := Middleware(manager)
 

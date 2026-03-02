@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
@@ -22,13 +23,18 @@ var (
 type SessionManager struct {
 	sessionRepo *repositories.SessionRepository
 	userRepo    *repositories.UserRepository
+	logger      *slog.Logger
 }
 
 // NewSessionManager creates a new SessionManager.
-func NewSessionManager(sessionRepo *repositories.SessionRepository, userRepo *repositories.UserRepository) *SessionManager {
+func NewSessionManager(sessionRepo *repositories.SessionRepository, userRepo *repositories.UserRepository, logger *slog.Logger) *SessionManager {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &SessionManager{
 		sessionRepo: sessionRepo,
 		userRepo:    userRepo,
+		logger:      logger,
 	}
 }
 
@@ -87,7 +93,11 @@ func (s *SessionManager) GetSession(ctx context.Context, token string) (*models.
 	if time.Since(session.LastActiveAt) > time.Minute {
 		if updateErr := s.sessionRepo.UpdateLastActive(ctx, session.ID); updateErr != nil {
 			// Log error but don't fail the request for last active update
-			return session, user, updateErr
+			s.logger.Error("failed to update session last active time",
+				"error", updateErr,
+				"session_id", session.ID,
+				"user_id", user.ID,
+			)
 		}
 	}
 

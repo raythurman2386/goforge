@@ -214,21 +214,21 @@ func runServer() error {
 	}
 
 	// Initialize repositories
-	userRepo := repositories.NewUserRepository(db.DB)
-	sessionRepo := repositories.NewSessionRepository(db.DB)
-	projectRepo := repositories.NewProjectRepository(db.DB)
-	environmentRepo := repositories.NewEnvironmentRepository(db.DB)
-	envVariableRepo := repositories.NewEnvVariableRepository(db.DB)
-	containerRepo := repositories.NewContainerRepository(db.DB)
-	deploymentRepo := repositories.NewDeploymentRepository(db.DB)
-	deploymentLogRepo := repositories.NewDeploymentLogRepository(db.DB)
-	instanceRepo := repositories.NewServiceInstanceRepository(db.DB)
-	auditLogRepo := repositories.NewAuditLogRepository(db.DB)
 	secretService, err := secrets.NewEncryptionService(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create encryption service: %w", err)
 	}
 
+	userRepo := repositories.NewUserRepository(db.DB, secretService)
+	sessionRepo := repositories.NewSessionRepository(db.DB)
+	projectRepo := repositories.NewProjectRepository(db.DB)
+	environmentRepo := repositories.NewEnvironmentRepository(db.DB)
+	envVariableRepo := repositories.NewEnvVariableRepository(db.DB, secretService)
+	containerRepo := repositories.NewContainerRepository(db.DB)
+	deploymentRepo := repositories.NewDeploymentRepository(db.DB)
+	deploymentLogRepo := repositories.NewDeploymentLogRepository(db.DB)
+	instanceRepo := repositories.NewServiceInstanceRepository(db.DB)
+	auditLogRepo := repositories.NewAuditLogRepository(db.DB)
 	gitSourceRepo := repositories.NewGitSourceRepository(db.DB, secretService)
 
 	// Initialize clients
@@ -247,7 +247,7 @@ func runServer() error {
 
 	// Initialize services
 	auditService := services.NewAuditService(auditLogRepo, logger.WithComponent(log, "audit"))
-	sessionManager := auth.NewSessionManager(sessionRepo, userRepo)
+	sessionManager := auth.NewSessionManager(sessionRepo, userRepo, logger.WithComponent(log, "auth"))
 	githubProvider := auth.NewGitHubProvider(cfg)
 	authenticator := auth.NewLocalAuthenticator(userRepo)
 	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo, deploymentRepo, containerRepo, gitSourceRepo, gitService, dockerClient)
@@ -268,7 +268,7 @@ func runServer() error {
 	)
 
 	// Initialize worker
-	deployWorker := deploy.NewWorker(deployService, cfg.MaxConcurrentBuilds)
+	deployWorker := deploy.NewWorker(deployService, cfg.MaxConcurrentBuilds, cfg.BuildTimeout)
 	deployWorker.Start()
 	defer deployWorker.Stop()
 
@@ -291,6 +291,7 @@ func runServer() error {
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService)
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret)
+	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
 
 	// Create router
 	router := web.Router(
@@ -306,6 +307,7 @@ func runServer() error {
 		gitHandler,
 		webhookHandler,
 		sseHandler,
+		healthHandler,
 	)
 
 	// Configure server

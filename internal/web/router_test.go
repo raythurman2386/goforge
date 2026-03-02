@@ -34,19 +34,19 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	t.Helper()
 
 	// Repos
-	userRepo := repositories.NewUserRepository(db)
+	userRepo := repositories.NewUserRepository(db, nil)
 	sessionRepo := repositories.NewSessionRepository(db)
 	projectRepo := repositories.NewProjectRepository(db)
 	envRepo := repositories.NewEnvironmentRepository(db)
-	varRepo := repositories.NewEnvVariableRepository(db)
+	varRepo := repositories.NewEnvVariableRepository(db, nil)
 	instanceRepo := repositories.NewServiceInstanceRepository(db)
 
 	// Services
-	sm := auth.NewSessionManager(sessionRepo, userRepo)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	sm := auth.NewSessionManager(sessionRepo, userRepo, logger)
 	ps := project.NewService(projectRepo, envRepo, varRepo, nil, nil, nil, nil, nil)
 	// We can pass nil for deployService dependencies that aren't used in these tests
 	ds := &deploy.Service{}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	is := services.NewInstanceService(instanceRepo, nil, nil, nil, "goforge_net", logger)
 	cat := services.NewCatalog("./templates")
 
@@ -70,7 +70,8 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	wh := &webhook.Handler{}
 	sseh := handlers.NewSSEHandler(nil, nil, nil)
 
-	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh)
+	hh := handlers.NewHealthHandler(nil, nil, logger)
+	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh)
 }
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{
