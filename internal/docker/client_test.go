@@ -143,6 +143,10 @@ func (m *mockDockerAPI) DiskUsage(ctx context.Context, options types.DiskUsageOp
 	return types.DiskUsage{}, nil
 }
 
+func (m *mockDockerAPI) ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error) {
+	return nil, nil
+}
+
 func TestClient_EnsureImage(t *testing.T) {
 	t.Parallel()
 

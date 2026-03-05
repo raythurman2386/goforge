@@ -31,6 +31,28 @@ templ Dashboard(csrfToken string, stats *models.SystemStats) {
 		<div class="max-w-7xl">
 			<h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">Dashboard</h1>
 			<p class="mt-2 text-sm text-gray-500">Overview of your Platform as a Service.</p>
+
+			<!-- Welcome & Quick Actions -->
+			<div class="mt-8">
+				<div class="card bg-gradient-to-br from-white to-gray-50/50">
+					<div class="sm:flex sm:items-start sm:justify-between">
+						<div>
+							<h3 class="text-xl font-bold text-gray-900 tracking-tight">Welcome to GoForge</h3>
+							<div class="mt-2 max-w-xl text-sm text-gray-500 leading-relaxed">
+								<p>Start by creating a project or deploying a service from the catalog.</p>
+							</div>
+						</div>
+						<div class="mt-5 sm:mt-0 sm:ml-6 sm:flex-shrink-0 flex space-x-3">
+							<a href="/projects/new" class="btn-primary">
+								Create Project
+							</a>
+							<a href="/services" class="btn-secondary">
+								Deploy Service
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
 			
 			if stats != nil {
 				<!-- Resource Usage Section -->
@@ -130,27 +152,6 @@ templ Dashboard(csrfToken string, stats *models.SystemStats) {
 					</div>
 				}
 			}
-
-			<div class="mt-8">
-				<div class="card bg-gradient-to-br from-white to-gray-50/50">
-					<div class="sm:flex sm:items-start sm:justify-between">
-						<div>
-							<h3 class="text-xl font-bold text-gray-900 tracking-tight">Welcome to GoForge</h3>
-							<div class="mt-2 max-w-xl text-sm text-gray-500 leading-relaxed">
-								<p>Start by creating a project or deploying a service from the catalog.</p>
-							</div>
-						</div>
-						<div class="mt-5 sm:mt-0 sm:ml-6 sm:flex-shrink-0 flex space-x-3">
-							<a href="/projects/new" class="btn-primary">
-								Create Project
-							</a>
-							<a href="/services" class="btn-secondary">
-								Deploy Service
-							</a>
-						</div>
-					</div>
-				</div>
-			</div>
 		</div>
 	}
 }

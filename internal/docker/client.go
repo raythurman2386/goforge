@@ -29,6 +29,7 @@ type dockerAPI interface {
 	ContainerStats(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
 	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 	ContainersPrune(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
+	ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error)
 	DiskUsage(ctx context.Context, options types.DiskUsageOptions) (types.DiskUsage, error)
 	Ping(ctx context.Context) (types.Ping, error)
 	Close() error
@@ -102,4 +103,10 @@ func (c *Client) DiskUsage(ctx context.Context) (*types.DiskUsage, error) {
 		return nil, err
 	}
 	return &usage, nil
+}
+
+// ListContainers returns a list of containers from Docker.
+func (c *Client) ListContainers(ctx context.Context, all bool) ([]types.Container, error) {
+	options := container.ListOptions{All: all}
+	return c.docker.ContainerList(ctx, options)
 }

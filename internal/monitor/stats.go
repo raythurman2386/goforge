@@ -49,20 +49,17 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 		return nil, err
 	}
 
-	// Get all containers for resource aggregation
-	containers, err := c.containerRepo.ListAll(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	// Aggregate resource usage across all containers
 	stats := &models.SystemStats{
 		TotalProjects: projects,
 		TotalServices: services,
 	}
 
-	// Collect container metrics and counts
-	c.collectContainerMetrics(ctx, containers, stats)
+	// Get actual container counts from Docker
+	c.collectContainerCounts(ctx, stats)
+
+	// Get resource metrics from running containers
+	c.collectContainerMetrics(ctx, stats)
 
 	// Get Docker disk usage
 	diskUsage, err := c.dockerClient.DiskUsage(ctx)
@@ -73,22 +70,40 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 	return stats, nil
 }
 
-// collectContainerMetrics aggregates metrics from running containers.
-func (c *Collector) collectContainerMetrics(ctx context.Context, containers []*models.Container, stats *models.SystemStats) {
-	for _, cont := range containers {
-		if cont.Status == models.ContainerStatusRunning {
-			stats.RunningContainers++
-		}
-		stats.TotalContainers++
+// collectContainerCounts gets actual container counts from Docker.
+func (c *Collector) collectContainerCounts(ctx context.Context, stats *models.SystemStats) {
+	// Get all containers (including stopped)
+	allContainers, err := c.dockerClient.ListContainers(ctx, true)
+	if err == nil {
+		stats.TotalContainers = len(allContainers)
+	}
 
-		// Try to get stats for running containers
-		if cont.Status == models.ContainerStatusRunning && cont.DockerID != "" {
-			containerStats, statsErr := c.CollectStats(ctx, cont.DockerID)
-			if statsErr == nil {
-				stats.TotalCPUUsage += containerStats.CPUPercent
-				stats.TotalMemoryUsage += containerStats.MemoryUsage
-				stats.TotalMemoryLimit += containerStats.MemoryLimit
-			}
+	// Get only running containers
+	runningContainers, err := c.dockerClient.ListContainers(ctx, false)
+	if err == nil {
+		stats.RunningContainers = len(runningContainers)
+	}
+}
+
+// collectContainerMetrics aggregates metrics from running containers.
+func (c *Collector) collectContainerMetrics(ctx context.Context, stats *models.SystemStats) {
+	// Get running containers from Docker
+	runningContainers, err := c.dockerClient.ListContainers(ctx, false)
+	if err != nil {
+		return
+	}
+
+	// Collect stats from each running container
+	for i := range runningContainers {
+		if runningContainers[i].ID == "" {
+			continue
+		}
+
+		containerStats, statsErr := c.CollectStats(ctx, runningContainers[i].ID)
+		if statsErr == nil {
+			stats.TotalCPUUsage += containerStats.CPUPercent
+			stats.TotalMemoryUsage += containerStats.MemoryUsage
+			stats.TotalMemoryLimit += containerStats.MemoryLimit
 		}
 	}
 
