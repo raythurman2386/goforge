@@ -1,7 +1,7 @@
 # Security
 
 > **⚠️ Warning: GoForge is in active development.** 
-> This document describes the current security model. Some features listed as "planned" or "known limitations" should be addressed before production use. See the [Security Policy](../SECURITY.md) for full disclaimers.
+> This document describes the current security model. Some features listed as "planned" or "known limitations" should be addressed before production use. See the [Security Policy](https://github.com/raythurman2386/goforge/blob/main/SECURITY.md) for full disclaimers.
 
 ---
 
