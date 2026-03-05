@@ -175,7 +175,7 @@ The following endpoints use Server-Sent Events for real-time streaming:
 SSE connections are long-lived HTTP connections. Clients should handle reconnection on disconnect.
 
 !!! warning "Server Timeout"
-    The default `WriteTimeout` of 15 seconds in the HTTP server configuration may prematurely terminate SSE connections. See the [Code Review](../code-review.md) for details.
+    The default `WriteTimeout` of 15 seconds in the HTTP server configuration may prematurely terminate SSE connections. Consider using `http.TimeoutHandler` selectively on non-SSE routes, or setting `WriteTimeout: 0` and implementing per-handler timeouts.
 
 ---
 

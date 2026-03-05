@@ -110,4 +110,3 @@ nav:
     - Database Schema: reference/database-schema.md
     - Service Templates: reference/service-templates.md
   - Security: security.md
-  - Code Review: code-review.md
