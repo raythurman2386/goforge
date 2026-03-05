@@ -2,10 +2,12 @@ package git
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
@@ -34,7 +36,7 @@ type gitlabBranch struct {
 	Name string `json:"name"`
 }
 
-func (p *LabProvider) doRequest(ctx context.Context, source *models.GitSource, method, path string) (*http.Response, error) {
+func (p *LabProvider) doRequest(ctx context.Context, source *models.GitSource, path string) (*http.Response, error) {
 	apiURL := "https://gitlab.com/api/v4"
 	if source.APIURL.Valid && source.APIURL.String != "" {
 		apiURL = source.APIURL.String
@@ -51,12 +53,13 @@ func (p *LabProvider) doRequest(ctx context.Context, source *models.GitSource, m
 		}
 	}
 
-	fullURL, err := url.JoinPath(apiURL, path)
-	if err != nil {
-		return nil, err
+	apiURL = strings.TrimSuffix(apiURL, "/")
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
 	}
+	fullURL := apiURL + path
 
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +75,7 @@ func (p *LabProvider) doRequest(ctx context.Context, source *models.GitSource, m
 // ListRepositories retrieves repositories from GitLab.
 func (p *LabProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
 	// membership=true gets projects user is a member of
-	resp, err := p.doRequest(ctx, source, "GET", "/projects?membership=true&simple=true&per_page=100&order_by=last_activity_at")
+	resp, err := p.doRequest(ctx, source, "/projects?membership=true&simple=true&per_page=100&order_by=last_activity_at")
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +112,7 @@ func (p *LabProvider) ListBranches(ctx context.Context, source *models.GitSource
 	projectID := url.QueryEscape(fmt.Sprintf("%s/%s", owner, repo))
 	path := fmt.Sprintf("/projects/%s/repository/branches", projectID)
 
-	resp, err := p.doRequest(ctx, source, "GET", path)
+	resp, err := p.doRequest(ctx, source, path)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +143,7 @@ func (p *LabProvider) ListTags(ctx context.Context, source *models.GitSource, ow
 	projectID := url.QueryEscape(fmt.Sprintf("%s/%s", owner, repo))
 	path := fmt.Sprintf("/projects/%s/repository/tags", projectID)
 
-	resp, err := p.doRequest(ctx, source, "GET", path)
+	resp, err := p.doRequest(ctx, source, path)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +171,35 @@ func (p *LabProvider) ListTags(ctx context.Context, source *models.GitSource, ow
 
 // GetFileContent retrieves the content of a file from GitLab.
 func (p *LabProvider) GetFileContent(ctx context.Context, source *models.GitSource, owner, repo, ref, path string) (string, error) {
-	// TODO: Implement GitLab file content retrieval
-	return "", fmt.Errorf("backend not implemented for GitLab")
+	projectID := url.QueryEscape(fmt.Sprintf("%s/%s", owner, repo))
+	filePath := url.QueryEscape(path)
+	requestPath := fmt.Sprintf("/projects/%s/repository/files/%s?ref=%s", projectID, filePath, url.QueryEscape(ref))
+
+	resp, err := p.doRequest(ctx, source, requestPath)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("gitlab api error: %s", resp.Status)
+	}
+
+	var glFile struct {
+		Encoding string `json:"encoding"`
+		Content  string `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&glFile); err != nil {
+		return "", err
+	}
+
+	if glFile.Encoding == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(glFile.Content)
+		if err != nil {
+			return "", err
+		}
+		return string(decoded), nil
+	}
+
+	return glFile.Content, nil
 }

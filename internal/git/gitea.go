@@ -2,10 +2,12 @@ package git
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
@@ -32,7 +34,7 @@ type giteaBranch struct {
 	Name string `json:"name"`
 }
 
-func (p *TeaProvider) doRequest(ctx context.Context, source *models.GitSource, method, path string) (*http.Response, error) {
+func (p *TeaProvider) doRequest(ctx context.Context, source *models.GitSource, path string) (*http.Response, error) {
 	apiURL := "https://gitea.com/api/v1" // Default, though rarely used without custom URL
 	if source.APIURL.Valid && source.APIURL.String != "" {
 		apiURL = source.APIURL.String
@@ -46,12 +48,13 @@ func (p *TeaProvider) doRequest(ctx context.Context, source *models.GitSource, m
 		}
 	}
 
-	fullURL, err := url.JoinPath(apiURL, path)
-	if err != nil {
-		return nil, err
+	apiURL = strings.TrimSuffix(apiURL, "/")
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
 	}
+	fullURL := apiURL + path
 
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +70,7 @@ func (p *TeaProvider) doRequest(ctx context.Context, source *models.GitSource, m
 
 // ListRepositories retrieves repositories from Gitea.
 func (p *TeaProvider) ListRepositories(ctx context.Context, source *models.GitSource) ([]*Repository, error) {
-	resp, err := p.doRequest(ctx, source, "GET", "/user/repos?limit=100&sort=updated")
+	resp, err := p.doRequest(ctx, source, "/user/repos?limit=100&sort=updated")
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +103,7 @@ func (p *TeaProvider) ListRepositories(ctx context.Context, source *models.GitSo
 // ListBranches retrieves branches for a repository from Gitea.
 func (p *TeaProvider) ListBranches(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
 	path := fmt.Sprintf("/repos/%s/%s/branches", owner, repo)
-	resp, err := p.doRequest(ctx, source, "GET", path)
+	resp, err := p.doRequest(ctx, source, path)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +131,7 @@ func (p *TeaProvider) ListBranches(ctx context.Context, source *models.GitSource
 // ListTags retrieves tags for a repository from Gitea.
 func (p *TeaProvider) ListTags(ctx context.Context, source *models.GitSource, owner, repo string) ([]*Branch, error) {
 	path := fmt.Sprintf("/repos/%s/%s/tags", owner, repo)
-	resp, err := p.doRequest(ctx, source, "GET", path)
+	resp, err := p.doRequest(ctx, source, path)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +158,33 @@ func (p *TeaProvider) ListTags(ctx context.Context, source *models.GitSource, ow
 
 // GetFileContent retrieves the content of a file from Gitea.
 func (p *TeaProvider) GetFileContent(ctx context.Context, source *models.GitSource, owner, repo, ref, path string) (string, error) {
-	// TODO: Implement Gitea file content retrieval
-	return "", fmt.Errorf("backend not implemented for Gitea")
+	requestPath := fmt.Sprintf("/repos/%s/%s/contents/%s?ref=%s", owner, repo, url.QueryEscape(path), url.QueryEscape(ref))
+
+	resp, err := p.doRequest(ctx, source, requestPath)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("gitea api error: %s", resp.Status)
+	}
+
+	var giteaFile struct {
+		Encoding string `json:"encoding"`
+		Content  string `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&giteaFile); err != nil {
+		return "", err
+	}
+
+	if giteaFile.Encoding == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(giteaFile.Content)
+		if err != nil {
+			return "", err
+		}
+		return string(decoded), nil
+	}
+
+	return giteaFile.Content, nil
 }

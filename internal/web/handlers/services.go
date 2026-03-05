@@ -139,6 +139,16 @@ func (h *ServiceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // Restart handles service instance restart.
 func (h *ServiceHandler) Restart(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement actual restart logic in service
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "instance ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.instanceService.RestartInstance(r.Context(), id); err != nil {
+		http.Error(w, "failed to restart service: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }

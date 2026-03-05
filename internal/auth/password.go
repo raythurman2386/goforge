@@ -85,7 +85,7 @@ func ComparePassword(password, encodedHash string) (bool, error) {
 		return false, ErrInvalidHash
 	}
 
-	hash := argon2.IDKey([]byte(password), salt, t, m, uint8(p), uint32(len(decodedHash))) //nolint:gosec // keyLength is 32
+	hash := argon2.IDKey([]byte(password), salt, t, m, uint8(p), uint32(len(decodedHash)))
 
 	if subtle.ConstantTimeCompare(hash, decodedHash) == 1 {
 		return true, nil

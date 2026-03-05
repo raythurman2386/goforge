@@ -81,8 +81,8 @@ func (c *Collector) calculateMetrics(dockerID string, v *container.StatsResponse
 		cpuPercent = (cpuDelta / systemDelta) * float64(len(v.CPUStats.CPUUsage.PercpuUsage)) * 100.0
 	}
 
-	memUsage := int64(v.MemoryStats.Usage) //nolint:gosec // usage fits in int64
-	memLimit := int64(v.MemoryStats.Limit) //nolint:gosec // limit fits in int64
+	memUsage := int64(v.MemoryStats.Usage)
+	memLimit := int64(v.MemoryStats.Limit)
 	memPercent := 0.0
 	if memLimit > 0 {
 		memPercent = float64(memUsage) / float64(memLimit) * 100.0
