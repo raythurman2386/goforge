@@ -46,8 +46,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: GoCool Version
-      description: Output of `gocool --version`
+      label: GoForge Version
+      description: Output of `goforge --version`
       placeholder: v0.1.0
 
   - type: input

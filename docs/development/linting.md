@@ -100,8 +100,8 @@ import (
 
 This is enforced by `goimports` with the local prefix configured in `.golangci.yml`.
 
-!!! warning "Stale prefix"
-    The `.golangci.yml` currently has `local-prefixes: github.com/raythurman2386/gocool` (the old project name). This should be updated to `github.com/raythurman2386/goforge`.
+!!! note "Local prefix"
+    The `.golangci.yml` has `local-prefixes: github.com/raythurman2386/goforge` configured to enforce correct import grouping.
 
 ## Formatting
 

@@ -278,14 +278,11 @@ Environment variable secrets ARE encrypted at rest using AES-256-GCM via `secret
 
 ---
 
-### 21. Stale Project Name in Linter Config
+### 21. ~~Stale Project Name in Linter Config~~ (Resolved)
 
 **File**: `.golangci.yml`
 
-Contains references to the old project name "gocool":
-
-- Import prefix exclusion rule references `gocool`
-- May cause the import grouping linter to misbehave
+~~Contains references to the old project name "gocool".~~ **Fixed** — `.golangci.yml` now uses `github.com/raythurman2386/goforge` as the local prefix.
 
 ---
 

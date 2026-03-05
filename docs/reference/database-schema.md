@@ -91,8 +91,8 @@ Configured git providers (GitHub, GitLab, Gitea, or raw SSH).
 
 **Migration**: `003_create_git_sources`
 
-!!! warning "Security Note"
-    The `access_token` and `ssh_private_key` columns store credentials in plaintext. Consider encrypting these values at the application level.
+!!! info "Security Note"
+    The `access_token` and `ssh_private_key` columns are encrypted at the application level using the `internal/secrets` package before storage.
 
 ---
 
@@ -170,8 +170,8 @@ Environment variables injected into containers at deploy time.
 
 **Migration**: `006_create_env_variables`
 
-!!! warning "Security Note"
-    Despite the `is_secret` flag, values are stored in plaintext. The flag currently only controls UI display masking. Application-level encryption is not yet implemented.
+!!! info "Security Note"
+    Secret values (where `is_secret` is `TRUE`) are encrypted at the application level using the `internal/secrets` package. The `is_secret` flag also controls UI display masking.
 
 ---
 
