@@ -21,7 +21,6 @@ graph TB
             DeploySvc[Deploy Service]
             ServiceSvc[Service Catalog]
             GitSvc[Git Service]
-            DomainSvc[Domain Service]
         end
         
         subgraph "Infrastructure"
@@ -80,7 +79,6 @@ graph TB
 - **Deploy Service** (`internal/deploy/`) -- Deployment pipeline orchestration with state machine
 - **Git Service** (`internal/git/`) -- Multi-provider Git operations (clone, pull, webhooks)
 - **Service Catalog** (`internal/services/`) -- One-click service template management
-- **Domain Service** (`internal/domain/`) -- Custom domain DNS verification and SSL tracking
 
 ### 3. Infrastructure Layer
 

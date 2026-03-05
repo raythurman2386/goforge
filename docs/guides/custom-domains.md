@@ -4,10 +4,9 @@ GoForge supports custom domains for your deployed projects, with automatic SSL c
 
 ## Adding a Custom Domain
 
-1. Navigate to your project's **Settings**
-2. Go to the **Domains** section
-3. Enter your custom domain (e.g., `app.example.com`)
-4. Click **Add Domain**
+1. Navigate to your project's **Settings** tab
+2. Enter your custom domain in the **Custom Domain** field (e.g., `app.example.com`)
+3. Click **Save Settings**
 
 ## DNS Configuration
 
@@ -37,15 +36,6 @@ If using Cloudflare:
 2. Set the proxy status to **Proxied** (orange cloud) for Cloudflare protection
 3. Or set to **DNS only** (gray cloud) for direct Traefik SSL
 
-## DNS Verification
-
-GoForge verifies that your domain's DNS records are correctly configured by checking for TXT records. The verification process:
-
-1. GoForge provides a TXT record value to add to your DNS
-2. Add the TXT record at your DNS provider
-3. GoForge periodically checks for the record
-4. Once verified, traffic routing is enabled
-
 ## SSL Certificates
 
 ### Automatic (Let's Encrypt)
@@ -63,28 +53,6 @@ When `CLOUDFLARE_PROXY_MODE=true`, Cloudflare handles SSL:
 - SSL termination at Cloudflare's edge
 - No Let's Encrypt certificates needed
 - Full SSL mode recommended in Cloudflare settings
-
-## SSL Status
-
-Each custom domain has an SSL status:
-
-| Status | Description |
-|--------|-------------|
-| `none` | No SSL certificate |
-| `pending` | Certificate is being provisioned |
-| `active` | Certificate is valid and active |
-| `expiring` | Certificate is expiring soon |
-| `expired` | Certificate has expired |
-| `failed` | Certificate provisioning failed |
-
-## Domain Validation Rules
-
-GoForge validates domain names against these rules:
-
-- Must be a valid domain format
-- Cannot be an IP address
-- Cannot be `localhost` or a `.localhost` subdomain
-- Must be a valid domain format (validated via `isValidDomainFormat`)
 
 ## Troubleshooting
 

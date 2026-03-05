@@ -134,6 +134,6 @@ GoForge creates these tables:
 | `audit_logs` | Administrative action audit trail |
 
 !!! note
-    Migration 011 adds a `custom_domain` column to the `projects` table rather than creating a separate `custom_domains` table. A separate `CustomDomain` model exists in the Go code but uses a different storage approach.
+    Migration 011 adds a `custom_domain` column to the `projects` table to handle custom domains per project without requiring a separate table.
 
 See the [Database Schema Reference](../reference/database-schema.md) for complete table definitions.

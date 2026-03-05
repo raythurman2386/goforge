@@ -191,6 +191,4 @@ erDiagram
     
     Deployment ||--o| Container : creates
     Deployment ||--o{ DeploymentLog : generates
-    
-    Project ||--o{ CustomDomain : has
 ```

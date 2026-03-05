@@ -14,7 +14,6 @@ goforge/
 │   ├── database/          # Database connection and repositories
 │   ├── deploy/            # Deployment pipeline
 │   ├── docker/            # Docker SDK wrapper
-│   ├── domain/            # Custom domain management
 │   ├── git/               # Git provider integrations
 │   ├── logger/            # Structured logging
 │   ├── models/            # Domain models
@@ -153,7 +152,6 @@ Domain model definitions.
 | `service_instance.go` | `ServiceInstance` |
 | `audit_log.go` | `AuditLog` |
 | `stats.go` | `SystemStats`, `ContainerMetrics` |
-| `custom_domain.go` | `CustomDomain`, `SSLStatus` |
 
 ### `internal/web/`
 
