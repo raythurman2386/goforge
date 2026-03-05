@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed orphaned `CustomDomain` model and `internal/domain` logic that had no database repository
 
 ### Fixed
+- SSE streaming connections (deployment logs, container stats/logs) killed after 15 seconds by global `WriteTimeout`; replaced with per-route timeout middleware so SSE routes stream indefinitely
 - Stale documentation references to old project name "GoCool"/"gocool"
 - Outdated security warnings in database schema docs (encryption is now implemented)
 - `X-Forwarded-For` header trusted unconditionally allowing IP spoofing in audit logs and rate limiter

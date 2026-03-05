@@ -3,6 +3,7 @@ package web
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
@@ -60,20 +61,28 @@ func Router(
 		r.Post("/gitea", webhookHandler.HandleGitea)
 	})
 
+	// Write timeout for non-streaming routes. This replaces the global
+	// http.Server WriteTimeout (which must be 0 to allow SSE streams).
+	writeTimeout := 15 * time.Second
+
 	// UI Routes (Require CSRF protection)
 	r.Group(func(r chi.Router) {
 		r.Use(auth.CSRFMiddleware)
 
-		// Serve static files
+		// Serve static files (no timeout — static file server manages its own I/O)
 		fileServer := http.FileServer(http.Dir("static"))
 		r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 
-		// Health check endpoints
-		r.Get("/health", healthHandler.Health)
-		r.Get("/health/ready", healthHandler.HealthReady)
+		// Health check endpoints (lightweight, but include timeout for consistency)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(writeTimeout))
+			r.Get("/health", healthHandler.Health)
+			r.Get("/health/ready", healthHandler.HealthReady)
+		})
 
 		// Public routes
 		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(writeTimeout))
 			r.Get("/", handlers.Index)
 			r.Get("/login", authHandler.LoginPage)
 			r.Post("/auth/login", authHandler.Login)
@@ -87,90 +96,98 @@ func Router(
 		// Authenticated routes
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth)
-			r.Get("/dashboard", dashboardHandler.Dashboard)
 
-			// Git API
-			r.Route("/api/git", func(r chi.Router) {
-				// Query-param based routes for HTMX components
-				r.Get("/repos", gitHandler.ListRepositories)
-				r.Get("/branches", gitHandler.ListBranches)
-				// Path-param based routes (legacy/direct API)
-				r.Get("/sources/{sourceId}/repos", gitHandler.ListRepositories)
-				r.Get("/sources/{sourceId}/repos/{owner}/{repo}/branches", gitHandler.ListBranches)
-				r.Get("/sources/{sourceId}/repos/{owner}/{repo}/tags", gitHandler.ListTags)
-			})
+			// --- Standard request/response routes (with timeout) ---
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.Timeout(writeTimeout))
 
-			r.Route("/projects", func(r chi.Router) {
-				r.Get("/", projectHandler.ListProjects)
-				r.Get("/new", projectHandler.NewProjectPage)
-				r.Post("/", projectHandler.CreateProject)
-				r.Route("/{id}", func(r chi.Router) {
-					r.Get("/", projectHandler.GetProject)
-					r.Put("/", projectHandler.UpdateProject)
-					r.Put("/settings", projectHandler.UpdateSettings)
-					r.Delete("/", projectHandler.DeleteProject)
-					r.Get("/deployments", projectHandler.GetProject)
-					r.Get("/settings", projectHandler.GetProject)
+				r.Get("/dashboard", dashboardHandler.Dashboard)
 
-					// Deployments
-					r.Post("/deployments", deploymentHandler.TriggerDeployment)
-					r.Route("/deployments/{deploymentID}", func(r chi.Router) {
-						r.Get("/", deploymentHandler.GetDeployment)
-						r.Get("/status", deploymentHandler.GetDeploymentStatus)
-						r.Post("/rollback", deploymentHandler.RollbackDeployment)
-						r.Post("/cancel", deploymentHandler.CancelDeployment)
-						r.Get("/logs", sseHandler.DeploymentLogs)
+				// Git API
+				r.Route("/api/git", func(r chi.Router) {
+					// Query-param based routes for HTMX components
+					r.Get("/repos", gitHandler.ListRepositories)
+					r.Get("/branches", gitHandler.ListBranches)
+					// Path-param based routes (legacy/direct API)
+					r.Get("/sources/{sourceId}/repos", gitHandler.ListRepositories)
+					r.Get("/sources/{sourceId}/repos/{owner}/{repo}/branches", gitHandler.ListBranches)
+					r.Get("/sources/{sourceId}/repos/{owner}/{repo}/tags", gitHandler.ListTags)
+				})
+
+				r.Route("/projects", func(r chi.Router) {
+					r.Get("/", projectHandler.ListProjects)
+					r.Get("/new", projectHandler.NewProjectPage)
+					r.Post("/", projectHandler.CreateProject)
+					r.Route("/{id}", func(r chi.Router) {
+						r.Get("/", projectHandler.GetProject)
+						r.Put("/", projectHandler.UpdateProject)
+						r.Put("/settings", projectHandler.UpdateSettings)
+						r.Delete("/", projectHandler.DeleteProject)
+						r.Get("/deployments", projectHandler.GetProject)
+						r.Get("/settings", projectHandler.GetProject)
+
+						// Deployments (non-streaming)
+						r.Post("/deployments", deploymentHandler.TriggerDeployment)
+						r.Route("/deployments/{deploymentID}", func(r chi.Router) {
+							r.Get("/", deploymentHandler.GetDeployment)
+							r.Get("/status", deploymentHandler.GetDeploymentStatus)
+							r.Post("/rollback", deploymentHandler.RollbackDeployment)
+							r.Post("/cancel", deploymentHandler.CancelDeployment)
+						})
+
+						// Environments
+						r.Route("/envs", func(r chi.Router) {
+							r.Get("/", envHandler.ListEnvironments)
+							r.Post("/", envHandler.CreateEnvironment)
+							r.Put("/{envId}", envHandler.UpdateEnvironment)
+							r.Get("/new", envHandler.NewEnvironmentModal)
+						})
 					})
+				})
 
-					// Environments
-					r.Route("/envs", func(r chi.Router) {
-						r.Get("/", envHandler.ListEnvironments)
-						r.Post("/", envHandler.CreateEnvironment)
-						r.Put("/{envId}", envHandler.UpdateEnvironment)
-						r.Get("/new", envHandler.NewEnvironmentModal)
+				// Global environment variable routes
+				r.Route("/envs/{envId}", func(r chi.Router) {
+					r.Route("/variables", func(r chi.Router) {
+						r.Get("/", envHandler.GetVariables)
+						r.Post("/", envHandler.AddVariable)
+						r.Get("/new", envHandler.NewVariableModal)
+					})
+				})
+
+				// Service Catalog
+				r.Route("/services", func(r chi.Router) {
+					r.Get("/", serviceHandler.Catalog)
+					r.Post("/", serviceHandler.Deploy) // Fallback if specific template route isn't used
+					r.Get("/{template}/configure", serviceHandler.Configure)
+					r.Post("/{template}", serviceHandler.Deploy)
+
+					// Instance management
+					r.Route("/{id:[a-f0-9-]{36}}", func(r chi.Router) {
+						r.Get("/", serviceHandler.Show)
+						r.Delete("/", serviceHandler.Delete)
+						r.Post("/restart", serviceHandler.Restart)
+					})
+				})
+
+				// Settings
+				r.Route("/settings", func(r chi.Router) {
+					r.Post("/prune", settingsHandler.PruneSystem)
+					r.Route("/git", func(r chi.Router) {
+						r.Get("/", settingsHandler.GitSources)
+						r.Post("/", settingsHandler.CreateGitSource)
+						r.Get("/new", settingsHandler.NewGitSourceModal)
+						r.Delete("/{id}", settingsHandler.DeleteGitSource)
 					})
 				})
 			})
 
-			// Global environment variable routes
-			r.Route("/envs/{envId}", func(r chi.Router) {
-				r.Route("/variables", func(r chi.Router) {
-					r.Get("/", envHandler.GetVariables)
-					r.Post("/", envHandler.AddVariable)
-					r.Get("/new", envHandler.NewVariableModal)
-				})
+			// --- SSE streaming routes (NO timeout) ---
+			r.Route("/projects/{id}/deployments/{deploymentID}", func(r chi.Router) {
+				r.Get("/logs", sseHandler.DeploymentLogs)
 			})
-
-			// Service Catalog
-			r.Route("/services", func(r chi.Router) {
-				r.Get("/", serviceHandler.Catalog)
-				r.Post("/", serviceHandler.Deploy) // Fallback if specific template route isn't used
-				r.Get("/{template}/configure", serviceHandler.Configure)
-				r.Post("/{template}", serviceHandler.Deploy)
-
-				// Instance management
-				r.Route("/{id:[a-f0-9-]{36}}", func(r chi.Router) {
-					r.Get("/", serviceHandler.Show)
-					r.Delete("/", serviceHandler.Delete)
-					r.Post("/restart", serviceHandler.Restart)
-				})
-			})
-
-			// Containers
 			r.Route("/containers/{id}", func(r chi.Router) {
 				r.Get("/stats", sseHandler.ContainerStats)
 				r.Get("/logs", sseHandler.ContainerLogs)
-			})
-
-			// Settings
-			r.Route("/settings", func(r chi.Router) {
-				r.Post("/prune", settingsHandler.PruneSystem)
-				r.Route("/git", func(r chi.Router) {
-					r.Get("/", settingsHandler.GitSources)
-					r.Post("/", settingsHandler.CreateGitSource)
-					r.Get("/new", settingsHandler.NewGitSourceModal)
-					r.Delete("/{id}", settingsHandler.DeleteGitSource)
-				})
 			})
 		})
 	})

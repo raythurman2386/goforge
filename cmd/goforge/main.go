@@ -311,12 +311,16 @@ func runServer() error {
 	)
 
 	// Configure server
+	//
+	// WriteTimeout is intentionally 0 (no global deadline) because the server
+	// hosts SSE streaming endpoints (deployment logs, container stats/logs)
+	// that are long-lived by design. Per-route write timeouts are applied via
+	// middleware.Timeout in the router for all non-streaming handlers.
 	srv := &http.Server{
-		Addr:         cfg.Addr(),
-		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:        cfg.Addr(),
+		Handler:     router,
+		ReadTimeout: 15 * time.Second,
+		IdleTimeout: 60 * time.Second,
 	}
 
 	// Channel to listen for errors coming from the listener
