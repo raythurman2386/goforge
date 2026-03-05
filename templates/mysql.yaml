@@ -1,0 +1,58 @@
+name: mysql
+display_name: MySQL
+description: The world's most popular open source relational database management system.
+icon: mysql
+category: database
+
+versions:
+  - "9"
+  - "8"
+default_version: "9"
+
+config:
+  - name: database
+    label: Database Name
+    type: text
+    default: "app"
+    required: true
+  - name: username
+    label: Username
+    type: text
+    default: "mysql"
+    required: true
+  - name: password
+    label: Password
+    type: password
+    generate: true
+    required: true
+  - name: root_password
+    label: Root Password
+    type: password
+    generate: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "mysql:{{ .Version }}"
+  ports:
+    - container: 3306
+      protocol: tcp
+  environment:
+    MYSQL_DATABASE: "{{ .Config.database }}"
+    MYSQL_USER: "{{ .Config.username }}"
+    MYSQL_PASSWORD: "{{ .Config.password }}"
+    MYSQL_ROOT_PASSWORD: "{{ .Config.root_password }}"
+  volumes:
+    - name: data
+      path: /var/lib/mysql
+  health_check:
+    test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "mysql://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:3306/{{ .Config.database }}"

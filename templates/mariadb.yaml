@@ -1,0 +1,58 @@
+name: mariadb
+display_name: MariaDB
+description: A community-developed fork of MySQL, designed to remain free and open source.
+icon: mariadb
+category: database
+
+versions:
+  - "11"
+  - "10"
+default_version: "11"
+
+config:
+  - name: database
+    label: Database Name
+    type: text
+    default: "app"
+    required: true
+  - name: username
+    label: Username
+    type: text
+    default: "mariadb"
+    required: true
+  - name: password
+    label: Password
+    type: password
+    generate: true
+    required: true
+  - name: root_password
+    label: Root Password
+    type: password
+    generate: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "mariadb:{{ .Version }}"
+  ports:
+    - container: 3306
+      protocol: tcp
+  environment:
+    MYSQL_DATABASE: "{{ .Config.database }}"
+    MYSQL_USER: "{{ .Config.username }}"
+    MYSQL_PASSWORD: "{{ .Config.password }}"
+    MYSQL_ROOT_PASSWORD: "{{ .Config.root_password }}"
+  volumes:
+    - name: data
+      path: /var/lib/mysql
+  health_check:
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "mysql://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:3306/{{ .Config.database }}"

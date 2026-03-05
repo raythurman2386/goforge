@@ -1,0 +1,48 @@
+name: minio
+display_name: MinIO
+description: High-performance object storage compatible with Amazon S3 API.
+icon: minio
+category: storage
+
+versions:
+  - "latest"
+default_version: "latest"
+
+config:
+  - name: username
+    label: Root User
+    type: text
+    default: "minioadmin"
+    required: true
+  - name: password
+    label: Root Password
+    type: password
+    generate: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "minio/minio:{{ .Version }}"
+  ports:
+    - container: 9000
+      protocol: tcp
+    - container: 9001
+      protocol: tcp
+  environment:
+    MINIO_ROOT_USER: "{{ .Config.username }}"
+    MINIO_ROOT_PASSWORD: "{{ .Config.password }}"
+  volumes:
+    - name: data
+      path: /data
+  command: server /data --console-address ':9001'
+  health_check:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:9000"

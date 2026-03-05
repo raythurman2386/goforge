@@ -1,0 +1,33 @@
+name: uptimekuma
+display_name: Uptime Kuma
+description: Self-hosted monitoring tool like "Uptime Robot" with a sleek UI.
+icon: uptimekuma
+category: monitoring
+
+versions:
+  - "1"
+default_version: "1"
+
+config: []
+
+resources:
+  cpu: "0.25"
+  memory: "256m"
+
+docker:
+  image: "louislam/uptime-kuma:{{ .Version }}"
+  ports:
+    - container: 3001
+      protocol: tcp
+  environment: {}
+  volumes:
+    - name: data
+      path: /app/data
+  health_check:
+    test: ["CMD", "extra/healthcheck"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:3001"

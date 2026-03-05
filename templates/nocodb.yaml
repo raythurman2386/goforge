@@ -1,0 +1,39 @@
+name: nocodb
+display_name: NocoDB
+description: Open source Airtable alternative that turns any MySQL, PostgreSQL, or SQL Server into a smart spreadsheet.
+icon: nocodb
+category: database
+
+versions:
+  - "latest"
+default_version: "latest"
+
+config:
+  - name: jwt_secret
+    label: JWT Secret
+    type: password
+    generate: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "nocodb/nocodb:{{ .Version }}"
+  ports:
+    - container: 8080
+      protocol: tcp
+  environment:
+    NC_JWT_SECRET: "{{ .Config.jwt_secret }}"
+  volumes:
+    - name: data
+      path: /usr/app/data
+  health_check:
+    test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/v1/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:8080"

@@ -1,0 +1,47 @@
+name: gitea
+display_name: Gitea
+description: A painless self-hosted Git service - lightweight GitHub/GitLab alternative written in Go.
+icon: gitea
+category: devtools
+
+versions:
+  - "latest"
+default_version: "latest"
+
+config:
+  - name: app_name
+    label: Application Name
+    type: text
+    default: "Gitea: Git with a cup of tea"
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "gitea/gitea:{{ .Version }}"
+  ports:
+    - container: 3000
+      protocol: tcp
+    - container: 22
+      protocol: tcp
+  environment:
+    USER_UID: "1000"
+    USER_GID: "1000"
+    GITEA__APP_NAME: "{{ .Config.app_name }}"
+    GITEA__SERVER__HTTP_PORT: "3000"
+    GITEA__SERVER__SSH_PORT: "22"
+    GITEA__SERVER__ROOT_URL: "http://{{ .ContainerName }}:3000/"
+  volumes:
+    - name: data
+      path: /data
+  health_check:
+    test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/healthz"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:3000"
+  external: "http://{{ .ContainerName }}:3000"

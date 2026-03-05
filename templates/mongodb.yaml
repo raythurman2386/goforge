@@ -1,0 +1,52 @@
+name: mongodb
+display_name: MongoDB
+description: A document-oriented NoSQL database used for high volume data storage.
+icon: mongodb
+category: database
+
+versions:
+  - "7"
+  - "6"
+default_version: "7"
+
+config:
+  - name: database
+    label: Database Name
+    type: text
+    default: "app"
+    required: true
+  - name: username
+    label: Username
+    type: text
+    default: "mongo"
+    required: true
+  - name: password
+    label: Password
+    type: password
+    generate: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "mongo:{{ .Version }}"
+  ports:
+    - container: 27017
+      protocol: tcp
+  environment:
+    MONGO_INITDB_DATABASE: "{{ .Config.database }}"
+    MONGO_INITDB_ROOT_USERNAME: "{{ .Config.username }}"
+    MONGO_INITDB_ROOT_PASSWORD: "{{ .Config.password }}"
+  volumes:
+    - name: data
+      path: /data/db
+  health_check:
+    test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "mongodb://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:27017/{{ .Config.database }}"
