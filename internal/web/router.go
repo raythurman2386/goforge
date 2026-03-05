@@ -127,6 +127,9 @@ func Router(
 						r.Delete("/", projectHandler.DeleteProject)
 						r.Get("/deployments", projectHandler.GetProject)
 						r.Get("/settings", projectHandler.GetProject)
+						r.Get("/services", projectHandler.GetProject)
+						r.Post("/services", projectHandler.LinkService)
+						r.Delete("/services/{serviceId}", projectHandler.UnlinkService)
 
 						// Deployments (non-streaming)
 						r.Post("/deployments", deploymentHandler.TriggerDeployment)

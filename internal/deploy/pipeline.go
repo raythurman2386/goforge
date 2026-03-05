@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -92,10 +93,14 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	// Generate Traefik labels
 	labels := proxy.GenerateLabelsForCloudflare(p, env, s.traefikNetwork, s.cloudflareProxyMode)
 
+	// Collect environment variables for the container
+	containerEnv := s.buildContainerEnv(ctx, d.EnvironmentID, env.ProjectID)
+
 	containerName := fmt.Sprintf("goforge-%s-%s-%s", p.ID, env.Name, d.ID)
 	containerID, err := s.dockerClient.CreateContainer(ctx, docker.ContainerOptions{
 		Name:        containerName,
 		Image:       imageName,
+		Env:         containerEnv,
 		Labels:      labels,
 		NetworkName: s.traefikNetwork,
 	})
@@ -132,4 +137,45 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	}(d.EnvironmentID, d.ID)
 
 	return nil
+}
+
+// buildContainerEnv collects environment variables from user-defined env vars
+// and linked service connection strings for injection into the deployment container.
+func (s *Service) buildContainerEnv(ctx context.Context, environmentID, projectID string) []string {
+	var env []string
+
+	// 1. User-defined environment variables
+	if s.envVariableRepo != nil {
+		vars, err := s.envVariableRepo.ListByEnvironmentID(ctx, environmentID)
+		if err != nil {
+			s.logger.Warn("failed to fetch env variables for deployment", "environment_id", environmentID, "error", err)
+		} else {
+			for _, v := range vars {
+				env = append(env, v.Key+"="+v.Value)
+			}
+		}
+	}
+
+	// 2. Linked service connection strings (e.g. POSTGRES_URL, REDIS_URL)
+	if s.projectServiceInstanceRepo != nil {
+		instances, err := s.projectServiceInstanceRepo.ListByProjectID(ctx, projectID)
+		if err != nil {
+			s.logger.Warn("failed to fetch linked services for deployment", "project_id", projectID, "error", err)
+		} else {
+			for _, inst := range instances {
+				connInfo, ciErr := inst.GetConnectionInfo()
+				if ciErr != nil {
+					s.logger.Warn("failed to parse connection info", "instance_id", inst.ID, "error", ciErr)
+					continue
+				}
+				prefix := strings.ToUpper(strings.ReplaceAll(inst.TemplateName, "-", "_"))
+				for key, val := range connInfo {
+					envKey := prefix + "_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+					env = append(env, envKey+"="+val)
+				}
+			}
+		}
+	}
+
+	return env
 }

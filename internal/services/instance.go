@@ -158,6 +158,34 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	}
 
 	instance.Status = models.ServiceStatusRunning
+
+	// Render connection string templates and store in ConnectionInfo
+	connInfo := make(map[string]string)
+	if tmpl.Connection.Internal != "" {
+		internal, interpErr := s.interpolate(tmpl.Connection.Internal, data)
+		if interpErr != nil {
+			s.logger.Error("failed to interpolate internal connection string", "error", interpErr, "instance_id", instance.ID)
+		} else {
+			connInfo["internal"] = internal
+		}
+	}
+	if tmpl.Connection.External != "" {
+		external, interpErr := s.interpolate(tmpl.Connection.External, data)
+		if interpErr != nil {
+			s.logger.Error("failed to interpolate external connection string", "error", interpErr, "instance_id", instance.ID)
+		} else {
+			connInfo["external"] = external
+		}
+	}
+	if len(connInfo) > 0 {
+		connJSON, marshalErr := json.Marshal(connInfo)
+		if marshalErr != nil {
+			s.logger.Error("failed to marshal connection info", "error", marshalErr, "instance_id", instance.ID)
+		} else {
+			instance.ConnectionInfo = connJSON
+		}
+	}
+
 	if err = s.instanceRepo.Update(ctx, instance); err != nil {
 		return nil, fmt.Errorf("failed to update instance status to running: %w", err)
 	}

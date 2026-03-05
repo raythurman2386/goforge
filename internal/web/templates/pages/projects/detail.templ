@@ -9,7 +9,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, activeTab string, csrfToken string) {
+templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, activeTab string, csrfToken string) {
 	@layouts.AppLayout(project.Name, csrfToken) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
@@ -55,6 +55,15 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 					templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300", activeTab != "deployments") }>
 				Deployments
 			</a>
+			<a href={ templ.URL("/projects/" + project.ID + "/services") }
+				class={ "whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ",
+					templ.KV("border-primary-600 text-primary-700", activeTab == "services"),
+					templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300", activeTab != "services") }>
+				Services
+				if len(linkedServices) > 0 {
+					<span class="ml-2 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">{ fmt.Sprintf("%d", len(linkedServices)) }</span>
+				}
+			</a>
 			<a href={ templ.URL("/projects/" + project.ID + "/settings?env=" + envID(currentEnv)) }
 				class={ "whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ",
 					templ.KV("border-primary-600 text-primary-700", activeTab == "settings"),
@@ -68,8 +77,10 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 			@Overview(project, latestDeployment, activeContainer)
 		} else if activeTab == "deployments" {
 			@Deployments(project, deployments)
+		} else if activeTab == "services" {
+			@Services(project, linkedServices, availableServices, csrfToken)
 		} else if activeTab == "settings" {
-			@Settings(project, currentEnv)
+			@ProjectSettings(project, currentEnv)
 		}
 	}
 }
@@ -332,7 +343,128 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%ds", s)
 }
 
-templ Settings(project *models.Project, currentEnv *models.Environment) {
+templ Services(project *models.Project, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, csrfToken string) {
+	<div class="space-y-6">
+		// Linked services
+		<div class="card overflow-hidden !p-0">
+			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between">
+				<div>
+					<h3 class="text-lg font-bold text-gray-900 tracking-tight">Linked Services</h3>
+					<p class="mt-1 text-sm text-gray-500">Services attached to this project. Connection strings are auto-injected as environment variables on deploy.</p>
+				</div>
+			</div>
+			<div class="divide-y divide-gray-100">
+				if len(linkedServices) == 0 {
+					<div class="text-center py-12 px-6">
+						<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+						</svg>
+						<h3 class="mt-2 text-sm font-medium text-gray-900">No linked services</h3>
+						<p class="mt-1 text-sm text-gray-500">Attach a running service below to inject its connection string into deployments.</p>
+					</div>
+				} else {
+					for _, svc := range linkedServices {
+						<div class="px-6 py-4 flex items-center justify-between">
+							<div class="flex items-center space-x-4 min-w-0">
+								<div class="flex-shrink-0">
+									<span class="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-primary-100 text-primary-700">
+										<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+										</svg>
+									</span>
+								</div>
+								<div class="min-w-0">
+									<p class="text-sm font-semibold text-gray-900 truncate">{ svc.Name }</p>
+									<div class="flex items-center space-x-2 mt-1">
+										<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+											{ svc.TemplateName }
+										</span>
+										<span class={ "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border", serviceStatusColor(svc.Status) }>
+											{ string(svc.Status) }
+										</span>
+									</div>
+									if connInfo, err := svc.GetConnectionInfo(); err == nil && len(connInfo) > 0 {
+										<div class="mt-2 space-y-1">
+											for key, val := range connInfo {
+												<div class="flex items-center space-x-2">
+													<span class="text-xs font-medium text-gray-500 uppercase">{ key }:</span>
+													<code class="text-xs bg-gray-50 px-2 py-0.5 rounded border border-gray-200 text-gray-700 font-mono truncate max-w-xs">{ val }</code>
+												</div>
+											}
+										</div>
+									}
+								</div>
+							</div>
+							<button
+								hx-delete={ "/projects/" + project.ID + "/services/" + svc.ID }
+								hx-confirm="Detach this service? The connection string will no longer be injected on next deploy."
+								hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` }
+								class="flex-shrink-0 ml-4 inline-flex items-center px-3 py-1.5 border border-red-200 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
+							>
+								<svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9.27-3.11-11-7.5a11.72 11.72 0 013.168-4.477M6.343 6.343l11.314 11.314"></path>
+								</svg>
+								Detach
+							</button>
+						</div>
+					}
+				}
+			</div>
+		</div>
+
+		// Attach new service
+		if len(availableServices) > 0 {
+			<div class="card overflow-hidden !p-0">
+				<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30">
+					<h3 class="text-lg font-bold text-gray-900 tracking-tight">Attach Service</h3>
+					<p class="mt-1 text-sm text-gray-500">Link a running service instance to this project.</p>
+				</div>
+				<div class="p-6">
+					<form hx-post={ "/projects/" + project.ID + "/services" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="flex items-end space-x-4">
+						<div class="flex-1">
+							<label for="service_instance_id" class="block text-sm font-medium text-gray-700 mb-1">Service</label>
+							<select name="service_instance_id" id="service_instance_id" class="input-text text-sm" required>
+								<option value="">Select a service...</option>
+								for _, svc := range availableServices {
+									<option value={ svc.ID }>{ svc.Name } ({ svc.TemplateName })</option>
+								}
+							</select>
+						</div>
+						<button type="submit" class="btn-primary">
+							<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"></path>
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101"></path>
+							</svg>
+							Attach
+						</button>
+					</form>
+				</div>
+			</div>
+		} else if len(linkedServices) == 0 {
+			<div class="card text-center py-8">
+				<p class="text-sm text-gray-500">No running service instances available to attach.</p>
+				<a href="/services" class="mt-2 inline-block text-sm text-primary-600 hover:text-primary-800 font-medium">
+					Deploy a service &rarr;
+				</a>
+			</div>
+		}
+	</div>
+}
+
+func serviceStatusColor(status models.ServiceInstanceStatus) string {
+	switch status {
+	case models.ServiceStatusRunning:
+		return "bg-green-100 text-green-800 border-green-200"
+	case models.ServiceStatusFailed:
+		return "bg-red-100 text-red-800 border-red-200"
+	case models.ServiceStatusPending, models.ServiceStatusStarting:
+		return "bg-yellow-100 text-yellow-800 border-yellow-200"
+	default:
+		return "bg-gray-100 text-gray-800 border-gray-200"
+	}
+}
+
+templ ProjectSettings(project *models.Project, currentEnv *models.Environment) {
 	if currentEnv != nil {
 		<div class="card mb-8">
 			<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6">Configuration</h3>

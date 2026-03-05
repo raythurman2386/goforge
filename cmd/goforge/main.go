@@ -228,6 +228,7 @@ func runServer() error {
 	deploymentRepo := repositories.NewDeploymentRepository(db.DB)
 	deploymentLogRepo := repositories.NewDeploymentLogRepository(db.DB)
 	instanceRepo := repositories.NewServiceInstanceRepository(db.DB)
+	projectServiceInstanceRepo := repositories.NewProjectServiceInstanceRepository(db.DB)
 	auditLogRepo := repositories.NewAuditLogRepository(db.DB)
 	gitSourceRepo := repositories.NewGitSourceRepository(db.DB, secretService)
 
@@ -258,6 +259,8 @@ func runServer() error {
 		environmentRepo,
 		containerRepo,
 		gitSourceRepo,
+		envVariableRepo,
+		projectServiceInstanceRepo,
 		gitService,
 		dockerClient,
 		sseHub,
@@ -284,7 +287,7 @@ func runServer() error {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, logger.WithComponent(log, "auth"))
 	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService)
-	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo)
+	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService)
 	envHandler := handlers.NewEnvironmentHandler(projectService)
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)

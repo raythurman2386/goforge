@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"path"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -15,24 +15,44 @@ import (
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/project"
+	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/projects"
+)
+
+// Tab name constants.
+const (
+	tabOverview    = "overview"
+	tabDeployments = "deployments"
+	tabSettings    = "settings"
+	tabServices    = "services"
 )
 
 // ProjectHandler handles project related requests.
 type ProjectHandler struct {
-	projectService *project.Service
-	gitSourceRepo  *repositories.GitSourceRepository
-	deploymentRepo *repositories.DeploymentRepository
-	containerRepo  *repositories.ContainerRepository
+	projectService         *project.Service
+	gitSourceRepo          *repositories.GitSourceRepository
+	deploymentRepo         *repositories.DeploymentRepository
+	containerRepo          *repositories.ContainerRepository
+	projectServiceInstRepo *repositories.ProjectServiceInstanceRepository
+	instanceService        *services.InstanceService
 }
 
 // NewProjectHandler creates a new ProjectHandler.
-func NewProjectHandler(ps *project.Service, gsr *repositories.GitSourceRepository, dr *repositories.DeploymentRepository, cr *repositories.ContainerRepository) *ProjectHandler {
+func NewProjectHandler(
+	ps *project.Service,
+	gsr *repositories.GitSourceRepository,
+	dr *repositories.DeploymentRepository,
+	cr *repositories.ContainerRepository,
+	psir *repositories.ProjectServiceInstanceRepository,
+	is *services.InstanceService,
+) *ProjectHandler {
 	return &ProjectHandler{
-		projectService: ps,
-		gitSourceRepo:  gsr,
-		deploymentRepo: dr,
-		containerRepo:  cr,
+		projectService:         ps,
+		gitSourceRepo:          gsr,
+		deploymentRepo:         dr,
+		containerRepo:          cr,
+		projectServiceInstRepo: psir,
+		instanceService:        is,
 	}
 }
 
@@ -73,8 +93,26 @@ func (h *ProjectHandler) NewProjectPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var instances []*models.ServiceInstance
+	if h.instanceService != nil {
+		var err error
+		instances, err = h.instanceService.ListInstances(r.Context(), user.ID)
+		if err != nil {
+			slog.Warn("failed to list service instances for project creation", "error", err)
+			instances = nil
+		}
+	}
+
+	// Filter to only running instances
+	var runningInstances []*models.ServiceInstance
+	for _, inst := range instances {
+		if inst.Status == models.ServiceStatusRunning {
+			runningInstances = append(runningInstances, inst)
+		}
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
-	component := projects.New(sources, csrfToken)
+	component := projects.New(sources, runningInstances, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render new project page")
 	}
@@ -126,11 +164,33 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Link selected service instances
+	if h.projectServiceInstRepo != nil {
+		if err := r.ParseForm(); err == nil {
+			serviceIDs := r.Form["service_ids"]
+			for _, svcID := range serviceIDs {
+				if svcID == "" {
+					continue
+				}
+				if linkErr := h.projectServiceInstRepo.Link(r.Context(), created.ID, svcID); linkErr != nil {
+					slog.Warn("failed to link service to project", "project_id", created.ID, "service_id", svcID, "error", linkErr)
+				}
+			}
+		}
+	}
+
 	http.Redirect(w, r, "/projects/"+created.ID, http.StatusSeeOther)
 }
 
 // GetProject renders the project detail page.
 func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 	p, err := h.projectService.GetProject(r.Context(), id)
 	if err != nil {
@@ -159,15 +219,10 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tab := "overview"
-	if strings.HasSuffix(r.URL.Path, "/deployments") {
-		tab = "deployments"
-	} else if strings.HasSuffix(r.URL.Path, "/settings") {
-		tab = "settings"
-	}
+	tab := resolveTab(r.URL.Path)
 
 	var deployments []*models.Deployment
-	if tab == "deployments" && currentEnv != nil {
+	if tab == tabDeployments && currentEnv != nil {
 		deployments, err = h.deploymentRepo.ListByEnvironmentID(r.Context(), currentEnv.ID, 50)
 		if err != nil {
 			RenderError(w, r, http.StatusInternalServerError, "failed to list deployments")
@@ -175,8 +230,10 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	linkedServices, availableServices := h.fetchServiceLinks(r.Context(), id, user.ID, tab)
+
 	csrfToken := auth.GetCSRFToken(r)
-	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, tab, csrfToken)
+	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, linkedServices, availableServices, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render project detail page")
 	}
@@ -207,6 +264,50 @@ func (h *ProjectHandler) getActiveContainer(ctx context.Context, deploymentID st
 		}
 	}
 	return containers[0]
+}
+
+// resolveTab determines the active tab from the URL path suffix.
+func resolveTab(urlPath string) string {
+	switch path.Base(urlPath) {
+	case tabDeployments:
+		return tabDeployments
+	case tabSettings:
+		return tabSettings
+	case tabServices:
+		return tabServices
+	default:
+		return tabOverview
+	}
+}
+
+// fetchServiceLinks retrieves linked and available (unlinked, running) service instances for a project.
+func (h *ProjectHandler) fetchServiceLinks(ctx context.Context, projectID, userID, tab string) (linked, available []*models.ServiceInstance) {
+	if h.projectServiceInstRepo != nil {
+		var err error
+		linked, err = h.projectServiceInstRepo.ListByProjectID(ctx, projectID)
+		if err != nil {
+			slog.Warn("failed to list linked services", "project_id", projectID, "error", err)
+		}
+	}
+
+	if tab == tabServices && h.instanceService != nil {
+		allInstances, err := h.instanceService.ListInstances(ctx, userID)
+		if err != nil {
+			slog.Warn("failed to list service instances", "error", err)
+		} else {
+			linkedIDs := make(map[string]bool, len(linked))
+			for _, ls := range linked {
+				linkedIDs[ls.ID] = true
+			}
+			for _, inst := range allInstances {
+				if inst.Status == models.ServiceStatusRunning && !linkedIDs[inst.ID] {
+					available = append(available, inst)
+				}
+			}
+		}
+	}
+
+	return linked, available
 }
 
 // DeleteProject handles project deletion.
@@ -299,5 +400,51 @@ func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusOK)
+}
+
+// LinkService associates a service instance with a project.
+func (h *ProjectHandler) LinkService(w http.ResponseWriter, r *http.Request) {
+	if h.projectServiceInstRepo == nil {
+		http.Error(w, "service linking not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	projectID := chi.URLParam(r, "id")
+	serviceID := r.FormValue("service_instance_id")
+	if serviceID == "" {
+		http.Error(w, "service_instance_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.projectServiceInstRepo.Link(r.Context(), projectID, serviceID); err != nil {
+		http.Error(w, "failed to link service", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/services")
+	w.WriteHeader(http.StatusOK)
+}
+
+// UnlinkService removes the association between a service instance and a project.
+func (h *ProjectHandler) UnlinkService(w http.ResponseWriter, r *http.Request) {
+	if h.projectServiceInstRepo == nil {
+		http.Error(w, "service linking not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	projectID := chi.URLParam(r, "id")
+	serviceID := chi.URLParam(r, "serviceId")
+
+	if err := h.projectServiceInstRepo.Unlink(r.Context(), projectID, serviceID); err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			http.Error(w, "service link not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to unlink service", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/services")
 	w.WriteHeader(http.StatusOK)
 }

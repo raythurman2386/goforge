@@ -14,19 +14,21 @@ import (
 
 // Service handles deployment orchestration.
 type Service struct {
-	deploymentRepo      *repositories.DeploymentRepository
-	logRepo             *repositories.DeploymentLogRepository
-	projectRepo         *repositories.ProjectRepository
-	environmentRepo     *repositories.EnvironmentRepository
-	containerRepo       *repositories.ContainerRepository
-	gitSourceRepo       *repositories.GitSourceRepository
-	gitService          *git.Service
-	dockerClient        *docker.Client
-	sseHub              *sse.Hub
-	traefikNetwork      string
-	cloudflareProxyMode bool
-	buildDir            string
-	logger              *slog.Logger
+	deploymentRepo             *repositories.DeploymentRepository
+	logRepo                    *repositories.DeploymentLogRepository
+	projectRepo                *repositories.ProjectRepository
+	environmentRepo            *repositories.EnvironmentRepository
+	containerRepo              *repositories.ContainerRepository
+	gitSourceRepo              *repositories.GitSourceRepository
+	envVariableRepo            *repositories.EnvVariableRepository
+	projectServiceInstanceRepo *repositories.ProjectServiceInstanceRepository
+	gitService                 *git.Service
+	dockerClient               *docker.Client
+	sseHub                     *sse.Hub
+	traefikNetwork             string
+	cloudflareProxyMode        bool
+	buildDir                   string
+	logger                     *slog.Logger
 }
 
 // NewService creates a new deployment Service.
@@ -37,6 +39,8 @@ func NewService(
 	er *repositories.EnvironmentRepository,
 	cr *repositories.ContainerRepository,
 	gsr *repositories.GitSourceRepository,
+	evr *repositories.EnvVariableRepository,
+	psir *repositories.ProjectServiceInstanceRepository,
 	gs *git.Service,
 	dc *docker.Client,
 	sh *sse.Hub,
@@ -46,19 +50,21 @@ func NewService(
 	logger *slog.Logger,
 ) *Service {
 	return &Service{
-		deploymentRepo:      dr,
-		logRepo:             lr,
-		projectRepo:         pr,
-		environmentRepo:     er,
-		containerRepo:       cr,
-		gitSourceRepo:       gsr,
-		gitService:          gs,
-		dockerClient:        dc,
-		sseHub:              sh,
-		traefikNetwork:      traefikNetwork,
-		cloudflareProxyMode: cloudflareProxyMode,
-		buildDir:            buildDir,
-		logger:              logger,
+		deploymentRepo:             dr,
+		logRepo:                    lr,
+		projectRepo:                pr,
+		environmentRepo:            er,
+		containerRepo:              cr,
+		gitSourceRepo:              gsr,
+		envVariableRepo:            evr,
+		projectServiceInstanceRepo: psir,
+		gitService:                 gs,
+		dockerClient:               dc,
+		sseHub:                     sh,
+		traefikNetwork:             traefikNetwork,
+		cloudflareProxyMode:        cloudflareProxyMode,
+		buildDir:                   buildDir,
+		logger:                     logger,
 	}
 }
 
