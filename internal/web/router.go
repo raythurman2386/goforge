@@ -146,6 +146,7 @@ func Router(
 							r.Post("/", envHandler.CreateEnvironment)
 							r.Put("/{envId}", envHandler.UpdateEnvironment)
 							r.Get("/new", envHandler.NewEnvironmentModal)
+							r.Post("/{envId}/variables/sync", envHandler.SyncEnvFromRepo)
 						})
 					})
 				})
@@ -156,6 +157,7 @@ func Router(
 						r.Get("/", envHandler.GetVariables)
 						r.Post("/", envHandler.AddVariable)
 						r.Get("/new", envHandler.NewVariableModal)
+						r.Delete("/{varId}", envHandler.DeleteVariable)
 					})
 				})
 

@@ -422,8 +422,61 @@ func (h *ProjectHandler) LinkService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Best-effort: inject conventional env vars for the linked service into the
+	// project's first environment. Errors here are non-fatal.
+	if h.instanceService != nil {
+		h.injectServiceEnvVars(r.Context(), projectID, serviceID)
+	}
+
 	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/services")
 	w.WriteHeader(http.StatusOK)
+}
+
+// injectServiceEnvVars inserts conventional connection-string env vars for a newly linked
+// service instance into the project's first environment. Existing keys are skipped.
+func (h *ProjectHandler) injectServiceEnvVars(ctx context.Context, projectID, serviceID string) {
+	inst, err := h.instanceService.GetInstance(ctx, serviceID)
+	if err != nil {
+		slog.Warn("injectServiceEnvVars: could not get instance", "service_id", serviceID, "error", err)
+		return
+	}
+
+	connInfo, err := inst.GetConnectionInfo()
+	if err != nil || len(connInfo) == 0 {
+		return
+	}
+
+	envs, err := h.projectService.ListEnvironments(ctx, projectID)
+	if err != nil || len(envs) == 0 {
+		return
+	}
+	env := envs[0]
+
+	// Collect existing keys so we don't overwrite them.
+	existing, err := h.projectService.ListEnvVariables(ctx, env.ID)
+	if err != nil {
+		return
+	}
+	existingKeys := make(map[string]bool, len(existing))
+	for _, v := range existing {
+		existingKeys[v.Key] = true
+	}
+
+	for connKey, connVal := range connInfo {
+		varName := services.ServiceEnvVarName(inst.Name, inst.TemplateName, connKey)
+		if existingKeys[varName] {
+			continue
+		}
+		v := &models.EnvVariable{
+			EnvironmentID: env.ID,
+			Key:           varName,
+			Value:         connVal,
+			IsSecret:      true,
+		}
+		if addErr := h.projectService.AddEnvVariable(ctx, v); addErr != nil {
+			slog.Warn("injectServiceEnvVars: failed to add env var", "key", varName, "error", addErr)
+		}
+	}
 }
 
 // UnlinkService removes the association between a service instance and a project.

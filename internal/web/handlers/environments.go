@@ -117,8 +117,15 @@ func (h *EnvironmentHandler) GetVariables(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Look up the environment to get the project ID (needed for the sync button URL).
+	projectID := ""
+	env, err := h.projectService.GetEnvironment(r.Context(), envID)
+	if err == nil {
+		projectID = env.ProjectID
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
-	component := components.VariableEditor(envID, vars, csrfToken)
+	component := components.VariableEditor(envID, vars, csrfToken, projectID)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render variable editor", http.StatusInternalServerError)
 	}
@@ -155,4 +162,33 @@ func (h *EnvironmentHandler) NewVariableModal(w http.ResponseWriter, r *http.Req
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render modal", http.StatusInternalServerError)
 	}
+}
+
+// SyncEnvFromRepo fetches .env.example from the project's repo and seeds new variables
+// into the given environment (idempotent — existing keys are skipped).
+func (h *EnvironmentHandler) SyncEnvFromRepo(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	envID := chi.URLParam(r, "envId")
+
+	_, err := h.projectService.SeedEnvVarsFromRepo(r.Context(), envID, projectID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to sync env vars: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusOK)
+}
+
+// DeleteVariable removes an environment variable by ID.
+func (h *EnvironmentHandler) DeleteVariable(w http.ResponseWriter, r *http.Request) {
+	varID := chi.URLParam(r, "varId")
+
+	if err := h.projectService.DeleteEnvVariable(r.Context(), varID); err != nil {
+		http.Error(w, fmt.Sprintf("failed to delete variable: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusOK)
 }

@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/git"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/proxy"
+	"github.com/raythurman2386/goforge/internal/services"
 )
 
 // RunPipeline executes the full deployment pipeline.
@@ -156,7 +156,7 @@ func (s *Service) buildContainerEnv(ctx context.Context, environmentID, projectI
 		}
 	}
 
-	// 2. Linked service connection strings (e.g. POSTGRES_URL, REDIS_URL)
+	// 2. Linked service connection strings (conventional aliases: DATABASE_URL, REDIS_URL, etc.)
 	if s.projectServiceInstanceRepo != nil {
 		instances, err := s.projectServiceInstanceRepo.ListByProjectID(ctx, projectID)
 		if err != nil {
@@ -168,9 +168,8 @@ func (s *Service) buildContainerEnv(ctx context.Context, environmentID, projectI
 					s.logger.Warn("failed to parse connection info", "instance_id", inst.ID, "error", ciErr)
 					continue
 				}
-				prefix := strings.ToUpper(strings.ReplaceAll(inst.TemplateName, "-", "_"))
-				for key, val := range connInfo {
-					envKey := prefix + "_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+				for connKey, val := range connInfo {
+					envKey := services.ServiceEnvVarName(inst.Name, inst.TemplateName, connKey)
 					env = append(env, envKey+"="+val)
 				}
 			}
