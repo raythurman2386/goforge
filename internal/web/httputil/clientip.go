@@ -12,7 +12,7 @@ import (
 // Proxy headers are only trusted when the direct connection (RemoteAddr) comes
 // from a network listed in trustedProxies. If trustedProxies is empty, only
 // RemoteAddr (with port stripped) is returned -- proxy headers are ignored.
-func ClientIP(remoteAddr string, xForwardedFor string, xRealIP string, trustedProxies []*net.IPNet) string {
+func ClientIP(remoteAddr, xForwardedFor, xRealIP string, trustedProxies []*net.IPNet) string {
 	host := stripPort(remoteAddr)
 
 	// Only trust proxy headers if the direct peer is a trusted proxy
@@ -36,7 +36,7 @@ func ClientIP(remoteAddr string, xForwardedFor string, xRealIP string, trustedPr
 // Single IPs without a mask (e.g. "10.0.0.1") are treated as /32 (IPv4) or /128 (IPv6).
 // Invalid entries are silently skipped.
 func ParseTrustedProxies(cidrs []string) []*net.IPNet {
-	var nets []*net.IPNet
+	nets := make([]*net.IPNet, 0, len(cidrs))
 	for _, cidr := range cidrs {
 		// If it's a plain IP without CIDR notation, add the appropriate mask
 		if !strings.Contains(cidr, "/") {

@@ -73,8 +73,7 @@ func TestSettingsHandler_PruneSystem_NoService(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				// Expected: nil instanceService causes panic.
-				// This confirms PruneSystem depends on instanceService.
+				t.Logf("PruneSystem panicked as expected with nil instanceService: %v", r)
 			}
 		}()
 		h.PruneSystem(rr, req)

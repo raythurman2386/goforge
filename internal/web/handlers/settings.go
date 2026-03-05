@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 
 	"github.com/a-h/templ"
@@ -125,5 +126,7 @@ func (h *SettingsHandler) PruneSystem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_ = components.Toast("System pruned successfully", "success").Render(r.Context(), w) // best-effort toast; failure only affects client-side notification
+	if err := components.Toast("System pruned successfully", "success").Render(r.Context(), w); err != nil {
+		slog.Error("failed to render prune toast", "error", err)
+	}
 }
