@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -67,6 +68,11 @@ type Config struct {
 	LogLevel  string
 	LogFormat string
 
+	// Trusted Proxies - CIDR ranges whose X-Forwarded-For/X-Real-IP headers are trusted.
+	// If empty, private/loopback networks are trusted by default (suitable for local Traefik).
+	// Set to explicit CIDRs in production if your proxy is on a non-private network.
+	TrustedProxies []string
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -81,7 +87,7 @@ func Load() (*Config, error) {
 		Port:    getEnvInt("GOFORGE_PORT", 8080),
 		BaseURL: getEnv("GOFORGE_BASE_URL", "http://localhost:8080"),
 
-		// Database - defaults to SQLite in dev mode
+		// Database (PostgreSQL)
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 
 		// Security
@@ -121,6 +127,9 @@ func Load() (*Config, error) {
 		// Logging
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: getEnv("LOG_FORMAT", "json"),
+
+		// Trusted proxies (comma-separated CIDRs or IPs)
+		TrustedProxies: getEnvStringSlice("TRUSTED_PROXIES"),
 
 		// Dev mode
 		DevMode: devMode,
@@ -238,6 +247,24 @@ func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
 		}
 	}
 	return defaultVal
+}
+
+// getEnvStringSlice returns the environment variable split by commas, with whitespace trimmed.
+// Returns nil if the variable is empty or unset.
+func getEnvStringSlice(key string) []string {
+	val := os.Getenv(key)
+	if val == "" {
+		return nil
+	}
+	parts := strings.Split(val, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 // generateRandomKey generates a random base64-encoded key.

@@ -10,6 +10,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/web/httputil"
 	"github.com/raythurman2386/goforge/internal/web/middleware"
 	"github.com/raythurman2386/goforge/internal/webhook"
 )
@@ -32,10 +33,19 @@ func Router(
 ) http.Handler {
 	r := chi.NewRouter()
 
+	// Parse trusted proxy CIDRs from config (defaults to private/loopback networks)
+	trustedProxies := httputil.DefaultTrustedProxies()
+	if len(cfg.TrustedProxies) > 0 {
+		trustedProxies = httputil.ParseTrustedProxies(cfg.TrustedProxies)
+	}
+
+	// Initialize handler-level trusted proxies for getClientIP
+	handlers.SetTrustedProxies(trustedProxies)
+
 	// Middleware stack
 	r.Use(chi_middleware.Recoverer)
 	// Rate limiting: 30 rps, burst 60
-	r.Use(middleware.RateLimit(30, 60))
+	r.Use(middleware.RateLimit(30, 60, trustedProxies))
 	// Session middleware is safe for all routes (just populates context)
 	r.Use(auth.Middleware(sessionManager))
 

@@ -17,7 +17,7 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
 - Go 1.25+
 - Docker Engine
-- SQLite or PostgreSQL
+- PostgreSQL
 - `templ` CLI (`go install github.com/a-h/templ/cmd/templ@latest`)
 
 ### Setup
@@ -89,4 +89,4 @@ GoForge follows a clean architecture with:
 - **Cmd:** Entry point and CLI commands.
 - **Internal:** Core logic separated into `auth`, `project`, `docker`, `git`, `deploy`, `proxy`, `sse`, and `monitor`.
 - **Web:** HTMX + Templ frontend with a RESTful-ish backend.
-- **Database:** Repository pattern supporting SQLite and Postgres.
+- **Database:** Repository pattern supporting PostgreSQL.

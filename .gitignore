@@ -1,5 +1,6 @@
 # Binaries
 bin/
+/goforge
 *.exe
 *.exe~
 *.dll

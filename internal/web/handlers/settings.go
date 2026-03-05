@@ -11,6 +11,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/settings"
 )
@@ -124,5 +125,5 @@ func (h *SettingsHandler) PruneSystem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	// TODO: Return a toast or success message if possible
+	_ = components.Toast("System pruned successfully", "success").Render(r.Context(), w) // best-effort toast; failure only affects client-side notification
 }

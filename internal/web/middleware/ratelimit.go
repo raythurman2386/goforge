@@ -2,11 +2,14 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"github.com/raythurman2386/goforge/internal/web/httputil"
 )
 
 type client struct {
@@ -15,7 +18,9 @@ type client struct {
 }
 
 // RateLimit implements a simple IP-based rate limiter using a token bucket.
-func RateLimit(rps float64, burst int) func(http.Handler) http.Handler {
+// trustedProxies controls which peers' X-Forwarded-For headers are trusted
+// for extracting the real client IP. Pass nil to only use RemoteAddr.
+func RateLimit(rps float64, burst int, trustedProxies []*net.IPNet) func(http.Handler) http.Handler {
 	clients := sync.Map{}
 
 	// Cleanup background routine
@@ -35,11 +40,12 @@ func RateLimit(rps float64, burst int) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.RemoteAddr
-			// In production behind a proxy (like Traefik), you might want X-Forwarded-For.
-			if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-				ip = forwarded
-			}
+			ip := httputil.ClientIP(
+				r.RemoteAddr,
+				r.Header.Get("X-Forwarded-For"),
+				r.Header.Get("X-Real-IP"),
+				trustedProxies,
+			)
 
 			var c *client
 			if v, ok := clients.Load(ip); ok {

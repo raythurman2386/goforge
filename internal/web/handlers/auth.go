@@ -82,7 +82,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 
-	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
@@ -147,8 +147,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.auditService.Record(r.Context(), user.ID, models.AuditActionCreate, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
-	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionCreate, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
 
 	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -224,7 +224,7 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, map[string]interface{}{"provider": "github"}, r.RemoteAddr, r.UserAgent())
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, map[string]interface{}{"provider": "github"}, getClientIP(r), r.UserAgent())
 
 	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -241,7 +241,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 			// Try to get user from context if possible, but context might not have it if middleware failed?
 			// Actually middleware puts it there.
 			if user := auth.GetUserFromContext(r.Context()); user != nil {
-				h.auditService.Record(r.Context(), user.ID, models.AuditActionLogout, models.ResourceTypeUser, user.ID, nil, r.RemoteAddr, r.UserAgent())
+				h.auditService.Record(r.Context(), user.ID, models.AuditActionLogout, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
 			}
 		}
 	}

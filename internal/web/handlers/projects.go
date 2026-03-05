@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
+	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,14 +23,16 @@ type ProjectHandler struct {
 	projectService *project.Service
 	gitSourceRepo  *repositories.GitSourceRepository
 	deploymentRepo *repositories.DeploymentRepository
+	containerRepo  *repositories.ContainerRepository
 }
 
 // NewProjectHandler creates a new ProjectHandler.
-func NewProjectHandler(ps *project.Service, gsr *repositories.GitSourceRepository, dr *repositories.DeploymentRepository) *ProjectHandler {
+func NewProjectHandler(ps *project.Service, gsr *repositories.GitSourceRepository, dr *repositories.DeploymentRepository, cr *repositories.ContainerRepository) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: ps,
 		gitSourceRepo:  gsr,
 		deploymentRepo: dr,
+		containerRepo:  cr,
 	}
 }
 
@@ -139,31 +144,18 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine current environment
-	envID := r.URL.Query().Get("env")
-	var currentEnv *models.Environment
-	if len(envs) > 0 {
-		if envID != "" {
-			for _, e := range envs {
-				if e.ID == envID {
-					currentEnv = e
-					break
-				}
-			}
-		}
-		// If explicit env not found or not provided, default to first (usually production)
-		if currentEnv == nil {
-			currentEnv = envs[0]
-		}
-	}
+	currentEnv := h.getCurrentEnv(envs, r.URL.Query().Get("env"))
 
-	// Get latest deployment for the current environment
 	var latestDeployment *models.Deployment
+	var activeContainer *models.Container
+
 	if currentEnv != nil {
-		// Ignore error - it's ok if there's no deployment yet
 		latestDeployment, err = h.deploymentRepo.GetLatestByEnvironmentID(r.Context(), currentEnv.ID)
-		if err != nil {
-			latestDeployment = nil
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("failed to fetch latest deployment", "environment_id", currentEnv.ID, "error", err)
+		}
+		if err == nil && latestDeployment != nil && h.containerRepo != nil {
+			activeContainer = h.getActiveContainer(r.Context(), latestDeployment.ID)
 		}
 	}
 
@@ -176,7 +168,6 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 	var deployments []*models.Deployment
 	if tab == "deployments" && currentEnv != nil {
-		var err error
 		deployments, err = h.deploymentRepo.ListByEnvironmentID(r.Context(), currentEnv.ID, 50)
 		if err != nil {
 			RenderError(w, r, http.StatusInternalServerError, "failed to list deployments")
@@ -185,10 +176,37 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, tab, csrfToken)
+	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render project detail page")
 	}
+}
+
+func (h *ProjectHandler) getCurrentEnv(envs []*models.Environment, envID string) *models.Environment {
+	if len(envs) == 0 {
+		return nil
+	}
+	if envID != "" {
+		for _, e := range envs {
+			if e.ID == envID {
+				return e
+			}
+		}
+	}
+	return envs[0]
+}
+
+func (h *ProjectHandler) getActiveContainer(ctx context.Context, deploymentID string) *models.Container {
+	containers, err := h.containerRepo.ListByDeploymentID(ctx, deploymentID)
+	if err != nil || len(containers) == 0 {
+		return nil
+	}
+	for _, c := range containers {
+		if c.Status == models.ContainerStatusRunning {
+			return c
+		}
+	}
+	return containers[0]
 }
 
 // DeleteProject handles project deletion.
