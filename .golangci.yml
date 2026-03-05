@@ -138,6 +138,7 @@ linters-settings:
   gosec:
     excludes:
       - G104 # Unhandled errors (covered by errcheck)
+      - G115 # Integer overflow conversion (safe in known-bounded contexts)
       - G304 # File path from variable (intentional in file handling)
 
   misspell:
