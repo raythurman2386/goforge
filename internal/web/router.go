@@ -102,6 +102,7 @@ func Router(
 				r.Use(middleware.Timeout(writeTimeout))
 
 				r.Get("/dashboard", dashboardHandler.Dashboard)
+				r.Get("/dashboard/stats", dashboardHandler.DashboardStats)
 				r.Post("/dashboard/prune", dashboardHandler.Prune)
 
 				// Git API

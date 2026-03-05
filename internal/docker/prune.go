@@ -11,7 +11,9 @@ import (
 
 // PruneImages removes unused images.
 func (c *Client) PruneImages(ctx context.Context) (image.PruneReport, error) {
-	return c.docker.ImagesPrune(ctx, filters.NewArgs())
+	args := filters.NewArgs()
+	args.Add("dangling", "false") // Set to false to remove ALL unused images, not just dangling ones
+	return c.docker.ImagesPrune(ctx, args)
 }
 
 // PruneContainers removes stopped containers.

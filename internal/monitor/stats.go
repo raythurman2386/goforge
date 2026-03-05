@@ -4,15 +4,28 @@ package monitor
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 )
+
+// hostMemoryBytes returns the total physical RAM of the host in bytes.
+// Falls back to 0 if the syscall is unavailable (non-Linux builds).
+func hostMemoryBytes() int64 {
+	var info syscall.Sysinfo_t
+	if err := syscall.Sysinfo(&info); err != nil {
+		return 0
+	}
+	return int64(info.Totalram) * int64(info.Unit)
+}
 
 // Collector handles container metrics collection.
 type Collector struct {
@@ -39,78 +52,91 @@ func NewCollector(
 
 // CollectSystemStats collects high-level system stats for a user.
 func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*models.SystemStats, error) {
-	projects, err := c.projectRepo.CountByUserID(ctx, userID)
-	if err != nil {
+	stats := &models.SystemStats{}
+	g, gCtx := errgroup.WithContext(ctx)
+
+	// 1. Projects count
+	g.Go(func() error {
+		projects, err := c.projectRepo.CountByUserID(gCtx, userID)
+		if err == nil {
+			stats.TotalProjects = projects
+		}
+		return err
+	})
+
+	// 2. Services count
+	g.Go(func() error {
+		services, err := c.serviceInstanceRepo.CountByUserID(gCtx, userID)
+		if err == nil {
+			stats.TotalServices = services
+		}
+		return err
+	})
+
+	// 3. Docker metrics (containers & stats)
+	g.Go(func() error {
+		allContainers, err := c.dockerClient.ListContainers(gCtx, true)
+		if err != nil {
+			// Ignore Docker list error to allow page load with empty stats
+			return nil //nolint:nilerr // we intentionally swallow docker error to not break the dashboard
+		}
+
+		stats.TotalContainers = len(allContainers)
+
+		var runningContainers []types.Container
+		for i := range allContainers {
+			if allContainers[i].State == "running" {
+				runningContainers = append(runningContainers, allContainers[i])
+			}
+		}
+		stats.RunningContainers = len(runningContainers)
+
+		var mu sync.Mutex
+		var metricsGroup errgroup.Group
+
+		for i := range runningContainers {
+			if runningContainers[i].ID == "" {
+				continue
+			}
+			containerID := runningContainers[i].ID
+			metricsGroup.Go(func() error {
+				containerStats, statsErr := c.CollectStats(gCtx, containerID)
+				if statsErr == nil {
+					mu.Lock()
+					stats.TotalCPUUsage += containerStats.CPUPercent
+					stats.TotalMemoryUsage += containerStats.MemoryUsage
+					mu.Unlock()
+				}
+				return nil
+			})
+		}
+
+		if err := metricsGroup.Wait(); err != nil {
+			return nil //nolint:nilerr // ignoring errcheck on wait
+		}
+
+		stats.TotalMemoryLimit = hostMemoryBytes()
+		if stats.TotalMemoryLimit > 0 {
+			stats.MemoryUsagePercent = float64(stats.TotalMemoryUsage) / float64(stats.TotalMemoryLimit) * 100
+		}
+		return nil
+	})
+
+	// 4. Docker disk usage
+	g.Go(func() error {
+		diskUsage, err := c.dockerClient.DiskUsage(gCtx)
+		if err == nil && diskUsage != nil {
+			usage := c.calculateDiskUsage(diskUsage)
+			stats.DiskUsage = usage
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
-	}
-
-	services, err := c.serviceInstanceRepo.CountByUserID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Aggregate resource usage across all containers
-	stats := &models.SystemStats{
-		TotalProjects: projects,
-		TotalServices: services,
-	}
-
-	// Get actual container counts from Docker
-	c.collectContainerCounts(ctx, stats)
-
-	// Get resource metrics from running containers
-	c.collectContainerMetrics(ctx, stats)
-
-	// Get Docker disk usage
-	diskUsage, err := c.dockerClient.DiskUsage(ctx)
-	if err == nil && diskUsage != nil {
-		stats.DiskUsage = c.calculateDiskUsage(diskUsage)
 	}
 
 	return stats, nil
-}
-
-// collectContainerCounts gets actual container counts from Docker.
-func (c *Collector) collectContainerCounts(ctx context.Context, stats *models.SystemStats) {
-	// Get all containers (including stopped)
-	allContainers, err := c.dockerClient.ListContainers(ctx, true)
-	if err == nil {
-		stats.TotalContainers = len(allContainers)
-	}
-
-	// Get only running containers
-	runningContainers, err := c.dockerClient.ListContainers(ctx, false)
-	if err == nil {
-		stats.RunningContainers = len(runningContainers)
-	}
-}
-
-// collectContainerMetrics aggregates metrics from running containers.
-func (c *Collector) collectContainerMetrics(ctx context.Context, stats *models.SystemStats) {
-	// Get running containers from Docker
-	runningContainers, err := c.dockerClient.ListContainers(ctx, false)
-	if err != nil {
-		return
-	}
-
-	// Collect stats from each running container
-	for i := range runningContainers {
-		if runningContainers[i].ID == "" {
-			continue
-		}
-
-		containerStats, statsErr := c.CollectStats(ctx, runningContainers[i].ID)
-		if statsErr == nil {
-			stats.TotalCPUUsage += containerStats.CPUPercent
-			stats.TotalMemoryUsage += containerStats.MemoryUsage
-			stats.TotalMemoryLimit += containerStats.MemoryLimit
-		}
-	}
-
-	// Calculate memory usage percentage
-	if stats.TotalMemoryLimit > 0 {
-		stats.MemoryUsagePercent = float64(stats.TotalMemoryUsage) / float64(stats.TotalMemoryLimit) * 100
-	}
 }
 
 // calculateDiskUsage extracts disk usage information from Docker.
@@ -118,29 +144,39 @@ func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskU
 	info := &models.DiskUsageInfo{}
 
 	// Calculate total sizes
-	for _, img := range diskUsage.Images {
-		info.ImagesSize += img.Size
+	for i := range diskUsage.Images {
+		info.ImagesSize += diskUsage.Images[i].Size
 	}
 
-	for _, cont := range diskUsage.Containers {
-		info.ContainersSize += cont.SizeRw
+	for i := range diskUsage.Containers {
+		info.ContainersSize += diskUsage.Containers[i].SizeRw
 	}
 
-	for _, vol := range diskUsage.Volumes {
-		if vol != nil && vol.UsageData != nil {
-			info.VolumesSize += vol.UsageData.Size
+	for i := range diskUsage.Volumes {
+		if diskUsage.Volumes[i] != nil && diskUsage.Volumes[i].UsageData != nil {
+			info.VolumesSize += diskUsage.Volumes[i].UsageData.Size
 		}
 	}
 
-	for _, cache := range diskUsage.BuildCache {
-		if cache != nil {
-			info.BuildCacheSize += cache.Size
+	for i := range diskUsage.BuildCache {
+		if diskUsage.BuildCache[i] != nil {
+			info.BuildCacheSize += diskUsage.BuildCache[i].Size
 		}
 	}
 
 	// Calculate reclaimable space
-	for _, img := range diskUsage.Images {
-		info.ReclaimableSize += img.SharedSize
+	// 1. Unused images
+	for i := range diskUsage.Images {
+		if diskUsage.Images[i].Containers == 0 {
+			info.ReclaimableSize += diskUsage.Images[i].Size
+		}
+	}
+
+	// 2. Stopped containers
+	for i := range diskUsage.Containers {
+		if diskUsage.Containers[i].State != "running" {
+			info.ReclaimableSize += diskUsage.Containers[i].SizeRw
+		}
 	}
 
 	return info

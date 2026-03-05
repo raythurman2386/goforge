@@ -23,7 +23,7 @@ func NewDashboardHandler(collector *monitor.Collector, instanceService *services
 	}
 }
 
-// Dashboard renders the dashboard page.
+// Dashboard renders the dashboard page skeleton.
 func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
@@ -31,18 +31,31 @@ func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	csrfToken := auth.GetCSRFToken(r)
+	component := pages.Dashboard(csrfToken)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, "failed to render dashboard", http.StatusInternalServerError)
+	}
+}
+
+// DashboardStats returns the HTMX component containing the loaded stats.
+func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	stats, err := h.collector.CollectSystemStats(r.Context(), user.ID)
 	if err != nil {
 		// Just log the error, don't fail the request.
-		// In a real logger we would use the logger instance.
-		// For now we just proceed with nil stats.
 		_ = err
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages.Dashboard(csrfToken, stats)
+	component := pages.DashboardStats(csrfToken, stats)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render dashboard", http.StatusInternalServerError)
+		http.Error(w, "failed to render dashboard stats", http.StatusInternalServerError)
 	}
 }
 
@@ -53,8 +66,6 @@ func (h *DashboardHandler) Prune(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusFound)
 		return
 	}
-
-	// Check if user is an admin (optional: add admin check here)
 
 	if err := h.instanceService.PruneSystem(r.Context()); err != nil {
 		http.Error(w, "failed to prune system: "+err.Error(), http.StatusInternalServerError)
