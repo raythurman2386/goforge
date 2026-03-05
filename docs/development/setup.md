@@ -148,6 +148,20 @@ Recommended extensions:
 
 ## Debugging
 
+## Limitations
+
+`make dev` runs the application locally without Docker integration. This means:
+
+- **Service deployment** (Redis, PostgreSQL, etc.) requires Docker socket access
+- **Project deployments** with container building requires Docker
+
+To test features that require Docker:
+
+```bash
+# Use the full Docker stack instead
+docker-compose up -d
+```
+
 ### Debug with Delve
 
 ```bash

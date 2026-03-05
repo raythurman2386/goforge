@@ -283,7 +283,7 @@ func runServer() error {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, logger.WithComponent(log, "auth"))
-	dashboardHandler := handlers.NewDashboardHandler(monitorCollector)
+	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService)
 	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo)
 	envHandler := handlers.NewEnvironmentHandler(projectService)
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)

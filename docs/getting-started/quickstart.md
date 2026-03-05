@@ -79,6 +79,12 @@ On first visit, you will see the login page. Click **Register** to create your f
 - [Add one-click services](../guides/services.md) like PostgreSQL or Redis
 - [Configure for production](../deployment/index.md)
 
+!!! note "Feature Limitations in Dev Mode"
+    `make dev` is designed for code development with hot reload. Features that require Docker (service deployment, project containerization) need the full stack:
+    ```bash
+    docker-compose up -d
+    ```
+
 ## Troubleshooting
 
 ### Port 8080 already in use

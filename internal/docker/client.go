@@ -29,6 +29,7 @@ type dockerAPI interface {
 	ContainerStats(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
 	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 	ContainersPrune(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
+	DiskUsage(ctx context.Context, options types.DiskUsageOptions) (types.DiskUsage, error)
 	Ping(ctx context.Context) (types.Ping, error)
 	Close() error
 }
@@ -92,4 +93,13 @@ func (c *Client) Ping(ctx context.Context) error {
 // Close closes the Docker client.
 func (c *Client) Close() error {
 	return c.docker.Close()
+}
+
+// DiskUsage returns system-wide disk usage information.
+func (c *Client) DiskUsage(ctx context.Context) (*types.DiskUsage, error) {
+	usage, err := c.docker.DiskUsage(ctx, types.DiskUsageOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return &usage, nil
 }

@@ -212,3 +212,44 @@ func (r *ContainerRepository) Delete(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+// ListAll retrieves all containers.
+func (r *ContainerRepository) ListAll(ctx context.Context) ([]*models.Container, error) {
+	query := `
+		SELECT id, deployment_id, service_instance_id, docker_id, name, image,
+			status, ports, labels, created_at, updated_at
+		FROM containers
+		ORDER BY created_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var containers []*models.Container
+	for rows.Next() {
+		c := &models.Container{}
+		err := rows.Scan(
+			&c.ID,
+			&c.DeploymentID,
+			&c.ServiceInstanceID,
+			&c.DockerID,
+			&c.Name,
+			&c.Image,
+			&c.Status,
+			&c.Ports,
+			&c.Labels,
+			&c.CreatedAt,
+			&c.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		containers = append(containers, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return containers, nil
+}

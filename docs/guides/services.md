@@ -2,6 +2,9 @@
 
 GoForge provides a catalog of pre-configured services that can be deployed with a single click.
 
+!!! note "Docker Required"
+    Service deployment requires GoForge to have access to the Docker daemon (via Docker socket). This is available when running via `docker-compose`, not when running locally with `make dev`.
+
 ## Available Services
 
 ### PostgreSQL

@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/secrets"
@@ -297,7 +299,8 @@ func TestUserRepository_PlaintextFallback(t *testing.T) {
 	plaintextToken := "ghp_plaintext_token"
 
 	// Insert user with plaintext token directly into DB (simulating old data)
-	userID := "12345678-1234-1234-1234-123456789012"
+	// Use unique ID to avoid conflicts with other test runs
+	userID := uuid.New().String()
 	_, err = db.ExecContext(ctx,
 		`INSERT INTO users (id, email, github_access_token, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())`,
 		userID, uniqueEmail("plaintext"), plaintextToken)

@@ -139,6 +139,10 @@ func (m *mockDockerAPI) Close() error {
 	return nil
 }
 
+func (m *mockDockerAPI) DiskUsage(ctx context.Context, options types.DiskUsageOptions) (types.DiskUsage, error) {
+	return types.DiskUsage{}, nil
+}
+
 func TestClient_EnsureImage(t *testing.T) {
 	t.Parallel()
 

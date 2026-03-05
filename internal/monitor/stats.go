@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
@@ -48,10 +49,86 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 		return nil, err
 	}
 
-	return &models.SystemStats{
+	// Get all containers for resource aggregation
+	containers, err := c.containerRepo.ListAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Aggregate resource usage across all containers
+	stats := &models.SystemStats{
 		TotalProjects: projects,
 		TotalServices: services,
-	}, nil
+	}
+
+	// Collect container metrics and counts
+	c.collectContainerMetrics(ctx, containers, stats)
+
+	// Get Docker disk usage
+	diskUsage, err := c.dockerClient.DiskUsage(ctx)
+	if err == nil && diskUsage != nil {
+		stats.DiskUsage = c.calculateDiskUsage(diskUsage)
+	}
+
+	return stats, nil
+}
+
+// collectContainerMetrics aggregates metrics from running containers.
+func (c *Collector) collectContainerMetrics(ctx context.Context, containers []*models.Container, stats *models.SystemStats) {
+	for _, cont := range containers {
+		if cont.Status == models.ContainerStatusRunning {
+			stats.RunningContainers++
+		}
+		stats.TotalContainers++
+
+		// Try to get stats for running containers
+		if cont.Status == models.ContainerStatusRunning && cont.DockerID != "" {
+			containerStats, statsErr := c.CollectStats(ctx, cont.DockerID)
+			if statsErr == nil {
+				stats.TotalCPUUsage += containerStats.CPUPercent
+				stats.TotalMemoryUsage += containerStats.MemoryUsage
+				stats.TotalMemoryLimit += containerStats.MemoryLimit
+			}
+		}
+	}
+
+	// Calculate memory usage percentage
+	if stats.TotalMemoryLimit > 0 {
+		stats.MemoryUsagePercent = float64(stats.TotalMemoryUsage) / float64(stats.TotalMemoryLimit) * 100
+	}
+}
+
+// calculateDiskUsage extracts disk usage information from Docker.
+func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskUsageInfo {
+	info := &models.DiskUsageInfo{}
+
+	// Calculate total sizes
+	for _, img := range diskUsage.Images {
+		info.ImagesSize += img.Size
+	}
+
+	for _, cont := range diskUsage.Containers {
+		info.ContainersSize += cont.SizeRw
+	}
+
+	for _, vol := range diskUsage.Volumes {
+		if vol != nil && vol.UsageData != nil {
+			info.VolumesSize += vol.UsageData.Size
+		}
+	}
+
+	for _, cache := range diskUsage.BuildCache {
+		if cache != nil {
+			info.BuildCacheSize += cache.Size
+		}
+	}
+
+	// Calculate reclaimable space
+	for _, img := range diskUsage.Images {
+		info.ReclaimableSize += img.SharedSize
+	}
+
+	return info
 }
 
 // CollectStats collects stats for a container once.

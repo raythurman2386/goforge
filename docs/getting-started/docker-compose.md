@@ -2,6 +2,13 @@
 
 The recommended way to run GoForge with all its dependencies is using Docker Compose. This sets up GoForge, PostgreSQL, Traefik, and optionally Cloudflare Tunnel and Redis in a single command.
 
+!!! tip "Full Feature Testing"
+    Use Docker Compose (not `make dev`) when you need to test features that require Docker integration:
+    
+    - Service deployment (PostgreSQL, Redis, etc.)
+    - Project containerization and building
+    - Complete end-to-end workflows
+
 ## Quick Start
 
 ```bash
