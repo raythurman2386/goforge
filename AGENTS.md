@@ -229,4 +229,35 @@ Use Conventional Commits: `type(scope): description`
 - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 - Example: `feat(deploy): add blue-green deployment strategy`
 
+## Security Guidelines for Code Changes
+
+When making code changes, consider these security implications:
+
+### Authentication & Authorization
+- Never expose sensitive data in error messages
+- Always use parameterized queries (prevent SQL injection)
+- Validate all user inputs
+- Use constant-time comparison for secrets/tokens
+
+### Secrets Management
+- Never log secrets, tokens, or passwords
+- Don't hardcode credentials - use environment variables
+- Clear sensitive data from memory when no longer needed
+
+### Container Security
+- Don't run containers as root unless necessary
+- Validate image names before pulling
+- Sanitize user inputs used in container names/labels
+- Limit container capabilities
+
+### API Security
+- Validate all CSRF tokens on state-changing operations
+- Implement proper rate limiting
+- Don't expose internal error details to clients
+
+### Data Protection
+- Use proper password hashing (Argon2id - already implemented)
+- Encrypt sensitive data at rest where applicable
+- Sanitize log output for PII
+
 * Go version must NEVER be dropped below the official latest release (currently 1.25).

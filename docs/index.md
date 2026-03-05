@@ -1,8 +1,13 @@
 # GoForge
 
+> **⚠️ Security Warning: GoForge is in active development.** 
+> This is a self-hosted PaaS that runs containerized workloads. Review the [Security Guide](security.md) before production use.
+
+---
+
 **A lightweight, self-hosted Platform as a Service (PaaS) built in Go.**
 
-GoForge provides git-to-deploy workflows, one-click services, automatic SSL via Traefik, and real-time monitoring. Think of it as a self-hosted alternative to Heroku or Railway that you run on your own infrastructure.
+GoForge provides git-to-deploy workflows, one-click services, automatic SSL via Cloudflare/Traefik, and real-time monitoring. Think of it as a self-hosted alternative to Heroku or Railway that you run on your own infrastructure.
 
 ---
 
@@ -11,7 +16,7 @@ GoForge provides git-to-deploy workflows, one-click services, automatic SSL via 
 - **Git-to-Deploy** -- Push code to your repository and GoForge builds and deploys Docker containers automatically via webhooks.
 - **Multi-Provider Git Integration** -- Supports GitHub, GitLab, and Gitea for repository management, branch selection, and webhook-triggered deployments.
 - **One-Click Services** -- Deploy PostgreSQL, Redis, and other services from a template catalog with a single click.
-- **Automatic SSL** -- Traefik reverse proxy handles Let's Encrypt certificates and routing automatically.
+- **Automatic SSL** -- Cloudflare Tunnel + Traefik handles certificates and routing automatically.
 - **Real-Time Monitoring** -- Live CPU, memory, and network stats for all containers via Server-Sent Events.
 - **Blue-Green Deployments** -- Zero-downtime deployments with health check verification and automatic rollback.
 - **Authentication** -- Local email/password authentication (Argon2id) and GitHub OAuth.

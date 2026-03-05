@@ -1,5 +1,10 @@
 # Security
 
+> **⚠️ Warning: GoForge is in active development.** 
+> This document describes the current security model. Some features listed as "planned" or "known limitations" should be addressed before production use. See the [Security Policy](../SECURITY.md) for full disclaimers.
+
+---
+
 This page documents GoForge's security model, current protections, and known areas for improvement.
 
 ---
@@ -96,10 +101,20 @@ GoForge implements double-submit cookie CSRF protection:
 
 ## Network Security
 
-### Traefik Reverse Proxy
+### Recommended: Cloudflare Tunnel
 
-- All external traffic should route through Traefik
-- Automatic SSL/TLS via Let's Encrypt (ACME)
+GoForge is designed to work with **Cloudflare Tunnel** for secure public access:
+
+- **No inbound ports required** - The tunnel connects outbound to Cloudflare
+- **Zero-trust access** - Traffic is authenticated before reaching your server
+- **Automatic TLS** - All connections encrypted end-to-end
+- **DDoS protection** - Cloudflare handles attack mitigation
+
+### Traefik (Internal Routing Only)
+
+- Traefik handles **internal container routing** only (not exposed publicly)
+- All external traffic routes through Cloudflare Tunnel first
+- Automatic SSL/TLS via Let's Encrypt (ACME) for custom domains
 - Containers are not directly exposed to the internet
 - Internal communication happens over the Docker network
 
@@ -182,13 +197,24 @@ Webhooks receive push events from git providers to trigger deployments.
 
 ## Security Checklist for Production
 
+### Before Production Use
+
+> ⚠️ **Important**: GoForge is in active development. Review and address the following before production deployment:
+
+- [ ] Understand that the project has not been security-audited
+- [ ] Test thoroughly in a non-production environment
+- [ ] Review all known limitations in this document
+
+### Deployment Checklist
+
 - [ ] Set strong, unique values for `SESSION_SECRET` and `CSRF_SECRET`
 - [ ] Use a strong `DATABASE_URL` password (not the default)
 - [ ] Configure `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` if using OAuth
+- [ ] **Use Cloudflare Tunnel** for external access (recommended)
 - [ ] Enable HTTPS via Traefik with valid SSL certificates
 - [ ] Remove PostgreSQL host port mapping in Docker Compose
 - [ ] Run GoForge as a non-root user
 - [ ] Set up regular database backups
 - [ ] Review and restrict Docker socket access
-- [ ] Configure firewall rules to limit access to management ports
+- [ ] Configure firewall rules to limit access (allow outbound to Cloudflare only)
 - [ ] Set up log monitoring and alerting for security events

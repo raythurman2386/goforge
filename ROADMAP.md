@@ -2,6 +2,117 @@
 
 This roadmap tracks the development of GoForge.
 
+## 🚨 CRITICAL: User Flow & Experience Gaps (Immediate Priority)
+
+Based on comprehensive user flow analysis, the following must be addressed before V1.0 can be considered complete:
+
+### Phase 1: Critical User Experience (Blocking V1.0)
+
+#### 1. User Account Management (Missing Entirely)
+- [ ] **User Profile Page** (`/settings/profile`)
+  - Update email and personal information
+  - Change password functionality
+  - View/manage connected GitHub account
+  - Account deletion with confirmation flow
+- [ ] **API Token Management** 
+  - Generate/revoke personal access tokens
+  - Token permissions and expiration
+  - Usage tracking
+
+#### 2. First-Time User Experience (Major Gap)
+- [ ] **Onboarding Flow**
+  - Welcome modal after registration
+  - Step-by-step guide: Connect Git → Create Project → Deploy
+  - Sample project template option
+- [ ] **Empty State Improvements**
+  - Prompt to add Git Source when creating project (if none exist)
+  - Guided tour for first-time project creation
+  - Quick-start wizard for common stacks
+
+#### 3. Container & Runtime Management (Operational Critical)
+- [ ] **Container Logs Viewer** (`/containers/{id}/logs`)
+  - Real-time log streaming via SSE
+  - Historical log search/filter
+  - Download logs functionality
+- [ ] **Container Controls**
+  - Stop/start/restart individual containers
+  - Exec/shell access to running containers
+  - Resource limit adjustment (CPU/Memory)
+- [ ] **Container List View**
+  - Global view of all running containers
+  - Filter by project/service status
+
+#### 4. Domain & SSL Management
+- [ ] **SSL Certificate Dashboard**
+  - Certificate status and expiration dates
+  - Force renew/refresh certificates
+  - Domain validation status
+- [ ] **Domain Configuration Validation**
+  - DNS verification before adding custom domain
+  - Error messages for misconfigured domains
+  - Auto-generated subdomain preview
+
+### Phase 2: UX Polish & Edge Cases
+
+#### 5. Navigation & Wayfinding
+- [ ] **Breadcrumbs** (Add to all major pages)
+  - Project detail: Dashboard → Projects → {Project Name}
+  - Service detail: Dashboard → Services → {Service Name}
+  - Deployment detail: Already has breadcrumbs (reference implementation)
+- [ ] **Back Navigation**
+  - Consistent back buttons on detail pages
+  - Preserve filter/sort state when returning to lists
+- [ ] **Active Sidebar State**
+  - Highlight current page in sidebar
+  - Show project list in sidebar (currently static)
+
+#### 6. Form & Validation Improvements
+- [ ] **Client-Side Validation**
+  - Validate required fields before submission
+  - Real-time password strength indicator
+  - Email format validation
+- [ ] **Inline Error Messages**
+  - Field-level error display (not just top-level)
+  - Specific validation messages
+- [ ] **Loading States**
+  - Disable buttons during HTMX requests
+  - Show spinner on async actions
+  - Progress indicators for long operations
+
+#### 7. Mobile Responsiveness (High Priority)
+- [ ] **Table Views**
+  - Horizontal scroll for deployment/service tables
+  - Card view option for mobile
+  - Collapsible columns
+- [ ] **Navigation**
+  - Hamburger menu for mobile sidebar
+  - Bottom tab bar for primary actions
+  - Touch-friendly button sizing (min 44px)
+- [ ] **Form Layouts**
+  - Stack form fields on mobile
+  - Full-width buttons on small screens
+
+### Phase 3: Technical Debt & TODOs
+
+#### 8. Health Checks (Has TODO)
+- [ ] **Implement Real Health Checks** (Replace TODO in handlers.go:88)
+  - Database connectivity check
+  - Docker daemon health check
+  - Disk space validation
+  - Memory usage warnings
+
+#### 9. Documentation & Help
+- [ ] **Service Template Documentation**
+  - Inline help for configuration fields
+  - Connection string examples
+  - Required vs optional field indicators
+- [ ] **Contextual Help Tooltips**
+  - Environment variable naming conventions
+  - Build context explanations
+  - Domain configuration guide
+
+---
+
 ## ✅ V1.0 Release (Completed)
 
 **Core Foundation & Deployment**
@@ -28,7 +139,15 @@ The focus for the next release is hardening the platform and improving the devel
 - [ ] **Log Persistence:** Store logs in database/files for historical viewing (currently memory/stream only).
 - [ ] **Alerting System:** Email/Slack notifications for failed deployments or high resource usage.
 - [ ] **Status Page:** Public-facing status page for services.
-- [ ] **Health Checks:** Add real comprehensive health checks for DB, Docker, and other dependencies.
+- [x] **Health Checks:** Add real comprehensive health checks for DB, Docker, and other dependencies. *(Moved to Critical Phase)*
+- [ ] **Notifications Center:** In-app notification system for deployment events
+
+### 1.5 Recent V1.0.x Improvements (Completed)
+- [x] **Environment Variable Sync:** Added `.env.example` sync from repository
+- [x] **Service Linking:** Automatic env var injection when linking services to projects
+- [x] **Variable Management:** Delete and sync buttons for environment variables
+- [x] **Shared Service Env Var Naming:** Extracted `ServiceEnvVarName` to avoid collisions
+- [x] **Improved Secret Detection:** Segment-based matching to reduce false positives
 
 ### 2. Enhanced Services
 - [ ] **Database Backups:** Automated nightly backups to S3/MinIO.
@@ -37,24 +156,37 @@ The focus for the next release is hardening the platform and improving the devel
 - [ ] **Lifecycle Management:** Implement actual restart logic and proper container stopping in service instances.
 
 ### 3. Team & Security
-- [ ] **Team Management:** Invite users, Role-based Access Control (RBAC).
-- [ ] **Audit Logs:** Track who did what and when (13.4).
+- [ ] **Team Management:** Invite users, Role-based Access Control (RBAC). *(Moved to Critical Phase)*
+- [ ] **Audit Logs:** Track who did what and when (13.4). *(Moved to Critical Phase - partially implemented)*
 - [ ] **2FA:** Two-factor authentication for local accounts.
 - [ ] **Data Encryption:** Encrypt project variables marked as secret and OAuth access tokens at rest.
+- [ ] **API Key Management:** Secure storage and rotation of service API keys
 
 ### 4. Developer Experience
 - [ ] **CLI Tool:** `goforge` CLI for deploying from terminal.
-- [ ] **API Tokens:** Personal Access Tokens for external integrations.
+- [ ] **API Tokens:** Personal Access Tokens for external integrations. *(Moved to Critical Phase)*
 - [ ] **Build Caching:** S3/Local cache for faster Docker builds.
-- [ ] **UX Polish:** Show rollback info via toast notifications and finalize login template rendering.
+- [x] **UX Polish:** Show rollback info via toast notifications and finalize login template rendering. *(Completed)*
 
 ### 5. Mobile & Responsive Design
-- [ ] **Navigation:** Implement hamburger menu and mobile-optimized sidebar.
-- [ ] **Dashboard Cards:** Ensure stackable layouts for project/service stats on small screens.
-- [ ] **Tables:** Add horizontal scroll or card view for deployments/containers lists on mobile.
-- [ ] **Touch Targets:** Verify button and input sizes meet accessibility standards (min 44px).
+- [ ] **Navigation:** Implement hamburger menu and mobile-optimized sidebar. *(Moved to Critical Phase)*
+- [x] **Dashboard Cards:** Ensure stackable layouts for project/service stats on small screens.
+- [ ] **Tables:** Add horizontal scroll or card view for deployments/containers lists on mobile. *(Moved to Critical Phase)*
+- [ ] **Touch Targets:** Verify button and input sizes meet accessibility standards (min 44px). *(Moved to Critical Phase)*
 
 ## 🛠 Code Review Findings (Priority Fixes)
+
+### Recent Fixes (V1.0.x)
+- [x] **Environment Variable System:**
+    - [x] Extracted `ServiceEnvVarName` to shared `internal/services/envvars.go` package
+    - [x] Fixed collision issue: Now uses instance name prefix (e.g., `MYDB_DATABASE_URL`)
+    - [x] Improved secret detection with segment-based matching (avoids false positives like KEYWORD)
+    - [x] Added idempotency checks in `CreateProject` env var seeding
+    - [x] Added `SeedEnvVarsFromRepo` method for manual sync
+    - [x] Added delete button for environment variables
+    - [x] Fixed `.env.example` parsing to handle quoted values and inline comments
+
+### Outstanding Issues
 - [ ] **Pipeline Robustness:**
     - [ ] Integrate the unused `BlueGreenDeployer` into the main `RunPipeline` (currently dead code).
     - [ ] Implement a persistent deployment queue (Redis/Postgres) to survive restarts (currently in-memory).
@@ -67,6 +199,37 @@ The focus for the next release is hardening the platform and improving the devel
     - [x] **Structured Logging:** Replace `fmt.Printf` with the structural logger in critical paths (`deploy/queue.go`, `services/instance.go`).
 - [ ] **Configuration:**
     - [x] Replace hardcoded `/tmp` paths in build pipeline with configured directories.
+
+## 📊 V1.0 Release Readiness Checklist
+
+### Definition of Done for V1.0 GA
+Before tagging V1.0, the following **must** be completed:
+
+**Critical User Flows (All Working End-to-End):**
+- [x] User can register/login via email or GitHub
+- [x] User can create a project with Git repository
+- [x] User can deploy the project successfully
+- [x] User can view deployment logs in real-time
+- [x] User can link services and see connection strings injected
+- [ ] **User can view container logs (currently missing)**
+- [ ] **User can restart/stop containers (currently missing)**
+- [ ] **User can update their profile/password (currently missing)**
+- [ ] **User can add/manage API tokens (currently missing)**
+
+**Documentation:**
+- [ ] API documentation for all endpoints
+- [ ] User guide for first-time setup
+- [ ] Deployment troubleshooting guide
+- [ ] Environment variable naming conventions doc
+
+**Quality Assurance:**
+- [ ] All critical user paths tested manually
+- [ ] Mobile responsiveness verified on actual devices
+- [ ] Accessibility audit (WCAG 2.1 AA)
+- [ ] Security review of auth flows
+- [ ] Load testing for concurrent deployments
+
+---
 
 ## 🔮 V2.0: Multi-Server (Future)
 
