@@ -295,6 +295,7 @@ func runServer() error {
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService)
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret)
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
+	containerHandler := handlers.NewContainerHandler(containerRepo, dockerClient, logger.WithComponent(log, "containers"))
 
 	// Create router
 	router := web.Router(
@@ -311,6 +312,7 @@ func runServer() error {
 		webhookHandler,
 		sseHandler,
 		healthHandler,
+		containerHandler,
 	)
 
 	// Configure server

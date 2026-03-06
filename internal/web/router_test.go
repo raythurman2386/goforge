@@ -71,7 +71,8 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	sseh := handlers.NewSSEHandler(nil, nil, nil)
 
 	hh := handlers.NewHealthHandler(nil, nil, logger)
-	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh)
+	ch := handlers.NewContainerHandler(nil, nil, logger) // Container handler with nil dependencies for testing
+	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch)
 }
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{

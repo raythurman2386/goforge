@@ -1,0 +1,141 @@
+package containers
+
+import (
+	"fmt"
+
+	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
+)
+
+templ Detail(containerID string, csrfToken string) {
+	@layouts.AppLayout(fmt.Sprintf("Container %s", truncateID(containerID)), csrfToken) {
+		<!-- Breadcrumb -->
+		<nav class="flex mb-4" aria-label="Breadcrumb">
+			<ol class="flex items-center space-x-2">
+				<li>
+					<a href="/containers" class="text-gray-400 hover:text-gray-500">
+						<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+							<path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
+						</svg>
+					</a>
+				</li>
+				<li>
+					<div class="flex items-center">
+						<svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+						</svg>
+						<a href="/containers" class="ml-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+							Containers
+						</a>
+					</div>
+				</li>
+				<li>
+					<div class="flex items-center">
+						<svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+						</svg>
+						<span class="ml-2 text-sm font-medium text-gray-700">
+							{ truncateID(containerID) }
+						</span>
+					</div>
+				</li>
+			</ol>
+		</nav>
+
+		<!-- Header -->
+		<div class="flex items-center justify-between mb-6">
+			<div class="flex items-center space-x-4">
+				<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl">
+					Container { truncateID(containerID) }
+				</h2>
+				<span id="container-status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+					Loading...
+				</span>
+			</div>
+			<div class="flex space-x-3">
+				<button
+					id="restart-btn"
+					hx-post={ fmt.Sprintf("/containers/%s/restart", containerID) }
+					hx-confirm="Are you sure you want to restart this container?"
+					class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
+					<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+					</svg>
+					Restart
+				</button>
+				<button
+					id="stop-btn"
+					hx-post={ fmt.Sprintf("/containers/%s/stop", containerID) }
+					hx-confirm="Are you sure you want to stop this container?"
+					class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+					<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+					</svg>
+					Stop
+				</button>
+			</div>
+		</div>
+
+		<!-- Stats Card -->
+		<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+			<div class="px-4 py-5 sm:px-6">
+				<h3 class="text-lg leading-6 font-medium text-gray-900">Resource Usage</h3>
+			</div>
+			<div class="border-t border-gray-200">
+				<div id="container-stats" class="px-4 py-5 sm:px-6">
+					<div class="flex items-center justify-center h-32">
+						<svg class="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Container Logs -->
+		<div class="bg-white shadow sm:rounded-lg">
+			<div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+				<h3 class="text-lg leading-6 font-medium text-gray-900">Container Logs</h3>
+				<span class="inline-flex items-center text-sm text-gray-500">
+					<svg class="animate-pulse -ml-0.5 mr-2 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
+						<circle cx="4" cy="4" r="3"></circle>
+					</svg>
+					Live
+				</span>
+			</div>
+			<div class="border-t border-gray-200">
+				<div
+					id="container-logs"
+					class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto"
+					hx-ext="sse"
+					sse-connect={ fmt.Sprintf("/containers/%s/logs", containerID) }
+					sse-swap="log"
+					hx-swap="beforeend"
+				>
+					<p class="text-gray-500 italic">Waiting for logs...</p>
+				</div>
+			</div>
+		</div>
+	}
+
+	<script>
+		// Listen for container events and update UI
+		document.body.addEventListener('containerStopped', function() {
+			document.getElementById('container-status').textContent = 'Stopped';
+			document.getElementById('container-status').className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+		});
+		
+		document.body.addEventListener('containerRestarted', function() {
+			document.getElementById('container-status').textContent = 'Running';
+			document.getElementById('container-status').className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+		});
+	</script>
+}
+
+func truncateID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}

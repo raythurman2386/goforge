@@ -31,6 +31,7 @@ func Router(
 	webhookHandler *webhook.Handler,
 	sseHandler *handlers.SSEHandler,
 	healthHandler *handlers.HealthHandler,
+	containerHandler *handlers.ContainerHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -185,6 +186,15 @@ func Router(
 						r.Get("/new", settingsHandler.NewGitSourceModal)
 						r.Delete("/{id}", settingsHandler.DeleteGitSource)
 					})
+				})
+
+				// Containers
+				r.Route("/containers", func(r chi.Router) {
+					r.Get("/", containerHandler.List)
+					r.Get("/api", containerHandler.ListAPI)
+					r.Get("/{id}", containerHandler.Detail)
+					r.Post("/{id}/stop", containerHandler.Stop)
+					r.Post("/{id}/restart", containerHandler.Restart)
 				})
 			})
 
