@@ -235,7 +235,7 @@ func TestUserRepository_EncryptionRoundTrip(t *testing.T) {
 	cfg := &config.Config{
 		EncryptionKey: "dGVzdC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXMtMDE=", // 32 bytes base64 encoded
 	}
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		t.Fatalf("Failed to create encryption service: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestUserRepository_PlaintextFallback(t *testing.T) {
 	cfg := &config.Config{
 		EncryptionKey: "dGVzdC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXMtMDE=",
 	}
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		t.Fatalf("Failed to create encryption service: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestUserRepository_UpdateEncryption(t *testing.T) {
 	cfg := &config.Config{
 		EncryptionKey: "dGVzdC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXMtMDE=",
 	}
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		t.Fatalf("Failed to create encryption service: %v", err)
 	}
@@ -365,8 +365,8 @@ func TestUserRepository_UpdateEncryption(t *testing.T) {
 	}
 }
 
-// TestUserRepository_NilEncryptionService tests that nil encryption service doesn't break anything
-func TestUserRepository_NilEncryptionService(t *testing.T) {
+// TestUserRepository_NilEncryptor tests that nil encryptor doesn't break anything
+func TestUserRepository_NilEncryptor(t *testing.T) {
 	t.Parallel()
 	db := getTestDB(t)
 
@@ -390,7 +390,7 @@ func TestUserRepository_NilEncryptionService(t *testing.T) {
 		t.Fatalf("GetByID() error = %v", err)
 	}
 
-	// With nil encryption service, token should be stored as plaintext
+	// With nil encryptor, token should be stored as plaintext
 	if retrieved.GitHubAccessToken.String != token {
 		t.Errorf("Token should remain plaintext with nil service: got %q, want %q", retrieved.GitHubAccessToken.String, token)
 	}

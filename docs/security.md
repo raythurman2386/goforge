@@ -81,14 +81,14 @@ GoForge implements double-submit cookie CSRF protection:
 
 ### Environment Variables
 
-- Environment variables marked as `is_secret` are encrypted at rest using AES-256-GCM via the `secrets.EncryptionService` (`internal/database/repositories/env_variable.go`)
+- Environment variables marked as `is_secret` are encrypted at rest using AES-256-GCM via the `secrets.Encryptor` (`internal/database/repositories/env_variable.go`)
 - The `ENCRYPTION_KEY` environment variable provides the key material
 - Variables are decrypted at read time and injected into containers at deploy time via Docker environment variables
 
 ### Git Source Credentials
 
 - Git provider access tokens and SSH private keys are stored in the `git_sources` table
-- These are encrypted at rest using the same `secrets.EncryptionService` (`internal/database/repositories/git_source.go`)
+- These are encrypted at rest using the same `secrets.Encryptor` (`internal/database/repositories/git_source.go`)
 - GitHub user access tokens in the `users` table are also encrypted (`internal/database/repositories/user.go`)
 
 ### Recommendations

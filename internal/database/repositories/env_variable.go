@@ -14,11 +14,11 @@ import (
 // EnvVariableRepository handles environment variable data access.
 type EnvVariableRepository struct {
 	db      *sql.DB
-	secrets *secrets.EncryptionService
+	secrets *secrets.Encryptor
 }
 
 // NewEnvVariableRepository creates a new EnvVariableRepository.
-func NewEnvVariableRepository(db *sql.DB, secrets *secrets.EncryptionService) *EnvVariableRepository {
+func NewEnvVariableRepository(db *sql.DB, secrets *secrets.Encryptor) *EnvVariableRepository {
 	return &EnvVariableRepository{db: db, secrets: secrets}
 }
 

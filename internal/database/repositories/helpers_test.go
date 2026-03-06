@@ -91,17 +91,17 @@ func uniqueEmail(prefix string) string {
 
 // testSecretService creates a secrets service for testing.
 var (
-	testSecretService     *secrets.EncryptionService
+	testSecretService     *secrets.Encryptor
 	testSecretServiceOnce sync.Once
 )
 
-func getTestSecretService(t *testing.T) *secrets.EncryptionService {
+func getTestSecretService(t *testing.T) *secrets.Encryptor {
 	t.Helper()
 
 	testSecretServiceOnce.Do(func() {
 		key, _ := secrets.GenerateKeyString(32)
 		cfg := &config.Config{EncryptionKey: key}
-		testSecretService, _ = secrets.NewEncryptionService(cfg)
+		testSecretService, _ = secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	})
 
 	return testSecretService

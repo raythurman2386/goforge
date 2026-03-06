@@ -22,11 +22,11 @@ var (
 // UserRepository handles user data access.
 type UserRepository struct {
 	db      *sql.DB
-	secrets *secrets.EncryptionService
+	secrets *secrets.Encryptor
 }
 
 // NewUserRepository creates a new UserRepository.
-func NewUserRepository(db *sql.DB, secrets *secrets.EncryptionService) *UserRepository {
+func NewUserRepository(db *sql.DB, secrets *secrets.Encryptor) *UserRepository {
 	return &UserRepository{db: db, secrets: secrets}
 }
 

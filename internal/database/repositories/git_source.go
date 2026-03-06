@@ -15,11 +15,11 @@ import (
 type GitSourceRepository struct {
 	db *sql.DB
 	// encryption service
-	secrets *secrets.EncryptionService
+	secrets *secrets.Encryptor
 }
 
 // NewGitSourceRepository creates a new GitSourceRepository.
-func NewGitSourceRepository(db *sql.DB, secrets *secrets.EncryptionService) *GitSourceRepository {
+func NewGitSourceRepository(db *sql.DB, secrets *secrets.Encryptor) *GitSourceRepository {
 	return &GitSourceRepository{db: db, secrets: secrets}
 }
 

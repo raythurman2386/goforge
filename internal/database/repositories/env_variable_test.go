@@ -174,7 +174,7 @@ func TestEnvVariableRepository_SecretEncryptionRoundTrip(t *testing.T) {
 	cfg := &config.Config{
 		EncryptionKey: "dGVzdC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXMtMDE=",
 	}
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		t.Fatalf("Failed to create encryption service: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestEnvVariableRepository_NonSecretNotEncrypted(t *testing.T) {
 	cfg := &config.Config{
 		EncryptionKey: "dGVzdC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXMtMDE=",
 	}
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		t.Fatalf("Failed to create encryption service: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestEnvVariableRepository_UpdateEncryption(t *testing.T) {
 	cfg := &config.Config{
 		EncryptionKey: "dGVzdC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXMtMDE=",
 	}
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		t.Fatalf("Failed to create encryption service: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestEnvVariableRepository_PlaintextFallback(t *testing.T) {
 	cfg := &config.Config{
 		EncryptionKey: "dGVzdC1rZXktZm9yLXRlc3RpbmctcHVycG9zZXMtMDE=",
 	}
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		t.Fatalf("Failed to create encryption service: %v", err)
 	}
@@ -445,8 +445,8 @@ func TestEnvVariableRepository_PlaintextFallback(t *testing.T) {
 	}
 }
 
-// TestEnvVariableRepository_NilEncryptionService tests that nil service doesn't break functionality
-func TestEnvVariableRepository_NilEncryptionService(t *testing.T) {
+// TestEnvVariableRepository_NilEncryptor tests that nil service doesn't break functionality
+func TestEnvVariableRepository_NilEncryptor(t *testing.T) {
 	t.Parallel()
 	db := getTestDB(t)
 
@@ -477,7 +477,7 @@ func TestEnvVariableRepository_NilEncryptionService(t *testing.T) {
 		t.Fatalf("failed to create environment: %v", err)
 	}
 
-	// Create a secret with nil encryption service
+	// Create a secret with nil encryptor
 	secretValue := "should-be-plaintext"
 	v := &models.EnvVariable{
 		EnvironmentID: env.ID,

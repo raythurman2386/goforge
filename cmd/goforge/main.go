@@ -214,7 +214,7 @@ func runServer() error {
 	}
 
 	// Initialize repositories
-	secretService, err := secrets.NewEncryptionService(cfg)
+	secretService, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to create encryption service: %w", err)
 	}
