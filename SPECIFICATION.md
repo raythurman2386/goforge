@@ -424,6 +424,14 @@ Deployments:
   POST   /deployments/{id}/rollback             Rollback to this deployment
   GET    /deployments/{id}/logs                 SSE log stream
 
+User Settings:
+  GET    /settings/profile                    User profile page
+  PUT    /settings/profile                    Update email
+  PUT    /settings/password                    Change password
+  GET    /settings/tokens                     List API tokens
+  POST   /settings/tokens                     Create API token
+  DELETE /settings/tokens/{id}                Revoke API token
+
 Git Sources:
   GET    /settings/git                          Git source list
   POST   /settings/git                          Add git source

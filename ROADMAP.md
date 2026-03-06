@@ -8,13 +8,13 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 
 ### Phase 1: Critical User Experience (Blocking V1.0)
 
-#### 1. User Account Management (Missing Entirely)
-- [ ] **User Profile Page** (`/settings/profile`)
+#### 1. User Account Management (Completed Mar 2026)
+- [x] **User Profile Page** (`/settings/profile`)
   - Update email and personal information
   - Change password functionality
   - View/manage connected GitHub account
   - Account deletion with confirmation flow
-- [ ] **API Token Management** 
+- [x] **API Token Management** 
   - Generate/revoke personal access tokens
   - Token permissions and expiration
   - Usage tracking
@@ -29,16 +29,16 @@ Based on comprehensive user flow analysis, the following must be addressed befor
   - Guided tour for first-time project creation
   - Quick-start wizard for common stacks
 
-#### 3. Container & Runtime Management (Operational Critical)
-- [ ] **Container Logs Viewer** (`/containers/{id}/logs`)
+#### 3. Container & Runtime Management (Completed Mar 2026)
+- [x] **Container Logs Viewer** (`/containers/{id}/logs`)
   - Real-time log streaming via SSE
   - Historical log search/filter
   - Download logs functionality
-- [ ] **Container Controls**
+- [x] **Container Controls**
   - Stop/start/restart individual containers
   - Exec/shell access to running containers
   - Resource limit adjustment (CPU/Memory)
-- [ ] **Container List View**
+- [x] **Container List View**
   - Global view of all running containers
   - Filter by project/service status
 
@@ -229,8 +229,8 @@ Before tagging V1.0, the following **must** be completed:
 - [x] User can link services and see connection strings injected
 - [x] **User can view container logs (completed Mar 2026)**
 - [x] **User can restart/stop containers (completed Mar 2026)**
-- [ ] **User can update their profile/password (currently missing)**
-- [ ] **User can add/manage API tokens (currently missing)**
+- [x] **User can update their profile/password (completed Mar 2026)**
+- [x] **User can add/manage API tokens (completed Mar 2026)**
 
 **Documentation:**
 - [ ] API documentation for all endpoints

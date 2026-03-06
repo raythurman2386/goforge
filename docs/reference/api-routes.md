@@ -136,10 +136,15 @@ Used by HTMX components for dynamic repository/branch selection.
 !!! note "Route Disambiguation"
     The `{id}` parameter for service instances uses a UUID regex pattern (`[a-f0-9-]{36}`) to disambiguate from `{template}` string routes.
 
-### Containers (SSE Streams)
+### Containers
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
+| `GET` | `/containers` | `containerHandler.List` | List all containers |
+| `GET` | `/containers/api` | `containerHandler.ListAPI` | List containers (JSON API) |
+| `GET` | `/containers/{id}` | `containerHandler.Detail` | Container detail page |
+| `POST` | `/containers/{id}/stop` | `containerHandler.Stop` | Stop a container |
+| `POST` | `/containers/{id}/restart` | `containerHandler.Restart` | Restart a container |
 | `GET` | `/containers/{id}/stats` | `sseHandler.ContainerStats` | Stream container metrics (SSE) |
 | `GET` | `/containers/{id}/logs` | `sseHandler.ContainerLogs` | Stream container logs (SSE) |
 
@@ -147,6 +152,13 @@ Used by HTMX components for dynamic repository/branch selection.
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
+| `GET` | `/settings/profile` | `settingsHandler.Profile` | User profile page |
+| `PUT` | `/settings/profile` | `settingsHandler.UpdateProfile` | Update email |
+| `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password |
+| `GET` | `/settings/tokens` | `settingsHandler.ListAPITokens` | List API tokens (HTMX partial) |
+| `GET` | `/settings/tokens/new` | `settingsHandler.NewAPITokenModal` | New token modal (HTMX) |
+| `POST` | `/settings/tokens` | `settingsHandler.CreateAPIToken` | Create API token |
+| `DELETE` | `/settings/tokens/{id}` | `settingsHandler.DeleteAPIToken` | Revoke API token |
 | `POST` | `/settings/prune` | `settingsHandler.PruneSystem` | Prune Docker system resources |
 | `GET` | `/settings/git` | `settingsHandler.GitSources` | List configured git sources |
 | `POST` | `/settings/git` | `settingsHandler.CreateGitSource` | Add a git source |
