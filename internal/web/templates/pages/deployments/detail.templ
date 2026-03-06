@@ -20,7 +20,7 @@ type DetailProps struct {
 }
 
 templ Detail(props DetailProps) {
-	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID)), props.CSRFToken) {
+	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID)), props.CSRFToken, nil) {
 		<!-- Breadcrumb -->
 		<nav class="flex mb-4" aria-label="Breadcrumb">
 			<ol class="flex items-center space-x-2">

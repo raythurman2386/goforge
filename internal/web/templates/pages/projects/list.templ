@@ -7,7 +7,7 @@ import (
 )
 
 templ List(projects []*models.Project, csrfToken string) {
-	@layouts.AppLayout("Projects", csrfToken) {
+	@layouts.AppLayout("Projects", csrfToken, nil) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
 				<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">

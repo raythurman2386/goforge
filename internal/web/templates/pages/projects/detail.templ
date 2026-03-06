@@ -10,7 +10,7 @@ import (
 )
 
 templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, activeTab string, csrfToken string) {
-	@layouts.AppLayout(project.Name, csrfToken) {
+	@layouts.AppLayout(project.Name, csrfToken, nil) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center space-x-4">

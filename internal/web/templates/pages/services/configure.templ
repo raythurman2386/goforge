@@ -8,7 +8,7 @@ import (
 )
 
 templ Configure(tmpl *services.ServiceTemplate, csrfToken string) {
-	@layouts.AppLayout("Configure " + tmpl.DisplayName, csrfToken) {
+	@layouts.AppLayout("Configure " + tmpl.DisplayName, csrfToken, nil) {
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">

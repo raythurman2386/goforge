@@ -9,7 +9,7 @@ import (
 )
 
 templ Profile(user *models.User, csrfToken string) {
-	@layouts.AppLayout("Profile Settings", csrfToken) {
+	@layouts.AppLayout("Profile Settings", csrfToken, nil) {
 		<div class="max-w-2xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">

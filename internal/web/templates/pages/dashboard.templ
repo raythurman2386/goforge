@@ -146,7 +146,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats) {
 }
 
 templ Dashboard(csrfToken string) {
-	@layouts.AppLayout("Dashboard", csrfToken) {
+	@layouts.AppLayout("Dashboard", csrfToken, nil) {
 		<div class="max-w-7xl">
 			<h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">Dashboard</h1>
 			<p class="mt-2 text-sm text-gray-500">Overview of your Platform as a Service.</p>
