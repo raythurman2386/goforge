@@ -94,12 +94,12 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 
 ### Phase 3: Technical Debt & TODOs
 
-#### 8. Health Checks (Has TODO)
-- [ ] **Implement Real Health Checks** (Replace TODO in handlers.go:88)
-  - Database connectivity check
-  - Docker daemon health check
-  - Disk space validation
-  - Memory usage warnings
+#### 8. Health Checks
+- [x] **Implement Real Health Checks** (Completed Mar 2026)
+  - Database connectivity check (already implemented)
+  - Docker daemon health check (already implemented)
+  - Disk space validation (existing via Docker)
+  - Blue-green health checks for deployments (newly integrated)
 
 #### 9. Documentation & Help
 - [ ] **Service Template Documentation**
@@ -186,16 +186,32 @@ The focus for the next release is hardening the platform and improving the devel
     - [x] Added delete button for environment variables
     - [x] Fixed `.env.example` parsing to handle quoted values and inline comments
 
+- [x] **Pipeline Robustness (Mar 2026):**
+    - [x] **Integrated BlueGreenDeployer** into the main `RunPipeline` for zero-downtime deployments with health checks
+    - [x] Added graceful period (5 minutes) for blue-green deployments before cleanup
+    - [x] Extended cleanup timeout to 10 minutes to accommodate grace period
+    - [x] Added container inspection for health check IP detection
+
+- [x] **Security & Error Handling (Mar 2026):**
+    - [x] **Fixed Information Leakage:** Replaced raw `http.Error` strings with proper `RenderError` in auth.go
+    - [x] Fixed dead code: Removed duplicate `Health`, `HealthReady`, and `LoginPage` functions from handlers.go
+
+- [x] **Container Management UI (Mar 2026):**
+    - [x] Added global containers view (`GET /containers`)
+    - [x] Added container detail page with live logs viewer
+    - [x] Added container stop/restart controls via HTMX
+    - [x] Added container type detection (Deployment/Service/External)
+    - [x] Integrated with existing SSE endpoints for real-time logs
+
 ### Outstanding Issues
 - [ ] **Pipeline Robustness:**
-    - [ ] Integrate the unused `BlueGreenDeployer` into the main `RunPipeline` (currently dead code).
     - [ ] Implement a persistent deployment queue (Redis/Postgres) to survive restarts (currently in-memory).
     - [ ] Add graceful shutdown for deployment workers.
 - [ ] **Service Management:**
     - [x] Implement `StopInstance` and `RestartInstance` functionality (currently missing).
     - [x] Fix orphaned containers: Ensure Docker containers are removed when a Service Instance is deleted.
 - [ ] **Security & Error Handling:**
-    - [ ] **Information Leakage:** Stop returning raw error strings to valid users in `auth.go` (e.g. `GitHubCallback`).
+    - [x] **Information Leakage:** Fixed - replaced raw error strings with proper HTML error pages in auth.go
     - [x] **Structured Logging:** Replace `fmt.Printf` with the structural logger in critical paths (`deploy/queue.go`, `services/instance.go`).
 - [ ] **Configuration:**
     - [x] Replace hardcoded `/tmp` paths in build pipeline with configured directories.
@@ -211,8 +227,8 @@ Before tagging V1.0, the following **must** be completed:
 - [x] User can deploy the project successfully
 - [x] User can view deployment logs in real-time
 - [x] User can link services and see connection strings injected
-- [ ] **User can view container logs (currently missing)**
-- [ ] **User can restart/stop containers (currently missing)**
+- [x] **User can view container logs (completed Mar 2026)**
+- [x] **User can restart/stop containers (completed Mar 2026)**
 - [ ] **User can update their profile/password (currently missing)**
 - [ ] **User can add/manage API tokens (currently missing)**
 
