@@ -3,12 +3,22 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // CleanupOldDeployments stops containers from previous deployments of the same environment.
 func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, currentDeploymentID string) error {
+	// Apply grace period if blue-green deployer is configured
+	if s.blueGreenDeployer != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(s.blueGreenDeployer.config.GracePeriod):
+			// Grace period elapsed, proceed with cleanup
+		}
+	}
 	// 1. List recent deployments for the environment
 	deployments, err := s.deploymentRepo.ListByEnvironmentID(ctx, environmentID, 10)
 	if err != nil {

@@ -30,6 +30,7 @@ type dockerAPI interface {
 	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 	ContainersPrune(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
 	ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error)
+	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
 	DiskUsage(ctx context.Context, options types.DiskUsageOptions) (types.DiskUsage, error)
 	Ping(ctx context.Context) (types.Ping, error)
 	Close() error

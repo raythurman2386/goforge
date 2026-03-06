@@ -120,6 +120,11 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 		s.logger.Error("failed to record container in DB", "error", err, "deployment_id", d.ID)
 	}
 
+	// 4.5. Perform Blue-Green Health Check if configured
+	if err := s.performHealthCheck(ctx, p, env, containerID, d.ID); err != nil {
+		return err
+	}
+
 	// 5. Transition to Running
 	if err := s.Transition(ctx, d.ID, models.DeploymentStatusRunning, nil); err != nil {
 		return err
@@ -129,7 +134,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) error {
 	//nolint:contextcheck // cleanup is background task
 	go func(envID, deployID string) {
 		// Create a new context for cleanup as the request context might be canceled
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		if err := s.CleanupOldDeployments(cleanupCtx, envID, deployID); err != nil {
 			s.logger.Error("failed to cleanup old deployments", "error", err, "environment_id", envID)
@@ -177,4 +182,64 @@ func (s *Service) buildContainerEnv(ctx context.Context, environmentID, projectI
 	}
 
 	return env
+}
+
+// performHealthCheck executes blue-green health checks if configured for the project.
+func (s *Service) performHealthCheck(ctx context.Context, p *models.Project, env *models.Environment, containerID, deploymentID string) error {
+	if p.HealthCheckPath == "" || s.blueGreenDeployer == nil {
+		return nil
+	}
+
+	containerInfo, inspectErr := s.dockerClient.InspectContainer(ctx, containerID)
+	if inspectErr != nil {
+		s.logger.Warn("failed to inspect container for health check", "container_id", containerID, "error", inspectErr)
+		return nil // Continue deployment without health check if inspection fails
+	}
+
+	ipAddress := ""
+	if network, ok := containerInfo.NetworkSettings.Networks[s.traefikNetwork]; ok {
+		ipAddress = network.IPAddress
+	}
+
+	if ipAddress == "" {
+		return nil // Continue deployment if no IP found
+	}
+
+	port := "80"
+	if env.Port.Valid {
+		port = fmt.Sprintf("%d", env.Port.Int32)
+	}
+
+	healthCheckURL := fmt.Sprintf("http://%s:%s", ipAddress, port)
+
+	req := BlueGreenRequest{
+		DeploymentID:    deploymentID,
+		NewContainerID:  containerID,
+		OldContainerID:  "", // Let CleanupOldDeployments handle DB-aware cleanup
+		HealthCheckURL:  healthCheckURL,
+		HealthCheckPath: p.HealthCheckPath,
+	}
+
+	_, bgErr := s.blueGreenDeployer.Deploy(ctx, req)
+	if bgErr != nil {
+		// Rollback container
+		s.logger.Error("health check failed, rolling back", "deployment_id", deploymentID, "error", bgErr)
+		if stopErr := s.dockerClient.StopContainer(ctx, containerID); stopErr != nil {
+			s.logger.Error("failed to stop container during rollback", "container_id", containerID, "error", stopErr)
+		}
+		// Update container status in DB
+		containers, err := s.containerRepo.ListByDeploymentID(ctx, deploymentID)
+		if err != nil {
+			s.logger.Warn("failed to list containers during rollback", "deployment_id", deploymentID, "error", err)
+		} else {
+			for _, c := range containers {
+				if updateErr := s.containerRepo.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); updateErr != nil {
+					s.logger.Warn("failed to update container status during rollback", "container_id", c.ID, "error", updateErr)
+				}
+			}
+		}
+		return fmt.Errorf("health check failed: %w", bgErr)
+	}
+
+	return nil
 }

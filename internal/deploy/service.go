@@ -4,6 +4,7 @@ package deploy
 import (
 	"context"
 	"log/slog"
+	"net/http"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -25,6 +26,7 @@ type Service struct {
 	gitService                 *git.Service
 	dockerClient               *docker.Client
 	sseHub                     *sse.Hub
+	blueGreenDeployer          *BlueGreenDeployer
 	traefikNetwork             string
 	cloudflareProxyMode        bool
 	buildDir                   string
@@ -49,6 +51,10 @@ func NewService(
 	buildDir string,
 	logger *slog.Logger,
 ) *Service {
+	// Initialize BlueGreenDeployer
+	bgConfig := DefaultBlueGreenConfig()
+	bgDeployer := NewBlueGreenDeployer(dc, &http.Client{Timeout: bgConfig.HealthCheckTimeout}, bgConfig)
+
 	return &Service{
 		deploymentRepo:             dr,
 		logRepo:                    lr,
@@ -61,6 +67,7 @@ func NewService(
 		gitService:                 gs,
 		dockerClient:               dc,
 		sseHub:                     sh,
+		blueGreenDeployer:          bgDeployer,
 		traefikNetwork:             traefikNetwork,
 		cloudflareProxyMode:        cloudflareProxyMode,
 		buildDir:                   buildDir,

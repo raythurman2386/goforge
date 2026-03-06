@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
@@ -100,4 +101,9 @@ func (c *Client) RestartContainer(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to restart container: %w", err)
 	}
 	return nil
+}
+
+// InspectContainer gets details about a container.
+func (c *Client) InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error) {
+	return c.docker.ContainerInspect(ctx, id)
 }

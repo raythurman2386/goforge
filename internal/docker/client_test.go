@@ -147,6 +147,10 @@ func (m *mockDockerAPI) ContainerList(ctx context.Context, options container.Lis
 	return nil, nil
 }
 
+func (m *mockDockerAPI) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	return types.ContainerJSON{}, nil
+}
+
 func TestClient_EnsureImage(t *testing.T) {
 	t.Parallel()
 
