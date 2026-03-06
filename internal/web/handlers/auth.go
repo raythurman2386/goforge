@@ -126,7 +126,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	hashedPassword, err := auth.HashPassword(password)
 	if err != nil {
-		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to hash password")
 		return
 	}
 
@@ -174,7 +174,7 @@ func (h *AuthHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	stateCookie, err := r.Cookie("github_oauth_state")
 	if err != nil || stateCookie.Value != r.FormValue("state") {
-		http.Error(w, "invalid oauth state", http.StatusBadRequest)
+		RenderError(w, r, http.StatusBadRequest, "invalid oauth state")
 		return
 	}
 
@@ -182,14 +182,14 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	token, err := h.githubProvider.Exchange(r.Context(), code)
 	if err != nil {
 		h.logger.Error("failed to exchange token", "error", err)
-		http.Error(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "Authentication failed. Please try again.")
 		return
 	}
 
 	ghUser, err := h.githubProvider.GetUser(r.Context(), token)
 	if err != nil {
 		h.logger.Error("failed to get user info from GitHub", "error", err)
-		http.Error(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "Authentication failed. Please try again.")
 		return
 	}
 
@@ -212,7 +212,7 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 
 		if dbErr := h.userRepo.Create(r.Context(), user); dbErr != nil {
 			h.logger.Error("failed to create user from GitHub login", "error", dbErr)
-			http.Error(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
+			RenderError(w, r, http.StatusInternalServerError, "Authentication failed. Please try again.")
 			return
 		}
 	}
@@ -220,7 +220,7 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	// Create session
 	session, sessionToken, err := h.sessionManager.CreateSession(r.Context(), user.ID, true)
 	if err != nil {
-		http.Error(w, "failed to create session", http.StatusInternalServerError)
+		RenderError(w, r, http.StatusInternalServerError, "failed to create session")
 		return
 	}
 
