@@ -208,6 +208,42 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// UpdateEmail updates the user's email address.
+func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) error {
+	query := `UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.ExecContext(ctx, query, email, id)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdatePassword updates the user's password hash.
+func (r *UserRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	query := `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.ExecContext(ctx, query, passwordHash, id)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // encrypt encrypts sensitive fields before storing.
 func (r *UserRepository) encrypt(user *models.User) error {
 	if r.secrets == nil {

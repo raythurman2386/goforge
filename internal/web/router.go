@@ -179,7 +179,16 @@ func Router(
 
 				// Settings
 				r.Route("/settings", func(r chi.Router) {
+					r.Get("/profile", settingsHandler.Profile)
+					r.Put("/profile", settingsHandler.UpdateProfile)
+					r.Put("/password", settingsHandler.UpdatePassword)
 					r.Post("/prune", settingsHandler.PruneSystem)
+					r.Route("/tokens", func(r chi.Router) {
+						r.Get("/", settingsHandler.ListAPITokens)
+						r.Get("/new", settingsHandler.NewAPITokenModal)
+						r.Post("/", settingsHandler.CreateAPIToken)
+						r.Delete("/{id}", settingsHandler.DeleteAPIToken)
+					})
 					r.Route("/git", func(r chi.Router) {
 						r.Get("/", settingsHandler.GitSources)
 						r.Post("/", settingsHandler.CreateGitSource)

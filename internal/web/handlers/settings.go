@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
@@ -21,13 +26,22 @@ import (
 type SettingsHandler struct {
 	gitSourceRepo   *repositories.GitSourceRepository
 	instanceService *services.InstanceService
+	userRepo        *repositories.UserRepository
+	apiTokenRepo    *repositories.APITokenRepository
+	logger          *slog.Logger
 }
 
 // NewSettingsHandler creates a new SettingsHandler.
-func NewSettingsHandler(gsr *repositories.GitSourceRepository, is *services.InstanceService) *SettingsHandler {
+func NewSettingsHandler(gsr *repositories.GitSourceRepository, is *services.InstanceService, ur *repositories.UserRepository, atr *repositories.APITokenRepository, logger *slog.Logger) *SettingsHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &SettingsHandler{
 		gitSourceRepo:   gsr,
 		instanceService: is,
+		userRepo:        ur,
+		apiTokenRepo:    atr,
+		logger:          logger,
 	}
 }
 
@@ -127,6 +141,266 @@ func (h *SettingsHandler) PruneSystem(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	if err := components.Toast("System pruned successfully", "success").Render(r.Context(), w); err != nil {
-		slog.Error("failed to render prune toast", "error", err)
+		h.logger.Error("failed to render prune toast", "error", err)
 	}
+}
+
+// Profile renders the profile settings page.
+func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+
+	// Fetch fresh user data
+	currentUser, err := h.userRepo.GetByID(r.Context(), user.ID)
+	if err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to load profile")
+		return
+	}
+
+	csrfToken := auth.GetCSRFToken(r)
+	component := settings.Profile(currentUser, csrfToken)
+	if err := component.Render(r.Context(), w); err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to render profile page")
+	}
+}
+
+// UpdateProfile handles updating profile information.
+func (h *SettingsHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+
+	email := r.FormValue("email")
+	if email == "" {
+		RenderError(w, r, http.StatusBadRequest, "Email is required")
+		return
+	}
+
+	// Update user email
+	if err := h.userRepo.UpdateEmail(r.Context(), user.ID, email); err != nil {
+		h.logger.Error("failed to update user email", "error", err, "user_id", user.ID)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to update email")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if err := components.Toast("Profile updated successfully", "success").Render(r.Context(), w); err != nil {
+		h.logger.Error("failed to render toast", "error", err)
+	}
+}
+
+// UpdatePassword handles changing the user's password.
+func (h *SettingsHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+
+	currentPassword := r.FormValue("current_password")
+	newPassword := r.FormValue("new_password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	if currentPassword == "" || newPassword == "" || confirmPassword == "" {
+		RenderError(w, r, http.StatusBadRequest, "All password fields are required")
+		return
+	}
+
+	if newPassword != confirmPassword {
+		RenderError(w, r, http.StatusBadRequest, "New passwords do not match")
+		return
+	}
+
+	if len(newPassword) < 8 {
+		RenderError(w, r, http.StatusBadRequest, "Password must be at least 8 characters")
+		return
+	}
+
+	// Verify current password
+	dbUser, err := h.userRepo.GetByID(r.Context(), user.ID)
+	if err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to verify password")
+		return
+	}
+
+	valid, compareErr := auth.ComparePassword(currentPassword, dbUser.PasswordHash.String)
+	if compareErr != nil || !valid {
+		RenderError(w, r, http.StatusBadRequest, "Current password is incorrect")
+		return
+	}
+
+	// Hash new password and update
+	hashedPassword, err := auth.HashPassword(newPassword)
+	if err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to hash password")
+		return
+	}
+
+	if err := h.userRepo.UpdatePassword(r.Context(), user.ID, hashedPassword); err != nil {
+		h.logger.Error("failed to update password", "error", err, "user_id", user.ID)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to update password")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if err := components.Toast("Password updated successfully", "success").Render(r.Context(), w); err != nil {
+		h.logger.Error("failed to render toast", "error", err)
+	}
+}
+
+// ListAPITokens renders the list of API tokens.
+func (h *SettingsHandler) ListAPITokens(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+
+	tokens, err := h.apiTokenRepo.ListByUserID(r.Context(), user.ID)
+	if err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to list tokens")
+		return
+	}
+
+	if len(tokens) == 0 {
+		if err := settings.EmptyTokenList().Render(r.Context(), w); err != nil {
+			h.logger.Error("failed to render empty token list", "error", err)
+		}
+		return
+	}
+
+	for _, token := range tokens {
+		if err := settings.APITokenRow(token).Render(r.Context(), w); err != nil {
+			h.logger.Error("failed to render token row", "error", err)
+		}
+	}
+}
+
+// NewAPITokenModal renders the modal to create a new API token.
+func (h *SettingsHandler) NewAPITokenModal(w http.ResponseWriter, r *http.Request) {
+	csrfToken := auth.GetCSRFToken(r)
+	component := settings.AddAPITokenModal(csrfToken)
+
+	if r.Header.Get("HX-Request") == "true" {
+		if err := component.Render(r.Context(), w); err != nil {
+			http.Error(w, "failed to render modal", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	layout := layouts.AppLayout("Generate API Token", csrfToken)
+	if err := layout.Render(templ.WithChildren(r.Context(), component), w); err != nil {
+		http.Error(w, "failed to render page", http.StatusInternalServerError)
+	}
+}
+
+// CreateAPIToken handles creating a new API token.
+func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+
+	name := r.FormValue("name")
+	expiresIn := r.FormValue("expires_in")
+
+	if name == "" {
+		RenderError(w, r, http.StatusBadRequest, "Token name is required")
+		return
+	}
+
+	// Generate random token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		h.logger.Error("failed to generate token", "error", err)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to generate token")
+		return
+	}
+	rawToken := hex.EncodeToString(tokenBytes)
+
+	// Hash the token for storage
+	tokenHash := hashToken(rawToken)
+
+	// Calculate expiration
+	var expiresAt sql.NullTime
+	if expiresIn != "0" {
+		days := 365
+		if _, err := fmt.Sscanf(expiresIn, "%d", &days); err == nil {
+			expiresAt = sql.NullTime{Time: time.Now().AddDate(0, 0, days), Valid: true}
+		}
+	}
+
+	token := &models.APIToken{
+		UserID:    user.ID,
+		Name:      name,
+		TokenHash: tokenHash,
+		ExpiresAt: expiresAt,
+		CreatedAt: time.Now(),
+	}
+
+	if err := h.apiTokenRepo.Create(r.Context(), token); err != nil {
+		h.logger.Error("failed to create API token", "error", err)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to create token")
+		return
+	}
+
+	// Return the raw token to the user (only shown once)
+	w.WriteHeader(http.StatusCreated)
+	if err := settings.TokenCreatedModal(rawToken).Render(r.Context(), w); err != nil {
+		h.logger.Error("failed to render token created modal", "error", err)
+	}
+}
+
+// DeleteAPIToken handles deleting an API token.
+func (h *SettingsHandler) DeleteAPIToken(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	// Verify token belongs to user
+	token, err := h.apiTokenRepo.GetByID(r.Context(), id)
+	if err != nil {
+		RenderError(w, r, http.StatusNotFound, "Token not found")
+		return
+	}
+
+	if token.UserID != user.ID {
+		RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	if err := h.apiTokenRepo.Delete(r.Context(), id); err != nil {
+		h.logger.Error("failed to delete API token", "error", err, "token_id", id)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to delete token")
+		return
+	}
+
+	// Re-render the full token list after deletion
+	h.ListAPITokens(w, r)
+}
+
+// hashToken creates a SHA-256 hash of an API token for storage.
+// SHA-256 is appropriate here because API tokens are high-entropy,
+// cryptographically random values (32 bytes / 256 bits) that are not
+// susceptible to dictionary attacks.
+func hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
 }

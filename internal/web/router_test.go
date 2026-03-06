@@ -65,7 +65,7 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	eh := handlers.NewEnvironmentHandler(ps)
 	dh := handlers.NewDeploymentHandler(ds, ps, nil, nil)
 	sh := handlers.NewServiceHandler(cat, is)
-	sth := handlers.NewSettingsHandler(nil, is) // No GitSourceRepo needed for general router tests
+	sth := handlers.NewSettingsHandler(nil, is, userRepo, nil, logger) // Settings handler
 	gh := handlers.NewGitHandler(nil, nil)
 	wh := &webhook.Handler{}
 	sseh := handlers.NewSSEHandler(nil, nil, nil)
