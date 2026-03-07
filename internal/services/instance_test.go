@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"testing"
@@ -129,6 +130,32 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 	}
 	catalog.templates["redis"] = tmpl
 
+	// Setup catalog with web-facing template (has ports and health check)
+	webTmpl := &ServiceTemplate{
+		Name:           "gitea",
+		DefaultVersion: "latest",
+		Docker: DockerConfig{
+			Image: "gitea/gitea:{{ .Version }}",
+			Ports: []PortConfig{
+				{Container: 3000, Protocol: "tcp"},
+			},
+			Environment: map[string]string{
+				"GITEA__APP_NAME": "{{ .Config.app_name }}",
+			},
+			HealthCheck: HealthCheckConfig{
+				Test:     []string{"CMD", "wget", "--spider", "-q", "http://localhost:3000/api/healthz"},
+				Interval: "10s",
+				Timeout:  "5s",
+				Retries:  5,
+			},
+		},
+		Connection: ConnectionConfig{
+			Internal: "http://{{ .ContainerName }}:3000",
+			External: "{{ if .Domain }}https://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:3000{{ end }}",
+		},
+	}
+	catalog.templates["gitea"] = webTmpl
+
 	tests := []struct {
 		name       string
 		userID     string
@@ -137,6 +164,7 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 		setupMock  func(*mockInstanceRepository, *mockContainerRepository, *mockDockerClient)
 		wantErr    bool
 		wantStatus models.ServiceInstanceStatus
+		checkOpts  func(t *testing.T, opts docker.ContainerOptions)
 	}{
 		{
 			name:     "Success",
@@ -162,6 +190,85 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 						return errors.New("unexpected instance id in container")
 					}
 					return nil
+				}
+			},
+			wantErr:    false,
+			wantStatus: models.ServiceStatusRunning,
+		},
+		{
+			name:     "Deploy with domain sets Traefik labels",
+			userID:   "user1",
+			tmplName: "gitea",
+			config:   map[string]interface{}{"name": "my-gitea", "domain": "gitea.example.com", "app_name": "My Gitea"},
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					s.ID = "inst-2"
+					if !s.Domain.Valid || s.Domain.String != "gitea.example.com" {
+						return errors.New("expected domain to be set on instance")
+					}
+					return nil
+				}
+				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					return nil
+				}
+				mc.createFunc = func(ctx context.Context, c *models.Container) error {
+					return nil
+				}
+				md.createContainerFunc = func(ctx context.Context, opts docker.ContainerOptions) (string, error) {
+					// Verify Traefik labels are set
+					if opts.Labels == nil {
+						return "", errors.New("expected labels to be set")
+					}
+					if opts.Labels["traefik.enable"] != "true" {
+						return "", errors.New("expected traefik.enable label")
+					}
+					routerRule := opts.Labels["traefik.http.routers.goforge-svc-inst-2.rule"]
+					if routerRule != "Host(`gitea.example.com`)" {
+						return "", fmt.Errorf("unexpected router rule: %s", routerRule)
+					}
+					portLabel := opts.Labels["traefik.http.services.goforge-svc-inst-2.loadbalancer.server.port"]
+					if portLabel != "3000" {
+						return "", fmt.Errorf("unexpected port label: %s", portLabel)
+					}
+					// Verify health check is set
+					if opts.HealthCheck == nil {
+						return "", errors.New("expected health check to be set")
+					}
+					if len(opts.HealthCheck.Test) == 0 {
+						return "", errors.New("expected health check test commands")
+					}
+					return "docker-id-2", nil
+				}
+			},
+			wantErr:    false,
+			wantStatus: models.ServiceStatusRunning,
+		},
+		{
+			name:     "Deploy without domain has no Traefik routing labels",
+			userID:   "user1",
+			tmplName: "gitea",
+			config:   map[string]interface{}{"name": "my-gitea", "app_name": "My Gitea"},
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					s.ID = "inst-3"
+					return nil
+				}
+				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					return nil
+				}
+				mc.createFunc = func(ctx context.Context, c *models.Container) error {
+					return nil
+				}
+				md.createContainerFunc = func(ctx context.Context, opts docker.ContainerOptions) (string, error) {
+					// Verify no Traefik routing labels when no domain
+					if opts.Labels != nil {
+						return "", errors.New("expected no labels when domain is empty")
+					}
+					// But health check should still be set
+					if opts.HealthCheck == nil {
+						return "", errors.New("expected health check to be set even without domain")
+					}
+					return "docker-id-3", nil
 				}
 			},
 			wantErr:    false,
@@ -245,7 +352,7 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 				tt.setupMock(mockRepo, mockContainerRepo, mockDocker)
 			}
 
-			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, catalog, "goforge_net", slog.New(slog.NewTextHandler(io.Discard, nil)))
+			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, catalog, "goforge_net", false, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 			got, err := svc.DeployInstance(context.Background(), tt.userID, tt.tmplName, tt.config)
 			if (err != nil) != tt.wantErr {
@@ -305,7 +412,7 @@ func TestInstanceService_ListInstances(t *testing.T) {
 				tt.setupMock(mockRepo)
 			}
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", logger)
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", false, logger)
 			got, err := svc.ListInstances(context.Background(), tt.userID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ListInstances() error = %v, wantErr %v", err, tt.wantErr)
@@ -358,7 +465,7 @@ func TestInstanceService_GetInstance(t *testing.T) {
 				tt.setupMock(mockRepo)
 			}
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", logger)
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", false, logger)
 			got, err := svc.GetInstance(context.Background(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetInstance() error = %v, wantErr %v", err, tt.wantErr)
@@ -420,7 +527,7 @@ func TestInstanceService_DeleteInstance(t *testing.T) {
 				tt.setupMock(mockRepo, mockContainerRepo, mockDocker)
 			}
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, nil, "goforge_net", logger)
+			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, nil, "goforge_net", false, logger)
 			err := svc.DeleteInstance(context.Background(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteInstance() error = %v, wantErr %v", err, tt.wantErr)
@@ -468,7 +575,7 @@ func TestInstanceService_UpdateInstance(t *testing.T) {
 				tt.setupMock(mockRepo)
 			}
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", logger)
+			svc := NewInstanceService(mockRepo, nil, nil, nil, "goforge_net", false, logger)
 			err := svc.UpdateInstance(context.Background(), tt.instance)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateInstance() error = %v, wantErr %v", err, tt.wantErr)
@@ -566,7 +673,7 @@ func TestInstanceService_Lifecycle(t *testing.T) {
 				tt.setupMock(mockRepo, mockContainerRepo, mockDocker)
 			}
 
-			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, nil, "goforge_net", logger)
+			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, nil, "goforge_net", false, logger)
 
 			var err error
 			switch tt.operation {
@@ -623,7 +730,7 @@ func TestInstanceService_PruneSystem(t *testing.T) {
 				tt.setupMock(mockDocker)
 			}
 
-			svc := NewInstanceService(nil, nil, mockDocker, nil, "goforge_net", logger)
+			svc := NewInstanceService(nil, nil, mockDocker, nil, "goforge_net", false, logger)
 
 			err := svc.PruneSystem(context.Background())
 			if (err != nil) != tt.wantErr {

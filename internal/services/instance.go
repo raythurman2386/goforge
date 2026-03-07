@@ -8,9 +8,13 @@ import (
 	"fmt"
 	"log/slog"
 	"text/template"
+	"time"
+
+	"github.com/docker/docker/api/types/container"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/proxy"
 )
 
 // InstanceRepository defines the interface for instance data access.
@@ -39,12 +43,13 @@ type DockerClient interface {
 
 // InstanceService handles service instance management.
 type InstanceService struct {
-	instanceRepo   InstanceRepository
-	containerRepo  ContainerRepository
-	dockerClient   DockerClient
-	catalog        *Catalog
-	traefikNetwork string
-	logger         *slog.Logger
+	instanceRepo        InstanceRepository
+	containerRepo       ContainerRepository
+	dockerClient        DockerClient
+	catalog             *Catalog
+	traefikNetwork      string
+	cloudflareProxyMode bool
+	logger              *slog.Logger
 }
 
 // NewInstanceService creates a new instance service.
@@ -54,15 +59,17 @@ func NewInstanceService(
 	dc DockerClient,
 	c *Catalog,
 	traefikNetwork string,
+	cloudflareProxyMode bool,
 	logger *slog.Logger,
 ) *InstanceService {
 	return &InstanceService{
-		instanceRepo:   ir,
-		containerRepo:  cr,
-		dockerClient:   dc,
-		catalog:        c,
-		traefikNetwork: traefikNetwork,
-		logger:         logger,
+		instanceRepo:        ir,
+		containerRepo:       cr,
+		dockerClient:        dc,
+		catalog:             c,
+		traefikNetwork:      traefikNetwork,
+		cloudflareProxyMode: cloudflareProxyMode,
+		logger:              logger,
 	}
 }
 
@@ -83,12 +90,19 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		return nil, fmt.Errorf("config missing name")
 	}
 
+	// Extract optional domain for Traefik routing
+	var domain string
+	if d, ok := config["domain"].(string); ok {
+		domain = d
+	}
+
 	instance := &models.ServiceInstance{
 		UserID:       userID,
 		TemplateName: tmplName,
 		Name:         name,
 		Version:      sql.NullString{String: tmpl.DefaultVersion, Valid: true},
 		Config:       configJSON,
+		Domain:       sql.NullString{String: domain, Valid: domain != ""},
 		Status:       models.ServiceStatusPending,
 	}
 
@@ -97,11 +111,19 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	}
 
 	// Prepare interpolation data
+	containerName := fmt.Sprintf("goforge-service-%s", instance.ID)
+	protocol := "https"
+	if domain == "" || s.cloudflareProxyMode || proxy.IsLocalhostDomain(domain) {
+		protocol = "http"
+	}
+
 	data := map[string]interface{}{
 		"Config":        config,
 		"Version":       instance.Version.String,
 		"InstanceID":    instance.ID,
-		"ContainerName": fmt.Sprintf("goforge-service-%s", instance.ID),
+		"ContainerName": containerName,
+		"Domain":        domain,
+		"Protocol":      protocol,
 	}
 
 	// Interpolate Docker config
@@ -120,12 +142,28 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	}
 
 	// Create container
-	containerName := fmt.Sprintf("goforge-service-%s", instance.ID)
 	opts := docker.ContainerOptions{
 		Name:        containerName,
 		Image:       image,
 		Env:         envVars,
 		NetworkName: s.traefikNetwork,
+	}
+
+	// Determine the primary HTTP port from the template
+	servicePort := 0
+	if len(tmpl.Docker.Ports) > 0 {
+		servicePort = tmpl.Docker.Ports[0].Container
+	}
+
+	// Generate Traefik labels for routing (only if domain is provided)
+	if domain != "" {
+		labels := proxy.GenerateServiceLabels(instance.ID, domain, s.traefikNetwork, servicePort, s.cloudflareProxyMode)
+		opts.Labels = labels.ToMap()
+	}
+
+	// Apply health check from template
+	if hc := buildHealthCheck(tmpl.Docker.HealthCheck); hc != nil {
+		opts.HealthCheck = hc
 	}
 
 	// Add volumes (Binds)
@@ -139,8 +177,6 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	if err != nil {
 		instance.Status = models.ServiceStatusFailed
 		if updateErr := s.instanceRepo.Update(ctx, instance); updateErr != nil {
-			// Using blank identifier for fmt to explicitly ignore it if needed,
-			// but logging is better.
 			s.logger.Error("failed to update instance status to failed", "error", updateErr, "instance_id", instance.ID)
 		}
 		return nil, fmt.Errorf("failed to create container: %w", err)
@@ -160,30 +196,8 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	instance.Status = models.ServiceStatusRunning
 
 	// Render connection string templates and store in ConnectionInfo
-	connInfo := make(map[string]string)
-	if tmpl.Connection.Internal != "" {
-		internal, interpErr := s.interpolate(tmpl.Connection.Internal, data)
-		if interpErr != nil {
-			s.logger.Error("failed to interpolate internal connection string", "error", interpErr, "instance_id", instance.ID)
-		} else {
-			connInfo["internal"] = internal
-		}
-	}
-	if tmpl.Connection.External != "" {
-		external, interpErr := s.interpolate(tmpl.Connection.External, data)
-		if interpErr != nil {
-			s.logger.Error("failed to interpolate external connection string", "error", interpErr, "instance_id", instance.ID)
-		} else {
-			connInfo["external"] = external
-		}
-	}
-	if len(connInfo) > 0 {
-		connJSON, marshalErr := json.Marshal(connInfo)
-		if marshalErr != nil {
-			s.logger.Error("failed to marshal connection info", "error", marshalErr, "instance_id", instance.ID)
-		} else {
-			instance.ConnectionInfo = connJSON
-		}
+	if connJSON := s.renderConnectionInfo(tmpl, data, instance.ID); connJSON != nil {
+		instance.ConnectionInfo = connJSON
 	}
 
 	if err = s.instanceRepo.Update(ctx, instance); err != nil {
@@ -191,6 +205,60 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	}
 
 	return instance, nil
+}
+
+func (s *InstanceService) renderConnectionInfo(tmpl *ServiceTemplate, data map[string]interface{}, instanceID string) []byte {
+	connInfo := make(map[string]string)
+	if tmpl.Connection.Internal != "" {
+		internal, interpErr := s.interpolate(tmpl.Connection.Internal, data)
+		if interpErr != nil {
+			s.logger.Error("failed to interpolate internal connection string", "error", interpErr, "instance_id", instanceID)
+		} else {
+			connInfo["internal"] = internal
+		}
+	}
+	if tmpl.Connection.External != "" {
+		external, interpErr := s.interpolate(tmpl.Connection.External, data)
+		if interpErr != nil {
+			s.logger.Error("failed to interpolate external connection string", "error", interpErr, "instance_id", instanceID)
+		} else {
+			connInfo["external"] = external
+		}
+	}
+	if len(connInfo) > 0 {
+		connJSON, marshalErr := json.Marshal(connInfo)
+		if marshalErr != nil {
+			s.logger.Error("failed to marshal connection info", "error", marshalErr, "instance_id", instanceID)
+		} else {
+			return connJSON
+		}
+	}
+	return nil
+}
+
+// buildHealthCheck converts a template HealthCheckConfig into a Docker HealthConfig.
+// Returns nil if the template has no health check test command configured.
+func buildHealthCheck(hc HealthCheckConfig) *container.HealthConfig {
+	if len(hc.Test) == 0 {
+		return nil
+	}
+
+	interval, parseErr := time.ParseDuration(hc.Interval)
+	if parseErr != nil {
+		interval = 10 * time.Second
+	}
+
+	timeout, parseErr := time.ParseDuration(hc.Timeout)
+	if parseErr != nil {
+		timeout = 5 * time.Second
+	}
+
+	return &container.HealthConfig{
+		Test:     hc.Test,
+		Interval: interval,
+		Timeout:  timeout,
+		Retries:  hc.Retries,
+	}
 }
 
 func (s *InstanceService) interpolate(text string, data interface{}) (string, error) {

@@ -17,6 +17,7 @@ type ServiceTemplate struct {
 	Description    string           `yaml:"description" json:"description"`
 	Icon           string           `yaml:"icon" json:"icon"`
 	Category       string           `yaml:"category" json:"category"`
+	Web            bool             `yaml:"web" json:"web"`
 	Versions       []string         `yaml:"versions" json:"versions"`
 	DefaultVersion string           `yaml:"default_version" json:"default_version"`
 	Config         []ConfigField    `yaml:"config" json:"config"`

@@ -21,9 +21,16 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string) {
 
 			<div class="card">
 				<form class="space-y-8" action={ templ.SafeURL("/services/" + tmpl.Name) } method="POST">
-					<input type="hidden" name="csrf_token" value={ csrfToken } />
+				<input type="hidden" name="csrf_token" value={ csrfToken } />
 					
-					@components.Input("Service Name", "name", "text", tmpl.Name, true)
+				@components.Input("Service Name", "name", "text", tmpl.Name, true)
+
+				if tmpl.Web {
+					@components.Input("Domain", "domain", "text", tmpl.Name+".localhost", true)
+					<div class="mt-[-1rem] mb-4 text-xs text-gray-500">
+						Required. Assign a custom domain (e.g., <code>gitea.localhost</code> or <code>gitea.example.com</code>) to access this service via the browser.
+					</div>
+				}
 
 					for _, field := range tmpl.Config {
 						if field.Type == "password" && field.Generate {

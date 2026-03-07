@@ -3,6 +3,7 @@ display_name: MinIO
 description: High-performance object storage compatible with Amazon S3 API.
 icon: minio
 category: storage
+web: true
 
 versions:
   - "latest"
@@ -46,3 +47,4 @@ docker:
 
 connection:
   internal: "http://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:9000"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:9000{{ end }}"

@@ -164,11 +164,11 @@ func GenerateLabelsWithOptions(p *models.Project, env *models.Environment, netwo
 	rule := buildRoutingRule(domain, opts.PathPrefix)
 
 	// Configure router based on proxy mode
-	if opts.CloudflareProxyMode {
-		// Cloudflare Tunnel mode: traffic arrives as HTTP after Cloudflare terminates SSL
+	if opts.CloudflareProxyMode || IsLocalhostDomain(domain) {
+		// Cloudflare Tunnel mode or Localhost: traffic arrives as HTTP
 		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
 		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTP
-		// No TLS config needed - Cloudflare handles SSL at the edge
+		// No TLS config needed
 	} else {
 		// Standard mode: Traefik handles TLS with Let's Encrypt
 		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
@@ -264,6 +264,11 @@ func buildRoutingRule(domain, pathPrefix string) string {
 		rule = fmt.Sprintf("%s && PathPrefix(`%s`)", rule, pathPrefix)
 	}
 	return rule
+}
+
+// IsLocalhostDomain returns true if the domain is localhost or ends with .localhost
+func IsLocalhostDomain(domain string) bool {
+	return domain == "localhost" || strings.HasSuffix(domain, ".localhost")
 }
 
 // addHTTPRedirectLabels adds HTTP to HTTPS redirect router and middleware.
@@ -375,6 +380,46 @@ func DefaultSecurityHeaders() *HeadersConfig {
 		BrowserXSSFilter:     true,
 		FrameDeny:            true,
 	}
+}
+
+// GenerateServiceLabels generates Traefik labels for a one-click service instance.
+// If domain is empty, only base management labels are returned (no routing).
+func GenerateServiceLabels(instanceID, domain, network string, port int, cloudflareMode bool) Labels {
+	name := fmt.Sprintf("goforge-svc-%s", instanceID)
+
+	labels := Labels{
+		"traefik.enable":              labelTrue,
+		"traefik.docker.network":      network,
+		"goforge.managed":             labelTrue,
+		"goforge.service.instance.id": instanceID,
+	}
+
+	// Only add routing labels if domain is set
+	if domain == "" {
+		return labels
+	}
+
+	rule := fmt.Sprintf("Host(`%s`)", domain)
+
+	if cloudflareMode || IsLocalhostDomain(domain) {
+		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
+		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTP
+	} else {
+		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
+		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTPS
+		labels[fmt.Sprintf("traefik.http.routers.%s.tls.certresolver", name)] = "letsencrypt"
+
+		// Add HTTP to HTTPS redirect
+		addHTTPRedirectLabels(labels, name, domain, "")
+	}
+
+	// Service port configuration
+	if port <= 0 {
+		port = 80
+	}
+	labels[fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", name)] = fmt.Sprintf("%d", port)
+
+	return labels
 }
 
 // DefaultRateLimit returns a RateLimitConfig with reasonable defaults.

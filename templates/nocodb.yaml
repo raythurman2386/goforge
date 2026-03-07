@@ -3,6 +3,7 @@ display_name: NocoDB
 description: Open source Airtable alternative that turns any MySQL, PostgreSQL, or SQL Server into a smart spreadsheet.
 icon: nocodb
 category: database
+web: true
 
 versions:
   - "latest"
@@ -37,3 +38,4 @@ docker:
 
 connection:
   internal: "http://{{ .ContainerName }}:8080"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:8080{{ end }}"

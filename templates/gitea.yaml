@@ -3,6 +3,7 @@ display_name: Gitea
 description: A painless self-hosted Git service - lightweight GitHub/GitLab alternative written in Go.
 icon: gitea
 category: devtools
+web: true
 
 versions:
   - "latest"
@@ -32,7 +33,7 @@ docker:
     GITEA__APP_NAME: "{{ .Config.app_name }}"
     GITEA__SERVER__HTTP_PORT: "3000"
     GITEA__SERVER__SSH_PORT: "22"
-    GITEA__SERVER__ROOT_URL: "http://{{ .ContainerName }}:3000/"
+    GITEA__SERVER__ROOT_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}/{{ else }}http://{{ .ContainerName }}:3000/{{ end }}"
   volumes:
     - name: data
       path: /data
@@ -44,4 +45,4 @@ docker:
 
 connection:
   internal: "http://{{ .ContainerName }}:3000"
-  external: "http://{{ .ContainerName }}:3000"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:3000{{ end }}"

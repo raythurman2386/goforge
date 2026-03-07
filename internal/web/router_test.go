@@ -47,7 +47,7 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	ps := project.NewService(projectRepo, envRepo, varRepo, nil, nil, nil, nil, nil)
 	// We can pass nil for deployService dependencies that aren't used in these tests
 	ds := &deploy.Service{}
-	is := services.NewInstanceService(instanceRepo, nil, nil, nil, "goforge_net", logger)
+	is := services.NewInstanceService(instanceRepo, nil, nil, nil, "goforge_net", false, logger)
 	cat := services.NewCatalog("./templates")
 
 	// Audit Service (mocking repo implicitly by passing nil? No, NewAuditService takes interface, but we need concrete impl or mock.

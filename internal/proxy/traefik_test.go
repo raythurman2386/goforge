@@ -518,6 +518,85 @@ func TestLabels_ToMap(t *testing.T) {
 	}
 }
 
+func TestGenerateServiceLabels_WithDomain(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "gitea.example.com", "traefik", 3000, false)
+
+	name := "goforge-svc-inst-abc"
+
+	// Base labels
+	assertLabel(t, labels, "traefik.enable", "true")
+	assertLabel(t, labels, "traefik.docker.network", "traefik")
+	assertLabel(t, labels, "goforge.managed", "true")
+	assertLabel(t, labels, "goforge.service.instance.id", "inst-abc")
+
+	// Routing labels (standard mode with TLS)
+	assertLabel(t, labels, "traefik.http.routers."+name+".rule", "Host(`gitea.example.com`)")
+	assertLabel(t, labels, "traefik.http.routers."+name+".entrypoints", "websecure")
+	assertLabel(t, labels, "traefik.http.routers."+name+".tls.certresolver", "letsencrypt")
+	assertLabel(t, labels, "traefik.http.services."+name+".loadbalancer.server.port", "3000")
+
+	// HTTP-to-HTTPS redirect
+	assertLabel(t, labels, "traefik.http.routers."+name+"-http.rule", "Host(`gitea.example.com`)")
+	assertLabel(t, labels, "traefik.http.routers."+name+"-http.entrypoints", "web")
+	assertLabel(t, labels, "traefik.http.routers."+name+"-http.middlewares", name+"-redirect")
+	assertLabel(t, labels, "traefik.http.middlewares."+name+"-redirect.redirectscheme.scheme", "https")
+	assertLabel(t, labels, "traefik.http.middlewares."+name+"-redirect.redirectscheme.permanent", "true")
+}
+
+func TestGenerateServiceLabels_NoDomain(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "", "traefik", 3000, false)
+
+	name := "goforge-svc-inst-abc"
+
+	// Should have base labels
+	assertLabel(t, labels, "traefik.enable", "true")
+	assertLabel(t, labels, "traefik.docker.network", "traefik")
+	assertLabel(t, labels, "goforge.managed", "true")
+	assertLabel(t, labels, "goforge.service.instance.id", "inst-abc")
+
+	// Should NOT have routing labels
+	if _, ok := labels["traefik.http.routers."+name+".rule"]; ok {
+		t.Error("expected no router rule without domain")
+	}
+	if _, ok := labels["traefik.http.services."+name+".loadbalancer.server.port"]; ok {
+		t.Error("expected no port label without domain")
+	}
+}
+
+func TestGenerateServiceLabels_CloudflareMode(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "gitea.example.com", "traefik", 3000, true)
+
+	name := "goforge-svc-inst-abc"
+
+	// Should use HTTP entrypoint
+	assertLabel(t, labels, "traefik.http.routers."+name+".rule", "Host(`gitea.example.com`)")
+	assertLabel(t, labels, "traefik.http.routers."+name+".entrypoints", "web")
+	assertLabel(t, labels, "traefik.http.services."+name+".loadbalancer.server.port", "3000")
+
+	// Should NOT have TLS or redirect labels
+	if _, ok := labels["traefik.http.routers."+name+".tls.certresolver"]; ok {
+		t.Error("expected no TLS certresolver in Cloudflare mode")
+	}
+	if _, ok := labels["traefik.http.routers."+name+"-http.rule"]; ok {
+		t.Error("expected no HTTP redirect router in Cloudflare mode")
+	}
+}
+
+func TestGenerateServiceLabels_DefaultPort(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "app.example.com", "traefik", 0, false)
+
+	name := "goforge-svc-inst-abc"
+
+	// Should default to port 80
+	assertLabel(t, labels, "traefik.http.services."+name+".loadbalancer.server.port", "80")
+}
+
+func TestGenerateServiceLabels_CustomNetwork(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "app.example.com", "custom-net", 8080, false)
+
+	assertLabel(t, labels, "traefik.docker.network", "custom-net")
+}
+
 // Helper functions
 
 func assertLabel(t *testing.T, labels Labels, key, want string) {
