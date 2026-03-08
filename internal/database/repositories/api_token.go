@@ -103,7 +103,7 @@ func (r *APITokenRepository) ListByUserID(ctx context.Context, userID string) ([
 		FROM api_tokens
 		WHERE user_id = $1
 		ORDER BY created_at DESC
-	`
+		LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {

@@ -112,7 +112,8 @@ func (r *EnvironmentRepository) ListByProjectID(ctx context.Context, projectID s
 	query := `
 		SELECT id, project_id, name, domain, port, branch, replicas, cpu_limit,
 			memory_limit, auto_deploy, created_at, updated_at
-		FROM environments WHERE project_id = $1 ORDER BY name`
+		FROM environments WHERE project_id = $1 ORDER BY name
+		LIMIT 100`
 
 	rows, err := r.db.QueryContext(ctx, query, projectID)
 	if err != nil {

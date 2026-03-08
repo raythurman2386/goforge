@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,15 +25,15 @@ func TestSSEHandler_DeploymentLogs(t *testing.T) {
 		wantSSEHeaders bool
 	}{
 		{
-			name:           "valid deployment returns SSE stream",
-			deploymentID:   "deploy-123",
-			wantStatus:     http.StatusOK,
-			wantSSEHeaders: true,
-		},
-		{
 			name:           "empty deployment ID returns 400",
 			deploymentID:   "",
 			wantStatus:     http.StatusBadRequest,
+			wantSSEHeaders: false,
+		},
+		{
+			name:           "no auth context returns 401",
+			deploymentID:   "deploy-123",
+			wantStatus:     http.StatusUnauthorized,
 			wantSSEHeaders: false,
 		},
 	}
@@ -45,7 +47,7 @@ func TestSSEHandler_DeploymentLogs(t *testing.T) {
 			go hub.Run()
 			defer hub.Stop()
 
-			handler := NewSSEHandler(hub, nil, nil)
+			handler := NewSSEHandler(hub, nil, nil, nil, nil, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 			// Build URL with chi context
 			path := "/deployments/" + tt.deploymentID + "/logs"
@@ -96,15 +98,15 @@ func TestSSEHandler_ContainerLogs(t *testing.T) {
 		wantSSEHeaders bool
 	}{
 		{
-			name:           "valid container returns SSE stream",
-			containerID:    "container-456",
-			wantStatus:     http.StatusOK,
-			wantSSEHeaders: true,
-		},
-		{
 			name:           "empty container ID returns 400",
 			containerID:    "",
 			wantStatus:     http.StatusBadRequest,
+			wantSSEHeaders: false,
+		},
+		{
+			name:           "no auth context returns 401",
+			containerID:    "container-456",
+			wantStatus:     http.StatusUnauthorized,
 			wantSSEHeaders: false,
 		},
 	}
@@ -118,7 +120,7 @@ func TestSSEHandler_ContainerLogs(t *testing.T) {
 			go hub.Run()
 			defer hub.Stop()
 
-			handler := NewSSEHandler(hub, nil, nil)
+			handler := NewSSEHandler(hub, nil, nil, nil, nil, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 			path := "/containers/" + tt.containerID + "/logs"
 			if tt.containerID == "" {
@@ -163,7 +165,7 @@ func TestSSEHandler_BuildOutput(t *testing.T) {
 	go hub.Run()
 	defer hub.Stop()
 
-	handler := NewSSEHandler(hub, nil, nil)
+	handler := NewSSEHandler(hub, nil, nil, nil, nil, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	req := httptest.NewRequest("GET", "/builds/build-789/output", nil)
 
@@ -199,12 +201,13 @@ func TestSSEHandler_RequiresFlush(t *testing.T) {
 	go hub.Run()
 	defer hub.Stop()
 
-	handler := NewSSEHandler(hub, nil, nil)
+	handler := NewSSEHandler(hub, nil, nil, nil, nil, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest("GET", "/deployments/deploy-123/logs", nil)
+	// Test with BuildOutput which does NOT require ownership verification
+	req := httptest.NewRequest("GET", "/builds/build-123/output", nil)
 
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("deploymentID", "deploy-123")
+	rctx.URLParams.Add("id", "build-123")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
@@ -214,7 +217,7 @@ func TestSSEHandler_RequiresFlush(t *testing.T) {
 	// Use httptest.ResponseRecorder which implements Flusher
 	w := httptest.NewRecorder()
 
-	handler.DeploymentLogs(w, req)
+	handler.BuildOutput(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()

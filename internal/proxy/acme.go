@@ -31,6 +31,12 @@ const (
 	KeyTypeEC384   KeyType = "EC384"
 )
 
+// Pre-compiled regexps for validation hot paths.
+var (
+	emailRegex  = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	domainRegex = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+)
+
 // ACMEConfig contains configuration for ACME certificate resolver.
 type ACMEConfig struct {
 	// Email is the registration email for Let's Encrypt.
@@ -98,7 +104,6 @@ func (c *ACMEConfig) Validate() error {
 	}
 
 	// Check for proper email format
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(c.Email) {
 		return ErrACMEEmailInvalid
 	}
@@ -285,7 +290,7 @@ func (v *DomainValidator) IsDomainRoutable(ctx context.Context, domain string) (
 		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
 			return false, nil
 		}
-		return false, fmt.Errorf("DNS lookup failed: %w", err)
+		return false, fmt.Errorf("dns lookup failed: %w", err)
 	}
 
 	return len(addrs) > 0, nil
@@ -359,7 +364,7 @@ func (v *DomainValidator) CheckHTTPReachability(ctx context.Context, domain stri
 
 	resp, err := v.httpClient.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("HTTP request failed: %w", err)
+		return false, fmt.Errorf("http request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -399,8 +404,6 @@ func (v *DomainValidator) ExtractBaseDomain(domain string) string {
 func isValidDomainFormat(domain string) bool {
 	// Domain regex: allows alphanumeric characters and hyphens
 	// Each label must start and end with alphanumeric
-	domainRegex := regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
-
 	if !domainRegex.MatchString(domain) {
 		return false
 	}
@@ -424,7 +427,7 @@ func handleDNSError(err error) error {
 			return nil // Not found is not an error, just means record doesn't exist
 		}
 		if dnsErr.IsTimeout {
-			return fmt.Errorf("DNS lookup timed out: %w", err)
+			return fmt.Errorf("dns lookup timed out: %w", err)
 		}
 	}
 	return err

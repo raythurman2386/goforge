@@ -72,7 +72,7 @@ func (h *SettingsHandler) NewGitSourceModal(w http.ResponseWriter, r *http.Reque
 	csrfToken := auth.GetCSRFToken(r)
 	component := settings.AddGitSourceModal(csrfToken)
 
-	if r.Header.Get("HX-Request") == "true" {
+	if r.Header.Get("HX-Request") == htmxTrue {
 		if err := component.Render(r.Context(), w); err != nil {
 			http.Error(w, "failed to render modal", http.StatusInternalServerError)
 		}
@@ -101,6 +101,20 @@ func (h *SettingsHandler) CreateGitSource(w http.ResponseWriter, r *http.Request
 	apiURL := r.FormValue("api_url")
 	accessToken := r.FormValue("access_token")
 
+	if name == "" || len(name) > maxInputLength {
+		http.Error(w, "name is required and must be under 255 characters", http.StatusBadRequest)
+		return
+	}
+
+	switch models.GitSourceType(sourceType) {
+	case models.GitSourceTypeGitHub, models.GitSourceTypeGitLab,
+		models.GitSourceTypeGitea, models.GitSourceTypeSSH:
+		// valid
+	default:
+		http.Error(w, "invalid git source type", http.StatusBadRequest)
+		return
+	}
+
 	source := &models.GitSource{
 		UserID:      user.ID,
 		Name:        name,
@@ -122,7 +136,26 @@ func (h *SettingsHandler) CreateGitSource(w http.ResponseWriter, r *http.Request
 
 // DeleteGitSource handles deleting a git source.
 func (h *SettingsHandler) DeleteGitSource(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+
 	id := chi.URLParam(r, "id")
+
+	// Verify the git source belongs to the authenticated user
+	source, err := h.gitSourceRepo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "git source not found", http.StatusNotFound)
+		return
+	}
+	if source.UserID != user.ID {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+
 	if err := h.gitSourceRepo.Delete(r.Context(), id); err != nil {
 		http.Error(w, "failed to delete git source", http.StatusInternalServerError)
 		return
@@ -183,6 +216,11 @@ func (h *SettingsHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if !isValidEmail(email) {
+		RenderError(w, r, http.StatusBadRequest, "Please enter a valid email address")
+		return
+	}
+
 	// Update user email
 	if err := h.userRepo.UpdateEmail(r.Context(), user.ID, email); err != nil {
 		h.logger.Error("failed to update user email", "error", err, "user_id", user.ID)
@@ -221,6 +259,11 @@ func (h *SettingsHandler) UpdatePassword(w http.ResponseWriter, r *http.Request)
 
 	if len(newPassword) < 8 {
 		RenderError(w, r, http.StatusBadRequest, "Password must be at least 8 characters")
+		return
+	}
+
+	if len(newPassword) > maxPasswordLen {
+		RenderError(w, r, http.StatusBadRequest, "Password must be at most 256 characters")
 		return
 	}
 
@@ -290,7 +333,7 @@ func (h *SettingsHandler) NewAPITokenModal(w http.ResponseWriter, r *http.Reques
 	csrfToken := auth.GetCSRFToken(r)
 	component := settings.AddAPITokenModal(csrfToken)
 
-	if r.Header.Get("HX-Request") == "true" {
+	if r.Header.Get("HX-Request") == htmxTrue {
 		if err := component.Render(r.Context(), w); err != nil {
 			http.Error(w, "failed to render modal", http.StatusInternalServerError)
 		}
@@ -318,6 +361,10 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 
 	if name == "" {
 		RenderError(w, r, http.StatusBadRequest, "Token name is required")
+		return
+	}
+	if len(name) > maxTokenNameLen {
+		RenderError(w, r, http.StatusBadRequest, "Token name must be under 100 characters")
 		return
 	}
 
@@ -355,6 +402,9 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 		RenderError(w, r, http.StatusInternalServerError, "Failed to create token")
 		return
 	}
+
+	// Trigger a token list refresh on the client
+	w.Header().Set("HX-Trigger", "tokenCreated")
 
 	// Return the raw token to the user (only shown once)
 	w.WriteHeader(http.StatusCreated)

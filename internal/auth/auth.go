@@ -3,6 +3,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
@@ -33,12 +34,12 @@ func (a *LocalAuthenticator) Authenticate(ctx context.Context, email, password s
 	}
 
 	if !user.PasswordHash.Valid {
-		return nil, fmt.Errorf("user has no local password")
+		return nil, errors.New("user has no local password")
 	}
 
 	match, err := ComparePassword(password, user.PasswordHash.String)
 	if err != nil || !match {
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, errors.New("invalid credentials")
 	}
 
 	return user, nil

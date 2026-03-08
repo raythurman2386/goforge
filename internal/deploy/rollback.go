@@ -9,6 +9,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/proxy"
 )
 
 // Rollback related errors.
@@ -264,11 +265,11 @@ func (rm *RollbackManager) stopDeploymentContainers(ctx context.Context, deploym
 
 		if err := rm.service.dockerClient.StopContainer(ctx, container.DockerID); err != nil {
 			// Log but continue - container might already be stopped
-			fmt.Printf("warning: failed to stop container %s: %v\n", container.DockerID, err)
+			rm.service.logger.Warn("failed to stop container during rollback", "container_id", container.DockerID, "error", err)
 		}
 
 		if err := rm.service.containerRepo.UpdateStatus(ctx, container.ID, models.ContainerStatusExited); err != nil {
-			fmt.Printf("warning: failed to update container status: %v\n", err)
+			rm.service.logger.Warn("failed to update container status during rollback", "container_id", container.ID, "error", err)
 		}
 	}
 
@@ -284,10 +285,10 @@ func (rm *RollbackManager) restoreDeployment(ctx context.Context, target *models
 	}
 
 	if len(containers) == 0 {
-		return fmt.Errorf("no containers found for target deployment")
+		return errors.New("no containers found for target deployment")
 	}
 
-	// Get the environment and project for Traefik labels
+	// Get the environment and project for Traefik labels and env vars
 	env, err := rm.service.environmentRepo.GetByID(ctx, target.EnvironmentID)
 	if err != nil {
 		return fmt.Errorf("failed to get environment: %w", err)
@@ -301,24 +302,61 @@ func (rm *RollbackManager) restoreDeployment(ctx context.Context, target *models
 	// Restore the first container (main application container)
 	targetContainer := containers[0]
 
+	// Build container options with full configuration
+	opts := containerOptionsFromContainer(ctx, targetContainer, project, env, rm.service)
+
 	// Create a new container with the same image
-	_, err = rm.service.dockerClient.CreateContainer(ctx, containerOptionsFromContainer(targetContainer, project, env))
+	newDockerID, err := rm.service.dockerClient.CreateContainer(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create restored container: %w", err)
+	}
+
+	// Record the new container in the database
+	if err := rm.service.containerRepo.Create(ctx, &models.Container{
+		DeploymentID: sql.NullString{String: target.ID, Valid: true},
+		DockerID:     newDockerID,
+		Name:         opts.Name,
+		Image:        opts.Image,
+		Status:       models.ContainerStatusRunning,
+	}); err != nil {
+		rm.service.logger.Error("failed to record restored container in DB", "error", err, "deployment_id", target.ID)
+	}
+
+	// Mark the target deployment as running again
+	if err := rm.service.Transition(ctx, target.ID, models.DeploymentStatusRunning, nil); err != nil {
+		rm.service.logger.Error("failed to transition restored deployment to running", "error", err, "deployment_id", target.ID)
 	}
 
 	return nil
 }
 
-// containerOptionsFromContainer creates container options from an existing container record.
-func containerOptionsFromContainer(c *models.Container, _ *models.Project, _ *models.Environment) docker.ContainerOptions {
+// containerOptionsFromContainer creates container options from an existing container record,
+// including the full network, environment variable, and label configuration.
+func containerOptionsFromContainer(ctx context.Context, c *models.Container, project *models.Project, env *models.Environment, svc *Service) docker.ContainerOptions {
 	labels, err := c.GetLabels()
 	if err != nil {
 		labels = make(map[string]string)
 	}
+
+	// Re-generate Traefik labels from project/env so routing works correctly
+	if project != nil && env != nil {
+		traefikLabels := proxy.GenerateLabelsForCloudflare(project, env, svc.traefikNetwork, svc.cloudflareProxyMode)
+		for k, v := range traefikLabels {
+			labels[k] = v
+		}
+	}
+
+	// Rebuild environment variables from the environment and linked services
+	var containerEnv []string
+	if svc != nil && env != nil {
+		containerEnv = svc.buildContainerEnv(ctx, env.ID, env.ProjectID)
+	}
+
 	return docker.ContainerOptions{
-		Name:   c.Name + "-restored",
-		Image:  c.Image,
-		Labels: labels,
+		Name:        c.Name + "-restored",
+		Image:       c.Image,
+		Labels:      labels,
+		Env:         containerEnv,
+		NetworkName: svc.traefikNetwork,
 	}
 }

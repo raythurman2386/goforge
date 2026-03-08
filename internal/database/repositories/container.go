@@ -219,9 +219,59 @@ func (r *ContainerRepository) ListAll(ctx context.Context) ([]*models.Container,
 		SELECT id, deployment_id, service_instance_id, docker_id, name, image,
 			status, ports, labels, created_at, updated_at
 		FROM containers
-		ORDER BY created_at DESC`
+		ORDER BY created_at DESC
+		LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var containers []*models.Container
+	for rows.Next() {
+		c := &models.Container{}
+		err := rows.Scan(
+			&c.ID,
+			&c.DeploymentID,
+			&c.ServiceInstanceID,
+			&c.DockerID,
+			&c.Name,
+			&c.Image,
+			&c.Status,
+			&c.Ports,
+			&c.Labels,
+			&c.CreatedAt,
+			&c.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		containers = append(containers, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return containers, nil
+}
+
+// ListByUserID returns containers belonging to a specific user.
+// Ownership is determined via the service_instances table (service_instance.user_id)
+// or via deployments→environments→projects (project.user_id).
+func (r *ContainerRepository) ListByUserID(ctx context.Context, userID string) ([]*models.Container, error) {
+	query := `
+		SELECT c.id, c.deployment_id, c.service_instance_id, c.docker_id, c.name, c.image,
+			c.status, c.ports, c.labels, c.created_at, c.updated_at
+		FROM containers c
+		LEFT JOIN service_instances si ON c.service_instance_id = si.id
+		LEFT JOIN deployments d ON c.deployment_id = d.id
+		LEFT JOIN environments e ON d.environment_id = e.id
+		LEFT JOIN projects p ON e.project_id = p.id
+		WHERE si.user_id = $1 OR p.user_id = $1
+		ORDER BY c.created_at DESC
+		LIMIT 1000`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}

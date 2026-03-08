@@ -15,10 +15,6 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/pages"
 )
 
-const (
-	schemeHTTPS = "https"
-)
-
 // AuthHandler handles authentication related requests.
 type AuthHandler struct {
 	sessionManager *auth.SessionManager
@@ -80,7 +76,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
+	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, auth.IsSecureRequest(r))
 
 	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
 
@@ -102,9 +98,39 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 
+	if !isValidEmail(email) {
+		csrfToken := auth.GetCSRFToken(r)
+		component := pages.Register(csrfToken, "Please enter a valid email address")
+		w.WriteHeader(http.StatusBadRequest)
+		if err := component.Render(r.Context(), w); err != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to render register page")
+		}
+		return
+	}
+
 	if password != confirmPassword {
 		csrfToken := auth.GetCSRFToken(r)
 		component := pages.Register(csrfToken, "Passwords do not match")
+		w.WriteHeader(http.StatusBadRequest)
+		if err := component.Render(r.Context(), w); err != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to render register page")
+		}
+		return
+	}
+
+	if len(password) < 8 {
+		csrfToken := auth.GetCSRFToken(r)
+		component := pages.Register(csrfToken, "Password must be at least 8 characters")
+		w.WriteHeader(http.StatusBadRequest)
+		if err := component.Render(r.Context(), w); err != nil {
+			RenderError(w, r, http.StatusInternalServerError, "failed to render register page")
+		}
+		return
+	}
+
+	if len(password) > maxPasswordLen {
+		csrfToken := auth.GetCSRFToken(r)
+		component := pages.Register(csrfToken, "Password must be at most 256 characters")
 		w.WriteHeader(http.StatusBadRequest)
 		if err := component.Render(r.Context(), w); err != nil {
 			RenderError(w, r, http.StatusInternalServerError, "failed to render register page")
@@ -150,7 +176,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	h.auditService.Record(r.Context(), user.ID, models.AuditActionCreate, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
 	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
 
-	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
+	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, auth.IsSecureRequest(r))
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -163,6 +189,8 @@ func (h *AuthHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   auth.IsSecureRequest(r),
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   300, // 5 minutes
 	})
 
@@ -196,24 +224,39 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	// Find or create user
 	user, err := h.userRepo.GetByGitHubID(r.Context(), ghUser.GetID())
 	if err != nil {
-		// If not found, create new user
+		// Not found by GitHub ID — check if an account with this email already exists
 		email := ghUser.GetEmail()
 		if email == "" {
 			email = fmt.Sprintf("%s@github.com", ghUser.GetLogin())
 		}
 
-		user = &models.User{
-			Email:             email,
-			GitHubID:          sql.NullInt64{Int64: ghUser.GetID(), Valid: true},
-			GitHubUsername:    sql.NullString{String: ghUser.GetLogin(), Valid: true},
-			AvatarURL:         sql.NullString{String: ghUser.GetAvatarURL(), Valid: true},
-			GitHubAccessToken: sql.NullString{String: token.AccessToken, Valid: true},
-		}
+		user, err = h.userRepo.GetByEmail(r.Context(), email)
+		if err == nil {
+			// Existing user found by email — link their GitHub account
+			user.GitHubID = sql.NullInt64{Int64: ghUser.GetID(), Valid: true}
+			user.GitHubUsername = sql.NullString{String: ghUser.GetLogin(), Valid: true}
+			user.AvatarURL = sql.NullString{String: ghUser.GetAvatarURL(), Valid: true}
+			user.GitHubAccessToken = sql.NullString{String: token.AccessToken, Valid: true}
+			if dbErr := h.userRepo.Update(r.Context(), user); dbErr != nil {
+				h.logger.Error("failed to link GitHub account to existing user", "error", dbErr)
+				RenderError(w, r, http.StatusInternalServerError, "Authentication failed. Please try again.")
+				return
+			}
+		} else {
+			// No existing user — create a new one
+			user = &models.User{
+				Email:             email,
+				GitHubID:          sql.NullInt64{Int64: ghUser.GetID(), Valid: true},
+				GitHubUsername:    sql.NullString{String: ghUser.GetLogin(), Valid: true},
+				AvatarURL:         sql.NullString{String: ghUser.GetAvatarURL(), Valid: true},
+				GitHubAccessToken: sql.NullString{String: token.AccessToken, Valid: true},
+			}
 
-		if dbErr := h.userRepo.Create(r.Context(), user); dbErr != nil {
-			h.logger.Error("failed to create user from GitHub login", "error", dbErr)
-			RenderError(w, r, http.StatusInternalServerError, "Authentication failed. Please try again.")
-			return
+			if dbErr := h.userRepo.Create(r.Context(), user); dbErr != nil {
+				h.logger.Error("failed to create user from GitHub login", "error", dbErr)
+				RenderError(w, r, http.StatusInternalServerError, "Authentication failed. Please try again.")
+				return
+			}
 		}
 	}
 
@@ -226,7 +269,7 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 
 	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, map[string]interface{}{"provider": "github"}, getClientIP(r), r.UserAgent())
 
-	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, r.URL.Scheme == schemeHTTPS)
+	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, auth.IsSecureRequest(r))
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -236,7 +279,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if token != "" {
 		if err := h.sessionManager.DestroySession(r.Context(), token); err != nil {
 			// Log error but continue with clearing cookie
-			h.logger.Error("failed to destroy session", "error", err)
+			h.logger.Warn("failed to destroy session", "error", err)
 		} else {
 			// Try to get user from context if possible, but context might not have it if middleware failed?
 			// Actually middleware puts it there.

@@ -2,7 +2,10 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
+	"strings"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -46,6 +49,66 @@ func Middleware(manager *SessionManager) func(http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), UserContextKey, user)
 			ctx = context.WithValue(ctx, SessionContextKey, session)
 
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// TokenLookup provides the ability to look up an API token by its hash.
+type TokenLookup interface {
+	GetByTokenHash(ctx context.Context, hash string) (*models.APIToken, error)
+	UpdateLastUsed(ctx context.Context, id string) error
+}
+
+// UserLookup provides the ability to look up a user by ID.
+type UserLookup interface {
+	GetByID(ctx context.Context, id string) (*models.User, error)
+}
+
+// APITokenMiddleware authenticates requests that carry an Authorization: Bearer
+// header with an API token. If the request already has a user in context (from
+// session cookie auth) or has no Bearer token, it passes through unchanged.
+func APITokenMiddleware(tokens TokenLookup, users UserLookup) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip if already authenticated via session cookie
+			if r.Context().Value(UserContextKey) != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+			if rawToken == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Hash the token and look it up
+			hash := sha256.Sum256([]byte(rawToken))
+			tokenHash := hex.EncodeToString(hash[:])
+
+			apiToken, err := tokens.GetByTokenHash(r.Context(), tokenHash)
+			if err != nil || !apiToken.IsActive() {
+				http.Error(w, "invalid or expired API token", http.StatusUnauthorized)
+				return
+			}
+
+			user, err := users.GetByID(r.Context(), apiToken.UserID)
+			if err != nil {
+				http.Error(w, "invalid API token", http.StatusUnauthorized)
+				return
+			}
+
+			// Update last used timestamp (best-effort, don't block on error)
+			_ = tokens.UpdateLastUsed(r.Context(), apiToken.ID) //nolint:errcheck // best-effort update
+
+			ctx := context.WithValue(r.Context(), UserContextKey, user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

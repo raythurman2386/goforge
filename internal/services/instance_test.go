@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
@@ -81,6 +82,7 @@ type mockDockerClient struct {
 	createContainerFunc  func(ctx context.Context, opts docker.ContainerOptions) (string, error)
 	startContainerFunc   func(ctx context.Context, id string) error
 	stopContainerFunc    func(ctx context.Context, id string) error
+	removeContainerFunc  func(ctx context.Context, id string) error
 	restartContainerFunc func(ctx context.Context, id string) error
 	cleanupSystemFunc    func(ctx context.Context) error
 }
@@ -102,6 +104,13 @@ func (m *mockDockerClient) StartContainer(ctx context.Context, id string) error 
 func (m *mockDockerClient) StopContainer(ctx context.Context, id string) error {
 	if m.stopContainerFunc != nil {
 		return m.stopContainerFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockDockerClient) RemoveContainer(ctx context.Context, id string) error {
+	if m.removeContainerFunc != nil {
+		return m.removeContainerFunc(ctx, id)
 	}
 	return nil
 }
@@ -161,17 +170,18 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 		userID     string
 		tmplName   string
 		config     map[string]interface{}
-		setupMock  func(*mockInstanceRepository, *mockContainerRepository, *mockDockerClient)
+		setupMock  func(*mockInstanceRepository, *mockContainerRepository, *mockDockerClient, chan struct{})
 		wantErr    bool
 		wantStatus models.ServiceInstanceStatus
-		checkOpts  func(t *testing.T, opts docker.ContainerOptions)
+		// wantAsync indicates the test expects background goroutine completion
+		wantAsync bool
 	}{
 		{
 			name:     "Success",
 			userID:   "user1",
 			tmplName: "redis",
 			config:   map[string]interface{}{"name": "my-redis"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
 				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
 					if s.UserID != "user1" || s.TemplateName != "redis" || s.Name != "my-redis" {
 						return errors.New("unexpected instance data")
@@ -179,10 +189,15 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 					s.ID = "inst-1"
 					return nil
 				}
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusPending}, nil
+				}
 				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
 					if s.ID != "inst-1" {
 						return errors.New("unexpected id in update")
 					}
+					// Signal that the async goroutine completed
+					close(done)
 					return nil
 				}
 				mc.createFunc = func(ctx context.Context, c *models.Container) error {
@@ -193,14 +208,15 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 				}
 			},
 			wantErr:    false,
-			wantStatus: models.ServiceStatusRunning,
+			wantStatus: models.ServiceStatusPending,
+			wantAsync:  true,
 		},
 		{
 			name:     "Deploy with domain sets Traefik labels",
 			userID:   "user1",
 			tmplName: "gitea",
 			config:   map[string]interface{}{"name": "my-gitea", "domain": "gitea.example.com", "app_name": "My Gitea"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
 				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
 					s.ID = "inst-2"
 					if !s.Domain.Valid || s.Domain.String != "gitea.example.com" {
@@ -208,7 +224,11 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 					}
 					return nil
 				}
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusPending}, nil
+				}
 				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					close(done)
 					return nil
 				}
 				mc.createFunc = func(ctx context.Context, c *models.Container) error {
@@ -241,19 +261,24 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 				}
 			},
 			wantErr:    false,
-			wantStatus: models.ServiceStatusRunning,
+			wantStatus: models.ServiceStatusPending,
+			wantAsync:  true,
 		},
 		{
 			name:     "Deploy without domain has no Traefik routing labels",
 			userID:   "user1",
 			tmplName: "gitea",
 			config:   map[string]interface{}{"name": "my-gitea", "app_name": "My Gitea"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
 				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
 					s.ID = "inst-3"
 					return nil
 				}
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusPending}, nil
+				}
 				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					close(done)
 					return nil
 				}
 				mc.createFunc = func(ctx context.Context, c *models.Container) error {
@@ -272,14 +297,15 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 				}
 			},
 			wantErr:    false,
-			wantStatus: models.ServiceStatusRunning,
+			wantStatus: models.ServiceStatusPending,
+			wantAsync:  true,
 		},
 		{
 			name:     "Template not found",
 			userID:   "user1",
 			tmplName: "postgres",
 			config:   map[string]interface{}{"name": "my-pg"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
 			},
 			wantErr: true,
 		},
@@ -288,7 +314,7 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 			userID:   "user1",
 			tmplName: "redis",
 			config:   map[string]interface{}{"foo": "bar"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
 			},
 			wantErr: true,
 		},
@@ -297,7 +323,7 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 			userID:   "user1",
 			tmplName: "redis",
 			config:   map[string]interface{}{"name": "my-redis"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
 				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
 					return errors.New("db error")
 				}
@@ -305,39 +331,56 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:     "Repository update error",
+			name:     "Docker create error updates status to failed",
 			userID:   "user1",
 			tmplName: "redis",
 			config:   map[string]interface{}{"name": "my-redis"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
 				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
 					s.ID = "inst-1"
 					return nil
 				}
-				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
-					return errors.New("update failed")
-				}
-			},
-			wantErr: true,
-		},
-		{
-			name:     "Docker create error",
-			userID:   "user1",
-			tmplName: "redis",
-			config:   map[string]interface{}{"name": "my-redis"},
-			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient) {
-				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
-					s.ID = "inst-1"
-					return nil
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusPending}, nil
 				}
 				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					// The async goroutine should set status to failed
+					if s.Status != models.ServiceStatusFailed {
+						close(done)
+						return fmt.Errorf("expected failed status, got %s", s.Status)
+					}
+					close(done)
 					return nil
 				}
 				md.createContainerFunc = func(ctx context.Context, opts docker.ContainerOptions) (string, error) {
 					return "", errors.New("docker error")
 				}
 			},
-			wantErr: true,
+			wantErr:    false, // DeployInstance returns nil; error is handled async
+			wantStatus: models.ServiceStatusPending,
+			wantAsync:  true,
+		},
+		{
+			name:     "Repository update error is handled async",
+			userID:   "user1",
+			tmplName: "redis",
+			config:   map[string]interface{}{"name": "my-redis"},
+			setupMock: func(mi *mockInstanceRepository, mc *mockContainerRepository, md *mockDockerClient, done chan struct{}) {
+				mi.createFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					s.ID = "inst-1"
+					return nil
+				}
+				mi.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+					return &models.ServiceInstance{ID: id, Status: models.ServiceStatusPending}, nil
+				}
+				mi.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+					close(done)
+					return errors.New("update failed")
+				}
+			},
+			wantErr:    false, // DeployInstance returns nil; error is handled async
+			wantStatus: models.ServiceStatusPending,
+			wantAsync:  true,
 		},
 	}
 
@@ -348,8 +391,9 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 			mockRepo := &mockInstanceRepository{}
 			mockContainerRepo := &mockContainerRepository{}
 			mockDocker := &mockDockerClient{}
+			done := make(chan struct{})
 			if tt.setupMock != nil {
-				tt.setupMock(mockRepo, mockContainerRepo, mockDocker)
+				tt.setupMock(mockRepo, mockContainerRepo, mockDocker, done)
 			}
 
 			svc := NewInstanceService(mockRepo, mockContainerRepo, mockDocker, catalog, "goforge_net", false, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -362,6 +406,15 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 			if !tt.wantErr && got != nil {
 				if got.Status != tt.wantStatus {
 					t.Errorf("DeployInstance() status = %v, want %v", got.Status, tt.wantStatus)
+				}
+			}
+
+			// Wait for the async goroutine to finish for tests that spawn one
+			if tt.wantAsync {
+				select {
+				case <-done:
+				case <-time.After(5 * time.Second):
+					t.Fatal("timed out waiting for async deployment goroutine")
 				}
 			}
 		})

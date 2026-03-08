@@ -29,6 +29,8 @@ import (
 	"github.com/raythurman2386/goforge/internal/sse"
 	"github.com/raythurman2386/goforge/internal/web"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/web/httputil"
+	"github.com/raythurman2386/goforge/internal/web/middleware"
 	"github.com/raythurman2386/goforge/internal/webhook"
 )
 
@@ -244,7 +246,6 @@ func runServer() error {
 	go sseHub.Run()
 
 	monitorCollector := monitor.NewCollector(dockerClient, containerRepo, projectRepo, instanceRepo)
-	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector)
 
 	// Initialize services
 	auditService := services.NewAuditService(auditLogRepo, logger.WithComponent(log, "audit"))
@@ -285,23 +286,35 @@ func runServer() error {
 	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog, cfg.TraefikNetwork, cfg.CloudflareProxyMode, logger.WithComponent(log, "instance"))
 
 	// Initialize handlers
+	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector, containerRepo, instanceRepo, deployService, projectService, logger.WithComponent(log, "sse"))
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, logger.WithComponent(log, "auth"))
-	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService)
-	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService)
-	envHandler := handlers.NewEnvironmentHandler(projectService)
-	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker)
-	serviceHandler := handlers.NewServiceHandler(catalog, instanceService)
+	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService, logger.WithComponent(log, "dashboard"))
+	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService, logger.WithComponent(log, "projects"))
+	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments"))
+	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments"))
+	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services"))
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings"))
-	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService)
-	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret)
+	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
+	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
-	containerHandler := handlers.NewContainerHandler(containerRepo, dockerClient, logger.WithComponent(log, "containers"))
+	containerHandler := handlers.NewContainerHandler(containerRepo, instanceRepo, dockerClient, logger.WithComponent(log, "containers"))
+
+	// Rate limiter (stopped during graceful shutdown)
+	trustedProxies := httputil.DefaultTrustedProxies()
+	if len(cfg.TrustedProxies) > 0 {
+		trustedProxies = httputil.ParseTrustedProxies(cfg.TrustedProxies)
+	}
+	rateLimiter := middleware.NewRateLimiter(30, 60, trustedProxies)
+	defer rateLimiter.Stop()
 
 	// Create router
 	router := web.Router(
 		cfg,
 		sessionManager,
+		apiTokenRepo,
+		userRepo,
+		rateLimiter,
 		authHandler,
 		dashboardHandler,
 		projectHandler,

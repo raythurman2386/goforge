@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -16,35 +17,91 @@ import (
 // EnvironmentHandler handles environment related requests.
 type EnvironmentHandler struct {
 	projectService *project.Service
+	logger         *slog.Logger
 }
 
 // NewEnvironmentHandler creates a new EnvironmentHandler.
-func NewEnvironmentHandler(ps *project.Service) *EnvironmentHandler {
+func NewEnvironmentHandler(ps *project.Service, logger *slog.Logger) *EnvironmentHandler {
 	return &EnvironmentHandler{
 		projectService: ps,
+		logger:         logger,
 	}
+}
+
+// verifyProjectOwnership checks that the project (from URL param "id") belongs to the authenticated user.
+// Returns the project on success, or nil if unauthorized (after writing the error response).
+func (h *EnvironmentHandler) verifyProjectOwnership(w http.ResponseWriter, r *http.Request, user *models.User) *models.Project {
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		return nil
+	}
+	p, err := h.projectService.GetProject(r.Context(), projectID)
+	if err != nil || p.UserID != user.ID {
+		http.Error(w, "project not found", http.StatusNotFound)
+		return nil
+	}
+	return p
+}
+
+// verifyEnvOwnership checks that an environment (looked up by envID) belongs to a project
+// that the authenticated user owns. Returns the environment on success.
+func (h *EnvironmentHandler) verifyEnvOwnership(w http.ResponseWriter, r *http.Request, user *models.User, envID string) *models.Environment {
+	env, err := h.projectService.GetEnvironment(r.Context(), envID)
+	if err != nil {
+		http.Error(w, "environment not found", http.StatusNotFound)
+		return nil
+	}
+	// Verify the environment's project belongs to the user
+	p, err := h.projectService.GetProject(r.Context(), env.ProjectID)
+	if err != nil || p.UserID != user.ID {
+		http.Error(w, "environment not found", http.StatusNotFound)
+		return nil
+	}
+	return env
 }
 
 // ListEnvironments renders the environment list for a project.
 func (h *EnvironmentHandler) ListEnvironments(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "id")
-	envs, err := h.projectService.ListEnvironments(r.Context(), projectID)
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
+	p := h.verifyProjectOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
+	envs, err := h.projectService.ListEnvironments(r.Context(), p.ID)
 	if err != nil {
 		http.Error(w, "failed to list environments", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	_, _ = fmt.Fprintf(w, "<div>Found %d environments for project %s</div>", len(envs), projectID)
+	_, _ = fmt.Fprintf(w, "<div>Found %d environments for project %s</div>", len(envs), p.ID)
 }
 
 // CreateEnvironment handles environment creation.
 func (h *EnvironmentHandler) CreateEnvironment(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "id")
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
+	p := h.verifyProjectOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
 	name := r.FormValue("name")
+	if name == "" || len(name) > maxInputLength {
+		http.Error(w, "environment name is required and must be under 255 characters", http.StatusBadRequest)
+		return
+	}
 
 	env := &models.Environment{
-		ProjectID: projectID,
+		ProjectID: p.ID,
 		Name:      name,
 	}
 
@@ -59,15 +116,23 @@ func (h *EnvironmentHandler) CreateEnvironment(w http.ResponseWriter, r *http.Re
 
 // UpdateEnvironment handles environment updates.
 func (h *EnvironmentHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	envID := chi.URLParam(r, "envId")
 
-	env, err := h.projectService.GetEnvironment(r.Context(), envID)
-	if err != nil {
-		http.Error(w, "environment not found", http.StatusNotFound)
+	env := h.verifyEnvOwnership(w, r, user, envID)
+	if env == nil {
 		return
 	}
 
 	if domain := r.FormValue("domain"); domain != "" {
+		if !isValidDomain(domain) {
+			http.Error(w, "invalid domain format", http.StatusBadRequest)
+			return
+		}
 		env.Domain.String = domain
 		env.Domain.Valid = true
 	} else {
@@ -100,9 +165,18 @@ func (h *EnvironmentHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Re
 
 // NewEnvironmentModal renders the modal to create a new environment.
 func (h *EnvironmentHandler) NewEnvironmentModal(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "id")
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
+	p := h.verifyProjectOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
-	component := components.CreateEnvironmentModal(projectID, csrfToken)
+	component := components.CreateEnvironmentModal(p.ID, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render modal", http.StatusInternalServerError)
 	}
@@ -110,22 +184,26 @@ func (h *EnvironmentHandler) NewEnvironmentModal(w http.ResponseWriter, r *http.
 
 // GetVariables renders the variable editor for an environment.
 func (h *EnvironmentHandler) GetVariables(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	envID := chi.URLParam(r, "envId")
+
+	env := h.verifyEnvOwnership(w, r, user, envID)
+	if env == nil {
+		return
+	}
+
 	vars, err := h.projectService.ListEnvVariables(r.Context(), envID)
 	if err != nil {
 		http.Error(w, "failed to list variables", http.StatusInternalServerError)
 		return
 	}
 
-	// Look up the environment to get the project ID (needed for the sync button URL).
-	projectID := ""
-	env, err := h.projectService.GetEnvironment(r.Context(), envID)
-	if err == nil {
-		projectID = env.ProjectID
-	}
-
 	csrfToken := auth.GetCSRFToken(r)
-	component := components.VariableEditor(envID, vars, csrfToken, projectID)
+	component := components.VariableEditor(envID, vars, csrfToken, env.ProjectID)
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render variable editor", http.StatusInternalServerError)
 	}
@@ -133,10 +211,26 @@ func (h *EnvironmentHandler) GetVariables(w http.ResponseWriter, r *http.Request
 
 // AddVariable handles adding a new environment variable.
 func (h *EnvironmentHandler) AddVariable(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	envID := chi.URLParam(r, "envId")
+
+	env := h.verifyEnvOwnership(w, r, user, envID)
+	if env == nil {
+		return
+	}
+
 	key := r.FormValue("key")
 	value := r.FormValue("value")
 	isSecret := r.FormValue("is_secret") == "on"
+
+	if key == "" || len(key) > maxEnvVarKeyLen {
+		http.Error(w, "variable key is required and must be under 128 characters", http.StatusBadRequest)
+		return
+	}
 
 	v := &models.EnvVariable{
 		EnvironmentID: envID,
@@ -156,7 +250,18 @@ func (h *EnvironmentHandler) AddVariable(w http.ResponseWriter, r *http.Request)
 
 // NewVariableModal renders the modal to add a new environment variable.
 func (h *EnvironmentHandler) NewVariableModal(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	envID := chi.URLParam(r, "envId")
+
+	env := h.verifyEnvOwnership(w, r, user, envID)
+	if env == nil {
+		return
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
 	component := components.AddVariableModal(envID, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
@@ -167,12 +272,31 @@ func (h *EnvironmentHandler) NewVariableModal(w http.ResponseWriter, r *http.Req
 // SyncEnvFromRepo fetches .env.example from the project's repo and seeds new variables
 // into the given environment (idempotent — existing keys are skipped).
 func (h *EnvironmentHandler) SyncEnvFromRepo(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "id")
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
+	p := h.verifyProjectOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
 	envID := chi.URLParam(r, "envId")
 
-	_, err := h.projectService.SeedEnvVarsFromRepo(r.Context(), envID, projectID)
+	// Verify environment belongs to this project
+	env := h.verifyEnvOwnership(w, r, user, envID)
+	if env == nil {
+		return
+	}
+	if env.ProjectID != p.ID {
+		http.Error(w, "environment does not belong to this project", http.StatusForbidden)
+		return
+	}
+
+	_, err := h.projectService.SeedEnvVarsFromRepo(r.Context(), envID, p.ID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to sync env vars: %v", err), http.StatusInternalServerError)
+		http.Error(w, "failed to sync environment variables from repository", http.StatusInternalServerError)
 		return
 	}
 
@@ -182,10 +306,22 @@ func (h *EnvironmentHandler) SyncEnvFromRepo(w http.ResponseWriter, r *http.Requ
 
 // DeleteVariable removes an environment variable by ID.
 func (h *EnvironmentHandler) DeleteVariable(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
+	// For the global /envs/{envId}/variables/{varId} route, verify ownership via envId
+	envID := chi.URLParam(r, "envId")
+	env := h.verifyEnvOwnership(w, r, user, envID)
+	if env == nil {
+		return
+	}
+
 	varID := chi.URLParam(r, "varId")
 
-	if err := h.projectService.DeleteEnvVariable(r.Context(), varID); err != nil {
-		http.Error(w, fmt.Sprintf("failed to delete variable: %v", err), http.StatusInternalServerError)
+	if err := h.projectService.DeleteEnvVariableScoped(r.Context(), varID, envID); err != nil {
+		http.Error(w, "failed to delete variable", http.StatusInternalServerError)
 		return
 	}
 

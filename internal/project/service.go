@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -78,7 +79,7 @@ func (s *Service) CreateProject(ctx context.Context, p *models.Project) (*models
 // Returns the number of new variables inserted and any non-fatal diagnostic error.
 func (s *Service) SeedEnvVarsFromRepo(ctx context.Context, envID, projectID string) (int, error) {
 	if s.gitService == nil || s.gitSourceRepo == nil {
-		return 0, fmt.Errorf("git service not configured")
+		return 0, errors.New("git service not configured")
 	}
 
 	p, err := s.projectRepo.GetByID(ctx, projectID)
@@ -86,7 +87,7 @@ func (s *Service) SeedEnvVarsFromRepo(ctx context.Context, envID, projectID stri
 		return 0, fmt.Errorf("project not found: %w", err)
 	}
 	if !p.GitSourceID.Valid {
-		return 0, fmt.Errorf("project has no git source configured")
+		return 0, errors.New("project has no git source configured")
 	}
 
 	source, err := s.gitSourceRepo.GetByID(ctx, p.GitSourceID.String)

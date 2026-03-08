@@ -38,6 +38,7 @@ func CSRFMiddleware(next http.Handler) http.Handler {
 				Value:    token,
 				Path:     "/",
 				HttpOnly: false, // Must be accessible by JS for HTMX
+				Secure:   IsSecureRequest(r),
 				SameSite: http.SameSiteLaxMode,
 			})
 		} else {

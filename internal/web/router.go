@@ -20,6 +20,9 @@ import (
 func Router(
 	cfg *config.Config,
 	sessionManager *auth.SessionManager,
+	apiTokenRepo auth.TokenLookup,
+	userRepo auth.UserLookup,
+	rateLimiter *middleware.RateLimiter,
 	authHandler *handlers.AuthHandler,
 	dashboardHandler *handlers.DashboardHandler,
 	projectHandler *handlers.ProjectHandler,
@@ -46,10 +49,13 @@ func Router(
 
 	// Middleware stack
 	r.Use(chi_middleware.Recoverer)
-	// Rate limiting: 30 rps, burst 60
-	r.Use(middleware.RateLimit(30, 60, trustedProxies))
+	// Rate limiting
+	r.Use(rateLimiter.Middleware)
 	// Session middleware is safe for all routes (just populates context)
 	r.Use(auth.Middleware(sessionManager))
+	// API token middleware — authenticates requests with Authorization: Bearer headers.
+	// Placed after session middleware so session-based auth takes priority.
+	r.Use(auth.APITokenMiddleware(apiTokenRepo, userRepo))
 
 	// Global error handlers
 	r.NotFound(handlers.NotFoundHandler)
@@ -165,6 +171,7 @@ func Router(
 				// Service Catalog
 				r.Route("/services", func(r chi.Router) {
 					r.Get("/", serviceHandler.Catalog)
+					r.Get("/instances", serviceHandler.InstanceList)
 					r.Post("/", serviceHandler.Deploy) // Fallback if specific template route isn't used
 					r.Get("/{template}/configure", serviceHandler.Configure)
 					r.Post("/{template}", serviceHandler.Deploy)

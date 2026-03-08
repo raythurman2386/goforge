@@ -10,6 +10,16 @@ const (
 	SessionCookieName = "goforge_session"
 )
 
+// IsSecureRequest returns true if the request was made over HTTPS.
+// It checks the X-Forwarded-Proto header (set by reverse proxies like Traefik)
+// and falls back to r.TLS. r.URL.Scheme is almost always empty server-side.
+func IsSecureRequest(r *http.Request) bool {
+	if r.Header.Get("X-Forwarded-Proto") == "https" {
+		return true
+	}
+	return r.TLS != nil
+}
+
 // SetSessionCookie sets the session cookie on the response.
 func SetSessionCookie(w http.ResponseWriter, token string, expiresAt time.Time, secure bool) {
 	http.SetCookie(w, &http.Cookie{

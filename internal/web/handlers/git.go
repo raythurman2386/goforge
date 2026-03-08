@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -17,13 +18,15 @@ import (
 type GitHandler struct {
 	gitSourceRepo *repositories.GitSourceRepository
 	gitService    *git.Service
+	logger        *slog.Logger
 }
 
 // NewGitHandler creates a new GitHandler.
-func NewGitHandler(gsr *repositories.GitSourceRepository, gs *git.Service) *GitHandler {
+func NewGitHandler(gsr *repositories.GitSourceRepository, gs *git.Service, logger *slog.Logger) *GitHandler {
 	return &GitHandler{
 		gitSourceRepo: gsr,
 		gitService:    gs,
+		logger:        logger,
 	}
 }
 
@@ -35,8 +38,11 @@ func (h *GitHandler) ListRepositories(w http.ResponseWriter, r *http.Request) {
 		sourceID = chi.URLParam(r, "sourceId")
 	}
 	if sourceID == "" {
-		// Return empty or manual input indicator if needed,
-		// but here we likely just want to return nothing or handle it gracefully
+		// Return an empty select options placeholder so HTMX gets a valid response
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if _, err := w.Write([]byte(`<option value="">Select a repository</option>`)); err != nil {
+			http.Error(w, "failed to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -60,7 +66,8 @@ func (h *GitHandler) ListRepositories(w http.ResponseWriter, r *http.Request) {
 
 	repos, err := h.gitService.ListRepositories(r.Context(), source)
 	if err != nil {
-		http.Error(w, "Failed to list repositories: "+err.Error(), http.StatusInternalServerError)
+		h.logger.Error("failed to list repositories", "error", err, "source_id", sourceID)
+		http.Error(w, "Failed to list repositories", http.StatusInternalServerError)
 		return
 	}
 
@@ -115,7 +122,8 @@ func (h *GitHandler) ListBranches(w http.ResponseWriter, r *http.Request) {
 
 	branches, err := h.gitService.ListBranches(r.Context(), source, fullName)
 	if err != nil {
-		http.Error(w, "Failed to list branches: "+err.Error(), http.StatusInternalServerError)
+		h.logger.Error("failed to list branches", "error", err, "source_id", sourceID, "repo", fullName)
+		http.Error(w, "Failed to list branches", http.StatusInternalServerError)
 		return
 	}
 

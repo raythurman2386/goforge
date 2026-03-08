@@ -43,10 +43,24 @@ func (w *Worker) Start() {
 			case id := <-w.queue:
 				w.process(id)
 			case <-w.quit:
+				// Drain remaining queued deployments before exiting
+				w.drain()
 				return
 			}
 		}
 	}()
+}
+
+// drain processes any remaining items in the queue before shutdown.
+func (w *Worker) drain() {
+	for {
+		select {
+		case id := <-w.queue:
+			w.process(id)
+		default:
+			return
+		}
+	}
 }
 
 // Stop stops the deployment worker gracefully.
@@ -55,9 +69,15 @@ func (w *Worker) Stop() {
 	w.wg.Wait()
 }
 
-// Enqueue adds a deployment to the queue.
-func (w *Worker) Enqueue(id string) {
-	w.queue <- id
+// Enqueue adds a deployment to the queue. Returns false if the queue is full.
+func (w *Worker) Enqueue(id string) bool {
+	select {
+	case w.queue <- id:
+		return true
+	default:
+		w.service.logger.Warn("deployment queue is full, rejecting deployment", "deployment_id", id)
+		return false
+	}
 }
 
 // process handles a single deployment with proper context and timeout.
@@ -72,7 +92,10 @@ func (w *Worker) process(id string) {
 		if ctx.Err() == context.DeadlineExceeded {
 			w.service.logger.Error("deployment timed out", "deployment_id", id, "timeout", w.timeout)
 			msg := "deployment timed out after " + w.timeout.String()
-			if transitionErr := w.service.Transition(ctx, id, models.DeploymentStatusFailed, &msg); transitionErr != nil {
+			// Use a fresh context for the transition since the deployment context is expired.
+			transitionCtx, transitionCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer transitionCancel()
+			if transitionErr := w.service.Transition(transitionCtx, id, models.DeploymentStatusFailed, &msg); transitionErr != nil {
 				w.service.logger.Error("failed to transition deployment to failed", "deployment_id", id, "error", transitionErr)
 			}
 			return

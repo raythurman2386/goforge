@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -50,6 +52,7 @@ type Handler struct {
 	environmentRepo *repositories.EnvironmentRepository
 	worker          *deploy.Worker
 	webhookSecret   string
+	logger          *slog.Logger
 }
 
 // NewHandler creates a new webhook Handler.
@@ -59,6 +62,7 @@ func NewHandler(
 	er *repositories.EnvironmentRepository,
 	w *deploy.Worker,
 	secret string,
+	logger *slog.Logger,
 ) *Handler {
 	return &Handler{
 		deployService:   ds,
@@ -66,6 +70,7 @@ func NewHandler(
 		environmentRepo: er,
 		worker:          w,
 		webhookSecret:   secret,
+		logger:          logger,
 	}
 }
 
@@ -93,7 +98,8 @@ func (h *Handler) HandleGitHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read body
+	// Read body (limit to 1MB to prevent abuse)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
@@ -222,6 +228,7 @@ func (h *Handler) HandleGitea(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
@@ -263,8 +270,8 @@ func (h *Handler) HandleGitea(w http.ResponseWriter, r *http.Request) {
 
 // processPushEvent processes a push event and triggers deployments.
 func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
-	fmt.Printf("Received push event: repo=%s branch=%s commit=%s\n",
-		event.RepositoryName, event.Branch, event.CommitSHA)
+	h.logger.Info("received push event",
+		"repo", event.RepositoryName, "branch", event.Branch, "commit", event.CommitSHA)
 
 	if !event.IsBranchPush() {
 		return
@@ -279,12 +286,12 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 	// For now, we assume exact match or simple normalization if needed.
 	projects, err := h.projectRepo.ListByRepoURL(ctx, event.RepositoryURL)
 	if err != nil {
-		fmt.Printf("Failed to list projects for repo %s: %v\n", event.RepositoryURL, err)
+		h.logger.Error("failed to list projects for repo", "repo", event.RepositoryURL, "error", err)
 		return
 	}
 
 	if len(projects) == 0 {
-		fmt.Printf("No projects found for repo %s\n", event.RepositoryURL)
+		h.logger.Debug("no projects found for repo", "repo", event.RepositoryURL)
 		return
 	}
 
@@ -292,7 +299,7 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 	for _, proj := range projects {
 		envs, err := h.environmentRepo.ListByProjectID(ctx, proj.ID)
 		if err != nil {
-			fmt.Printf("Failed to list environments for project %s: %v\n", proj.ID, err)
+			h.logger.Error("failed to list environments for project", "project_id", proj.ID, "error", err)
 			continue
 		}
 
@@ -312,7 +319,7 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 			}
 
 			// 3. Trigger deployment
-			fmt.Printf("Triggering deployment for project %s env %s\n", proj.Name, env.Name)
+			h.logger.Info("triggering deployment", "project", proj.Name, "environment", env.Name)
 
 			d := &models.Deployment{
 				EnvironmentID: env.ID,
@@ -325,12 +332,14 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 			}
 
 			if err := h.deployService.CreateDeployment(ctx, d); err != nil {
-				fmt.Printf("Failed to create deployment record: %v\n", err)
+				h.logger.Error("failed to create deployment record", "error", err)
 				continue
 			}
 
 			// Enqueue for background processing
-			h.worker.Enqueue(d.ID)
+			if !h.worker.Enqueue(d.ID) {
+				h.logger.Warn("deployment queue full, skipping deployment", "deployment_id", d.ID)
+			}
 		}
 	}
 }
@@ -354,15 +363,16 @@ func (h *Handler) HandleGitLab(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// GitLab sends a secret token in the header
+	// GitLab sends a secret token in the header — use constant-time comparison
 	token := r.Header.Get("X-Gitlab-Token")
-	if token != h.webhookSecret {
+	if subtle.ConstantTimeCompare([]byte(token), []byte(h.webhookSecret)) != 1 {
 		http.Error(w, "Invalid token", http.StatusUnauthorized)
 		return
 	}
 
 	eventType := r.Header.Get("X-Gitlab-Event")
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)

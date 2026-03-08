@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -210,10 +211,10 @@ func (s *Service) SanitizeLogOutput(_ context.Context, output string, vars []*mo
 // ValidateSecretValue validates that a secret value meets requirements.
 func ValidateSecretValue(value string) error {
 	if value == "" {
-		return fmt.Errorf("secret value cannot be empty")
+		return errors.New("secret value cannot be empty")
 	}
 	if IsMasked(value) {
-		return fmt.Errorf("secret value cannot be a masked value")
+		return errors.New("secret value cannot be a masked value")
 	}
 	return nil
 }

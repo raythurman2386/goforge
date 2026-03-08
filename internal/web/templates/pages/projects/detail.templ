@@ -26,7 +26,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 			</div>
 			<div class="mt-4 flex md:mt-0 md:ml-4">
 				if currentEnv != nil {
-					<button hx-post={ "/projects/" + project.ID + "/deployments?env_id=" + currentEnv.ID } class="btn-primary">
+					<button hx-post={ "/projects/" + project.ID + "/deployments?env_id=" + currentEnv.ID } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="btn-primary">
 						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
 						</svg>
@@ -80,7 +80,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 		} else if activeTab == "services" {
 			@Services(project, linkedServices, availableServices, csrfToken)
 		} else if activeTab == "settings" {
-			@ProjectSettings(project, currentEnv)
+			@ProjectSettings(project, currentEnv, csrfToken)
 		}
 	}
 }
@@ -464,12 +464,12 @@ func serviceStatusColor(status models.ServiceInstanceStatus) string {
 	}
 }
 
-templ ProjectSettings(project *models.Project, currentEnv *models.Environment) {
+templ ProjectSettings(project *models.Project, currentEnv *models.Environment, csrfToken string) {
 	if currentEnv != nil {
 		<div class="card mb-8">
 			<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6">Configuration</h3>
 			
-			<form hx-put={ "/projects/" + project.ID + "/settings" } hx-swap="none">
+			<form hx-put={ "/projects/" + project.ID + "/settings" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-swap="none">
 				<input type="hidden" name="env_id" value={ currentEnv.ID } />
 				
 				<div class="space-y-8 divide-y divide-gray-100">
@@ -563,7 +563,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment) {
 				</div>
 			</div>
 			<div class="mt-5 sm:mt-0 sm:ml-6 flex-shrink-0">
-				<button type="button" hx-delete={ "/projects/" + project.ID } hx-confirm="Are you sure you want to delete this project?" class="btn-danger">
+				<button type="button" hx-delete={ "/projects/" + project.ID } hx-confirm="Are you sure you want to delete this project?" hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="btn-danger">
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
 					</svg>

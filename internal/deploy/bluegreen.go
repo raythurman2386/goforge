@@ -218,8 +218,10 @@ func (d *BlueGreenDeployer) scheduleCleanup(ctx context.Context, containerID str
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		// Best effort cleanup - don't fail if container is already gone
+		// Best effort cleanup - stop then remove. Don't fail if container is already gone.
 		//nolint:errcheck,contextcheck // Intentional: best effort cleanup with independent timeout context
 		_ = d.dockerClient.StopContainer(cleanupCtx, containerID)
+		//nolint:errcheck,contextcheck // Intentional: best effort removal with independent timeout context
+		_ = d.dockerClient.RemoveContainer(cleanupCtx, containerID)
 	}
 }

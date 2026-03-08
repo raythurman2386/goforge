@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -19,21 +20,36 @@ type DeploymentHandler struct {
 	projectService  *project.Service
 	rollbackManager *deploy.RollbackManager
 	worker          *deploy.Worker
+	logger          *slog.Logger
 }
 
 // NewDeploymentHandler creates a new DeploymentHandler.
-func NewDeploymentHandler(ds *deploy.Service, ps *project.Service, rm *deploy.RollbackManager, w *deploy.Worker) *DeploymentHandler {
+func NewDeploymentHandler(ds *deploy.Service, ps *project.Service, rm *deploy.RollbackManager, w *deploy.Worker, logger *slog.Logger) *DeploymentHandler {
 	return &DeploymentHandler{
 		deployService:   ds,
 		projectService:  ps,
 		rollbackManager: rm,
 		worker:          w,
+		logger:          logger,
 	}
 }
 
 // TriggerDeployment triggers a new deployment.
 func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	projectID := chi.URLParam(r, "id")
+
+	// Verify project ownership
+	proj, err := h.projectService.GetProject(r.Context(), projectID)
+	if err != nil || proj.UserID != user.ID {
+		http.Error(w, "project not found", http.StatusNotFound)
+		return
+	}
+
 	envID := r.URL.Query().Get("env_id")
 
 	if envID == "" {
@@ -57,7 +73,10 @@ func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	h.worker.Enqueue(d.ID)
+	if !h.worker.Enqueue(d.ID) {
+		http.Error(w, "deployment queue is full, please try again later", http.StatusServiceUnavailable)
+		return
+	}
 
 	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments")
 	w.WriteHeader(http.StatusOK)
@@ -65,12 +84,17 @@ func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Req
 
 // GetDeployment renders the deployment detail page.
 func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
 
-	// Get the project
+	// Get the project and verify ownership
 	proj, err := h.projectService.GetProject(r.Context(), projectID)
-	if err != nil {
+	if err != nil || proj.UserID != user.ID {
 		http.Error(w, "project not found", http.StatusNotFound)
 		return
 	}
@@ -92,7 +116,7 @@ func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request
 	// Get deployment logs
 	logs, err := h.deployService.GetLogs(r.Context(), deploymentID)
 	if err != nil {
-		// Log error but continue - logs might just not exist yet
+		h.logger.Warn("failed to get deployment logs", "deployment_id", deploymentID, "error", err)
 		logs = nil
 	}
 
@@ -117,8 +141,20 @@ func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request
 
 // RollbackDeployment handles rollback requests.
 func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
+
+	// Verify project ownership
+	proj, err := h.projectService.GetProject(r.Context(), projectID)
+	if err != nil || proj.UserID != user.ID {
+		http.Error(w, "project not found", http.StatusNotFound)
+		return
+	}
 
 	if h.rollbackManager == nil {
 		http.Error(w, "rollback not available", http.StatusServiceUnavailable)
@@ -147,8 +183,20 @@ func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Re
 
 // CancelDeployment handles deployment cancellation requests.
 func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
+
+	// Verify project ownership
+	proj, err := h.projectService.GetProject(r.Context(), projectID)
+	if err != nil || proj.UserID != user.ID {
+		http.Error(w, "project not found", http.StatusNotFound)
+		return
+	}
 
 	// Get the deployment
 	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
@@ -178,8 +226,20 @@ func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Requ
 // GetDeploymentStatus returns the current deployment status for HTMX polling.
 // When the deployment is no longer active, it returns an empty div to stop the banner.
 func (h *DeploymentHandler) GetDeploymentStatus(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	projectID := chi.URLParam(r, "id")
 	deploymentID := chi.URLParam(r, "deploymentID")
+
+	// Verify project ownership
+	proj, err := h.projectService.GetProject(r.Context(), projectID)
+	if err != nil || proj.UserID != user.ID {
+		http.Error(w, "project not found", http.StatusNotFound)
+		return
+	}
 
 	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
 	if err != nil {

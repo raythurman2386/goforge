@@ -77,6 +77,7 @@ templ Detail(props DetailProps) {
 					<button
 						hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/rollback", props.Project.ID, props.Deployment.ID) }
 						hx-confirm="Are you sure you want to rollback this deployment?"
+						hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
 						class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
 						<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
@@ -88,6 +89,7 @@ templ Detail(props DetailProps) {
 					<button
 						hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/cancel", props.Project.ID, props.Deployment.ID) }
 						hx-confirm="Are you sure you want to cancel this deployment?"
+						hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
 						class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
 						<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>

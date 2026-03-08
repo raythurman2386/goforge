@@ -17,56 +17,90 @@ type client struct {
 	lastSeen time.Time
 }
 
-// RateLimit implements a simple IP-based rate limiter using a token bucket.
+// RateLimiter holds the rate limiter state and provides an HTTP middleware.
+type RateLimiter struct {
+	clients        sync.Map
+	rps            float64
+	burst          int
+	trustedProxies []*net.IPNet
+	done           chan struct{}
+}
+
+// NewRateLimiter creates a new IP-based rate limiter.
 // trustedProxies controls which peers' X-Forwarded-For headers are trusted
 // for extracting the real client IP. Pass nil to only use RemoteAddr.
-func RateLimit(rps float64, burst int, trustedProxies []*net.IPNet) func(http.Handler) http.Handler {
-	clients := sync.Map{}
+// Call Stop() during graceful shutdown to release the cleanup goroutine.
+func NewRateLimiter(rps float64, burst int, trustedProxies []*net.IPNet) *RateLimiter {
+	rl := &RateLimiter{
+		rps:            rps,
+		burst:          burst,
+		trustedProxies: trustedProxies,
+		done:           make(chan struct{}),
+	}
 
 	// Cleanup background routine
 	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
 		for {
-			time.Sleep(time.Minute)
-			clients.Range(func(key, value interface{}) bool {
-				if c, ok := value.(*client); ok {
-					if time.Since(c.lastSeen) > 3*time.Minute {
-						clients.Delete(key)
+			select {
+			case <-ticker.C:
+				rl.clients.Range(func(key, value interface{}) bool {
+					if c, ok := value.(*client); ok {
+						if time.Since(c.lastSeen) > 3*time.Minute {
+							rl.clients.Delete(key)
+						}
 					}
-				}
-				return true
-			})
+					return true
+				})
+			case <-rl.done:
+				return
+			}
 		}
 	}()
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := httputil.ClientIP(
-				r.RemoteAddr,
-				r.Header.Get("X-Forwarded-For"),
-				r.Header.Get("X-Real-IP"),
-				trustedProxies,
-			)
+	return rl
+}
 
-			var c *client
-			if v, ok := clients.Load(ip); ok {
-				if typed, ok := v.(*client); ok {
-					c = typed
-				}
-			}
-
-			if c == nil {
-				c = &client{limiter: rate.NewLimiter(rate.Limit(rps), burst)}
-				clients.Store(ip, c)
-			}
-
-			c.lastSeen = time.Now()
-
-			if !c.limiter.Allow() {
-				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
+// Stop stops the cleanup goroutine. Safe to call multiple times.
+func (rl *RateLimiter) Stop() {
+	select {
+	case <-rl.done:
+		// already closed
+	default:
+		close(rl.done)
 	}
+}
+
+// Middleware returns the chi-compatible middleware handler.
+func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := httputil.ClientIP(
+			r.RemoteAddr,
+			r.Header.Get("X-Forwarded-For"),
+			r.Header.Get("X-Real-IP"),
+			rl.trustedProxies,
+		)
+
+		var c *client
+		if v, ok := rl.clients.Load(ip); ok {
+			if typed, ok := v.(*client); ok {
+				c = typed
+			}
+		}
+
+		if c == nil {
+			c = &client{limiter: rate.NewLimiter(rate.Limit(rl.rps), rl.burst)}
+			rl.clients.Store(ip, c)
+		}
+
+		c.lastSeen = time.Now()
+
+		if !c.limiter.Allow() {
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

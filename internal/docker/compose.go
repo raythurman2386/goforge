@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -149,7 +150,7 @@ func (h *HealthCheck) UnmarshalYAML(value *yaml.Node) error {
 		return nil
 	}
 
-	return fmt.Errorf("failed to unmarshal healthcheck")
+	return errors.New("failed to unmarshal healthcheck")
 }
 
 // ParseCompose parses a Docker Compose YAML file.

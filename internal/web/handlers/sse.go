@@ -4,31 +4,50 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/database/repositories"
+	"github.com/raythurman2386/goforge/internal/deploy"
 	"github.com/raythurman2386/goforge/internal/docker"
+	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/monitor"
+	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/sse"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 )
 
 // SSEHandler handles Server-Sent Events for log streaming.
 type SSEHandler struct {
-	hub          *sse.Hub
-	dockerClient *docker.Client
-	collector    *monitor.Collector
+	hub                 *sse.Hub
+	dockerClient        *docker.Client
+	collector           *monitor.Collector
+	containerRepo       *repositories.ContainerRepository
+	serviceInstanceRepo *repositories.ServiceInstanceRepository
+	deployService       *deploy.Service
+	projectService      *project.Service
+	logger              *slog.Logger
 }
 
 // NewSSEHandler creates a new SSE handler.
-func NewSSEHandler(hub *sse.Hub, dc *docker.Client, c *monitor.Collector) *SSEHandler {
+func NewSSEHandler(hub *sse.Hub, dc *docker.Client, c *monitor.Collector,
+	cr *repositories.ContainerRepository, sir *repositories.ServiceInstanceRepository,
+	ds *deploy.Service, ps *project.Service, logger *slog.Logger,
+) *SSEHandler {
 	return &SSEHandler{
-		hub:          hub,
-		dockerClient: dc,
-		collector:    c,
+		hub:                 hub,
+		dockerClient:        dc,
+		collector:           c,
+		containerRepo:       cr,
+		serviceInstanceRepo: sir,
+		deployService:       ds,
+		projectService:      ps,
+		logger:              logger,
 	}
 }
 
@@ -37,7 +56,6 @@ func setSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 }
 
 // DeploymentLogs streams deployment logs via SSE.
@@ -46,6 +64,11 @@ func (h *SSEHandler) DeploymentLogs(w http.ResponseWriter, r *http.Request) {
 	deploymentID := chi.URLParam(r, "deploymentID")
 	if deploymentID == "" {
 		http.Error(w, "deployment ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Verify deployment ownership via deployment -> environment -> project -> user
+	if !h.verifyDeploymentOwnership(w, r, deploymentID) {
 		return
 	}
 
@@ -91,6 +114,11 @@ func (h *SSEHandler) ContainerLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify container ownership
+	if !h.verifyContainerOwnership(w, r, containerID) {
+		return
+	}
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -131,6 +159,11 @@ func (h *SSEHandler) ContainerStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify container ownership
+	if !h.verifyContainerOwnership(w, r, containerID) {
+		return
+	}
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -152,11 +185,13 @@ func (h *SSEHandler) ContainerStats(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 			stats, err := h.collector.CollectStats(r.Context(), containerID)
 			if err != nil {
+				h.logger.Debug("failed to collect container stats", "container_id", containerID, "error", err)
 				continue
 			}
 
 			var buf bytes.Buffer
 			if err := components.Stats(stats).Render(r.Context(), &buf); err != nil {
+				h.logger.Debug("failed to render stats component", "container_id", containerID, "error", err)
 				continue
 			}
 			writeRawEvent(w, flusher, "stats", buf.Bytes())
@@ -226,4 +261,62 @@ func writeRawEvent(w http.ResponseWriter, flusher http.Flusher, eventType string
 	}
 	fmt.Fprintf(w, "\n")
 	flusher.Flush()
+}
+
+// verifyContainerOwnership checks that the Docker container belongs to the
+// authenticated user by tracing tracked container → service instance → user.
+// Returns true if ownership is verified; writes an HTTP error and returns false otherwise.
+func (h *SSEHandler) verifyContainerOwnership(w http.ResponseWriter, r *http.Request, dockerID string) bool {
+	user, ok := r.Context().Value(auth.UserContextKey).(*models.User)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return false
+	}
+
+	tracked, err := h.containerRepo.GetByDockerID(r.Context(), dockerID)
+	if err != nil {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return false
+	}
+
+	if tracked.ServiceInstanceID.Valid {
+		instance, err := h.serviceInstanceRepo.GetByID(r.Context(), tracked.ServiceInstanceID.String)
+		if err == nil && instance.UserID == user.ID {
+			return true
+		}
+	}
+
+	http.Error(w, "access denied", http.StatusForbidden)
+	return false
+}
+
+// verifyDeploymentOwnership checks that a deployment belongs to the authenticated
+// user by tracing deployment → environment → project → user.
+// Returns true if ownership is verified; writes an HTTP error and returns false otherwise.
+func (h *SSEHandler) verifyDeploymentOwnership(w http.ResponseWriter, r *http.Request, deploymentID string) bool {
+	user, ok := r.Context().Value(auth.UserContextKey).(*models.User)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return false
+	}
+
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return false
+	}
+
+	env, err := h.projectService.GetEnvironment(r.Context(), deployment.EnvironmentID)
+	if err != nil {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return false
+	}
+
+	proj, err := h.projectService.GetProject(r.Context(), env.ProjectID)
+	if err != nil || proj.UserID != user.ID {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return false
+	}
+
+	return true
 }

@@ -3,7 +3,7 @@ package deploy
 import (
 	"context"
 	"fmt"
-	"time"
+	"log/slog"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -58,8 +58,22 @@ func isValidTransition(from, to models.DeploymentStatus) bool {
 }
 
 // Log logs a message for a deployment.
-func (s *Service) Log(ctx context.Context, deploymentID, level, source, message string) error {
-	// For now, we'll just print to stdout until we implement DeploymentLogRepository
-	fmt.Printf("[%s] [%s] [%s] %s\n", time.Now().Format(time.RFC3339), level, source, message)
+func (s *Service) Log(ctx context.Context, _, level, source, message string) error {
+	// Use structured logging until we implement DeploymentLogRepository
+	s.logger.Log(ctx, slogLevel(level), message, "source", source)
 	return nil
+}
+
+// slogLevel converts a string log level to slog.Level.
+func slogLevel(level string) slog.Level {
+	switch level {
+	case "error", "ERROR":
+		return slog.LevelError
+	case "warn", "WARN", "warning", "WARNING":
+		return slog.LevelWarn
+	case "debug", "DEBUG":
+		return slog.LevelDebug
+	default:
+		return slog.LevelInfo
+	}
 }

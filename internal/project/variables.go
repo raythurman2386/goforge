@@ -27,3 +27,8 @@ func (s *Service) UpdateEnvVariable(ctx context.Context, v *models.EnvVariable) 
 func (s *Service) DeleteEnvVariable(ctx context.Context, id string) error {
 	return s.envVariableRepo.Delete(ctx, id)
 }
+
+// DeleteEnvVariableScoped deletes an environment variable only if it belongs to the given environment.
+func (s *Service) DeleteEnvVariableScoped(ctx context.Context, id, environmentID string) error {
+	return s.envVariableRepo.DeleteScoped(ctx, id, environmentID)
+}

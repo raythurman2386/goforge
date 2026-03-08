@@ -6,46 +6,22 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
+// hasPendingInstance returns true if any instance is in a transitional state.
+func hasPendingInstance(instances []*models.ServiceInstance) bool {
+	for _, i := range instances {
+		if i.Status == models.ServiceStatusPending || i.Status == models.ServiceStatusStarting {
+			return true
+		}
+	}
+	return false
+}
+
 templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceInstance, csrfToken string) {
 	@layouts.AppLayout("Services", csrfToken, nil) {
 		<div class="mb-12">
 			<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">Your Services</h2>
 			<p class="mt-2 text-sm text-gray-500">Currently active and pending instances.</p>
-			if len(instances) == 0 {
-				<div class="mt-6 card p-12 text-center">
-					<div class="flex flex-col items-center">
-						<div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-							<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-							</svg>
-						</div>
-						<h3 class="text-lg font-bold text-gray-900">No services yet</h3>
-						<p class="mt-1 text-sm text-gray-500">Choose a template from the catalog below to get started.</p>
-					</div>
-				</div>
-			} else {
-				<div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-					for _, instance := range instances {
-						<a href={ templ.URL("/services/" + instance.ID) } class="card hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group">
-							<div class="flex items-center justify-between mb-4">
-								<h3 class="text-lg font-bold text-gray-900 tracking-tight">{ instance.Name }</h3>
-								<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-									templ.KV("bg-emerald-100 text-emerald-800", instance.Status == models.ServiceStatusRunning),
-									templ.KV("bg-amber-100 text-amber-800", instance.Status == models.ServiceStatusPending),
-									templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed) }>
-									{ string(instance.Status) }
-								</span>
-							</div>
-							<div class="flex items-center text-sm text-gray-500">
-								<div class="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold mr-2">
-									{ string(instance.TemplateName[0]) }
-								</div>
-								{ instance.TemplateName }
-							</div>
-						</a>
-					}
-				</div>
-			}
+			@InstanceList(instances)
 		</div>
 
 		<div class="pt-12 border-t border-gray-200/60">
@@ -83,6 +59,58 @@ templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceIn
 					</div>
 				}
 			</div>
+		</div>
+	}
+}
+
+// InstanceList renders the service instance grid with conditional HTMX polling.
+// When any instance is pending or starting, it polls every 3s to auto-update.
+templ InstanceList(instances []*models.ServiceInstance) {
+	if len(instances) == 0 {
+		<div
+			id="instance-list"
+			class="mt-6 card p-12 text-center"
+		>
+			<div class="flex flex-col items-center">
+				<div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+					<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+					</svg>
+				</div>
+				<h3 class="text-lg font-bold text-gray-900">No services yet</h3>
+				<p class="mt-1 text-sm text-gray-500">Choose a template from the catalog below to get started.</p>
+			</div>
+		</div>
+	} else {
+		<div
+			id="instance-list"
+			class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+			if hasPendingInstance(instances) {
+				hx-get="/services/instances"
+				hx-trigger="every 3s"
+				hx-swap="outerHTML"
+			}
+		>
+			for _, instance := range instances {
+				<a href={ templ.URL("/services/" + instance.ID) } class="card hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group">
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-lg font-bold text-gray-900 tracking-tight">{ instance.Name }</h3>
+						<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+							templ.KV("bg-emerald-100 text-emerald-800", instance.Status == models.ServiceStatusRunning),
+							templ.KV("bg-amber-100 text-amber-800", instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting),
+							templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed),
+							templ.KV("bg-gray-100 text-gray-600", instance.Status == models.ServiceStatusStopped) }>
+							{ string(instance.Status) }
+						</span>
+					</div>
+					<div class="flex items-center text-sm text-gray-500">
+						<div class="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold mr-2">
+							{ string(instance.TemplateName[0]) }
+						</div>
+						{ instance.TemplateName }
+					</div>
+				</a>
+			}
 		</div>
 	}
 }

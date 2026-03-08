@@ -93,7 +93,8 @@ func (r *GitSourceRepository) ListByUserID(ctx context.Context, userID string) (
 		SELECT id, user_id, name, type, api_url, access_token, 
 			ssh_private_key, is_default, created_at, updated_at
 		FROM git_sources WHERE user_id = $1
-		ORDER BY created_at DESC`
+		ORDER BY created_at DESC
+		LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
@@ -166,6 +167,10 @@ func (r *GitSourceRepository) Update(ctx context.Context, source *models.GitSour
 }
 
 func (r *GitSourceRepository) encrypt(source *models.GitSource) error {
+	if r.secrets == nil {
+		return nil
+	}
+
 	if source.AccessToken.Valid && source.AccessToken.String != "" {
 		encrypted, err := r.secrets.Encrypt(source.AccessToken.String)
 		if err != nil {
@@ -185,6 +190,10 @@ func (r *GitSourceRepository) encrypt(source *models.GitSource) error {
 }
 
 func (r *GitSourceRepository) decrypt(source *models.GitSource) {
+	if r.secrets == nil {
+		return
+	}
+
 	if source.AccessToken.Valid && source.AccessToken.String != "" {
 		decrypted, err := r.secrets.Decrypt(source.AccessToken.String)
 		if err == nil {

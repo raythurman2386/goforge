@@ -18,6 +18,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/web/middleware"
 	"github.com/raythurman2386/goforge/internal/webhook"
 )
 
@@ -60,19 +61,21 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 
 	// Handlers
 	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil, as, logger)
-	dbh := handlers.NewDashboardHandler(mon, is)
-	ph := handlers.NewProjectHandler(ps, nil, nil, nil, nil, is)
-	eh := handlers.NewEnvironmentHandler(ps)
-	dh := handlers.NewDeploymentHandler(ds, ps, nil, nil)
-	sh := handlers.NewServiceHandler(cat, is)
+	dbh := handlers.NewDashboardHandler(mon, is, logger)
+	ph := handlers.NewProjectHandler(ps, nil, nil, nil, nil, is, logger)
+	eh := handlers.NewEnvironmentHandler(ps, logger)
+	dh := handlers.NewDeploymentHandler(ds, ps, nil, nil, logger)
+	sh := handlers.NewServiceHandler(cat, is, logger)
 	sth := handlers.NewSettingsHandler(nil, is, userRepo, nil, logger) // Settings handler
-	gh := handlers.NewGitHandler(nil, nil)
-	wh := &webhook.Handler{}
-	sseh := handlers.NewSSEHandler(nil, nil, nil)
+	gh := handlers.NewGitHandler(nil, nil, logger)
+	wh := webhook.NewHandler(nil, nil, nil, nil, "", logger)
+	sseh := handlers.NewSSEHandler(nil, nil, nil, nil, nil, nil, nil, logger)
 
 	hh := handlers.NewHealthHandler(nil, nil, logger)
-	ch := handlers.NewContainerHandler(nil, nil, logger) // Container handler with nil dependencies for testing
-	return Router(cfg, sm, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch)
+	ch := handlers.NewContainerHandler(nil, nil, nil, logger) // Container handler with nil dependencies for testing
+	rl := middleware.NewRateLimiter(100, 200, nil)
+	t.Cleanup(rl.Stop)
+	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch)
 }
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{

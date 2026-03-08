@@ -204,7 +204,8 @@ func (r *DeploymentLogRepository) Create(ctx context.Context, log *models.Deploy
 func (r *DeploymentLogRepository) ListByDeploymentID(ctx context.Context, deploymentID string) ([]*models.DeploymentLog, error) {
 	query := `
 		SELECT id, deployment_id, timestamp, level, message, source
-		FROM deployment_logs WHERE deployment_id = $1 ORDER BY timestamp`
+		FROM deployment_logs WHERE deployment_id = $1 ORDER BY timestamp
+		LIMIT 10000`
 
 	rows, err := r.db.QueryContext(ctx, query, deploymentID)
 	if err != nil {

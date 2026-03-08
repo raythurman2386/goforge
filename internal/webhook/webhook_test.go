@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -249,7 +250,7 @@ func TestWebhookHandler_HandleGitHub(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			h := NewHandler(nil, nil, nil, nil, secret)
+			h := NewHandler(nil, nil, nil, nil, secret, slog.Default())
 			h.HandleGitHub(w, req)
 
 			if w.Code != tt.wantStatusCode {
@@ -354,7 +355,7 @@ func TestWebhookHandler_HandleGitea(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			h := NewHandler(nil, nil, nil, nil, secret)
+			h := NewHandler(nil, nil, nil, nil, secret, slog.Default())
 			h.HandleGitea(w, req)
 
 			if w.Code != tt.wantStatusCode {

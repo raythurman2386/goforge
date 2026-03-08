@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -16,13 +16,15 @@ import (
 type ServiceHandler struct {
 	catalog         *services.Catalog
 	instanceService *services.InstanceService
+	logger          *slog.Logger
 }
 
 // NewServiceHandler creates a new ServiceHandler.
-func NewServiceHandler(c *services.Catalog, is *services.InstanceService) *ServiceHandler {
+func NewServiceHandler(c *services.Catalog, is *services.InstanceService, logger *slog.Logger) *ServiceHandler {
 	return &ServiceHandler{
 		catalog:         c,
 		instanceService: is,
+		logger:          logger,
 	}
 }
 
@@ -83,14 +85,20 @@ func (h *ServiceHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		RenderError(w, r, http.StatusBadRequest, "invalid form data")
 		return
 	}
+	// Filter out non-config form fields (CSRF token, name, domain are handled separately)
+	skipFields := map[string]bool{
+		"csrf_token":         true,
+		"gorilla.csrf.Token": true,
+	}
 	for key, values := range r.Form {
-		if len(values) > 0 {
+		if len(values) > 0 && !skipFields[key] {
 			config[key] = values[0]
 		}
 	}
 
 	if _, err := h.instanceService.DeployInstance(r.Context(), user.ID, templateName, config); err != nil {
-		RenderError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to deploy service: %v", err))
+		h.logger.Error("failed to deploy service", "template", templateName, "error", err)
+		RenderError(w, r, http.StatusInternalServerError, "failed to deploy service")
 		return
 	}
 
@@ -103,6 +111,14 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	instance, err := h.instanceService.GetInstance(r.Context(), id)
 	if err != nil {
 		RenderError(w, r, http.StatusNotFound, "service instance not found")
+		return
+	}
+
+	// Verify ownership
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok || user.ID != instance.UserID {
+		RenderError(w, r, http.StatusForbidden, "access denied")
 		return
 	}
 
@@ -128,6 +144,20 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 // Delete handles service instance deletion.
 func (h *ServiceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+
+	// Verify ownership
+	instance, err := h.instanceService.GetInstance(r.Context(), id)
+	if err != nil {
+		http.Error(w, "service instance not found", http.StatusNotFound)
+		return
+	}
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok || user.ID != instance.UserID {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+
 	if err := h.instanceService.DeleteInstance(r.Context(), id); err != nil {
 		http.Error(w, "failed to delete service instance", http.StatusInternalServerError)
 		return
@@ -145,10 +175,44 @@ func (h *ServiceHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify ownership
+	instance, err := h.instanceService.GetInstance(r.Context(), id)
+	if err != nil {
+		http.Error(w, "service instance not found", http.StatusNotFound)
+		return
+	}
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok || user.ID != instance.UserID {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+
 	if err := h.instanceService.RestartInstance(r.Context(), id); err != nil {
 		http.Error(w, "failed to restart service: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// InstanceList renders the instance grid fragment for HTMX polling.
+func (h *ServiceHandler) InstanceList(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	instances, err := h.instanceService.ListInstances(r.Context(), user.ID)
+	if err != nil {
+		http.Error(w, "failed to list instances", http.StatusInternalServerError)
+		return
+	}
+
+	component := pages_services.InstanceList(instances)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, "failed to render instance list", http.StatusInternalServerError)
+	}
 }

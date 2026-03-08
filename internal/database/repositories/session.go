@@ -69,7 +69,8 @@ func (r *SessionRepository) GetByTokenHash(ctx context.Context, tokenHash string
 func (r *SessionRepository) GetByUserID(ctx context.Context, userID string) ([]*models.Session, error) {
 	query := `
 		SELECT id, user_id, token_hash, expires_at, created_at, last_active_at
-		FROM sessions WHERE user_id = $1 ORDER BY created_at DESC`
+		FROM sessions WHERE user_id = $1 ORDER BY created_at DESC
+		LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {

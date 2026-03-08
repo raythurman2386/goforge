@@ -5,9 +5,9 @@ import (
 )
 
 templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentEnvID string) {
-	<div class="relative inline-block text-left">
+	<div class="relative inline-block text-left" onclick="event.stopPropagation()">
 		<div>
-			<button type="button" class="btn-secondary !py-1.5 !px-3 font-bold flex items-center shadow-sm" id="menu-button" aria-expanded="true" aria-haspopup="true" onclick="this.nextElementSibling.classList.toggle('hidden')">
+			<button type="button" class="btn-secondary !py-1.5 !px-3 font-bold flex items-center shadow-sm" id="menu-button" aria-expanded="true" aria-haspopup="true" onclick="var dd = this.nextElementSibling; dd.classList.toggle('hidden'); if (!dd.classList.contains('hidden')) { var close = function(e) { if (!dd.contains(e.target) && e.target !== this) { dd.classList.add('hidden'); document.removeEventListener('click', close); } }.bind(this); document.addEventListener('click', close); }">
 				<div class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></div>
 				for _, e := range envs {
 					if e.ID == currentEnvID {

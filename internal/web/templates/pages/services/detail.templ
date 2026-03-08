@@ -7,42 +7,69 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
+// isPending returns true if the instance is in a transitional state.
+func isPending(instance *models.ServiceInstance) bool {
+	return instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting
+}
+
 templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl *services.ServiceTemplate, csrfToken string) {
 	@layouts.AppLayout(instance.Name, csrfToken, nil) {
-		<div class="md:flex md:items-center md:justify-between mb-8">
-			<div class="flex-1 min-w-0">
-				<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-					{ instance.Name }
-				</h2>
-				<div class="mt-2 flex items-center space-x-2">
-					<span class="inline-flex items-center px-2 py-0.5 rounded bg-primary-50 text-[10px] font-bold text-primary-700 uppercase tracking-widest leading-none border border-primary-100">
-						{ tmpl.DisplayName }
-					</span>
-					<span class={ "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider leading-none",
-						templ.KV("bg-emerald-100 text-emerald-800", instance.Status == models.ServiceStatusRunning),
-						templ.KV("bg-amber-100 text-amber-800", instance.Status == models.ServiceStatusPending),
-						templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed) }>
-						{ string(instance.Status) }
-					</span>
+		// When pending/starting, poll the full detail page to pick up container + status changes.
+		if isPending(instance) {
+			<div
+				id="service-detail-poll"
+				hx-get={ "/services/" + instance.ID }
+				hx-trigger="every 3s"
+				hx-select="#service-detail-content"
+				hx-target="#service-detail-content"
+				hx-swap="outerHTML"
+			></div>
+		}
+		<div id="service-detail-content">
+			<div class="md:flex md:items-center md:justify-between mb-8">
+				<div class="flex-1 min-w-0">
+					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+						{ instance.Name }
+					</h2>
+					<div class="mt-2 flex items-center space-x-2">
+						<span class="inline-flex items-center px-2 py-0.5 rounded bg-primary-50 text-[10px] font-bold text-primary-700 uppercase tracking-widest leading-none border border-primary-100">
+							{ tmpl.DisplayName }
+						</span>
+						<span class={ "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider leading-none",
+							templ.KV("bg-emerald-100 text-emerald-800", instance.Status == models.ServiceStatusRunning),
+							templ.KV("bg-amber-100 text-amber-800", instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting),
+							templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed),
+							templ.KV("bg-gray-100 text-gray-600", instance.Status == models.ServiceStatusStopped) }>
+							{ string(instance.Status) }
+						</span>
+						if isPending(instance) {
+							<span class="inline-flex items-center text-xs text-amber-600">
+								<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+								</svg>
+								Deploying...
+							</span>
+						}
+					</div>
+				</div>
+				<div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
+					<button hx-post={ "/services/" + instance.ID + "/restart" } hx-swap="none" class="btn-secondary">
+						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+						</svg>
+						Restart
+					</button>
+					<button hx-delete={ "/services/" + instance.ID } hx-confirm="Are you sure you want to delete this service? Data will be lost." class="btn-danger">
+						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+						</svg>
+						Delete
+					</button>
 				</div>
 			</div>
-			<div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-				<button hx-post={ "/services/" + instance.ID + "/restart" } hx-swap="none" class="btn-secondary">
-					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-					</svg>
-					Restart
-				</button>
-				<button hx-delete={ "/services/" + instance.ID } hx-confirm="Are you sure you want to delete this service? Data will be lost." class="btn-danger">
-					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-					</svg>
-					Delete
-				</button>
-			</div>
-		</div>
 
-		if container != nil {
+			if container != nil {
 			<div class="card overflow-hidden !p-0 mb-8">
 				<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30">
 					<h3 class="text-lg font-bold text-gray-900 tracking-tight">Resource Usage</h3>
@@ -86,6 +113,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 					}
 				}
 			</div>
+		</div>
 		</div>
 	}
 }

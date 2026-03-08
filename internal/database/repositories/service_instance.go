@@ -90,7 +90,8 @@ func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID str
 		SELECT id, user_id, template_name, name, version, config, 
 			domain, status, connection_info, created_at, updated_at
 		FROM service_instances WHERE user_id = $1
-		ORDER BY created_at DESC`
+		ORDER BY created_at DESC
+		LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {

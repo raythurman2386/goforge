@@ -54,7 +54,8 @@ func (r *ProjectServiceInstanceRepository) ListByProjectID(ctx context.Context, 
 		FROM service_instances si
 		INNER JOIN project_service_instances psi ON si.id = psi.service_instance_id
 		WHERE psi.project_id = $1
-		ORDER BY si.name`
+		ORDER BY si.name
+		LIMIT 100`
 
 	rows, err := r.db.QueryContext(ctx, query, projectID)
 	if err != nil {
@@ -91,7 +92,7 @@ func (r *ProjectServiceInstanceRepository) ListByProjectID(ctx context.Context, 
 
 // ListByServiceInstanceID returns all project IDs linked to a service instance.
 func (r *ProjectServiceInstanceRepository) ListByServiceInstanceID(ctx context.Context, serviceInstanceID string) ([]string, error) {
-	query := `SELECT project_id FROM project_service_instances WHERE service_instance_id = $1`
+	query := `SELECT project_id FROM project_service_instances WHERE service_instance_id = $1 LIMIT 100`
 
 	rows, err := r.db.QueryContext(ctx, query, serviceInstanceID)
 	if err != nil {

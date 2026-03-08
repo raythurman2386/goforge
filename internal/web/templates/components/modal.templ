@@ -2,7 +2,7 @@ package components
 
 templ Modal(title string) {
 	<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300">
-		<div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full transform transition-all border border-gray-200" hx-on::after-request="if(event.detail.successful) this.remove()">
+		<div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full transform transition-all border border-gray-200" hx-on::after-request="if(event.detail.successful) { this.remove(); } else { var errDiv = this.querySelector('#modal-error'); if (errDiv) { errDiv.textContent = event.detail.xhr.responseText || 'An error occurred. Please try again.'; errDiv.classList.remove('hidden'); } }">
 			<div class="flex justify-between items-center px-6 py-4 border-b border-gray-100">
 				<h3 class="text-xl font-bold text-gray-900 tracking-tight">{ title }</h3>
 				<button onclick="document.getElementById('modal').remove()" class="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
@@ -11,6 +11,7 @@ templ Modal(title string) {
 					</svg>
 				</button>
 			</div>
+			<div id="modal-error" class="hidden mx-6 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg"></div>
 			<div class="px-6 py-6">
 				{ children... }
 			</div>

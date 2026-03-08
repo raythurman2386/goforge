@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -35,6 +36,7 @@ type ProjectHandler struct {
 	containerRepo          *repositories.ContainerRepository
 	projectServiceInstRepo *repositories.ProjectServiceInstanceRepository
 	instanceService        *services.InstanceService
+	logger                 *slog.Logger
 }
 
 // NewProjectHandler creates a new ProjectHandler.
@@ -45,6 +47,7 @@ func NewProjectHandler(
 	cr *repositories.ContainerRepository,
 	psir *repositories.ProjectServiceInstanceRepository,
 	is *services.InstanceService,
+	logger *slog.Logger,
 ) *ProjectHandler {
 	return &ProjectHandler{
 		projectService:         ps,
@@ -53,15 +56,14 @@ func NewProjectHandler(
 		containerRepo:          cr,
 		projectServiceInstRepo: psir,
 		instanceService:        is,
+		logger:                 logger,
 	}
 }
 
 // ListProjects renders the project list page.
 func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(auth.UserContextKey)
-	user, ok := val.(*models.User)
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
 		return
 	}
 
@@ -80,10 +82,8 @@ func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
 // NewProjectPage renders the form to create a new project.
 func (h *ProjectHandler) NewProjectPage(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(auth.UserContextKey)
-	user, ok := val.(*models.User)
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
 		return
 	}
 
@@ -120,15 +120,27 @@ func (h *ProjectHandler) NewProjectPage(w http.ResponseWriter, r *http.Request) 
 
 // CreateProject handles project creation.
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(auth.UserContextKey)
-	user, ok := val.(*models.User)
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
 		return
 	}
 
 	name := r.FormValue("name")
 	repoURL := r.FormValue("repository_url")
+
+	if strings.TrimSpace(name) == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+	if len(name) > maxInputLength {
+		http.Error(w, "project name is too long", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(repoURL) == "" {
+		http.Error(w, "repository URL is required", http.StatusBadRequest)
+		return
+	}
+
 	gitSourceID := r.FormValue("git_source_id")
 	defaultBranch := r.FormValue("default_branch")
 	dockerfilePath := r.FormValue("dockerfile_path")
@@ -182,23 +194,47 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/projects/"+created.ID, http.StatusSeeOther)
 }
 
-// GetProject renders the project detail page.
-func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
+// getAuthenticatedUser extracts the authenticated user from the request context.
+// Returns nil and redirects to /login if not authenticated.
+func getAuthenticatedUser(w http.ResponseWriter, r *http.Request) *models.User {
 	val := r.Context().Value(auth.UserContextKey)
 	user, ok := val.(*models.User)
 	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
+		return nil
 	}
+	return user
+}
 
+// getProjectWithOwnership retrieves a project and verifies it belongs to the authenticated user.
+// Returns nil and writes an appropriate error response if the project is not found or unauthorized.
+func (h *ProjectHandler) getProjectWithOwnership(w http.ResponseWriter, r *http.Request, user *models.User) *models.Project {
 	id := chi.URLParam(r, "id")
 	p, err := h.projectService.GetProject(r.Context(), id)
 	if err != nil {
 		RenderError(w, r, http.StatusNotFound, "project not found")
+		return nil
+	}
+	if p.UserID != user.ID {
+		RenderError(w, r, http.StatusNotFound, "project not found")
+		return nil
+	}
+	return p
+}
+
+// GetProject renders the project detail page.
+func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
 		return
 	}
 
-	envs, err := h.projectService.ListEnvironments(r.Context(), id)
+	p := h.getProjectWithOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
+	envs, err := h.projectService.ListEnvironments(r.Context(), p.ID)
 	if err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to list environments")
 		return
@@ -230,7 +266,7 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	linkedServices, availableServices := h.fetchServiceLinks(r.Context(), id, user.ID, tab)
+	linkedServices, availableServices := h.fetchServiceLinks(r.Context(), p.ID, user.ID, tab)
 
 	csrfToken := auth.GetCSRFToken(r)
 	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, linkedServices, availableServices, tab, csrfToken)
@@ -255,7 +291,11 @@ func (h *ProjectHandler) getCurrentEnv(envs []*models.Environment, envID string)
 
 func (h *ProjectHandler) getActiveContainer(ctx context.Context, deploymentID string) *models.Container {
 	containers, err := h.containerRepo.ListByDeploymentID(ctx, deploymentID)
-	if err != nil || len(containers) == 0 {
+	if err != nil {
+		h.logger.Warn("failed to list containers for deployment", "deployment_id", deploymentID, "error", err)
+		return nil
+	}
+	if len(containers) == 0 {
 		return nil
 	}
 	for _, c := range containers {
@@ -312,8 +352,17 @@ func (h *ProjectHandler) fetchServiceLinks(ctx context.Context, projectID, userI
 
 // DeleteProject handles project deletion.
 func (h *ProjectHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if err := h.projectService.DeleteProject(r.Context(), id); err != nil {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
+	p := h.getProjectWithOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
+	if err := h.projectService.DeleteProject(r.Context(), p.ID); err != nil {
 		http.Error(w, "failed to delete project", http.StatusInternalServerError)
 		return
 	}
@@ -324,14 +373,21 @@ func (h *ProjectHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProject handles project updates.
 func (h *ProjectHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	p, err := h.projectService.GetProject(r.Context(), id)
-	if err != nil {
-		RenderError(w, r, http.StatusNotFound, "project not found")
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
+	p := h.getProjectWithOwnership(w, r, user)
+	if p == nil {
 		return
 	}
 
 	customDomain := r.FormValue("custom_domain")
+	if customDomain != "" && !isValidDomain(customDomain) {
+		http.Error(w, "invalid domain format", http.StatusBadRequest)
+		return
+	}
 	p.CustomDomain = sql.NullString{String: customDomain, Valid: customDomain != ""}
 
 	if err := h.projectService.UpdateProject(r.Context(), p); err != nil {
@@ -344,17 +400,23 @@ func (h *ProjectHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 
 // UpdateSettings handles unified updates for project and environment settings.
 func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "id")
-	envID := r.FormValue("env_id")
-
-	// Update Project
-	p, err := h.projectService.GetProject(r.Context(), projectID)
-	if err != nil {
-		RenderError(w, r, http.StatusNotFound, "project not found")
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
 		return
 	}
 
+	p := h.getProjectWithOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
+	envID := r.FormValue("env_id")
+
 	customDomain := r.FormValue("custom_domain")
+	if customDomain != "" && !isValidDomain(customDomain) {
+		RenderError(w, r, http.StatusBadRequest, "invalid domain format")
+		return
+	}
 	// Only update if present in form (it will be, but safe check)
 	p.CustomDomain = sql.NullString{String: customDomain, Valid: customDomain != ""}
 
@@ -371,7 +433,17 @@ func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
+		// Verify environment belongs to this project
+		if env.ProjectID != p.ID {
+			http.Error(w, "environment does not belong to this project", http.StatusForbidden)
+			return
+		}
+
 		if domain := r.FormValue("domain"); domain != "" {
+			if !isValidDomain(domain) {
+				RenderError(w, r, http.StatusBadRequest, "invalid environment domain format")
+				return
+			}
 			env.Domain.String = domain
 			env.Domain.Valid = true
 		} else {
@@ -405,19 +477,28 @@ func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) 
 
 // LinkService associates a service instance with a project.
 func (h *ProjectHandler) LinkService(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	if h.projectServiceInstRepo == nil {
 		http.Error(w, "service linking not available", http.StatusServiceUnavailable)
 		return
 	}
 
-	projectID := chi.URLParam(r, "id")
+	p := h.getProjectWithOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
 	serviceID := r.FormValue("service_instance_id")
 	if serviceID == "" {
 		http.Error(w, "service_instance_id is required", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.projectServiceInstRepo.Link(r.Context(), projectID, serviceID); err != nil {
+	if err := h.projectServiceInstRepo.Link(r.Context(), p.ID, serviceID); err != nil {
 		http.Error(w, "failed to link service", http.StatusInternalServerError)
 		return
 	}
@@ -425,10 +506,10 @@ func (h *ProjectHandler) LinkService(w http.ResponseWriter, r *http.Request) {
 	// Best-effort: inject conventional env vars for the linked service into the
 	// project's first environment. Errors here are non-fatal.
 	if h.instanceService != nil {
-		h.injectServiceEnvVars(r.Context(), projectID, serviceID)
+		h.injectServiceEnvVars(r.Context(), p.ID, serviceID)
 	}
 
-	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/services")
+	w.Header().Set("HX-Redirect", "/projects/"+p.ID+"/services")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -442,12 +523,20 @@ func (h *ProjectHandler) injectServiceEnvVars(ctx context.Context, projectID, se
 	}
 
 	connInfo, err := inst.GetConnectionInfo()
-	if err != nil || len(connInfo) == 0 {
+	if err != nil {
+		h.logger.Warn("injectServiceEnvVars: failed to get connection info", "service_id", inst.ID, "error", err)
+		return
+	}
+	if len(connInfo) == 0 {
 		return
 	}
 
 	envs, err := h.projectService.ListEnvironments(ctx, projectID)
-	if err != nil || len(envs) == 0 {
+	if err != nil {
+		h.logger.Warn("injectServiceEnvVars: failed to list environments", "project_id", projectID, "error", err)
+		return
+	}
+	if len(envs) == 0 {
 		return
 	}
 	env := envs[0]
@@ -455,6 +544,7 @@ func (h *ProjectHandler) injectServiceEnvVars(ctx context.Context, projectID, se
 	// Collect existing keys so we don't overwrite them.
 	existing, err := h.projectService.ListEnvVariables(ctx, env.ID)
 	if err != nil {
+		h.logger.Warn("injectServiceEnvVars: failed to list env variables", "env_id", env.ID, "error", err)
 		return
 	}
 	existingKeys := make(map[string]bool, len(existing))
@@ -481,15 +571,24 @@ func (h *ProjectHandler) injectServiceEnvVars(ctx context.Context, projectID, se
 
 // UnlinkService removes the association between a service instance and a project.
 func (h *ProjectHandler) UnlinkService(w http.ResponseWriter, r *http.Request) {
+	user := getAuthenticatedUser(w, r)
+	if user == nil {
+		return
+	}
+
 	if h.projectServiceInstRepo == nil {
 		http.Error(w, "service linking not available", http.StatusServiceUnavailable)
 		return
 	}
 
-	projectID := chi.URLParam(r, "id")
+	p := h.getProjectWithOwnership(w, r, user)
+	if p == nil {
+		return
+	}
+
 	serviceID := chi.URLParam(r, "serviceId")
 
-	if err := h.projectServiceInstRepo.Unlink(r.Context(), projectID, serviceID); err != nil {
+	if err := h.projectServiceInstRepo.Unlink(r.Context(), p.ID, serviceID); err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
 			http.Error(w, "service link not found", http.StatusNotFound)
 			return
@@ -498,6 +597,6 @@ func (h *ProjectHandler) UnlinkService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/services")
+	w.Header().Set("HX-Redirect", "/projects/"+p.ID+"/services")
 	w.WriteHeader(http.StatusOK)
 }

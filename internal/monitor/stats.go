@@ -61,7 +61,7 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 		if err == nil {
 			stats.TotalProjects = projects
 		}
-		return err
+		return nil // swallow DB error to allow partial dashboard rendering
 	})
 
 	// 2. Services count
@@ -70,7 +70,7 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 		if err == nil {
 			stats.TotalServices = services
 		}
-		return err
+		return nil // swallow DB error to allow partial dashboard rendering
 	})
 
 	// 3. Docker metrics (containers & stats)
@@ -132,8 +132,10 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 		return nil
 	})
 
+	// All goroutines swallow errors to allow partial stats, so Wait should
+	// never return an error. We still check defensively.
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return stats, nil //nolint:nilerr // partial stats are acceptable
 	}
 
 	return stats, nil
@@ -149,7 +151,9 @@ func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskU
 	}
 
 	for i := range diskUsage.Containers {
-		info.ContainersSize += diskUsage.Containers[i].SizeRw
+		if diskUsage.Containers[i].SizeRw > 0 {
+			info.ContainersSize += diskUsage.Containers[i].SizeRw
+		}
 	}
 
 	for i := range diskUsage.Volumes {
@@ -174,7 +178,7 @@ func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskU
 
 	// 2. Stopped containers
 	for i := range diskUsage.Containers {
-		if diskUsage.Containers[i].State != "running" {
+		if diskUsage.Containers[i].State != "running" && diskUsage.Containers[i].SizeRw > 0 {
 			info.ReclaimableSize += diskUsage.Containers[i].SizeRw
 		}
 	}
@@ -206,7 +210,14 @@ func (c *Collector) calculateMetrics(dockerID string, v *container.StatsResponse
 	systemDelta := float64(v.CPUStats.SystemUsage) - float64(v.PreCPUStats.SystemUsage)
 
 	if systemDelta > 0.0 && cpuDelta > 0.0 {
-		cpuPercent = (cpuDelta / systemDelta) * float64(len(v.CPUStats.CPUUsage.PercpuUsage)) * 100.0
+		// On cgroups v2, PercpuUsage is empty; fall back to OnlineCPUs.
+		numCPUs := len(v.CPUStats.CPUUsage.PercpuUsage)
+		if numCPUs == 0 {
+			numCPUs = int(v.CPUStats.OnlineCPUs)
+		}
+		if numCPUs > 0 {
+			cpuPercent = (cpuDelta / systemDelta) * float64(numCPUs) * 100.0
+		}
 	}
 
 	memUsage := int64(v.MemoryStats.Usage)

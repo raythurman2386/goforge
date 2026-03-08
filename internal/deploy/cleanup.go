@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
@@ -22,7 +21,8 @@ func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, curr
 	// 1. List recent deployments for the environment
 	deployments, err := s.deploymentRepo.ListByEnvironmentID(ctx, environmentID, 10)
 	if err != nil {
-		return fmt.Errorf("failed to list deployments: %w", err)
+		s.logger.Error("failed to list deployments for cleanup", "environment_id", environmentID, "error", err)
+		return err
 	}
 
 	for _, d := range deployments {
@@ -37,7 +37,7 @@ func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, curr
 			containers, err := s.containerRepo.ListByDeploymentID(ctx, d.ID)
 			if err != nil {
 				// Log error but continue
-				fmt.Printf("failed to list containers for deployment %s: %v\n", d.ID, err)
+				s.logger.Warn("failed to list containers for deployment during cleanup", "deployment_id", d.ID, "error", err)
 				continue
 			}
 
@@ -46,13 +46,13 @@ func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, curr
 				if c.Status == models.ContainerStatusRunning {
 					// Stop and remove container from Docker
 					if err := s.dockerClient.StopContainer(ctx, c.DockerID); err != nil {
-						fmt.Printf("failed to stop container %s: %v\n", c.DockerID, err)
+						s.logger.Warn("failed to stop container during cleanup", "container_id", c.DockerID, "error", err)
 						// Continue anyway to update DB
 					}
 
 					// Update container status in DB
 					if err := s.containerRepo.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); err != nil {
-						fmt.Printf("failed to update container status %s: %v\n", c.ID, err)
+						s.logger.Warn("failed to update container status during cleanup", "container_id", c.ID, "error", err)
 					}
 				}
 			}
@@ -62,7 +62,7 @@ func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, curr
 	// Prune dangling images (optional, maybe run this async or periodically, but for now we do it here)
 	// We don't error out if pruning fails
 	if _, err := s.dockerClient.PruneImages(ctx); err != nil {
-		fmt.Printf("failed to prune images: %v\n", err)
+		s.logger.Warn("failed to prune images during cleanup", "error", err)
 	}
 
 	return nil

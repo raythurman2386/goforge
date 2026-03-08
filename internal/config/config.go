@@ -4,6 +4,7 @@ package config
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -187,16 +188,16 @@ func (c *Config) validate() error {
 
 	// Production validation
 	if c.DatabaseURL == "" {
-		return fmt.Errorf("DATABASE_URL is required")
+		return errors.New("DATABASE_URL is required")
 	}
 	if c.EncryptionKey == "" {
-		return fmt.Errorf("ENCRYPTION_KEY is required")
+		return errors.New("ENCRYPTION_KEY is required")
 	}
 	if c.SessionSecret == "" {
-		return fmt.Errorf("SESSION_SECRET is required")
+		return errors.New("SESSION_SECRET is required")
 	}
 	if c.CSRFSecret == "" {
-		return fmt.Errorf("CSRF_SECRET is required")
+		return errors.New("CSRF_SECRET is required")
 	}
 	return nil
 }

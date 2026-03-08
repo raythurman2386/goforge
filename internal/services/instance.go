@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"text/template"
@@ -37,6 +38,7 @@ type DockerClient interface {
 	CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error)
 	StartContainer(ctx context.Context, id string) error
 	StopContainer(ctx context.Context, id string) error
+	RemoveContainer(ctx context.Context, id string) error
 	RestartContainer(ctx context.Context, id string) error
 	CleanupSystem(ctx context.Context) error
 }
@@ -87,7 +89,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 
 	name, ok := config["name"].(string)
 	if !ok {
-		return nil, fmt.Errorf("config missing name")
+		return nil, errors.New("config missing name")
 	}
 
 	// Extract optional domain for Traefik routing
@@ -173,38 +175,69 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		opts.Binds = append(opts.Binds, fmt.Sprintf("%s:%s", volumeName, v.Path))
 	}
 
-	dockerID, err := s.dockerClient.CreateContainer(ctx, opts)
-	if err != nil {
-		instance.Status = models.ServiceStatusFailed
-		if updateErr := s.instanceRepo.Update(ctx, instance); updateErr != nil {
-			s.logger.Error("failed to update instance status to failed", "error", updateErr, "instance_id", instance.ID)
+	// Capture immutable values needed by the background goroutine.
+	instanceID := instance.ID
+
+	// Run deployment in background
+	// We do not pass ctx to the goroutine because it is a request context that
+	// will be canceled when the HTTP handler returns.
+	//nolint:contextcheck // Intentional use of background context for async work
+	go func() {
+		// Create a new context since the request context will be canceled
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+
+		dockerID, err := s.dockerClient.CreateContainer(bgCtx, opts)
+		if err != nil {
+			s.logger.Error("failed to create container", "error", err, "instance_id", instanceID)
+			s.setInstanceStatus(bgCtx, instanceID, models.ServiceStatusFailed)
+			return
 		}
-		return nil, fmt.Errorf("failed to create container: %w", err)
-	}
 
-	// Record container in DB
-	if err = s.containerRepo.Create(ctx, &models.Container{
-		ServiceInstanceID: sql.NullString{String: instance.ID, Valid: true},
-		DockerID:          dockerID,
-		Name:              opts.Name,
-		Image:             image,
-		Status:            models.ContainerStatusRunning,
-	}); err != nil {
-		s.logger.Error("failed to record container in DB", "error", err, "instance_id", instance.ID)
-	}
+		// Record container in DB
+		if err = s.containerRepo.Create(bgCtx, &models.Container{
+			ServiceInstanceID: sql.NullString{String: instanceID, Valid: true},
+			DockerID:          dockerID,
+			Name:              opts.Name,
+			Image:             image,
+			Status:            models.ContainerStatusRunning,
+		}); err != nil {
+			s.logger.Error("failed to record container in DB", "error", err, "instance_id", instanceID)
+		}
 
-	instance.Status = models.ServiceStatusRunning
+		// Fetch a fresh copy to avoid racing with the returned pointer
+		inst, err := s.instanceRepo.GetByID(bgCtx, instanceID)
+		if err != nil {
+			s.logger.Error("failed to fetch instance for status update", "error", err, "instance_id", instanceID)
+			return
+		}
 
-	// Render connection string templates and store in ConnectionInfo
-	if connJSON := s.renderConnectionInfo(tmpl, data, instance.ID); connJSON != nil {
-		instance.ConnectionInfo = connJSON
-	}
+		inst.Status = models.ServiceStatusRunning
 
-	if err = s.instanceRepo.Update(ctx, instance); err != nil {
-		return nil, fmt.Errorf("failed to update instance status to running: %w", err)
-	}
+		// Render connection string templates and store in ConnectionInfo
+		if connJSON := s.renderConnectionInfo(tmpl, data, instanceID); connJSON != nil {
+			inst.ConnectionInfo = connJSON
+		}
+
+		if err = s.instanceRepo.Update(bgCtx, inst); err != nil {
+			s.logger.Error("failed to update instance status to running", "error", err, "instance_id", instanceID)
+		}
+	}()
 
 	return instance, nil
+}
+
+// setInstanceStatus fetches the instance and updates its status.
+func (s *InstanceService) setInstanceStatus(ctx context.Context, instanceID string, status models.ServiceInstanceStatus) {
+	inst, err := s.instanceRepo.GetByID(ctx, instanceID)
+	if err != nil {
+		s.logger.Error("failed to fetch instance for status update", "error", err, "instance_id", instanceID)
+		return
+	}
+	inst.Status = status
+	if err = s.instanceRepo.Update(ctx, inst); err != nil {
+		s.logger.Error("failed to update instance status", "error", err, "instance_id", instanceID, "status", status)
+	}
 }
 
 func (s *InstanceService) renderConnectionInfo(tmpl *ServiceTemplate, data map[string]interface{}, instanceID string) []byte {
@@ -359,12 +392,11 @@ func (s *InstanceService) DeleteInstance(ctx context.Context, id string) error {
 	container, err := s.containerRepo.GetByServiceInstanceID(ctx, id)
 	if err == nil && container != nil {
 		if stopErr := s.dockerClient.StopContainer(ctx, container.DockerID); stopErr != nil {
-			// Log error but continue with DB deletion?
-			// Ideally we want to ensure cleanup, but if container is gone/invalid, we should proceed.
-			// For now, let's return error if we can't clean up, or maybe log it.
-			// Since we don't have logger yet, we'll return error wrapped.
-			// But wait, StopContainer tries to stop AND remove.
-			s.logger.Warn("failed to stop/remove container", "docker_id", container.DockerID, "error", stopErr)
+			s.logger.Warn("failed to stop container", "docker_id", container.DockerID, "error", stopErr)
+		}
+		// Remove the container after stopping (StopContainer only stops, does not remove)
+		if removeErr := s.dockerClient.RemoveContainer(ctx, container.DockerID); removeErr != nil {
+			s.logger.Warn("failed to remove container", "docker_id", container.DockerID, "error", removeErr)
 		}
 	}
 

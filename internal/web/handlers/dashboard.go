@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/raythurman2386/goforge/internal/auth"
@@ -13,13 +14,15 @@ import (
 type DashboardHandler struct {
 	collector       *monitor.Collector
 	instanceService *services.InstanceService
+	logger          *slog.Logger
 }
 
 // NewDashboardHandler creates a new DashboardHandler.
-func NewDashboardHandler(collector *monitor.Collector, instanceService *services.InstanceService) *DashboardHandler {
+func NewDashboardHandler(collector *monitor.Collector, instanceService *services.InstanceService, logger *slog.Logger) *DashboardHandler {
 	return &DashboardHandler{
 		collector:       collector,
 		instanceService: instanceService,
+		logger:          logger,
 	}
 }
 
@@ -48,8 +51,7 @@ func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request
 
 	stats, err := h.collector.CollectSystemStats(r.Context(), user.ID)
 	if err != nil {
-		// Just log the error, don't fail the request.
-		_ = err
+		h.logger.Warn("failed to collect system stats", "user_id", user.ID, "error", err)
 	}
 
 	csrfToken := auth.GetCSRFToken(r)

@@ -43,7 +43,7 @@ templ DashboardStatsLoader() {
 }
 
 templ DashboardStats(csrfToken string, stats *models.SystemStats) {
-	<div id="dashboard-stats">
+	<div id="dashboard-stats" class="animate-fade-in">
 		if stats != nil {
 			<!-- Resource Usage Section -->
 			<div class="mt-8">

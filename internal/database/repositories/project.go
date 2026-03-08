@@ -104,7 +104,8 @@ func (r *ProjectRepository) ListByUserID(ctx context.Context, userID string) ([]
 		SELECT id, user_id, name, description, git_source_id, repository_url, repository_name,
 			default_branch, dockerfile_path, docker_compose_path, build_context, build_args,
 			health_check_path, health_check_interval, auto_deploy, custom_domain, created_at, updated_at
-		FROM projects WHERE user_id = $1 ORDER BY created_at DESC`
+		FROM projects WHERE user_id = $1 ORDER BY created_at DESC
+		LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
@@ -193,7 +194,8 @@ func (r *ProjectRepository) ListByRepoURL(ctx context.Context, repoURL string) (
 		SELECT id, user_id, name, description, git_source_id, repository_url, repository_name,
 			default_branch, dockerfile_path, docker_compose_path, build_context, build_args,
 			health_check_path, health_check_interval, auto_deploy, custom_domain, created_at, updated_at
-		FROM projects WHERE repository_url = $1`
+		FROM projects WHERE repository_url = $1
+		LIMIT 100`
 
 	rows, err := r.db.QueryContext(ctx, query, repoURL)
 	if err != nil {

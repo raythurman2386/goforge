@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
+	"github.com/docker/docker/api/types"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/raythurman2386/goforge/internal/auth"
@@ -15,39 +17,60 @@ import (
 
 // ContainerHandler handles container management HTTP requests.
 type ContainerHandler struct {
-	containerRepo *repositories.ContainerRepository
-	dockerClient  *docker.Client
-	logger        *slog.Logger
+	containerRepo       *repositories.ContainerRepository
+	serviceInstanceRepo *repositories.ServiceInstanceRepository
+	dockerClient        *docker.Client
+	logger              *slog.Logger
 }
 
 // NewContainerHandler creates a new container handler.
-func NewContainerHandler(cr *repositories.ContainerRepository, dc *docker.Client, logger *slog.Logger) *ContainerHandler {
+func NewContainerHandler(cr *repositories.ContainerRepository, sir *repositories.ServiceInstanceRepository, dc *docker.Client, logger *slog.Logger) *ContainerHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &ContainerHandler{
-		containerRepo: cr,
-		dockerClient:  dc,
-		logger:        logger,
+		containerRepo:       cr,
+		serviceInstanceRepo: sir,
+		dockerClient:        dc,
+		logger:              logger,
 	}
 }
 
 // ListAPI returns a list of containers as JSON for HTMX.
 func (h *ContainerHandler) ListAPI(w http.ResponseWriter, r *http.Request) {
-	// Fetch all tracked containers from DB
-	trackedContainers, err := h.containerRepo.ListAll(r.Context())
+	user, ok := r.Context().Value(auth.UserContextKey).(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	// Fetch tracked containers scoped to the authenticated user
+	trackedContainers, err := h.containerRepo.ListByUserID(r.Context(), user.ID)
 	if err != nil {
 		h.logger.Error("failed to list containers", "error", err)
 		RenderError(w, r, http.StatusInternalServerError, "failed to list containers")
 		return
 	}
 
-	// Fetch all containers from Docker
-	dockerContainers, err := h.dockerClient.ListContainers(r.Context(), true)
+	// Build a set of tracked Docker IDs so we can filter Docker containers
+	trackedDockerIDs := make(map[string]struct{}, len(trackedContainers))
+	for _, tc := range trackedContainers {
+		trackedDockerIDs[tc.DockerID] = struct{}{}
+	}
+
+	// Fetch all containers from Docker, then filter to only those owned by user
+	allDockerContainers, err := h.dockerClient.ListContainers(r.Context(), true)
 	if err != nil {
 		h.logger.Error("failed to list docker containers", "error", err)
 		RenderError(w, r, http.StatusInternalServerError, "failed to list docker containers")
 		return
+	}
+
+	var dockerContainers []types.Container
+	for i := range allDockerContainers {
+		if _, ok := trackedDockerIDs[allDockerContainers[i].ID]; ok {
+			dockerContainers = append(dockerContainers, allDockerContainers[i])
+		}
 	}
 
 	component := containers.ListAPI(trackedContainers, dockerContainers)
@@ -91,6 +114,11 @@ func (h *ContainerHandler) Stop(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Verify ownership: tracked container must belong to current user
+	if !h.verifyContainerOwnership(ctx, w, r, containerID) {
+		return
+	}
+
 	// Stop the container
 	if err := h.dockerClient.StopContainer(ctx, containerID); err != nil {
 		h.logger.Error("failed to stop container", "container_id", containerID, "error", err)
@@ -119,6 +147,11 @@ func (h *ContainerHandler) Restart(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Verify ownership: tracked container must belong to current user
+	if !h.verifyContainerOwnership(ctx, w, r, containerID) {
+		return
+	}
+
 	// Restart the container
 	if err := h.dockerClient.RestartContainer(ctx, containerID); err != nil {
 		h.logger.Error("failed to restart container", "container_id", containerID, "error", err)
@@ -135,4 +168,35 @@ func (h *ContainerHandler) Restart(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("HX-Trigger", "containerRestarted")
 	w.WriteHeader(http.StatusOK)
+}
+
+// verifyContainerOwnership checks that the Docker container belongs to the
+// authenticated user by tracing the tracked container → service instance chain.
+// Returns true if ownership is verified; writes an HTTP error and returns false otherwise.
+func (h *ContainerHandler) verifyContainerOwnership(ctx context.Context, w http.ResponseWriter, _ *http.Request, dockerID string) bool {
+	user, ok := ctx.Value(auth.UserContextKey).(*models.User)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return false
+	}
+
+	tracked, err := h.containerRepo.GetByDockerID(ctx, dockerID)
+	if err != nil {
+		// Container not tracked in DB — deny by default
+		http.Error(w, "access denied", http.StatusForbidden)
+		return false
+	}
+
+	// Check ownership via linked service instance
+	if tracked.ServiceInstanceID.Valid {
+		instance, err := h.serviceInstanceRepo.GetByID(ctx, tracked.ServiceInstanceID.String)
+		if err == nil && instance.UserID == user.ID {
+			return true
+		}
+	}
+
+	// TODO: also check DeploymentID ownership once the deployment model has UserID
+
+	http.Error(w, "access denied", http.StatusForbidden)
+	return false
 }

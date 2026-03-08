@@ -120,7 +120,7 @@ templ Profile(user *models.User, csrfToken string) {
 					</div>
 				</div>
 				
-				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load" hx-swap="innerHTML" class="divide-y divide-gray-100">
+				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-gray-100 animate-fade-in">
 					<div class="py-4 text-center text-gray-500 text-sm">
 						Loading tokens...
 					</div>
@@ -212,7 +212,7 @@ script copyToken(token string) {
 
 templ AddAPITokenModal(csrfToken string) {
 	@components.Modal("Generate API Token") {
-		<form hx-post="/settings/tokens" hx-target="body" hx-swap="beforeend">
+		<form hx-post="/settings/tokens" hx-target="#modal" hx-swap="outerHTML">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			
 			@components.Input("Token Name", "name", "text", "", true)

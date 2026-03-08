@@ -56,7 +56,8 @@ func (r *EnvVariableRepository) ListByEnvironmentID(ctx context.Context, envID s
 	query := `
 		SELECT id, environment_id, key, value, is_secret, created_at, updated_at
 		FROM env_variables WHERE environment_id = $1
-		ORDER BY key ASC`
+		ORDER BY key ASC
+		LIMIT 500`
 
 	rows, err := r.db.QueryContext(ctx, query, envID)
 	if err != nil {
@@ -126,6 +127,25 @@ func (r *EnvVariableRepository) Update(ctx context.Context, v *models.EnvVariabl
 func (r *EnvVariableRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM env_variables WHERE id = $1`
 	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteScoped deletes an environment variable only if it belongs to the given environment.
+// This prevents a user from deleting a variable belonging to a different environment.
+func (r *EnvVariableRepository) DeleteScoped(ctx context.Context, id, environmentID string) error {
+	query := `DELETE FROM env_variables WHERE id = $1 AND environment_id = $2`
+	result, err := r.db.ExecContext(ctx, query, id, environmentID)
 	if err != nil {
 		return err
 	}
