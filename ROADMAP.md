@@ -19,15 +19,15 @@ Based on comprehensive user flow analysis, the following must be addressed befor
   - Token permissions and expiration
   - Usage tracking
 
-#### 2. First-Time User Experience (Major Gap)
-- [ ] **Onboarding Flow**
-  - Welcome modal after registration
+#### 2. First-Time User Experience (Completed Mar 2026)
+- [x] **Onboarding Flow**
+  - Welcome modal after registration (replaced by Dashboard step-by-step UI)
   - Step-by-step guide: Connect Git → Create Project → Deploy
-  - Sample project template option
-- [ ] **Empty State Improvements**
+  - Sample project template option (Deferred to Quick-start)
+- [x] **Empty State Improvements**
   - Prompt to add Git Source when creating project (if none exist)
   - Guided tour for first-time project creation
-  - Quick-start wizard for common stacks
+  - Quick-start wizard for common stacks (Deferred to V1.1)
 
 #### 3. Container & Runtime Management (Completed Mar 2026)
 - [x] **Container Logs Viewer** (`/containers/{id}/logs`)

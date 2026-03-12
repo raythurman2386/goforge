@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- First-Time User Experience (FTUX) onboarding flow with a step-by-step dashboard guide
+- Clear empty state warnings when attempting to create a project without a Git Source connected
 - Initial project setup
 - GitHub CI workflow with fmt, vet, lint, and test checks
 - Project documentation (README, CONTRIBUTING, LICENSE)
