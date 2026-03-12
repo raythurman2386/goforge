@@ -287,7 +287,7 @@ func runServer() error {
 
 	// Initialize handlers
 	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector, containerRepo, instanceRepo, deployService, projectService, logger.WithComponent(log, "sse"))
-	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, logger.WithComponent(log, "auth"))
+	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, cfg.EnableRegistration, logger.WithComponent(log, "auth"))
 	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService, projectRepo, gitSourceRepo, logger.WithComponent(log, "dashboard"))
 	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService, logger.WithComponent(log, "projects"))
 	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments"))

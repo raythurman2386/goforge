@@ -60,7 +60,7 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	mon := monitor.NewCollector(nil, nil, projectRepo, instanceRepo)
 
 	// Handlers
-	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil, as, logger)
+	ah := handlers.NewAuthHandler(sm, userRepo, nil, nil, as, cfg.EnableRegistration, logger)
 	dbh := handlers.NewDashboardHandler(mon, is, nil, nil, logger)
 	ph := handlers.NewProjectHandler(ps, nil, nil, nil, nil, is, logger)
 	eh := handlers.NewEnvironmentHandler(ps, logger)
