@@ -17,23 +17,25 @@ import (
 
 // AuthHandler handles authentication related requests.
 type AuthHandler struct {
-	sessionManager *auth.SessionManager
-	userRepo       *repositories.UserRepository
-	githubProvider *auth.GitHubProvider
-	authenticator  auth.Authenticator
-	auditService   *services.AuditService
-	logger         *slog.Logger
+	sessionManager     *auth.SessionManager
+	userRepo           *repositories.UserRepository
+	githubProvider     *auth.GitHubProvider
+	authenticator      auth.Authenticator
+	auditService       *services.AuditService
+	logger             *slog.Logger
+	enableRegistration bool
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(sm *auth.SessionManager, ur *repositories.UserRepository, gp *auth.GitHubProvider, a auth.Authenticator, as *services.AuditService, logger *slog.Logger) *AuthHandler {
+func NewAuthHandler(sm *auth.SessionManager, ur *repositories.UserRepository, gp *auth.GitHubProvider, a auth.Authenticator, as *services.AuditService, enableRegistration bool, logger *slog.Logger) *AuthHandler {
 	return &AuthHandler{
-		sessionManager: sm,
-		userRepo:       ur,
-		githubProvider: gp,
-		authenticator:  a,
-		auditService:   as,
-		logger:         logger,
+		sessionManager:     sm,
+		userRepo:           ur,
+		githubProvider:     gp,
+		authenticator:      a,
+		auditService:       as,
+		logger:             logger,
+		enableRegistration: enableRegistration,
 	}
 }
 
@@ -46,7 +48,7 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages.Login(csrfToken, "")
+	component := pages.Login(csrfToken, "", h.enableRegistration)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render login page")
 	}
@@ -61,7 +63,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := h.authenticator.Authenticate(r.Context(), email, password)
 	if err != nil {
 		csrfToken := auth.GetCSRFToken(r)
-		component := pages.Login(csrfToken, "Invalid email or password")
+		component := pages.Login(csrfToken, "Invalid email or password", h.enableRegistration)
 		w.WriteHeader(http.StatusUnauthorized)
 		if renderErr := component.Render(r.Context(), w); renderErr != nil {
 			RenderError(w, r, http.StatusInternalServerError, "failed to render login page")
@@ -85,6 +87,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // RegisterPage renders the registration page.
 func (h *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
+	if !h.enableRegistration {
+		RenderError(w, r, http.StatusForbidden, "Registration is disabled")
+		return
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
 	component := pages.Register(csrfToken, "")
 	if err := component.Render(r.Context(), w); err != nil {
@@ -94,6 +101,11 @@ func (h *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
 
 // Register handles the registration form submission.
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	if !h.enableRegistration {
+		RenderError(w, r, http.StatusForbidden, "Registration is disabled")
+		return
+	}
+
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")

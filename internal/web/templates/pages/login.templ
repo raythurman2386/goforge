@@ -4,7 +4,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-templ Login(csrfToken, errorMessage string) {
+templ Login(csrfToken, errorMessage string, enableRegistration bool) {
 	@layouts.AuthLayout("Login", csrfToken) {
 		<div>
 			<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
@@ -71,11 +71,13 @@ templ Login(csrfToken, errorMessage string) {
 				</div>
 			</form>
 
-			<div class="text-center">
-				<a href="/auth/register" class="font-medium text-primary-600 hover:text-primary-500">
-					Don't have an account? Sign up
-				</a>
-			</div>
+			if enableRegistration {
+				<div class="text-center">
+					<a href="/auth/register" class="font-medium text-primary-600 hover:text-primary-500">
+						Don't have an account? Sign up
+					</a>
+				</div>
+			}
 		</div>
 	}
 }

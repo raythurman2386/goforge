@@ -74,6 +74,9 @@ type Config struct {
 	// Set to explicit CIDRs in production if your proxy is on a non-private network.
 	TrustedProxies []string
 
+	// Registration
+	EnableRegistration bool
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -131,6 +134,9 @@ func Load() (*Config, error) {
 
 		// Trusted proxies (comma-separated CIDRs or IPs)
 		TrustedProxies: getEnvStringSlice("TRUSTED_PROXIES"),
+
+		// Registration
+		EnableRegistration: getEnvBool("GOFORGE_ENABLE_REGISTRATION", true),
 
 		// Dev mode
 		DevMode: devMode,
