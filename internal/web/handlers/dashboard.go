@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages"
@@ -14,14 +15,18 @@ import (
 type DashboardHandler struct {
 	collector       *monitor.Collector
 	instanceService *services.InstanceService
+	projectRepo     *repositories.ProjectRepository
+	gitSourceRepo   *repositories.GitSourceRepository
 	logger          *slog.Logger
 }
 
 // NewDashboardHandler creates a new DashboardHandler.
-func NewDashboardHandler(collector *monitor.Collector, instanceService *services.InstanceService, logger *slog.Logger) *DashboardHandler {
+func NewDashboardHandler(collector *monitor.Collector, instanceService *services.InstanceService, projectRepo *repositories.ProjectRepository, gitSourceRepo *repositories.GitSourceRepository, logger *slog.Logger) *DashboardHandler {
 	return &DashboardHandler{
 		collector:       collector,
 		instanceService: instanceService,
+		projectRepo:     projectRepo,
+		gitSourceRepo:   gitSourceRepo,
 		logger:          logger,
 	}
 }
@@ -34,9 +39,25 @@ func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
+	// Check if this is a first-time user
+	projects, err := h.projectRepo.ListByUserID(ctx, user.ID)
+	if err != nil {
+		h.logger.Error("failed to list projects", "error", err)
+	}
+
+	gitSources, err := h.gitSourceRepo.ListByUserID(ctx, user.ID)
+	if err != nil {
+		h.logger.Error("failed to list git sources", "error", err)
+	}
+
+	hasProjects := len(projects) > 0
+	hasGitSources := len(gitSources) > 0
+
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages.Dashboard(csrfToken)
-	if err := component.Render(r.Context(), w); err != nil {
+	component := pages.Dashboard(csrfToken, hasProjects, hasGitSources)
+	if err := component.Render(ctx, w); err != nil {
 		http.Error(w, "failed to render dashboard", http.StatusInternalServerError)
 	}
 }

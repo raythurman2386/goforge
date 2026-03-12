@@ -18,6 +18,28 @@ templ New(sources []*models.GitSource, serviceInstances []*models.ServiceInstanc
 				</div>
 			</div>
 
+			if len(sources) == 0 {
+				<div class="mb-8 rounded-md bg-blue-50 p-4 border border-blue-200">
+					<div class="flex">
+						<div class="flex-shrink-0">
+							<svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+							</svg>
+						</div>
+						<div class="ml-3 flex-1 md:flex md:justify-between">
+							<p class="text-sm text-blue-700">
+								You don't have any Git Sources configured. You can still use public repositories manually, or add a Git Source to select private repositories.
+							</p>
+							<p class="mt-3 text-sm md:ml-6 md:mt-0">
+								<a href="/settings/git" class="whitespace-nowrap font-medium text-blue-700 hover:text-blue-600">
+									Add Git Source <span aria-hidden="true">&rarr;</span>
+								</a>
+							</p>
+						</div>
+					</div>
+				</div>
+			}
+
 			<div class="card">
 				<form class="space-y-8" action="/projects" method="POST">
 					<input type="hidden" name="csrf_token" value={ csrfToken } />
