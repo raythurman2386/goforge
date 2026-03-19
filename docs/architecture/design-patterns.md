@@ -80,17 +80,19 @@ Each transition is validated before being persisted to the database.
 
 ## Worker Queue
 
-Deployments are processed asynchronously through a buffered channel-based worker queue.
+Deployments are processed asynchronously through a PostgreSQL-backed persistent queue. The queue ensures deployments survive server restarts and enables automatic recovery of orphaned jobs.
 
 ```go
 type Worker struct {
-    queue   chan string  // Buffered channel of deployment IDs
-    quit    chan struct{}
-    service *Service
+    queueRepo    *repositories.QueueRepository  // Database-backed queue
+    pollInterval time.Duration                 // Polling interval when queue is empty
+    orphanTimeout time.Duration                // Timeout before requeuing stale jobs
+    quit        chan struct{}
+    service     *Service
 }
 ```
 
-The HTTP handler enqueues a deployment ID, and the worker goroutine picks it up, runs the pipeline, and updates the status. This prevents long-running builds from blocking HTTP requests.
+The HTTP handler enqueues a deployment ID via `Worker.Enqueue()`, and the worker goroutine polls the database for pending jobs, runs the pipeline, and updates the status. This prevents long-running builds from blocking HTTP requests and ensures no deployments are lost on restart.
 
 ## Pub/Sub (Server-Sent Events)
 

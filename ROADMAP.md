@@ -205,8 +205,8 @@ The focus for the next release is hardening the platform and improving the devel
 
 ### Outstanding Issues
 - [ ] **Pipeline Robustness:**
-    - [ ] Implement a persistent deployment queue (Redis/Postgres) to survive restarts (currently in-memory).
-    - [ ] Add graceful shutdown for deployment workers.
+    - [x] Implement a persistent deployment queue (PostgreSQL-backed) to survive restarts.
+    - [x] Add graceful shutdown for deployment workers.
 - [ ] **Service Management:**
     - [x] Implement `StopInstance` and `RestartInstance` functionality (currently missing).
     - [x] Fix orphaned containers: Ensure Docker containers are removed when a Service Instance is deleted.

@@ -5,106 +5,177 @@ import (
 	"sync"
 	"time"
 
+	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-// DefaultDeploymentTimeout is the maximum time allowed for a deployment (10 minutes).
-const DefaultDeploymentTimeout = 10 * time.Minute
+// Default values for deployment queue settings.
+const (
+	DefaultDeploymentTimeout = 10 * time.Minute
+	DefaultPollInterval      = 1 * time.Second
+	DefaultOrphanTimeout     = 10 * time.Minute
+)
 
-// Worker represents a deployment worker.
+// Worker processes deployment jobs from a persistent queue.
 type Worker struct {
-	service *Service
-	queue   chan string // deployment IDs
-	wg      sync.WaitGroup
-	quit    chan struct{}
-	timeout time.Duration // deployment timeout
+	service       *Service
+	queueRepo     *repositories.QueueRepository
+	pollInterval  time.Duration
+	orphanTimeout time.Duration
+	timeout       time.Duration
+	wg            sync.WaitGroup
+	quit          chan struct{}
+	stopped       chan struct{}
 }
 
 // NewWorker creates a new deployment worker.
-func NewWorker(s *Service, bufferSize int, timeout time.Duration) *Worker {
+func NewWorker(s *Service, qr *repositories.QueueRepository, pollInterval, orphanTimeout, timeout time.Duration) *Worker {
+	if pollInterval <= 0 {
+		pollInterval = DefaultPollInterval
+	}
+	if orphanTimeout <= 0 {
+		orphanTimeout = DefaultOrphanTimeout
+	}
 	if timeout <= 0 {
 		timeout = DefaultDeploymentTimeout
 	}
 	return &Worker{
-		service: s,
-		queue:   make(chan string, bufferSize),
-		quit:    make(chan struct{}),
-		timeout: timeout,
+		service:       s,
+		queueRepo:     qr,
+		pollInterval:  pollInterval,
+		orphanTimeout: orphanTimeout,
+		timeout:       timeout,
+		quit:          make(chan struct{}),
+		stopped:       make(chan struct{}),
 	}
 }
 
-// Start starts the deployment worker.
+// Start begins processing deployments from the queue.
 func (w *Worker) Start() {
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-		for {
-			select {
-			case id := <-w.queue:
-				w.process(id)
-			case <-w.quit:
-				// Drain remaining queued deployments before exiting
-				w.drain()
-				return
-			}
-		}
+		close(w.stopped)
+		w.run()
 	}()
 }
 
-// drain processes any remaining items in the queue before shutdown.
-func (w *Worker) drain() {
-	for {
-		select {
-		case id := <-w.queue:
-			w.process(id)
-		default:
-			return
-		}
-	}
-}
-
-// Stop stops the deployment worker gracefully.
+// Stop gracefully stops the worker.
 func (w *Worker) Stop() {
 	close(w.quit)
 	w.wg.Wait()
 }
 
-// Enqueue adds a deployment to the queue. Returns false if the queue is full.
-func (w *Worker) Enqueue(id string) bool {
-	select {
-	case w.queue <- id:
-		return true
-	default:
-		w.service.logger.Warn("deployment queue is full, rejecting deployment", "deployment_id", id)
-		return false
+func (w *Worker) run() {
+	if w.service != nil && w.service.logger != nil {
+		w.service.logger.Info("deployment worker started")
+	}
+
+	w.requeueOrphans()
+
+	for {
+		select {
+		case <-w.quit:
+			if w.service != nil && w.service.logger != nil {
+				w.service.logger.Info("deployment worker shutting down")
+			}
+			return
+		default:
+			w.processNext()
+		}
 	}
 }
 
-// process handles a single deployment with proper context and timeout.
-func (w *Worker) process(id string) {
-	// Create context with timeout for this deployment
+func (w *Worker) requeueOrphans() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	count, err := w.queueRepo.RequeueOrphans(ctx, w.orphanTimeout)
+	if err != nil {
+		if w.service != nil && w.service.logger != nil {
+			w.service.logger.Error("failed to requeue orphans", "error", err)
+		}
+		return
+	}
+	if count > 0 {
+		if w.service != nil && w.service.logger != nil {
+			w.service.logger.Info("requeued orphaned deployments", "count", count)
+		}
+	}
+}
+
+func (w *Worker) processNext() {
+	ctx, cancel := context.WithTimeout(context.Background(), w.pollInterval)
+	defer cancel()
+
+	item, err := w.queueRepo.Dequeue(ctx)
+	if err != nil {
+		if w.service != nil && w.service.logger != nil {
+			w.service.logger.Error("failed to dequeue deployment", "error", err)
+		}
+		time.Sleep(w.pollInterval)
+		return
+	}
+
+	if item == nil {
+		time.Sleep(w.pollInterval)
+		return
+	}
+
+	w.processItem(item)
+}
+
+func (w *Worker) processItem(item *models.QueueItem) {
 	ctx, cancel := context.WithTimeout(context.Background(), w.timeout)
 	defer cancel()
 
-	err := w.service.RunPipeline(ctx, id)
-	if err != nil {
-		// Check if it was a timeout
-		if ctx.Err() == context.DeadlineExceeded {
-			w.service.logger.Error("deployment timed out", "deployment_id", id, "timeout", w.timeout)
-			msg := "deployment timed out after " + w.timeout.String()
-			// Use a fresh context for the transition since the deployment context is expired.
-			transitionCtx, transitionCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer transitionCancel()
-			if transitionErr := w.service.Transition(transitionCtx, id, models.DeploymentStatusFailed, &msg); transitionErr != nil {
-				w.service.logger.Error("failed to transition deployment to failed", "deployment_id", id, "error", transitionErr)
-			}
-			return
-		}
+	if w.service != nil && w.service.logger != nil {
+		w.service.logger.Info("processing deployment", "deployment_id", item.DeploymentID, "queue_id", item.ID)
+	}
 
-		w.service.logger.Error("deployment failed", "deployment_id", id, "error", err)
-		msg := err.Error()
-		if transitionErr := w.service.Transition(ctx, id, models.DeploymentStatusFailed, &msg); transitionErr != nil {
-			w.service.logger.Error("failed to transition deployment to failed", "deployment_id", id, "error", transitionErr)
+	err := w.service.RunPipeline(ctx, item.DeploymentID)
+	if err != nil {
+		w.handleFailure(item, err)
+		return
+	}
+
+	if completeErr := w.queueRepo.Complete(ctx, item.ID); completeErr != nil {
+		if w.service != nil && w.service.logger != nil {
+			w.service.logger.Error("failed to mark queue item as completed", "queue_id", item.ID, "error", completeErr)
 		}
 	}
+}
+
+func (w *Worker) handleFailure(item *models.QueueItem, deploymentErr error) {
+	itemCtx, itemCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer itemCancel()
+
+	errMsg := deploymentErr.Error()
+	if failErr := w.queueRepo.Fail(itemCtx, item.ID, errMsg); failErr != nil {
+		w.service.logger.Error("failed to mark queue item as failed", "queue_id", item.ID, "error", failErr)
+	}
+
+	transitionErr := w.service.Transition(itemCtx, item.DeploymentID, models.DeploymentStatusFailed, &errMsg)
+	if transitionErr != nil {
+		w.service.logger.Error("failed to transition deployment to failed", "deployment_id", item.DeploymentID, "error", transitionErr)
+	}
+}
+
+// Enqueue adds a deployment to the queue for processing.
+func (w *Worker) Enqueue(deploymentID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	q := &models.QueueItem{
+		DeploymentID: deploymentID,
+	}
+
+	if err := w.queueRepo.Enqueue(ctx, q); err != nil {
+		return err
+	}
+
+	if w.service != nil && w.service.logger != nil {
+		w.service.logger.Info("deployment enqueued", "deployment_id", deploymentID, "queue_id", q.ID)
+	}
+	return nil
 }

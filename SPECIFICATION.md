@@ -760,7 +760,7 @@ goforge/
 │   ├── deploy/
 │   │   ├── service.go                 # Deployment orchestration
 │   │   ├── pipeline.go                # Build/deploy pipeline
-│   │   ├── queue.go                   # Deployment queue
+│   │   ├── queue.go                   # Persistent deployment queue
 │   │   ├── state.go                   # State machine
 │   │   └── rollback.go                # Rollback logic
 │   ├── proxy/

@@ -102,7 +102,7 @@ Deployment pipeline orchestration.
 |------|---------|
 | `service.go` | `Service` -- deployment orchestration coordinator |
 | `pipeline.go` | `Pipeline` -- clone, build, deploy sequence |
-| `queue.go` | `Worker` -- buffered deployment queue with timeout |
+| `queue.go` | `Worker` -- PostgreSQL-backed persistent deployment queue with polling |
 | `state.go` | State machine for deployment status transitions |
 | `bluegreen.go` | `BlueGreenDeployer` -- zero-downtime deployment strategy |
 | `health.go` | `HealthChecker` -- container health verification |

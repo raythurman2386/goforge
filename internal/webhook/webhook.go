@@ -337,8 +337,8 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 			}
 
 			// Enqueue for background processing
-			if !h.worker.Enqueue(d.ID) {
-				h.logger.Warn("deployment queue full, skipping deployment", "deployment_id", d.ID)
+			if err := h.worker.Enqueue(d.ID); err != nil {
+				h.logger.Error("failed to enqueue deployment", "deployment_id", d.ID, "error", err)
 			}
 		}
 	}

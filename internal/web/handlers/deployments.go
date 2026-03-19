@@ -73,8 +73,8 @@ func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if !h.worker.Enqueue(d.ID) {
-		http.Error(w, "deployment queue is full, please try again later", http.StatusServiceUnavailable)
+	if err := h.worker.Enqueue(d.ID); err != nil {
+		http.Error(w, "failed to enqueue deployment", http.StatusInternalServerError)
 		return
 	}
 

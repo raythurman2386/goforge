@@ -105,3 +105,36 @@ type DeploymentLog struct {
 	Message      string
 	Source       sql.NullString // build, deploy, health_check, etc.
 }
+
+// QueueStatus represents the status of a queued deployment job.
+type QueueStatus string
+
+const (
+	// QueueStatusPending indicates the job is waiting to be processed.
+	QueueStatusPending QueueStatus = "pending"
+	// QueueStatusProcessing indicates the job is currently being processed.
+	QueueStatusProcessing QueueStatus = "processing"
+	// QueueStatusCompleted indicates the job completed successfully.
+	QueueStatusCompleted QueueStatus = "completed"
+	// QueueStatusFailed indicates the job failed.
+	QueueStatusFailed QueueStatus = "failed"
+)
+
+// QueueItem represents a deployment job in the queue.
+type QueueItem struct {
+	ID           string
+	DeploymentID string
+	Status       QueueStatus
+	CreatedAt    time.Time
+	StartedAt    sql.NullTime
+	FinishedAt   sql.NullTime
+	ErrorMessage sql.NullString
+}
+
+// QueueStats holds statistics about the deployment queue.
+type QueueStats struct {
+	Pending    int
+	Processing int
+	Completed  int
+	Failed     int
+}

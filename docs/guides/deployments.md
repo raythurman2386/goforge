@@ -123,8 +123,9 @@ Deployments have a configurable timeout (`BUILD_TIMEOUT`, default: 15 minutes). 
 
 ## Queue Behavior
 
-Deployments are processed through a worker queue:
+Deployments are processed through a PostgreSQL-backed persistent queue:
 
-- Queue size is configurable
-- Only one deployment per project runs at a time
-- New deployments for the same project queue behind the current one
+- The queue is persistent — deployments survive server restarts
+- On startup, any orphaned jobs (from a previous crash) are automatically requeued
+- Deployments are processed one at a time in order
+- Queue state is visible in the database for monitoring

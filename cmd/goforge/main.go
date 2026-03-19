@@ -233,6 +233,7 @@ func runServer() error {
 	projectServiceInstanceRepo := repositories.NewProjectServiceInstanceRepository(db.DB)
 	auditLogRepo := repositories.NewAuditLogRepository(db.DB)
 	gitSourceRepo := repositories.NewGitSourceRepository(db.DB, secretService)
+	queueRepo := repositories.NewQueueRepository(db.DB)
 
 	// Initialize clients
 	dockerClient, err := docker.NewClient(cfg.DockerHost)
@@ -271,8 +272,8 @@ func runServer() error {
 		logger.WithComponent(log, "deploy"),
 	)
 
-	// Initialize worker
-	deployWorker := deploy.NewWorker(deployService, cfg.MaxConcurrentBuilds, cfg.BuildTimeout)
+	// Initialize deployment worker
+	deployWorker := deploy.NewWorker(deployService, queueRepo, 0, 0, cfg.BuildTimeout)
 	deployWorker.Start()
 	defer deployWorker.Stop()
 
