@@ -162,15 +162,15 @@ func (w *Worker) handleFailure(item *models.QueueItem, deploymentErr error) {
 }
 
 // Enqueue adds a deployment to the queue for processing.
-func (w *Worker) Enqueue(deploymentID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (w *Worker) Enqueue(ctx context.Context, deploymentID string) error {
+	enqueueCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	q := &models.QueueItem{
 		DeploymentID: deploymentID,
 	}
 
-	if err := w.queueRepo.Enqueue(ctx, q); err != nil {
+	if err := w.queueRepo.Enqueue(enqueueCtx, q); err != nil {
 		return err
 	}
 

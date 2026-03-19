@@ -135,7 +135,7 @@ func TestWorker_Enqueue(t *testing.T) {
 		queueRepo: queueRepo,
 	}
 
-	err := worker.Enqueue(deployment.ID)
+	err := worker.Enqueue(context.Background(), deployment.ID)
 	if err != nil {
 		t.Fatalf("Enqueue() error = %v", err)
 	}

@@ -73,7 +73,7 @@ func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.worker.Enqueue(d.ID); err != nil {
+	if err := h.worker.Enqueue(r.Context(), d.ID); err != nil {
 		http.Error(w, "failed to enqueue deployment", http.StatusInternalServerError)
 		return
 	}
