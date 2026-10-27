@@ -177,6 +177,46 @@ func TestRunPipeline(t *testing.T) {
 	})
 }
 
+func TestRunPipeline_UsesBuildContext(t *testing.T) {
+	_, _, projects, _, svc := pipelineFixture(t)
+	projects.items["proj-1"].DockerfilePath = "docker/Dockerfile.prod"
+	projects.items["proj-1"].BuildContext = "app"
+	dockerFake := &fakeRuntime{}
+	svc.gitService = &fakeGit{files: map[string]string{
+		"app/docker/Dockerfile.prod": "FROM scratch\n",
+		"app/hello.txt":              "hi\n",
+	}}
+	svc.dockerClient = dockerFake
+
+	if err := svc.RunPipeline(context.Background(), "dep-1"); err != nil {
+		t.Fatal(err)
+	}
+	dockerFake.mu.Lock()
+	contextDir := dockerFake.contextDir
+	dockerfile := dockerFake.dockerfile
+	dockerFake.mu.Unlock()
+	if !strings.HasSuffix(contextDir, string(filepath.Separator)+"app") {
+		t.Fatalf("context = %s", contextDir)
+	}
+	if dockerfile != "docker/Dockerfile.prod" {
+		t.Fatalf("dockerfile = %s", dockerfile)
+	}
+}
+
+func TestRunPipeline_MissingDockerfile(t *testing.T) {
+	deploys, _, projects, _, svc := pipelineFixture(t)
+	projects.items["proj-1"].DockerfilePath = "nope/Dockerfile"
+	svc.gitService = &fakeGit{files: map[string]string{"Dockerfile": "FROM scratch\n"}}
+
+	err := svc.RunPipeline(context.Background(), "dep-1")
+	if err == nil || !strings.Contains(err.Error(), "dockerfile not found") {
+		t.Fatalf("RunPipeline err = %v", err)
+	}
+	if status := deploymentStatus(t, deploys); status != models.DeploymentStatusFailed {
+		t.Fatalf("status = %s", status)
+	}
+}
+
 func TestRunPipeline_CancelDuringBuildStaysCanceled(t *testing.T) {
 	deploys, _, projects, _, svc := pipelineFixture(t)
 	dockerFake := &fakeRuntime{blockBuild: true, buildStarted: make(chan struct{})}

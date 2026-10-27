@@ -194,12 +194,21 @@ func (s *Service) buildForDeployment(ctx context.Context, d *models.Deployment, 
 		return "", fmt.Errorf("invalid build args: %w", bArgsErr)
 	}
 
+	spec, specErr := ParseBuildSpec(p.DockerfilePath, p.BuildContext)
+	if specErr != nil {
+		return "", specErr
+	}
+	contextDir, dockerfile, locErr := spec.Locate(workDir)
+	if locErr != nil {
+		return "", locErr
+	}
+
 	imageName := fmt.Sprintf("goforge-%s:%s", p.ID, d.ID)
 	buildLog := newLogWriter(ctx, d.ID, "build", s.Log)
 	if bErr := s.dockerClient.BuildImage(ctx, docker.BuildOptions{
 		ImageName:  imageName,
-		Dockerfile: p.DockerfilePath,
-		ContextDir: workDir,
+		Dockerfile: dockerfile,
+		ContextDir: contextDir,
 		BuildArgs:  buildArgs,
 	}, buildLog); bErr != nil {
 		buildLog.Flush()

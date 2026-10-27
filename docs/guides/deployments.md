@@ -43,7 +43,7 @@ GoForge clones your Git repository to a temporary build directory.
 
 ### 3. Building
 
-Docker builds an image from your Dockerfile:
+Docker builds an image from the project's Dockerfile. `build_context` is the directory sent to Docker, relative to the repository root. `dockerfile_path` is relative to that context. A path that leaves the repository is rejected, and a missing Dockerfile fails the deployment with `dockerfile not found`.
 
 ```dockerfile
 # Example Dockerfile for a Go application
@@ -77,7 +77,7 @@ The container is running and serving traffic. Previous deployment containers are
 
 ### Real-Time Logs
 
-Clone and build output is stored in `deployment_logs` and streamed on the deployment SSE topic. Opening the deployment page again replays the stored lines, then continues with new ones. The page shows clone, build, and pipeline messages. Container stdout is a separate stream on the container page.
+Clone and build output is stored in `deployment_logs`. The deployment page renders those lines, and the log stream replaces that block when it connects so a reconnect does not duplicate them. New lines append after that. The status badges on the same page update from the stream. Container stdout is a separate stream on the container page.
 
 ### Deployment Status
 
@@ -117,4 +117,5 @@ Deployments are processed through a PostgreSQL-backed persistent queue:
 - The queue is persistent — deployments survive server restarts
 - On startup, any orphaned jobs (from a previous crash) are automatically requeued
 - Deployments are processed one at a time in order
+- Canceling a queued deployment removes it. Canceling a running build stops that build and leaves the status `canceled`
 - Queue state is visible in the database for monitoring
