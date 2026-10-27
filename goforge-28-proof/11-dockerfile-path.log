@@ -1,0 +1,56 @@
+deploy 200
+status=running
+    dockerfile_path     | build_context 
+------------------------+---------------
+ docker/Dockerfile.prod | app
+(1 row)
+
+ status  | coalesce 
+---------+----------
+ running | 
+(1 row)
+
+                                                 left                                                  
+-------------------------------------------------------------------------------------------------------
+ cloning repository
+ Enumerating objects: 6, done.
+ Counting objects:  16% (1/6)
+ Counting objects:  33% (2/6)
+ Counting objects:  50% (3/6)
+ Counting objects:  66% (4/6)
+ Counting objects:  83% (5/6)
+ Counting objects: 100% (6/6)
+ Counting objects: 100% (6/6), done.
+ Compressing objects:  33% (1/3)
+ Compressing objects:  66% (2/3)
+ Compressing objects: 100% (3/3)
+ Compressing objects: 100% (3/3), done.
+ Total 6 (delta 0), reused 0 (delta 0), pack-reused 0
+ building image
+ Step 1/6 : FROM busybox:1.36
+ ---> 73aaf090f3d8
+ Step 2/6 : RUN echo goforge-proof-context-build
+ ---> Running in b54ace856af6
+ goforge-proof-context-build
+ ---> Removed intermediate container b54ace856af6
+ ---> 77dbc3198251
+ Step 3/6 : COPY hello.txt /hello.txt
+ ---> 5bf5cd665f87
+ Step 4/6 : EXPOSE 80
+ ---> Running in a9178f85f12f
+ ---> Removed intermediate container a9178f85f12f
+ ---> 86eae8266574
+ Step 5/6 : CMD ["httpd", "-f", "-p", "80", "-h", "/www"]
+ ---> Running in ecbb3dda1470
+ ---> Removed intermediate container ecbb3dda1470
+ ---> c04fcce2f80e
+ Step 6/6 : LABEL goforge.managed=true
+ ---> Running in 31c8408e0765
+ ---> Removed intermediate container 31c8408e0765
+ ---> 020094412e4c
+ Successfully built 020094412e4c
+ Successfully tagged goforge-ed220f91-04f9-47f2-997f-71a8e44d9f08:58532a00-0bac-4675-8e45-ee14bf10d82d
+ starting container
+ deployment is running
+(40 rows)
+

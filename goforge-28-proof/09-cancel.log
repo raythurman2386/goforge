@@ -1,0 +1,98 @@
+processes before cancel:
+48419 /bin/sh -c echo goforge-proof-sleep-start && sleep 60 && echo goforge-proof-sleep-done
+cancel 200
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+curl: (28) Operation timed out after 12002 milliseconds with 4320 bytes received
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+  status  |     coalesce     
+----------+------------------
+ canceled | canceled by user
+(1 row)
+
+processes after cancel:
+no sleep 60
+status events: 1
+detail canceled badge: 0

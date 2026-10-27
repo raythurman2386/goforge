@@ -1,0 +1,33 @@
+down
+ Container gf28proof-goforge-1  Stopping
+ Container gf28proof-goforge-1  Stopped
+ Container gf28proof-goforge-1  Removing
+ Container gf28proof-goforge-1  Removed
+ Container gf28proof-db-1  Stopping
+ Container gf28proof-traefik-1  Stopping
+ Container gf28proof-traefik-1  Stopped
+ Container gf28proof-traefik-1  Removing
+ Container gf28proof-traefik-1  Removed
+ Container gf28proof-db-1  Stopped
+ Container gf28proof-db-1  Removing
+ Container gf28proof-db-1  Removed
+ Volume gf28proof_traefik_letsencrypt  Removing
+ Volume gf28proof_goforge_data  Removing
+ Volume gf28proof_postgres_data  Removing
+ Network gf28proof_goforge_net  Removing
+ Network traefik  Removing
+ Volume gf28proof_traefik_letsencrypt  Removed
+ Volume gf28proof_goforge_data  Removed
+ Network traefik  Resource is still in use
+ Volume gf28proof_postgres_data  Removed
+ Network gf28proof_goforge_net  Removed
+down_exit:0
+goforge-service-3c4c91c0-3546-4ea2-9513-a2dc1f96b87b Up 11 minutes (unhealthy)
+goforge-ed220f91-04f9-47f2-997f-71a8e44d9f08-production-58532a00-0bac-4675-8e45-ee14bf10d82d Restarting (1) 7 seconds ago
+goforge-c12e6942-bea9-4b2a-a790-6b6e4cf0c42c-production-aacec74e-2bd2-4d71-ae85-3b8d365c6ad9 Up 13 minutes
+--- app containers after compose down ---
+no goforge containers
+--- volumes ---
+no goforge volumes
+--- networks ---
+no proof networks

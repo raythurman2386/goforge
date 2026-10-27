@@ -1,0 +1,2 @@
+first_wait_before_network_fix: register_ready:0 last:000curl_fail
+after_iptables_and_key_fix: GET /auth/register 200

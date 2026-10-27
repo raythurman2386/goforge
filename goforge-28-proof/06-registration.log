@@ -1,0 +1,7 @@
+GET /register 404
+GET /auth/register 200
+POST /auth/register 303
+GET /auth/register after 403
+GET /dashboard 200
+GET /auth/register open 200
+POST user B 303

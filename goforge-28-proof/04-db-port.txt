@@ -1,0 +1,4 @@
+compose port db 5432:
+:0
+published ports:
+{"5432/tcp":null}
