@@ -79,6 +79,10 @@ type Config struct {
 	// Registration
 	EnableRegistration bool
 
+	// AdminEmail is promoted to admin on startup and on account creation.
+	// Empty leaves every account as a user until the operator sets it.
+	AdminEmail string
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -137,8 +141,9 @@ func Load() (*Config, error) {
 		// Trusted proxies (comma-separated CIDRs or IPs)
 		TrustedProxies: getEnvStringSlice("TRUSTED_PROXIES"),
 
-		// Registration stays closed after the first admin unless explicitly enabled.
+		// Registration stays closed after the first account unless explicitly enabled.
 		EnableRegistration: getEnvBool("GOFORGE_ENABLE_REGISTRATION", false),
+		AdminEmail:         strings.TrimSpace(os.Getenv("GOFORGE_ADMIN_EMAIL")),
 
 		// Dev mode
 		DevMode: devMode,

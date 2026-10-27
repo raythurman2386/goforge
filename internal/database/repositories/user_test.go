@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,7 +68,7 @@ func TestUserRepository_Create_WithID(t *testing.T) {
 	_ = repo.Delete(ctx, user.ID)
 }
 
-func TestUserRepository_Create_SecondAccountIsNotAdmin(t *testing.T) {
+func TestUserRepository_Create_FirstAccountIsUserUntilGranted(t *testing.T) {
 	t.Parallel()
 	db := getTestDB(t)
 	repo := NewUserRepository(db, nil)
@@ -90,14 +91,29 @@ func TestUserRepository_Create_SecondAccountIsNotAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID(second) error = %v", err)
 	}
-	if gotSecond.Role != models.RoleUser {
+	if gotFirst.Role != models.RoleUser || gotFirst.IsAdmin() {
+		t.Fatalf("first role = %q, want user", gotFirst.Role)
+	}
+	if gotSecond.Role != models.RoleUser || gotSecond.IsAdmin() {
 		t.Fatalf("second role = %q, want user", gotSecond.Role)
 	}
-	if gotSecond.IsAdmin() {
-		t.Fatal("second account is admin")
+
+	if grantErr := repo.GrantAdmin(ctx, strings.ToUpper(first.Email)); grantErr != nil {
+		t.Fatalf("GrantAdmin() error = %v", grantErr)
 	}
-	if first.Role == models.RoleAdmin && gotFirst.Role != models.RoleAdmin {
-		t.Fatalf("stored first role = %q, want admin", gotFirst.Role)
+	gotFirst, err = repo.GetByID(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("GetByID(first) after grant error = %v", err)
+	}
+	gotSecond, err = repo.GetByID(ctx, second.ID)
+	if err != nil {
+		t.Fatalf("GetByID(second) after grant error = %v", err)
+	}
+	if !gotFirst.IsAdmin() {
+		t.Fatalf("granted role = %q, want admin", gotFirst.Role)
+	}
+	if gotSecond.IsAdmin() {
+		t.Fatal("grant changed the other account")
 	}
 }
 

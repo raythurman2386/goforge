@@ -70,7 +70,7 @@ make migrate
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
 
-On first visit, you will see the login page. Click **Register** to create your first account.
+On first visit, you will see the login page. Click **Register** to create your first account. It is a normal user until you set `GOFORGE_ADMIN_EMAIL` to that address and restart.
 
 ## Next Steps
 

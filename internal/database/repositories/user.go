@@ -22,8 +22,9 @@ var (
 
 // UserRepository handles user data access.
 type UserRepository struct {
-	db      *sql.DB
-	secrets *secrets.Encryptor
+	db         *sql.DB
+	secrets    *secrets.Encryptor
+	adminEmail string
 }
 
 // NewUserRepository creates a new UserRepository.
@@ -31,12 +32,18 @@ func NewUserRepository(db *sql.DB, secrets *secrets.Encryptor) *UserRepository {
 	return &UserRepository{db: db, secrets: secrets}
 }
 
+// WithAdminEmail sets the address that receives the admin role on create.
+// An empty address leaves every new account as a user.
+func (r *UserRepository) WithAdminEmail(email string) *UserRepository {
+	r.adminEmail = strings.TrimSpace(email)
+	return r
+}
+
 const userSelectColumns = `id, email, password_hash, github_id, github_username,
 			github_access_token, avatar_url, role, created_at, updated_at`
 
-// Create inserts a user. An empty users table yields one admin. Every later
-// account is a user. The table lock makes two simultaneous first signups
-// produce a single admin.
+// Create inserts a user. The role is user unless the email matches the
+// configured admin address. Registration order does not grant admin.
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	if err := r.encrypt(user); err != nil {
 		return err
@@ -48,34 +55,14 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	now := time.Now()
 	user.CreatedAt = now
 	user.UpdatedAt = now
-
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		rollbackErr := tx.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			return
-		}
-	}()
-
-	if lockErr := lockUsers(ctx, tx); lockErr != nil {
-		return lockErr
-	}
-
-	var existing int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&existing); err != nil {
-		return err
-	}
-	user.Role = models.BootstrapRole(existing)
+	user.Role = models.RoleForEmail(user.Email, r.adminEmail)
 
 	query := `
 		INSERT INTO users (id, email, password_hash, github_id, github_username,
 			github_access_token, avatar_url, role, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 
-	if _, err := tx.ExecContext(ctx, query,
+	_, err := r.db.ExecContext(ctx, query,
 		user.ID,
 		user.Email,
 		user.PasswordHash,
@@ -86,24 +73,31 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 		user.Role,
 		user.CreatedAt,
 		user.UpdatedAt,
-	); err != nil {
-		return err
-	}
-	return tx.Commit()
+	)
+	return err
 }
 
-// lockUsers serializes account creation on Postgres. SQLite has no LOCK TABLE
-// and already serializes writers on a single connection, so a syntax error there
-// is ignored.
-func lockUsers(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `LOCK TABLE users IN EXCLUSIVE MODE`)
-	if err == nil {
+// GrantAdmin promotes the account with this email. A blank email does nothing.
+// A missing account returns ErrNotFound so the caller can wait for registration.
+func (r *UserRepository) GrantAdmin(ctx context.Context, email string) error {
+	email = strings.TrimSpace(email)
+	if email == "" {
 		return nil
 	}
-	if strings.Contains(strings.ToLower(err.Error()), "syntax") {
-		return nil
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE users SET role = 'admin', updated_at = $2
+		WHERE lower(email) = lower($1)`, email, time.Now())
+	if err != nil {
+		return err
 	}
-	return err
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func scanUser(row interface{ Scan(dest ...any) error }) (*models.User, error) {

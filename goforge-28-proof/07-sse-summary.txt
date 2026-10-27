@@ -1,6 +1,0 @@
-detail_bytes 22406
-detail_has_sse 1
-detail_has_hello_log 1
-sse_first_hello 1
-sse_replay_hello 1
-sse_replay_status 0

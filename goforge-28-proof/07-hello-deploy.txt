@@ -1,3 +1,0 @@
-deploy 200
-status=running
-HELLO_DID=aacec74e-2bd2-4d71-ae85-3b8d365c6ad9

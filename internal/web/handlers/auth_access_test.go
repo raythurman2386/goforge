@@ -71,3 +71,22 @@ func TestRequireAdmin(t *testing.T) {
 		})
 	}
 }
+
+func TestRequireAdmin_EmailGrant(t *testing.T) {
+	const email = "Owner@Example.com"
+	user := &models.User{ID: "1", Email: email, Role: models.RoleForEmail(email, "")}
+	req := httptest.NewRequest(http.MethodPost, "/dashboard/prune", nil)
+	req = req.WithContext(context.WithValue(req.Context(), auth.UserContextKey, user))
+	rr := httptest.NewRecorder()
+	if got := requireAdmin(rr, req); got != nil || rr.Code != http.StatusForbidden {
+		t.Fatalf("before grant user=%v status=%d", got, rr.Code)
+	}
+
+	user.Role = models.RoleForEmail(email, "owner@example.com")
+	req = httptest.NewRequest(http.MethodPost, "/settings/prune", nil)
+	req = req.WithContext(context.WithValue(req.Context(), auth.UserContextKey, user))
+	rr = httptest.NewRecorder()
+	if got := requireAdmin(rr, req); got == nil || rr.Code != http.StatusOK {
+		t.Fatalf("after grant user=%v status=%d", got, rr.Code)
+	}
+}

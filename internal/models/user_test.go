@@ -5,15 +5,15 @@ import (
 	"testing"
 )
 
-func TestBootstrapRole(t *testing.T) {
-	if got := BootstrapRole(0); got != RoleAdmin {
-		t.Fatalf("BootstrapRole(0) = %q, want admin", got)
+func TestRoleForEmail(t *testing.T) {
+	if got := RoleForEmail("first@example.com", ""); got != RoleUser {
+		t.Fatalf("empty admin email = %q, want user", got)
 	}
-	if got := BootstrapRole(1); got != RoleUser {
-		t.Fatalf("BootstrapRole(1) = %q, want user", got)
+	if got := RoleForEmail("first@example.com", "other@example.com"); got != RoleUser {
+		t.Fatalf("non-matching email = %q, want user", got)
 	}
-	if got := BootstrapRole(4); got != RoleUser {
-		t.Fatalf("BootstrapRole(4) = %q, want user", got)
+	if got := RoleForEmail(" Owner@Example.com ", "owner@example.com"); got != RoleAdmin {
+		t.Fatalf("matching email = %q, want admin", got)
 	}
 }
 

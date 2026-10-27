@@ -149,7 +149,7 @@ The focus for the next release is hardening the platform and improving the devel
 - [x] **Shared Service Env Var Naming:** Extracted `ServiceEnvVarName` to avoid collisions
 - [x] **Improved Secret Detection:** Segment-based matching to reduce false positives
 - [x] **Service credential encryption:** One-click service `config` and `connection_info` are encrypted, and `generate: true` passwords are created on the server
-- [x] **Admin role:** The first account is an admin. Later accounts are users. Host prune requires the admin role
+- [x] **Admin role:** Accounts are users until `GOFORGE_ADMIN_EMAIL` grants admin. Host prune requires the admin role
 - [x] **Deployment cancel status:** The `canceled` status matches the database check constraint
 
 ### 2. Enhanced Services

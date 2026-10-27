@@ -221,7 +221,16 @@ func runServer() error {
 		return fmt.Errorf("failed to create encryption service: %w", err)
 	}
 
-	userRepo := repositories.NewUserRepository(db.DB, secretService)
+	userRepo := repositories.NewUserRepository(db.DB, secretService).WithAdminEmail(cfg.AdminEmail)
+	grantCtx, grantCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	grantErr := userRepo.GrantAdmin(grantCtx, cfg.AdminEmail)
+	grantCancel()
+	if grantErr != nil && !errors.Is(grantErr, repositories.ErrNotFound) {
+		return fmt.Errorf("failed to grant admin: %w", grantErr)
+	}
+	if cfg.AdminEmail != "" && errors.Is(grantErr, repositories.ErrNotFound) {
+		log.Info("admin email has no account yet", "email", cfg.AdminEmail)
+	}
 	sessionRepo := repositories.NewSessionRepository(db.DB)
 	projectRepo := repositories.NewProjectRepository(db.DB)
 	environmentRepo := repositories.NewEnvironmentRepository(db.DB)

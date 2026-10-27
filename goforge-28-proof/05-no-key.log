@@ -1,8 +1,0 @@
-Error: failed to load config: ENCRYPTION_KEY is required
-Usage:
-  goforge serve [flags]
-
-Flags:
-  -h, --help   help for serve
-
-

@@ -98,6 +98,25 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.EnableRegistration {
 		t.Error("expected registration to be closed by default")
 	}
+	if cfg.AdminEmail != "" {
+		t.Errorf("expected empty admin email, got %q", cfg.AdminEmail)
+	}
+}
+
+func TestLoad_AdminEmail(t *testing.T) {
+	os.Clearenv()
+	t.Cleanup(os.Clearenv)
+	os.Setenv("GOFORGE_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_SECRETS_FILE", filepath.Join(t.TempDir(), "dev-secrets.json"))
+	os.Setenv("GOFORGE_ADMIN_EMAIL", " Owner@Example.com ")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.AdminEmail != "Owner@Example.com" {
+		t.Fatalf("AdminEmail = %q", cfg.AdminEmail)
+	}
 }
 
 func TestLoad_DevSecretsPersist(t *testing.T) {

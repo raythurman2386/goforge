@@ -1,6 +1,0 @@
-          email          | role  
--------------------------+-------
- admin-proof@example.com | admin
- user-proof@example.com  | user
-(2 rows)
-

@@ -1,4 +1,0 @@
-NAME                  IMAGE                COMMAND                  SERVICE   CREATED         STATUS                   PORTS
-gf28proof-db-1        postgres:15-alpine   "docker-entrypoint.s…"   db        6 seconds ago   Up 5 seconds (healthy)   5432/tcp
-gf28proof-goforge-1   gf28proof-goforge    "./goforge serve"        goforge   6 seconds ago   Up Less than a second    127.0.0.1:8080->8080/tcp
-gf28proof-traefik-1   traefik:v3.6         "/entrypoint.sh --ap…"   traefik   6 seconds ago   Up 5 seconds             0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 0.0.0.0:8081->8080/tcp, [::]:8081->8080/tcp

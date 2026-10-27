@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"strings"
 	"time"
 )
 
 // Role is the operator privilege of an account.
-// Admin is the bootstrap operator. Every later account is a user.
 type Role string
 
 const (
@@ -19,10 +19,16 @@ const (
 	RoleUser Role = "user"
 )
 
-// BootstrapRole is the role assigned when an account is created.
-// The empty table produces one admin. Every later account is a user.
-func BootstrapRole(existingUsers int) Role {
-	if existingUsers == 0 {
+// RoleForEmail returns admin only when email matches the configured admin
+// address. An empty admin address never promotes anyone, including the first
+// account.
+func RoleForEmail(email, adminEmail string) Role {
+	email = strings.TrimSpace(email)
+	adminEmail = strings.TrimSpace(adminEmail)
+	if email == "" || adminEmail == "" {
+		return RoleUser
+	}
+	if strings.EqualFold(email, adminEmail) {
 		return RoleAdmin
 	}
 	return RoleUser
