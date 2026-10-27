@@ -42,7 +42,7 @@ templ DashboardStatsLoader() {
 	</div>
 }
 
-templ DashboardStats(csrfToken string, stats *models.SystemStats) {
+templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 	<div id="dashboard-stats" class="animate-fade-in">
 		if stats != nil {
 			<!-- Resource Usage Section -->
@@ -92,6 +92,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats) {
 				<div class="mt-6">
 					<div class="flex items-center justify-between">
 						<h2 class="text-lg font-semibold text-gray-900">Docker Disk Usage</h2>
+						if admin {
 						<form method="POST" action="/dashboard/prune" class="inline">
 							<input type="hidden" name="csrf_token" value={ csrfToken } />
 							if stats.DiskUsage.ReclaimableSize > 0 {
@@ -113,6 +114,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats) {
 								</button>
 							}
 						</form>
+						}
 					</div>
 					<div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 						<div class="card bg-blue-50 border-blue-200">

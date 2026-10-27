@@ -10,7 +10,7 @@ Type=simple
 # Run as root by default for Docker access, or use a user in the docker group.
 User=root
 WorkingDirectory=/opt/goforge
-ExecStart=/opt/goforge/goforge
+ExecStart=/opt/goforge/goforge serve
 Restart=always
 RestartSec=5
 EnvironmentFile=/opt/goforge/.env

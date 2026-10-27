@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -15,22 +16,25 @@ import (
 
 // Service handles deployment orchestration.
 type Service struct {
-	deploymentRepo             *repositories.DeploymentRepository
-	logRepo                    *repositories.DeploymentLogRepository
-	projectRepo                *repositories.ProjectRepository
-	environmentRepo            *repositories.EnvironmentRepository
-	containerRepo              *repositories.ContainerRepository
-	gitSourceRepo              *repositories.GitSourceRepository
-	envVariableRepo            *repositories.EnvVariableRepository
-	projectServiceInstanceRepo *repositories.ProjectServiceInstanceRepository
-	gitService                 *git.Service
-	dockerClient               *docker.Client
+	deploymentRepo             deploymentStore
+	logRepo                    deploymentLogStore
+	projectRepo                projectStore
+	environmentRepo            environmentStore
+	containerRepo              containerStore
+	gitSourceRepo              gitSourceStore
+	envVariableRepo            envVarStore
+	projectServiceInstanceRepo linkedServiceStore
+	gitService                 gitCloner
+	dockerClient               containerRuntime
 	sseHub                     *sse.Hub
 	blueGreenDeployer          *BlueGreenDeployer
 	traefikNetwork             string
 	cloudflareProxyMode        bool
 	buildDir                   string
 	logger                     *slog.Logger
+	transitionMu               sync.Mutex
+	runsMu                     sync.Mutex
+	runs                       map[string]context.CancelFunc
 }
 
 // NewService creates a new deployment Service.
@@ -92,10 +96,41 @@ func (s *Service) UpdateStatus(ctx context.Context, id string, status models.Dep
 
 // GetLogs retrieves logs for a deployment.
 func (s *Service) GetLogs(ctx context.Context, deploymentID string) ([]*models.DeploymentLog, error) {
+	if s.logRepo == nil {
+		return nil, nil
+	}
 	return s.logRepo.ListByDeploymentID(ctx, deploymentID)
 }
 
-// Cancel cancels an in-progress deployment.
+// Cancel marks a deployment canceled and stops its in-flight pipeline.
 func (s *Service) Cancel(ctx context.Context, deploymentID, reason string) error {
-	return s.Transition(ctx, deploymentID, models.DeploymentStatusCanceled, &reason)
+	if err := s.Transition(ctx, deploymentID, models.DeploymentStatusCanceled, &reason); err != nil {
+		return err
+	}
+	s.stopRun(deploymentID)
+	return nil
+}
+
+func (s *Service) trackRun(deploymentID string, cancel context.CancelFunc) {
+	s.runsMu.Lock()
+	defer s.runsMu.Unlock()
+	if s.runs == nil {
+		s.runs = map[string]context.CancelFunc{}
+	}
+	s.runs[deploymentID] = cancel
+}
+
+func (s *Service) untrackRun(deploymentID string) {
+	s.runsMu.Lock()
+	defer s.runsMu.Unlock()
+	delete(s.runs, deploymentID)
+}
+
+func (s *Service) stopRun(deploymentID string) {
+	s.runsMu.Lock()
+	cancel := s.runs[deploymentID]
+	s.runsMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }

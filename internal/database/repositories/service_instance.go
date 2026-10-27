@@ -3,21 +3,52 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/secrets"
 )
 
 // ServiceInstanceRepository handles service instance data access.
 type ServiceInstanceRepository struct {
-	db *sql.DB
+	db        *sql.DB
+	encryptor *secrets.Encryptor
 }
 
 // NewServiceInstanceRepository creates a new ServiceInstanceRepository.
 func NewServiceInstanceRepository(db *sql.DB) *ServiceInstanceRepository {
 	return &ServiceInstanceRepository{db: db}
+}
+
+// WithEncryptor seals config and connection_info at rest. The in-memory
+// instance keeps plaintext so callers can keep using the returned struct.
+func (r *ServiceInstanceRepository) WithEncryptor(enc *secrets.Encryptor) *ServiceInstanceRepository {
+	r.encryptor = enc
+	return r
+}
+
+func (r *ServiceInstanceRepository) sealInstance(s *models.ServiceInstance) (config, connection json.RawMessage, err error) {
+	config, err = sealJSON(r.encryptor, s.Config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encrypt service config: %w", err)
+	}
+	connection, err = sealJSON(r.encryptor, s.ConnectionInfo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encrypt connection info: %w", err)
+	}
+	return config, connection, nil
+}
+
+func (r *ServiceInstanceRepository) openInstance(s *models.ServiceInstance) {
+	if s == nil {
+		return
+	}
+	s.Config = openJSON(r.encryptor, s.Config)
+	s.ConnectionInfo = openJSON(r.encryptor, s.ConnectionInfo)
 }
 
 // Create creates a new service instance.
@@ -36,21 +67,26 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 		s.ConnectionInfo = []byte("{}")
 	}
 
+	config, connection, err := r.sealInstance(s)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		INSERT INTO service_instances (id, user_id, template_name, name, version, 
 			config, domain, status, connection_info, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
-	_, err := r.db.ExecContext(ctx, query,
+	_, err = r.db.ExecContext(ctx, query,
 		s.ID,
 		s.UserID,
 		s.TemplateName,
 		s.Name,
 		s.Version,
-		s.Config,
+		config,
 		s.Domain,
 		s.Status,
-		s.ConnectionInfo,
+		connection,
 		s.CreatedAt,
 		s.UpdatedAt,
 	)
@@ -81,7 +117,11 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return s, err
+	if err != nil {
+		return nil, err
+	}
+	r.openInstance(s)
+	return s, nil
 }
 
 // ListByUserID retrieves all service instances for a user.
@@ -118,6 +158,7 @@ func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID str
 		if err != nil {
 			return nil, err
 		}
+		r.openInstance(s)
 		instances = append(instances, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -130,6 +171,11 @@ func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID str
 func (r *ServiceInstanceRepository) Update(ctx context.Context, s *models.ServiceInstance) error {
 	s.UpdatedAt = time.Now()
 
+	config, connection, err := r.sealInstance(s)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		UPDATE service_instances SET 
 			name = $1, version = $2, config = $3, domain = $4, 
@@ -139,10 +185,10 @@ func (r *ServiceInstanceRepository) Update(ctx context.Context, s *models.Servic
 	result, err := r.db.ExecContext(ctx, query,
 		s.Name,
 		s.Version,
-		s.Config,
+		config,
 		s.Domain,
 		s.Status,
-		s.ConnectionInfo,
+		connection,
 		s.UpdatedAt,
 		s.ID,
 	)

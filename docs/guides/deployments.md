@@ -13,18 +13,13 @@ Deployments are the process of building and running your application from source
 
 ### Webhook-Triggered Deployment
 
-GoForge supports automatic deployments via Git webhooks:
+GoForge accepts push webhooks at one shared secret (`WEBHOOK_SECRET`):
 
-1. Go to project **Settings** > **Webhooks**
-2. Copy the webhook URL
-3. Add it to your Git provider:
-   - **GitHub:** Repository Settings > Webhooks > Add webhook
-   - **GitLab:** Repository Settings > Webhooks > Add webhook
-   - **Gitea:** Repository Settings > Webhooks > Add Gitea webhook
-4. Set the content type to `application/json`
-5. Select **Push events**
+- `POST /webhooks/github`
+- `POST /webhooks/gitlab`
+- `POST /webhooks/gitea`
 
-When you push to the configured branch, GoForge automatically triggers a deployment.
+Add that URL on the Git provider and select push events. There is no per-project webhook settings page. GitHub and Gitea payloads are checked with HMAC-SHA256. GitLab sends the secret in `X-Gitlab-Token`.
 
 ### Webhook Security
 
@@ -40,7 +35,7 @@ Each deployment goes through these stages:
 
 ### 1. Pending
 
-The deployment is queued and waiting for a worker slot. Only `MAX_CONCURRENT_BUILDS` deployments can run simultaneously (default: 2).
+The deployment is queued. The worker runs one deployment at a time. `MAX_CONCURRENT_BUILDS` is loaded and currently unused.
 
 ### 2. Cloning
 
@@ -48,7 +43,7 @@ GoForge clones your Git repository to a temporary build directory.
 
 ### 3. Building
 
-Docker builds an image from your Dockerfile:
+Docker builds an image from the project's Dockerfile. `build_context` is the directory sent to Docker, relative to the repository root. `dockerfile_path` is relative to that context. A path that leaves the repository is rejected, and a missing Dockerfile fails the deployment with `dockerfile not found`.
 
 ```dockerfile
 # Example Dockerfile for a Go application
@@ -82,13 +77,7 @@ The container is running and serving traffic. Previous deployment containers are
 
 ### Real-Time Logs
 
-Deployment logs stream in real-time via Server-Sent Events:
-
-- Build output from Docker
-- Container startup logs
-- Status transition events
-
-Navigate to the deployment detail page to see live logs.
+Clone and build output is stored in `deployment_logs`. The deployment page renders those lines, and the log stream replaces that block when it connects so a reconnect does not duplicate them. New lines append after that. The status badges on the same page update from the stream. Container stdout is a separate stream on the container page.
 
 ### Deployment Status
 
@@ -128,4 +117,5 @@ Deployments are processed through a PostgreSQL-backed persistent queue:
 - The queue is persistent — deployments survive server restarts
 - On startup, any orphaned jobs (from a previous crash) are automatically requeued
 - Deployments are processed one at a time in order
+- Canceling a queued deployment removes it. Canceling a running build stops that build and leaves the status `canceled`
 - Queue state is visible in the database for monitoring

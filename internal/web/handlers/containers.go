@@ -97,6 +97,10 @@ func (h *ContainerHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.verifyContainerOwnership(r.Context(), w, r, containerID) {
+		return
+	}
+
 	csrfToken := auth.GetCSRFToken(r)
 	component := containers.Detail(containerID, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
@@ -171,8 +175,7 @@ func (h *ContainerHandler) Restart(w http.ResponseWriter, r *http.Request) {
 }
 
 // verifyContainerOwnership checks that the Docker container belongs to the
-// authenticated user by tracing the tracked container → service instance chain.
-// Returns true if ownership is verified; writes an HTTP error and returns false otherwise.
+// authenticated user via a service instance or deployment → environment → project.
 func (h *ContainerHandler) verifyContainerOwnership(ctx context.Context, w http.ResponseWriter, _ *http.Request, dockerID string) bool {
 	user, ok := ctx.Value(auth.UserContextKey).(*models.User)
 	if !ok {
@@ -180,23 +183,10 @@ func (h *ContainerHandler) verifyContainerOwnership(ctx context.Context, w http.
 		return false
 	}
 
-	tracked, err := h.containerRepo.GetByDockerID(ctx, dockerID)
-	if err != nil {
-		// Container not tracked in DB — deny by default
+	owned, err := h.containerRepo.OwnedByUser(ctx, dockerID, user.ID)
+	if err != nil || !owned {
 		http.Error(w, "access denied", http.StatusForbidden)
 		return false
 	}
-
-	// Check ownership via linked service instance
-	if tracked.ServiceInstanceID.Valid {
-		instance, err := h.serviceInstanceRepo.GetByID(ctx, tracked.ServiceInstanceID.String)
-		if err == nil && instance.UserID == user.ID {
-			return true
-		}
-	}
-
-	// TODO: also check DeploymentID ownership once the deployment model has UserID
-
-	http.Error(w, "access denied", http.StatusForbidden)
-	return false
+	return true
 }

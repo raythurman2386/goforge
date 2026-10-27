@@ -136,7 +136,7 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 The focus for the next release is hardening the platform and improving the developer experience for power users.
 
 ### 1. Advanced Observability
-- [ ] **Log Persistence:** Store logs in database/files for historical viewing (currently memory/stream only).
+- [x] **Log Persistence:** Clone and build logs are stored in `deployment_logs` and replayed when the deployment log stream connects.
 - [ ] **Alerting System:** Email/Slack notifications for failed deployments or high resource usage.
 - [ ] **Status Page:** Public-facing status page for services.
 - [x] **Health Checks:** Add real comprehensive health checks for DB, Docker, and other dependencies. *(Moved to Critical Phase)*
@@ -148,6 +148,9 @@ The focus for the next release is hardening the platform and improving the devel
 - [x] **Variable Management:** Delete and sync buttons for environment variables
 - [x] **Shared Service Env Var Naming:** Extracted `ServiceEnvVarName` to avoid collisions
 - [x] **Improved Secret Detection:** Segment-based matching to reduce false positives
+- [x] **Service credential encryption:** One-click service `config` and `connection_info` are encrypted, and `generate: true` passwords are created on the server
+- [x] **Admin role:** Accounts are users until `GOFORGE_ADMIN_EMAIL` grants admin. Host prune requires the admin role
+- [x] **Deployment cancel status:** The `canceled` status matches the database check constraint
 
 ### 2. Enhanced Services
 - [ ] **Database Backups:** Automated nightly backups to S3/MinIO.

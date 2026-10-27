@@ -76,7 +76,7 @@ func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages.DashboardStats(csrfToken, stats)
+	component := pages.DashboardStats(csrfToken, stats, user.IsAdmin())
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render dashboard stats", http.StatusInternalServerError)
 	}
@@ -84,9 +84,7 @@ func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request
 
 // Prune handles Docker system prune requests.
 func (h *DashboardHandler) Prune(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Redirect(w, r, "/login", http.StatusFound)
+	if requireAdmin(w, r) == nil {
 		return
 	}
 

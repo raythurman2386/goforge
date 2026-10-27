@@ -14,6 +14,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
+	"github.com/raythurman2386/goforge/internal/deploy"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/services"
@@ -149,11 +150,10 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}
-	if dockerfilePath == "" {
-		dockerfilePath = "Dockerfile"
-	}
-	if buildContext == "" {
-		buildContext = "."
+	spec, specErr := deploy.ParseBuildSpec(dockerfilePath, buildContext)
+	if specErr != nil {
+		http.Error(w, specErr.Error(), http.StatusBadRequest)
+		return
 	}
 
 	p := &models.Project{
@@ -161,8 +161,8 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		Name:           name,
 		RepositoryURL:  repoURL,
 		DefaultBranch:  defaultBranch,
-		DockerfilePath: dockerfilePath,
-		BuildContext:   buildContext,
+		DockerfilePath: spec.Dockerfile,
+		BuildContext:   spec.Context,
 	}
 
 	// Set GitSourceID if provided

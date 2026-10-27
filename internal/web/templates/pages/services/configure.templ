@@ -34,8 +34,8 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string) {
 
 					for _, field := range tmpl.Config {
 						if field.Type == "password" && field.Generate {
-							// TODO: Client-side generation or hidden field
-							@components.Input(field.Label, field.Name, "password", "", field.Required)
+							@components.Input(field.Label, field.Name, "password", "", false)
+							<p class="mt-[-1rem] mb-4 text-xs text-gray-500">Leave blank and GoForge generates a password. It is stored encrypted.</p>
 						} else if field.Type == "number" {
 							@components.Input(field.Label, field.Name, "number", fmt.Sprintf("%v", field.Default), field.Required)
 						} else {

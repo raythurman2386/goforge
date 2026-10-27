@@ -138,14 +138,9 @@ func Router(
 						r.Post("/services", projectHandler.LinkService)
 						r.Delete("/services/{serviceId}", projectHandler.UnlinkService)
 
-						// Deployments (non-streaming)
+						// Deployments (non-streaming). Detail routes live with the SSE
+						// mount below. A second mount of the same pattern 404s.
 						r.Post("/deployments", deploymentHandler.TriggerDeployment)
-						r.Route("/deployments/{deploymentID}", func(r chi.Router) {
-							r.Get("/", deploymentHandler.GetDeployment)
-							r.Get("/status", deploymentHandler.GetDeploymentStatus)
-							r.Post("/rollback", deploymentHandler.RollbackDeployment)
-							r.Post("/cancel", deploymentHandler.CancelDeployment)
-						})
 
 						// Environments
 						r.Route("/envs", func(r chi.Router) {
@@ -204,21 +199,26 @@ func Router(
 					})
 				})
 
-				// Containers
+				// Containers. Per-container routes live with the SSE mount below.
 				r.Route("/containers", func(r chi.Router) {
 					r.Get("/", containerHandler.List)
 					r.Get("/api", containerHandler.ListAPI)
-					r.Get("/{id}", containerHandler.Detail)
-					r.Post("/{id}/stop", containerHandler.Stop)
-					r.Post("/{id}/restart", containerHandler.Restart)
 				})
 			})
 
-			// --- SSE streaming routes (NO timeout) ---
+			// One mount per pattern. Streaming routes stay outside the write timeout.
+			// Page routes on the same pattern take the timeout individually.
 			r.Route("/projects/{id}/deployments/{deploymentID}", func(r chi.Router) {
+				r.With(middleware.Timeout(writeTimeout)).Get("/", deploymentHandler.GetDeployment)
+				r.With(middleware.Timeout(writeTimeout)).Get("/status", deploymentHandler.GetDeploymentStatus)
+				r.With(middleware.Timeout(writeTimeout)).Post("/rollback", deploymentHandler.RollbackDeployment)
+				r.With(middleware.Timeout(writeTimeout)).Post("/cancel", deploymentHandler.CancelDeployment)
 				r.Get("/logs", sseHandler.DeploymentLogs)
 			})
 			r.Route("/containers/{id}", func(r chi.Router) {
+				r.With(middleware.Timeout(writeTimeout)).Get("/", containerHandler.Detail)
+				r.With(middleware.Timeout(writeTimeout)).Post("/stop", containerHandler.Stop)
+				r.With(middleware.Timeout(writeTimeout)).Post("/restart", containerHandler.Restart)
 				r.Get("/stats", sseHandler.ContainerStats)
 				r.Get("/logs", sseHandler.ContainerLogs)
 			})

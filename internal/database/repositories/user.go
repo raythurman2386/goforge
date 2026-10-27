@@ -21,8 +21,9 @@ var (
 
 // UserRepository handles user data access.
 type UserRepository struct {
-	db      *sql.DB
-	secrets *secrets.Encryptor
+	db         *sql.DB
+	secrets    *secrets.Encryptor
+	adminEmail string
 }
 
 // NewUserRepository creates a new UserRepository.
@@ -30,7 +31,18 @@ func NewUserRepository(db *sql.DB, secrets *secrets.Encryptor) *UserRepository {
 	return &UserRepository{db: db, secrets: secrets}
 }
 
-// Create creates a new user.
+// WithAdminEmail sets the address that receives the admin role on create.
+// An empty address leaves every new account as a user.
+func (r *UserRepository) WithAdminEmail(email string) *UserRepository {
+	r.adminEmail = models.NormalizeEmail(email)
+	return r
+}
+
+const userSelectColumns = `id, email, password_hash, github_id, github_username,
+			github_access_token, avatar_url, role, created_at, updated_at`
+
+// Create inserts a user. The role is user unless the email matches the
+// configured admin address. Registration order does not grant admin.
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	if err := r.encrypt(user); err != nil {
 		return err
@@ -42,11 +54,13 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	now := time.Now()
 	user.CreatedAt = now
 	user.UpdatedAt = now
+	user.Email = models.NormalizeEmail(user.Email)
+	user.Role = models.RoleForEmail(user.Email, r.adminEmail)
 
 	query := `
 		INSERT INTO users (id, email, password_hash, github_id, github_username,
-			github_access_token, avatar_url, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+			github_access_token, avatar_url, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		user.ID,
@@ -56,21 +70,39 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 		user.GitHubUsername,
 		user.GitHubAccessToken,
 		user.AvatarURL,
+		user.Role,
 		user.CreatedAt,
 		user.UpdatedAt,
 	)
 	return err
 }
 
-// GetByID retrieves a user by ID.
-func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
-	query := `
-		SELECT id, email, password_hash, github_id, github_username,
-			github_access_token, avatar_url, created_at, updated_at
-		FROM users WHERE id = $1`
+// GrantAdmin promotes the account with this email. A blank email does nothing.
+// A missing account returns ErrNotFound so the caller can wait for registration.
+func (r *UserRepository) GrantAdmin(ctx context.Context, email string) error {
+	email = models.NormalizeEmail(email)
+	if email == "" {
+		return nil
+	}
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE users SET role = 'admin', updated_at = $2
+		WHERE lower(email) = lower($1)`, email, time.Now())
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
 
+func scanUser(row interface{ Scan(dest ...any) error }) (*models.User, error) {
 	user := &models.User{}
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err := row.Scan(
 		&user.ID,
 		&user.Email,
 		&user.PasswordHash,
@@ -78,10 +110,22 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 		&user.GitHubUsername,
 		&user.GitHubAccessToken,
 		&user.AvatarURL,
+		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// GetByID retrieves a user by ID.
+func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
+	query := `SELECT ` + userSelectColumns + ` FROM users WHERE id = $1`
+
+	user, err := scanUser(r.db.QueryRowContext(ctx, query, id))
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -92,26 +136,13 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 	return user, nil
 }
 
-// GetByEmail retrieves a user by email.
+// GetByEmail retrieves a user by email. Lookup is case-insensitive.
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	query := `
-		SELECT id, email, password_hash, github_id, github_username,
-			github_access_token, avatar_url, created_at, updated_at
-		FROM users WHERE email = $1`
+	query := `SELECT ` + userSelectColumns + ` FROM users WHERE lower(email) = $1`
+	email = models.NormalizeEmail(email)
 
-	user := &models.User{}
-	err := r.db.QueryRowContext(ctx, query, email).Scan(
-		&user.ID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.GitHubID,
-		&user.GitHubUsername,
-		&user.GitHubAccessToken,
-		&user.AvatarURL,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
+	user, err := scanUser(r.db.QueryRowContext(ctx, query, email))
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -124,24 +155,10 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 
 // GetByGitHubID retrieves a user by GitHub ID.
 func (r *UserRepository) GetByGitHubID(ctx context.Context, githubID int64) (*models.User, error) {
-	query := `
-		SELECT id, email, password_hash, github_id, github_username,
-			github_access_token, avatar_url, created_at, updated_at
-		FROM users WHERE github_id = $1`
+	query := `SELECT ` + userSelectColumns + ` FROM users WHERE github_id = $1`
 
-	user := &models.User{}
-	err := r.db.QueryRowContext(ctx, query, githubID).Scan(
-		&user.ID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.GitHubID,
-		&user.GitHubUsername,
-		&user.GitHubAccessToken,
-		&user.AvatarURL,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
+	user, err := scanUser(r.db.QueryRowContext(ctx, query, githubID))
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -159,6 +176,7 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	}
 
 	user.UpdatedAt = time.Now()
+	user.Email = models.NormalizeEmail(user.Email)
 
 	query := `
 		UPDATE users SET
@@ -190,6 +208,13 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	return nil
 }
 
+// Count returns the number of users.
+func (r *UserRepository) Count(ctx context.Context) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
+	return n, err
+}
+
 // Delete deletes a user.
 func (r *UserRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM users WHERE id = $1`
@@ -211,7 +236,7 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 // UpdateEmail updates the user's email address.
 func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) error {
 	query := `UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2`
-	result, err := r.db.ExecContext(ctx, query, email, id)
+	result, err := r.db.ExecContext(ctx, query, models.NormalizeEmail(email), id)
 	if err != nil {
 		return err
 	}

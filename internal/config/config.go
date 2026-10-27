@@ -4,9 +4,11 @@ package config
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -77,6 +79,10 @@ type Config struct {
 	// Registration
 	EnableRegistration bool
 
+	// AdminEmail is promoted to admin on startup and on account creation.
+	// Empty leaves every account as a user until the operator sets it.
+	AdminEmail string
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -135,8 +141,9 @@ func Load() (*Config, error) {
 		// Trusted proxies (comma-separated CIDRs or IPs)
 		TrustedProxies: getEnvStringSlice("TRUSTED_PROXIES"),
 
-		// Registration
-		EnableRegistration: getEnvBool("GOFORGE_ENABLE_REGISTRATION", true),
+		// Registration stays closed after the first account unless explicitly enabled.
+		EnableRegistration: getEnvBool("GOFORGE_ENABLE_REGISTRATION", false),
+		AdminEmail:         strings.TrimSpace(os.Getenv("GOFORGE_ADMIN_EMAIL")),
 
 		// Dev mode
 		DevMode: devMode,
@@ -161,20 +168,9 @@ func (c *Config) applyDefaults() {
 	}
 	c.DatabaseType = DatabaseTypePostgres
 
-	// In dev mode, generate random secrets if not provided
+	// In dev mode, reuse or create a secrets file so restarts can decrypt data.
 	if c.DevMode {
-		if c.EncryptionKey == "" {
-			c.EncryptionKey = generateRandomKey(32)
-		}
-		if c.SessionSecret == "" {
-			c.SessionSecret = generateRandomKey(32)
-		}
-		if c.CSRFSecret == "" {
-			c.CSRFSecret = generateRandomKey(32)
-		}
-		if c.WebhookSecret == "" {
-			c.WebhookSecret = generateRandomKey(32)
-		}
+		c.ensureDevSecrets()
 		// Use text logging in dev mode for readability
 		if os.Getenv("LOG_FORMAT") == "" {
 			c.LogFormat = "text"
@@ -183,6 +179,61 @@ func (c *Config) applyDefaults() {
 			c.LogLevel = "debug"
 		}
 	}
+}
+
+type devSecretsFile struct {
+	EncryptionKey string `json:"encryption_key"`
+	SessionSecret string `json:"session_secret"`
+	CSRFSecret    string `json:"csrf_secret"`
+	WebhookSecret string `json:"webhook_secret"`
+}
+
+// ensureDevSecrets fills empty dev secrets from GOFORGE_DEV_SECRETS_FILE,
+// generating and persisting any that are still missing. Environment values win
+// and are not written back into the file.
+func (c *Config) ensureDevSecrets() {
+	path := os.Getenv("GOFORGE_DEV_SECRETS_FILE")
+	if path == "" {
+		path = filepath.Join(".goforge", "dev-secrets.json")
+	}
+
+	stored := devSecretsFile{}
+	if data, readErr := os.ReadFile(path); readErr == nil {
+		if unmarshalErr := json.Unmarshal(data, &stored); unmarshalErr != nil {
+			stored = devSecretsFile{}
+		}
+	}
+
+	changed := false
+	c.EncryptionKey, stored.EncryptionKey, changed = fillDevSecret(c.EncryptionKey, stored.EncryptionKey, changed)
+	c.SessionSecret, stored.SessionSecret, changed = fillDevSecret(c.SessionSecret, stored.SessionSecret, changed)
+	c.CSRFSecret, stored.CSRFSecret, changed = fillDevSecret(c.CSRFSecret, stored.CSRFSecret, changed)
+	c.WebhookSecret, stored.WebhookSecret, changed = fillDevSecret(c.WebhookSecret, stored.WebhookSecret, changed)
+	if !changed {
+		return
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return
+	}
+	data, err := json.MarshalIndent(stored, "", "  ")
+	if err != nil {
+		return
+	}
+	if writeErr := os.WriteFile(path, data, 0o600); writeErr != nil {
+		return
+	}
+}
+
+func fillDevSecret(current, stored string, changed bool) (value, persisted string, updated bool) {
+	if current != "" {
+		return current, stored, changed
+	}
+	if stored != "" {
+		return stored, stored, changed
+	}
+	generated := generateRandomKey(32)
+	return generated, generated, true
 }
 
 // validate checks that required configuration is present.
@@ -275,8 +326,6 @@ func getEnvStringSlice(key string) []string {
 }
 
 // generateRandomKey generates a random base64-encoded key.
-//
-//nolint:unparam // length is currently always 32 but this is intended to be a flexible utility
 func generateRandomKey(length int) string {
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {

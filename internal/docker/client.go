@@ -106,8 +106,11 @@ func (c *Client) DiskUsage(ctx context.Context) (*types.DiskUsage, error) {
 	return &usage, nil
 }
 
-// ListContainers returns a list of containers from Docker.
+// ListContainers returns GoForge-managed containers from Docker.
 func (c *Client) ListContainers(ctx context.Context, all bool) ([]types.Container, error) {
-	options := container.ListOptions{All: all}
+	options := container.ListOptions{
+		All:     all,
+		Filters: filters.NewArgs(filters.Arg("label", ManagedLabelFilter)),
+	}
 	return c.docker.ContainerList(ctx, options)
 }

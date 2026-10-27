@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,6 +66,124 @@ func TestUserRepository_Create_WithID(t *testing.T) {
 
 	// Cleanup: delete the user to avoid conflict on re-run
 	_ = repo.Delete(ctx, user.ID)
+}
+
+func TestUserRepository_Create_FirstAccountIsUserUntilGranted(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+	repo := NewUserRepository(db, nil)
+	ctx := context.Background()
+
+	first := &models.User{Email: uniqueEmail("role-first")}
+	if err := repo.Create(ctx, first); err != nil {
+		t.Fatalf("Create() first error = %v", err)
+	}
+	second := &models.User{Email: uniqueEmail("role-second")}
+	if err := repo.Create(ctx, second); err != nil {
+		t.Fatalf("Create() second error = %v", err)
+	}
+
+	gotFirst, err := repo.GetByID(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("GetByID(first) error = %v", err)
+	}
+	gotSecond, err := repo.GetByID(ctx, second.ID)
+	if err != nil {
+		t.Fatalf("GetByID(second) error = %v", err)
+	}
+	if gotFirst.Role != models.RoleUser || gotFirst.IsAdmin() {
+		t.Fatalf("first role = %q, want user", gotFirst.Role)
+	}
+	if gotSecond.Role != models.RoleUser || gotSecond.IsAdmin() {
+		t.Fatalf("second role = %q, want user", gotSecond.Role)
+	}
+
+	if grantErr := repo.GrantAdmin(ctx, strings.ToUpper(first.Email)); grantErr != nil {
+		t.Fatalf("GrantAdmin() error = %v", grantErr)
+	}
+	gotFirst, err = repo.GetByID(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("GetByID(first) after grant error = %v", err)
+	}
+	gotSecond, err = repo.GetByID(ctx, second.ID)
+	if err != nil {
+		t.Fatalf("GetByID(second) after grant error = %v", err)
+	}
+	if !gotFirst.IsAdmin() {
+		t.Fatalf("granted role = %q, want admin", gotFirst.Role)
+	}
+	if gotSecond.IsAdmin() {
+		t.Fatal("grant changed the other account")
+	}
+}
+
+func TestUserRepository_AdminEmailCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		adminEmail func(local string) string
+		signup     func(local string) string
+	}{
+		{
+			name:       "mixed-case env grants lowercase account",
+			adminEmail: func(local string) string { return local + "@Example.com" },
+			signup:     func(local string) string { return strings.ToLower(local) + "@example.com" },
+		},
+		{
+			name:       "lowercase env grants mixed-case account",
+			adminEmail: func(local string) string { return strings.ToLower(local) + "@example.com" },
+			signup:     func(local string) string { return local + "@Example.com" },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			local := "Admin" + uniqueID()
+			wantEmail := strings.ToLower(local) + "@example.com"
+			repo := NewUserRepository(db, nil).WithAdminEmail(tt.adminEmail(local))
+			user := &models.User{Email: tt.signup(local)}
+			if err := repo.Create(ctx, user); err != nil {
+				t.Fatalf("Create() error = %v", err)
+			}
+			if user.Email != wantEmail {
+				t.Fatalf("stored email = %q, want %q", user.Email, wantEmail)
+			}
+
+			got, err := repo.GetByID(ctx, user.ID)
+			if err != nil {
+				t.Fatalf("GetByID() error = %v", err)
+			}
+			if !got.IsAdmin() {
+				t.Fatalf("role = %q, want admin for env %q signup %q", got.Role, tt.adminEmail(local), tt.signup(local))
+			}
+			if got.Email != wantEmail {
+				t.Fatalf("loaded email = %q, want %q", got.Email, wantEmail)
+			}
+
+			found, err := repo.GetByEmail(ctx, local+"@EXAMPLE.com")
+			if err != nil {
+				t.Fatalf("GetByEmail() error = %v", err)
+			}
+			if found.ID != user.ID {
+				t.Fatalf("GetByEmail() id = %q, want %q", found.ID, user.ID)
+			}
+
+			dup := &models.User{Email: strings.ToUpper(local) + "@example.com"}
+			if dupErr := repo.Create(ctx, dup); dupErr == nil {
+				t.Fatal("duplicate signup with a different case was accepted")
+			}
+			again, err := repo.GetByEmail(ctx, dup.Email)
+			if err != nil {
+				t.Fatalf("GetByEmail() after duplicate error = %v", err)
+			}
+			if again.ID != user.ID {
+				t.Fatalf("duplicate casing created account %q", again.ID)
+			}
+		})
+	}
 }
 
 func TestUserRepository_Create_DuplicateEmail(t *testing.T) {

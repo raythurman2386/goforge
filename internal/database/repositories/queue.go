@@ -215,6 +215,15 @@ func (r *QueueRepository) GetByID(ctx context.Context, id string) (*models.Queue
 	return item, err
 }
 
+// DeletePendingByDeploymentID removes a job that has not started.
+func (r *QueueRepository) DeletePendingByDeploymentID(ctx context.Context, deploymentID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM deployment_queue WHERE deployment_id = $1 AND status = $2`,
+		deploymentID, models.QueueStatusPending,
+	)
+	return err
+}
+
 // GetByDeploymentID retrieves a queue item by deployment ID.
 func (r *QueueRepository) GetByDeploymentID(ctx context.Context, deploymentID string) (*models.QueueItem, error) {
 	query := `

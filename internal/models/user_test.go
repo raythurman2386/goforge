@@ -5,6 +5,44 @@ import (
 	"testing"
 )
 
+func TestRoleForEmail(t *testing.T) {
+	if got := RoleForEmail("first@example.com", ""); got != RoleUser {
+		t.Fatalf("empty admin email = %q, want user", got)
+	}
+	if got := RoleForEmail("first@example.com", "other@example.com"); got != RoleUser {
+		t.Fatalf("non-matching email = %q, want user", got)
+	}
+	if got := RoleForEmail(" Owner@Example.com ", "owner@example.com"); got != RoleAdmin {
+		t.Fatalf("matching email = %q, want admin", got)
+	}
+}
+
+func TestUser_IsAdmin(t *testing.T) {
+	if (&User{Role: RoleAdmin}).IsAdmin() != true {
+		t.Fatal("admin role should be admin")
+	}
+	if (&User{Role: RoleUser}).IsAdmin() {
+		t.Fatal("user role should not be admin")
+	}
+	var none *User
+	if none.IsAdmin() {
+		t.Fatal("nil user should not be admin")
+	}
+}
+
+func TestRole_ScanRejectsUnknown(t *testing.T) {
+	var role Role
+	if err := role.Scan("owner"); err == nil {
+		t.Fatal("Scan accepted an unknown role")
+	}
+	if err := role.Scan("admin"); err != nil {
+		t.Fatal(err)
+	}
+	if role != RoleAdmin {
+		t.Fatalf("role = %q", role)
+	}
+}
+
 func TestUser_HasPassword(t *testing.T) {
 	tests := []struct {
 		name         string

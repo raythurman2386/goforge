@@ -12,8 +12,22 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/sse"
 )
+
+func TestDeploymentStatusFromEvent(t *testing.T) {
+	status, ok := deploymentStatusFromEvent(map[string]interface{}{
+		"kind":   "status",
+		"status": models.DeploymentStatusBuilding,
+	})
+	if !ok || status != models.DeploymentStatusBuilding {
+		t.Fatalf("status = %q ok=%v", status, ok)
+	}
+	if _, ok := deploymentStatusFromEvent(map[string]interface{}{"kind": "log"}); ok {
+		t.Fatal("log event parsed as status")
+	}
+}
 
 func TestSSEHandler_DeploymentLogs(t *testing.T) {
 	t.Parallel()

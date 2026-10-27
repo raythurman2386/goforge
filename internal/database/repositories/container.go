@@ -255,6 +255,28 @@ func (r *ContainerRepository) ListAll(ctx context.Context) ([]*models.Container,
 	return containers, nil
 }
 
+// OwnedByUser reports whether the Docker container belongs to userID.
+// Ownership is the service instance owner or the project owner reached
+// through deployment → environment → project.
+func (r *ContainerRepository) OwnedByUser(ctx context.Context, dockerID, userID string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM containers c
+			LEFT JOIN service_instances si ON c.service_instance_id = si.id
+			LEFT JOIN deployments d ON c.deployment_id = d.id
+			LEFT JOIN environments e ON d.environment_id = e.id
+			LEFT JOIN projects p ON e.project_id = p.id
+			WHERE c.docker_id = $1 AND (si.user_id = $2 OR p.user_id = $2)
+		)`
+
+	var owned bool
+	if err := r.db.QueryRowContext(ctx, query, dockerID, userID).Scan(&owned); err != nil {
+		return false, err
+	}
+	return owned, nil
+}
+
 // ListByUserID returns containers belonging to a specific user.
 // Ownership is determined via the service_instances table (service_instance.user_id)
 // or via deployments→environments→projects (project.user_id).

@@ -72,8 +72,7 @@ GoForge implements double-submit cookie CSRF protection:
 - Users can only access their own resources (projects, environments, services)
 - Resource ownership is validated at the repository layer via `user_id` filtering
 
-!!! note
-    GoForge currently has a single-role model (all authenticated users have the same permissions). There is no admin/user role distinction.
+Accounts have a `role` of `admin` or `user`. Registration creates users, including the first account. `GOFORGE_ADMIN_EMAIL` promotes that address on process start and when the account is created. The match is case-insensitive, and account emails are stored in lowercase. Host actions such as Docker prune require the admin role and return 403 for anyone else. Project and service ownership is still checked separately, so a user only sees their own resources. Deployment get, rollback, cancel, and status also require the deployment's environment to belong to the project in the path; a cross-project id is not found.
 
 ---
 
@@ -173,12 +172,12 @@ Webhooks receive push events from git providers to trigger deployments.
 ## Database Security
 
 - PostgreSQL connections use the credentials in the `DATABASE_URL` environment variable
-- The default Docker Compose configuration exposes PostgreSQL port 5432 to the host
+- Docker Compose does not publish Postgres on the host. Other containers reach it on the Compose network
 
 ### Recommendations
 
-- Remove the host port mapping for PostgreSQL in production (`5432:5432` -> internal only)
-- Use strong, unique database credentials (not the default `password`)
+- Keep Postgres off the host network. Do not add a `5432:5432` mapping
+- Use strong, unique database credentials (the example `.env` password is `changeme` for a local copy only)
 - Enable SSL for PostgreSQL connections in production
 - Restrict database user privileges to only what GoForge needs
 

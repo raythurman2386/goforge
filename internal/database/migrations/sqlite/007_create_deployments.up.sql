@@ -3,7 +3,7 @@ CREATE TABLE deployments (
     id TEXT PRIMARY KEY,
     environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'pending' 
-        CHECK (status IN ('pending', 'cloning', 'building', 'deploying', 'running', 'failed', 'rolled_back', 'cancelled')),
+        CHECK (status IN ('pending', 'cloning', 'building', 'deploying', 'running', 'failed', 'rolled_back', 'canceled')),
     trigger_type TEXT NOT NULL DEFAULT 'manual'
         CHECK (trigger_type IN ('manual', 'webhook', 'rollback')),
     commit_sha TEXT,

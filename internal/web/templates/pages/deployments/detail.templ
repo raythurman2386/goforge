@@ -21,6 +21,7 @@ type DetailProps struct {
 
 templ Detail(props DetailProps) {
 	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID)), props.CSRFToken, nil) {
+		<div hx-ext="sse" sse-connect={ fmt.Sprintf("/projects/%s/deployments/%s/logs", props.Project.ID, props.Deployment.ID) }>
 		<!-- Breadcrumb -->
 		<nav class="flex mb-4" aria-label="Breadcrumb">
 			<ol class="flex items-center space-x-2">
@@ -70,7 +71,9 @@ templ Detail(props DetailProps) {
 				<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl">
 					Deployment { truncateID(props.Deployment.ID) }
 				</h2>
-				@components.DeploymentStatusBadge(props.Deployment.Status)
+				<span sse-swap="status" hx-swap="innerHTML">
+					@components.DeploymentStatusBadge(props.Deployment.Status)
+				</span>
 			</div>
 			<div class="flex space-x-3">
 				if props.CanRollback && props.Deployment.Status == models.DeploymentStatusRunning {
@@ -112,7 +115,9 @@ templ Detail(props DetailProps) {
 						<div class="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
 							<dt class="text-sm font-medium text-gray-500">Status</dt>
 							<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-								@components.DeploymentStatusBadge(props.Deployment.Status)
+								<span sse-swap="status" hx-swap="innerHTML">
+									@components.DeploymentStatusBadge(props.Deployment.Status)
+								</span>
 							</dd>
 						</div>
 						<div class="bg-white px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -236,25 +241,20 @@ templ Detail(props DetailProps) {
 				}
 			</div>
 			<div class="border-t border-gray-200">
-				<div
-					id="deployment-logs"
-					class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto"
-					if !props.Deployment.IsTerminal() {
-						hx-ext="sse"
-						sse-connect={ fmt.Sprintf("/projects/%s/deployments/%s/logs", props.Project.ID, props.Deployment.ID) }
-						sse-swap="log"
-						hx-swap="beforeend"
-					}
-				>
-					if len(props.Logs) == 0 {
-						<p class="text-gray-500 italic">No logs available yet...</p>
-					} else {
-						for _, log := range props.Logs {
-							@LogLine(log)
+				<div id="deployment-logs" class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto">
+					<div id="deployment-log-lines" sse-swap="snapshot" hx-swap="innerHTML">
+						if len(props.Logs) == 0 {
+							<p class="text-gray-500 italic">No logs available yet...</p>
+						} else {
+							for _, log := range props.Logs {
+								@LogLine(log)
+							}
 						}
-					}
+					</div>
+					<div sse-swap="log" hx-swap="beforeend" hx-target="#deployment-log-lines"></div>
 				</div>
 			</div>
+		</div>
 		</div>
 	}
 }
