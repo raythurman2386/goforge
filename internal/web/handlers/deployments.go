@@ -211,11 +211,15 @@ func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Cancel the deployment
 	errorMsg := "canceled by user"
 	if err := h.deployService.Cancel(r.Context(), deploymentID, errorMsg); err != nil {
 		http.Error(w, "failed to cancel deployment: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if h.worker != nil {
+		if dropErr := h.worker.DropPending(r.Context(), deploymentID); dropErr != nil && h.logger != nil {
+			h.logger.Error("failed to drop pending deployment", "deployment_id", deploymentID, "error", dropErr)
+		}
 	}
 
 	// Redirect back to deployment detail page

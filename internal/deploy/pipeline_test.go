@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -173,6 +175,45 @@ func TestRunPipeline(t *testing.T) {
 			t.Fatalf("logs = %#v", logs.messages())
 		}
 	})
+}
+
+func TestRunPipeline_CancelDuringBuildStaysCanceled(t *testing.T) {
+	deploys, _, projects, _, svc := pipelineFixture(t)
+	dockerFake := &fakeRuntime{blockBuild: true, buildStarted: make(chan struct{})}
+	svc.dockerClient = dockerFake
+	projects.items["proj-1"].DockerfilePath = "Dockerfile"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	svc.trackRun("dep-1", cancel)
+	defer svc.untrackRun("dep-1")
+
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.RunPipeline(ctx, "dep-1")
+	}()
+
+	select {
+	case <-dockerFake.buildStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("build did not start")
+	}
+
+	if err := svc.Cancel(context.Background(), "dep-1", "canceled by user"); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrCanceled) {
+			t.Fatalf("RunPipeline err = %v, want ErrCanceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("pipeline did not stop after cancel")
+	}
+
+	if status := deploymentStatus(t, deploys); status != models.DeploymentStatusCanceled {
+		t.Fatalf("status = %s", status)
+	}
 }
 
 func deploymentStatus(t *testing.T, deploys *memDeployments) models.DeploymentStatus {
@@ -383,10 +424,26 @@ type fakeGit struct {
 	progress string
 	called   bool
 	err      error
+	files    map[string]string
 }
 
 func (f *fakeGit) Clone(_ context.Context, opts git.CloneOptions) error {
 	f.called = true
+	if opts.Path != "" {
+		files := f.files
+		if files == nil {
+			files = map[string]string{"Dockerfile": "FROM scratch\n"}
+		}
+		for name, body := range files {
+			full := filepath.Join(opts.Path, name)
+			if err := os.MkdirAll(filepath.Dir(full), 0o700); err != nil {
+				return err
+			}
+			if err := os.WriteFile(full, []byte(body), 0o600); err != nil {
+				return err
+			}
+		}
+	}
 	if opts.Progress != nil && f.progress != "" {
 		_, _ = io.WriteString(opts.Progress, f.progress)
 	}
@@ -398,13 +455,32 @@ type fakeRuntime struct {
 	buildErr      error
 	restartPolicy string
 	buildArgs     map[string]*string
+	contextDir    string
+	dockerfile    string
 	stopped       bool
+	blockBuild    bool
+	buildStarted  chan struct{}
 }
 
-func (f *fakeRuntime) BuildImage(_ context.Context, opts docker.BuildOptions, output io.Writer) error {
+func (f *fakeRuntime) BuildImage(ctx context.Context, opts docker.BuildOptions, output io.Writer) error {
 	f.mu.Lock()
 	f.buildArgs = opts.BuildArgs
+	f.contextDir = opts.ContextDir
+	f.dockerfile = opts.Dockerfile
+	block := f.blockBuild
+	started := f.buildStarted
 	f.mu.Unlock()
+	if started != nil {
+		select {
+		case <-started:
+		default:
+			close(started)
+		}
+	}
+	if block {
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	if output != nil {
 		_, _ = io.WriteString(output, "step 1\n")
 	}

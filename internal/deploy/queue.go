@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -128,9 +129,21 @@ func (w *Worker) processNext() {
 func (w *Worker) processItem(item *models.QueueItem) {
 	ctx, cancel := context.WithTimeout(context.Background(), w.timeout)
 	defer cancel()
+	if w.service != nil {
+		w.service.trackRun(item.DeploymentID, cancel)
+		defer w.service.untrackRun(item.DeploymentID)
+	}
 
 	if w.service != nil && w.service.logger != nil {
 		w.service.logger.Info("processing deployment", "deployment_id", item.DeploymentID, "queue_id", item.ID)
+	}
+
+	if w.service != nil {
+		current, getErr := w.service.GetDeployment(ctx, item.DeploymentID)
+		if getErr == nil && current.Status == models.DeploymentStatusCanceled {
+			w.finishCanceled(item)
+			return
+		}
 	}
 
 	err := w.service.RunPipeline(ctx, item.DeploymentID)
@@ -146,9 +159,36 @@ func (w *Worker) processItem(item *models.QueueItem) {
 	}
 }
 
+func (w *Worker) finishCanceled(item *models.QueueItem) {
+	itemCtx, itemCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer itemCancel()
+	if err := w.queueRepo.Complete(itemCtx, item.ID); err != nil && w.service != nil && w.service.logger != nil {
+		w.service.logger.Error("failed to complete canceled queue item", "queue_id", item.ID, "error", err)
+	}
+}
+
+// DropPending removes a deployment that is still waiting in the queue.
+func (w *Worker) DropPending(ctx context.Context, deploymentID string) error {
+	if w == nil || w.queueRepo == nil {
+		return nil
+	}
+	return w.queueRepo.DeletePendingByDeploymentID(ctx, deploymentID)
+}
+
 func (w *Worker) handleFailure(item *models.QueueItem, deploymentErr error) {
 	itemCtx, itemCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer itemCancel()
+
+	if errors.Is(deploymentErr, ErrCanceled) {
+		w.finishCanceled(item)
+		return
+	}
+	if w.service != nil {
+		if current, getErr := w.service.GetDeployment(itemCtx, item.DeploymentID); getErr == nil && current.Status == models.DeploymentStatusCanceled {
+			w.finishCanceled(item)
+			return
+		}
+	}
 
 	errMsg := deploymentErr.Error()
 	if failErr := w.queueRepo.Fail(itemCtx, item.ID, errMsg); failErr != nil {

@@ -1,7 +1,6 @@
 -- Align the deployments status check with the application value "canceled".
 -- Existing databases created from 007 used the British spelling "cancelled".
-
-UPDATE deployments SET status = 'canceled' WHERE status = 'cancelled';
+-- Drop the old check before the update. It rejects the American spelling.
 
 DO $$
 DECLARE
@@ -20,6 +19,8 @@ BEGIN
         EXECUTE format('ALTER TABLE deployments DROP CONSTRAINT %I', constraint_name);
     END IF;
 END $$;
+
+UPDATE deployments SET status = 'canceled' WHERE status = 'cancelled';
 
 ALTER TABLE deployments ADD CONSTRAINT deployments_status_check
     CHECK (status IN ('pending', 'cloning', 'building', 'deploying', 'running', 'failed', 'rolled_back', 'canceled'));

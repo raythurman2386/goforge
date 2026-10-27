@@ -56,9 +56,9 @@ type Deployment struct {
 	CreatedAt     time.Time
 }
 
-// IsTerminal returns true if the deployment is in a terminal state.
-func (d *Deployment) IsTerminal() bool {
-	switch d.Status {
+// Terminal reports whether a deployment status accepts no further transitions.
+func (s DeploymentStatus) Terminal() bool {
+	switch s {
 	case DeploymentStatusRunning, DeploymentStatusFailed,
 		DeploymentStatusRolledBack, DeploymentStatusCanceled:
 		return true
@@ -68,6 +68,11 @@ func (d *Deployment) IsTerminal() bool {
 	default:
 		return false
 	}
+}
+
+// IsTerminal returns true if the deployment is in a terminal state.
+func (d *Deployment) IsTerminal() bool {
+	return d != nil && d.Status.Terminal()
 }
 
 // Duration returns the duration of the deployment.

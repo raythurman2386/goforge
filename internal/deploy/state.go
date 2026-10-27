@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -10,14 +11,21 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
+// ErrCanceled means a deployment was canceled and must stay canceled.
+var ErrCanceled = errors.New("deployment canceled")
+
 // Transition handles deployment state transitions.
+// The lock keeps a cancel from being overwritten by a pipeline transition
+// that already read the previous status.
 func (s *Service) Transition(ctx context.Context, deploymentID string, to models.DeploymentStatus, errorMsg *string) error {
+	s.transitionMu.Lock()
+	defer s.transitionMu.Unlock()
+
 	d, err := s.GetDeployment(ctx, deploymentID)
 	if err != nil {
 		return err
 	}
 
-	// Validate transition
 	if !isValidTransition(d.Status, to) {
 		return fmt.Errorf("invalid state transition from %s to %s", d.Status, to)
 	}
@@ -38,7 +46,10 @@ func (s *Service) Transition(ctx context.Context, deploymentID string, to models
 }
 
 func isValidTransition(from, to models.DeploymentStatus) bool {
-	// Any state can transition to failed or canceled
+	switch from {
+	case models.DeploymentStatusFailed, models.DeploymentStatusRolledBack, models.DeploymentStatusCanceled:
+		return false
+	}
 	if to == models.DeploymentStatusFailed || to == models.DeploymentStatusCanceled {
 		return true
 	}
