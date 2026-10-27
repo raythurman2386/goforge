@@ -223,3 +223,51 @@ func TestRouter_NotFound(t *testing.T) {
 		t.Errorf("GET /nonexistent-route status = %d, want %d", resp.StatusCode, http.StatusNotFound)
 	}
 }
+
+func TestRouter_DeploymentAndContainerRoutesExist(t *testing.T) {
+	cfg := &config.Config{DevMode: true, Port: 8080, LogLevel: "info"}
+	db := setupTestRouterDB(t)
+	defer db.Close()
+
+	router := setupTestRouter(t, db, cfg)
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	client := &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	paths := []string{
+		"/projects/p1/deployments/d1",
+		"/projects/p1/deployments/d1/logs",
+		"/containers/abc",
+		"/containers/abc/logs",
+		"/containers/abc/stats",
+	}
+	for _, path := range paths {
+		resp, err := client.Get(server.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			t.Errorf("GET %s = 404", path)
+		}
+	}
+
+	postPaths := []string{
+		"/projects/p1/deployments/d1/cancel",
+		"/containers/abc/stop",
+		"/containers/abc/restart",
+	}
+	for _, path := range postPaths {
+		resp, err := client.Post(server.URL+path, "application/x-www-form-urlencoded", nil)
+		if err != nil {
+			t.Fatalf("POST %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			t.Errorf("POST %s = 404", path)
+		}
+	}
+}

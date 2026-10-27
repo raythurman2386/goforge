@@ -101,9 +101,11 @@ func (h *SSEHandler) DeploymentLogs(w http.ResponseWriter, r *http.Request) {
 			h.logger.Warn("failed to load deployment logs", "deployment_id", deploymentID, "error", logErr)
 		}
 		for _, entry := range logs {
-			seen[entry.ID] = struct{}{}
-			writeDeploymentLog(w, flusher, r, entry)
+			if entry.ID != "" {
+				seen[entry.ID] = struct{}{}
+			}
 		}
+		writeDeploymentSnapshot(w, flusher, r, logs)
 	}
 
 	for {
@@ -111,6 +113,10 @@ func (h *SSEHandler) DeploymentLogs(w http.ResponseWriter, r *http.Request) {
 		case event, ok := <-ch:
 			if !ok {
 				return
+			}
+			if status, isStatus := deploymentStatusFromEvent(event.Data); isStatus {
+				writeDeploymentStatus(w, flusher, r, status)
+				continue
 			}
 			entry, isLog := deploymentLogFromEvent(event.Data)
 			if !isLog {
@@ -325,6 +331,47 @@ func writeDeploymentLog(w http.ResponseWriter, flusher http.Flusher, r *http.Req
 		return
 	}
 	writeRawEvent(w, flusher, "log", buf.Bytes())
+}
+
+func writeDeploymentSnapshot(w http.ResponseWriter, flusher http.Flusher, r *http.Request, logs []*models.DeploymentLog) {
+	var buf bytes.Buffer
+	if len(logs) == 0 {
+		buf.WriteString(`<p class="text-gray-500 italic">No logs available yet...</p>`)
+	}
+	for _, entry := range logs {
+		if err := deployments.LogLine(entry).Render(r.Context(), &buf); err != nil {
+			return
+		}
+	}
+	writeRawEvent(w, flusher, "snapshot", buf.Bytes())
+}
+
+func writeDeploymentStatus(w http.ResponseWriter, flusher http.Flusher, r *http.Request, status models.DeploymentStatus) {
+	var buf bytes.Buffer
+	if err := components.DeploymentStatusBadge(status).Render(r.Context(), &buf); err != nil {
+		return
+	}
+	writeRawEvent(w, flusher, "status", buf.Bytes())
+}
+
+func deploymentStatusFromEvent(data interface{}) (models.DeploymentStatus, bool) {
+	payload, ok := data.(map[string]interface{})
+	if !ok {
+		return "", false
+	}
+	kind, _ := payload["kind"].(string)
+	if kind != "status" {
+		return "", false
+	}
+	switch status := payload["status"].(type) {
+	case models.DeploymentStatus:
+		return status, status != ""
+	case string:
+		parsed := models.DeploymentStatus(status)
+		return parsed, parsed != ""
+	default:
+		return "", false
+	}
 }
 
 func deploymentLogFromEvent(data interface{}) (*models.DeploymentLog, bool) {
