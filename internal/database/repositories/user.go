@@ -53,7 +53,12 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			return
+		}
+	}()
 
 	if lockErr := lockUsers(ctx, tx); lockErr != nil {
 		return lockErr
@@ -126,7 +131,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 	query := `SELECT ` + userSelectColumns + ` FROM users WHERE id = $1`
 
 	user, err := scanUser(r.db.QueryRowContext(ctx, query, id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -142,7 +147,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 	query := `SELECT ` + userSelectColumns + ` FROM users WHERE email = $1`
 
 	user, err := scanUser(r.db.QueryRowContext(ctx, query, email))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -158,7 +163,7 @@ func (r *UserRepository) GetByGitHubID(ctx context.Context, githubID int64) (*mo
 	query := `SELECT ` + userSelectColumns + ` FROM users WHERE github_id = $1`
 
 	user, err := scanUser(r.db.QueryRowContext(ctx, query, githubID))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

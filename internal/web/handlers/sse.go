@@ -359,8 +359,8 @@ func deploymentStatusFromEvent(data interface{}) (models.DeploymentStatus, bool)
 	if !ok {
 		return "", false
 	}
-	kind, _ := payload["kind"].(string)
-	if kind != "status" {
+	kind, kindOK := payload["kind"].(string)
+	if !kindOK || kind != "status" {
 		return "", false
 	}
 	switch status := payload["status"].(type) {

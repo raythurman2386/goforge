@@ -21,26 +21,12 @@ import (
 // A non-nil error leaves the deployment in the failed status.
 func (s *Service) RunPipeline(ctx context.Context, deploymentID string) (err error) {
 	defer func() {
-		if err == nil {
-			return
-		}
-		if canceledDeployment(ctx, s, deploymentID, err) {
-			err = ErrCanceled
-			return
-		}
-		msg := err.Error()
-		s.recordLog(ctx, deploymentID, "error", "pipeline", msg)
-		if tErr := s.Transition(ctx, deploymentID, models.DeploymentStatusFailed, &msg); tErr != nil && s.logger != nil {
-			s.logger.Error("failed to mark deployment failed", "deployment_id", deploymentID, "error", tErr)
-		}
+		err = s.finishPipeline(ctx, deploymentID, err)
 	}()
 
-	d, err := s.GetDeployment(ctx, deploymentID)
+	d, err := s.deploymentForRun(ctx, deploymentID)
 	if err != nil {
 		return err
-	}
-	if d.Status == models.DeploymentStatusCanceled {
-		return ErrCanceled
 	}
 
 	env, err := s.environmentRepo.GetByID(ctx, d.EnvironmentID)
@@ -133,12 +119,38 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) (err err
 	return nil
 }
 
+func (s *Service) deploymentForRun(ctx context.Context, deploymentID string) (*models.Deployment, error) {
+	d, err := s.GetDeployment(ctx, deploymentID)
+	if err != nil {
+		return nil, err
+	}
+	if d.Status == models.DeploymentStatusCanceled {
+		return nil, ErrCanceled
+	}
+	return d, nil
+}
+
+func (s *Service) finishPipeline(ctx context.Context, deploymentID string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if canceledDeployment(ctx, s, deploymentID, err) {
+		return ErrCanceled
+	}
+	msg := err.Error()
+	s.recordLog(ctx, deploymentID, "error", "pipeline", msg)
+	if tErr := s.Transition(ctx, deploymentID, models.DeploymentStatusFailed, &msg); tErr != nil && s.logger != nil {
+		s.logger.Error("failed to mark deployment failed", "deployment_id", deploymentID, "error", tErr)
+	}
+	return err
+}
+
 func canceledDeployment(ctx context.Context, s *Service, deploymentID string, err error) bool {
 	if errors.Is(err, ErrCanceled) || errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 		return true
 	}
 	// The pipeline context may already be canceled, so read status with a fresh one.
-	lookupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	lookupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	current, getErr := s.GetDeployment(lookupCtx, deploymentID)
 	return getErr == nil && current.Status == models.DeploymentStatusCanceled

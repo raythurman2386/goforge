@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const defaultDockerfile = "Dockerfile"
+
 // BuildSpec is a Dockerfile and context inside a cloned repository.
 // Paths are slash-separated and relative. They cannot escape the clone.
 type BuildSpec struct {
@@ -19,7 +21,7 @@ type BuildSpec struct {
 // "Dockerfile". An empty context is the repository root.
 func ParseBuildSpec(dockerfile, contextDir string) (BuildSpec, error) {
 	if strings.TrimSpace(dockerfile) == "" {
-		dockerfile = "Dockerfile"
+		dockerfile = defaultDockerfile
 	}
 	if strings.TrimSpace(contextDir) == "" {
 		contextDir = "."

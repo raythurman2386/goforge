@@ -46,25 +46,18 @@ func (s *Service) Transition(ctx context.Context, deploymentID string, to models
 }
 
 func isValidTransition(from, to models.DeploymentStatus) bool {
-	switch from {
-	case models.DeploymentStatusFailed, models.DeploymentStatusRolledBack, models.DeploymentStatusCanceled:
-		return false
-	}
-	if to == models.DeploymentStatusFailed || to == models.DeploymentStatusCanceled {
-		return true
-	}
-
+	failedOrCanceled := to == models.DeploymentStatusFailed || to == models.DeploymentStatusCanceled
 	switch from {
 	case models.DeploymentStatusPending:
-		return to == models.DeploymentStatusCloning
+		return to == models.DeploymentStatusCloning || failedOrCanceled
 	case models.DeploymentStatusCloning:
-		return to == models.DeploymentStatusBuilding
+		return to == models.DeploymentStatusBuilding || failedOrCanceled
 	case models.DeploymentStatusBuilding:
-		return to == models.DeploymentStatusDeploying
+		return to == models.DeploymentStatusDeploying || failedOrCanceled
 	case models.DeploymentStatusDeploying:
-		return to == models.DeploymentStatusRunning
+		return to == models.DeploymentStatusRunning || failedOrCanceled
 	case models.DeploymentStatusRunning:
-		return to == models.DeploymentStatusRolledBack
+		return to == models.DeploymentStatusRolledBack || failedOrCanceled
 	case models.DeploymentStatusFailed, models.DeploymentStatusRolledBack, models.DeploymentStatusCanceled:
 		return false
 	default:

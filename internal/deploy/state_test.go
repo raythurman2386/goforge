@@ -52,7 +52,7 @@ func TestCancelStopsTrackedRun(t *testing.T) {
 	if got.Status != models.DeploymentStatusCanceled {
 		t.Fatalf("status = %s", got.Status)
 	}
-	if err := svc.Transition(context.Background(), "d1", models.DeploymentStatusFailed, nil); err == nil {
+	if transErr := svc.Transition(context.Background(), "d1", models.DeploymentStatusFailed, nil); transErr == nil {
 		t.Fatal("canceled deployment transitioned to failed")
 	}
 	got, err = deploys.GetByID(context.Background(), "d1")

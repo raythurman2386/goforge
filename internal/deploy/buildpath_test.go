@@ -11,7 +11,7 @@ func TestParseBuildSpec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spec.Dockerfile != "Dockerfile" || spec.Context != "." {
+	if spec.Dockerfile != defaultDockerfile || spec.Context != "." {
 		t.Fatalf("spec = %#v", spec)
 	}
 
@@ -28,7 +28,7 @@ func TestParseBuildSpec(t *testing.T) {
 		if _, err := ParseBuildSpec(raw, "."); err == nil {
 			t.Errorf("ParseBuildSpec(%q) accepted an escaping path", raw)
 		}
-		if _, err := ParseBuildSpec("Dockerfile", raw); err == nil {
+		if _, err := ParseBuildSpec(defaultDockerfile, raw); err == nil {
 			t.Errorf("ParseBuildSpec context %q accepted an escaping path", raw)
 		}
 	}
