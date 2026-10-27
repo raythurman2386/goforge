@@ -2,8 +2,10 @@ package deploy
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -24,11 +26,13 @@ func (s *Service) Transition(ctx context.Context, deploymentID string, to models
 		return err
 	}
 
-	// Broadcast status update
-	s.sseHub.Broadcast(fmt.Sprintf("deployment:%s", deploymentID), map[string]interface{}{
-		"status": to,
-		"error":  errorMsg,
-	})
+	if s.sseHub != nil {
+		s.sseHub.Broadcast(fmt.Sprintf("deployment:%s", deploymentID), map[string]interface{}{
+			"kind":   "status",
+			"status": to,
+			"error":  errorMsg,
+		})
+	}
 
 	return nil
 }
@@ -57,11 +61,54 @@ func isValidTransition(from, to models.DeploymentStatus) bool {
 	}
 }
 
-// Log logs a message for a deployment.
-func (s *Service) Log(ctx context.Context, _, level, source, message string) error {
-	// Use structured logging until we implement DeploymentLogRepository
-	s.logger.Log(ctx, slogLevel(level), message, "source", source)
+// Log stores a deployment log line and broadcasts it on the deployment SSE topic.
+func (s *Service) Log(ctx context.Context, deploymentID, level, source, message string) error {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return nil
+	}
+
+	entry := &models.DeploymentLog{
+		DeploymentID: deploymentID,
+		Level:        normalizeLogLevel(level),
+		Message:      message,
+		Source:       sql.NullString{String: source, Valid: source != ""},
+	}
+	if s.logRepo != nil {
+		if err := s.logRepo.Create(ctx, entry); err != nil {
+			if s.logger != nil {
+				s.logger.Error("failed to store deployment log", "deployment_id", deploymentID, "error", err)
+			}
+			return fmt.Errorf("failed to store deployment log: %w", err)
+		}
+	}
+	if s.logger != nil {
+		s.logger.Log(ctx, slogLevel(level), message, "deployment_id", deploymentID, "source", source)
+	}
+	if s.sseHub != nil {
+		s.sseHub.Broadcast(fmt.Sprintf("deployment:%s", deploymentID), map[string]interface{}{
+			"kind":      "log",
+			"id":        entry.ID,
+			"level":     string(entry.Level),
+			"source":    source,
+			"message":   message,
+			"timestamp": entry.Timestamp,
+		})
+	}
 	return nil
+}
+
+func normalizeLogLevel(level string) models.DeploymentLogLevel {
+	switch strings.ToLower(level) {
+	case "debug":
+		return models.LogLevelDebug
+	case "warn", "warning":
+		return models.LogLevelWarn
+	case "error":
+		return models.LogLevelError
+	default:
+		return models.LogLevelInfo
+	}
 }
 
 // slogLevel converts a string log level to slog.Level.

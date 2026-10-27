@@ -4,6 +4,7 @@ package monitor
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -141,49 +142,54 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 	return stats, nil
 }
 
-// calculateDiskUsage extracts disk usage information from Docker.
+// calculateDiskUsage extracts disk usage for objects GoForge created.
+// Images and containers must carry goforge.managed=true. Volumes are included
+// when their name contains "goforge". Build cache cannot be filtered by label,
+// so that total is the engine-wide cache size.
 func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskUsageInfo {
 	info := &models.DiskUsageInfo{}
-
-	// Calculate total sizes
-	for i := range diskUsage.Images {
-		info.ImagesSize += diskUsage.Images[i].Size
+	if diskUsage == nil {
+		return info
 	}
 
-	for i := range diskUsage.Containers {
-		if diskUsage.Containers[i].SizeRw > 0 {
-			info.ContainersSize += diskUsage.Containers[i].SizeRw
+	for _, img := range diskUsage.Images {
+		if img == nil || !managedDockerLabels(img.Labels) {
+			continue
+		}
+		info.ImagesSize += img.Size
+		if img.Containers == 0 {
+			info.ReclaimableSize += img.Size
 		}
 	}
 
-	for i := range diskUsage.Volumes {
-		if diskUsage.Volumes[i] != nil && diskUsage.Volumes[i].UsageData != nil {
-			info.VolumesSize += diskUsage.Volumes[i].UsageData.Size
+	for _, ctr := range diskUsage.Containers {
+		if ctr == nil || !managedDockerLabels(ctr.Labels) || ctr.SizeRw <= 0 {
+			continue
+		}
+		info.ContainersSize += ctr.SizeRw
+		if ctr.State != "running" {
+			info.ReclaimableSize += ctr.SizeRw
 		}
 	}
 
-	for i := range diskUsage.BuildCache {
-		if diskUsage.BuildCache[i] != nil {
-			info.BuildCacheSize += diskUsage.BuildCache[i].Size
+	for _, vol := range diskUsage.Volumes {
+		if vol == nil || vol.UsageData == nil || !strings.Contains(vol.Name, "goforge") {
+			continue
 		}
+		info.VolumesSize += vol.UsageData.Size
 	}
 
-	// Calculate reclaimable space
-	// 1. Unused images
-	for i := range diskUsage.Images {
-		if diskUsage.Images[i].Containers == 0 {
-			info.ReclaimableSize += diskUsage.Images[i].Size
-		}
-	}
-
-	// 2. Stopped containers
-	for i := range diskUsage.Containers {
-		if diskUsage.Containers[i].State != "running" && diskUsage.Containers[i].SizeRw > 0 {
-			info.ReclaimableSize += diskUsage.Containers[i].SizeRw
+	for _, cache := range diskUsage.BuildCache {
+		if cache != nil {
+			info.BuildCacheSize += cache.Size
 		}
 	}
 
 	return info
+}
+
+func managedDockerLabels(labels map[string]string) bool {
+	return labels[docker.ManagedLabelKey] == docker.ManagedLabelValue
 }
 
 // CollectStats collects stats for a container once.

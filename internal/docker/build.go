@@ -31,6 +31,7 @@ func (c *Client) BuildImage(ctx context.Context, opts BuildOptions, output io.Wr
 		Tags:       []string{opts.ImageName},
 		BuildArgs:  opts.BuildArgs,
 		Remove:     true,
+		Labels:     map[string]string{ManagedLabelKey: ManagedLabelValue},
 	}
 
 	res, err := c.docker.ImageBuild(ctx, tar, buildOptions)

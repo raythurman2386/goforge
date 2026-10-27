@@ -15,16 +15,16 @@ import (
 
 // Service handles deployment orchestration.
 type Service struct {
-	deploymentRepo             *repositories.DeploymentRepository
-	logRepo                    *repositories.DeploymentLogRepository
-	projectRepo                *repositories.ProjectRepository
-	environmentRepo            *repositories.EnvironmentRepository
-	containerRepo              *repositories.ContainerRepository
-	gitSourceRepo              *repositories.GitSourceRepository
-	envVariableRepo            *repositories.EnvVariableRepository
-	projectServiceInstanceRepo *repositories.ProjectServiceInstanceRepository
-	gitService                 *git.Service
-	dockerClient               *docker.Client
+	deploymentRepo             deploymentStore
+	logRepo                    deploymentLogStore
+	projectRepo                projectStore
+	environmentRepo            environmentStore
+	containerRepo              containerStore
+	gitSourceRepo              gitSourceStore
+	envVariableRepo            envVarStore
+	projectServiceInstanceRepo linkedServiceStore
+	gitService                 gitCloner
+	dockerClient               containerRuntime
 	sseHub                     *sse.Hub
 	blueGreenDeployer          *BlueGreenDeployer
 	traefikNetwork             string
@@ -92,6 +92,9 @@ func (s *Service) UpdateStatus(ctx context.Context, id string, status models.Dep
 
 // GetLogs retrieves logs for a deployment.
 func (s *Service) GetLogs(ctx context.Context, deploymentID string) ([]*models.DeploymentLog, error) {
+	if s.logRepo == nil {
+		return nil, nil
+	}
 	return s.logRepo.ListByDeploymentID(ctx, deploymentID)
 }
 

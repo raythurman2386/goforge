@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -17,16 +17,22 @@ type CloneOptions struct {
 	Branch      string
 	Path        string
 	Depth       int
-	AccessToken string // OAuth token for authentication
+	AccessToken string    // OAuth token for authentication
+	Progress    io.Writer // Receives clone progress. Discarded when nil.
 }
 
 // Clone clones a repository to the specified path.
 func (s *Service) Clone(ctx context.Context, opts CloneOptions) error {
+	progress := opts.Progress
+	if progress == nil {
+		progress = io.Discard
+	}
+
 	cloneOpts := &git.CloneOptions{
 		URL:           opts.URL,
 		ReferenceName: plumbing.NewBranchReferenceName(opts.Branch),
 		SingleBranch:  true,
-		Progress:      os.Stdout,
+		Progress:      progress,
 	}
 
 	if opts.Depth > 0 {
@@ -63,7 +69,7 @@ func (s *Service) Pull(ctx context.Context, path string) error {
 
 	err = w.PullContext(ctx, &git.PullOptions{
 		RemoteName: "origin",
-		Progress:   os.Stdout,
+		Progress:   io.Discard,
 	})
 	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return fmt.Errorf("failed to pull repository: %w", err)

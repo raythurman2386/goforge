@@ -155,6 +155,11 @@ func (w *Worker) handleFailure(item *models.QueueItem, deploymentErr error) {
 		w.service.logger.Error("failed to mark queue item as failed", "queue_id", item.ID, "error", failErr)
 	}
 
+	// RunPipeline already records the failed status. Skip a second write when it succeeded.
+	if current, getErr := w.service.GetDeployment(itemCtx, item.DeploymentID); getErr == nil && current.Status == models.DeploymentStatusFailed {
+		return
+	}
+
 	transitionErr := w.service.Transition(itemCtx, item.DeploymentID, models.DeploymentStatusFailed, &errMsg)
 	if transitionErr != nil {
 		w.service.logger.Error("failed to transition deployment to failed", "deployment_id", item.DeploymentID, "error", transitionErr)

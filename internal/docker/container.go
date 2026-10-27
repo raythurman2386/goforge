@@ -10,16 +10,29 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
+// RestartUnlessStopped is the restart policy used for GoForge-managed containers.
+const RestartUnlessStopped = "unless-stopped"
+
+// ManagedLabelKey is the Docker label that marks a GoForge container or image.
+const ManagedLabelKey = "goforge.managed"
+
+// ManagedLabelValue is the value of ManagedLabelKey.
+const ManagedLabelValue = "true"
+
+// ManagedLabelFilter selects Docker objects carrying ManagedLabelKey=ManagedLabelValue.
+const ManagedLabelFilter = ManagedLabelKey + "=" + ManagedLabelValue
+
 // ContainerOptions represents options for creating a container.
 type ContainerOptions struct {
-	Name         string
-	Image        string
-	Env          []string
-	Labels       map[string]string
-	PortMappings map[string]string // container_port -> host_port
-	NetworkName  string
-	Binds        []string
-	HealthCheck  *container.HealthConfig
+	Name          string
+	Image         string
+	Env           []string
+	Labels        map[string]string
+	PortMappings  map[string]string // container_port -> host_port
+	NetworkName   string
+	Binds         []string
+	HealthCheck   *container.HealthConfig
+	RestartPolicy string
 }
 
 // CreateContainer creates and starts a new container.
@@ -39,6 +52,9 @@ func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (st
 	hostConfig := &container.HostConfig{
 		PortBindings: make(nat.PortMap),
 		Binds:        opts.Binds,
+	}
+	if opts.RestartPolicy != "" {
+		hostConfig.RestartPolicy = container.RestartPolicy{Name: container.RestartPolicyMode(opts.RestartPolicy)}
 	}
 
 	for containerPort, hostPort := range opts.PortMappings {

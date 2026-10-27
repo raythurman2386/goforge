@@ -9,16 +9,26 @@ import (
 	"github.com/docker/docker/api/types/image"
 )
 
-// PruneImages removes unused images.
-func (c *Client) PruneImages(ctx context.Context) (image.PruneReport, error) {
+// managedPruneFilters limits prune operations to objects GoForge created.
+func managedPruneFilters() filters.Args {
 	args := filters.NewArgs()
-	args.Add("dangling", "false") // Set to false to remove ALL unused images, not just dangling ones
-	return c.docker.ImagesPrune(ctx, args)
+	args.Add("label", ManagedLabelFilter)
+	// dangling=false removes unused tagged images, not only dangling ones.
+	// The label filter keeps this from touching images GoForge did not build.
+	args.Add("dangling", "false")
+	return args
 }
 
-// PruneContainers removes stopped containers.
+// PruneImages removes unused images built by GoForge.
+func (c *Client) PruneImages(ctx context.Context) (image.PruneReport, error) {
+	return c.docker.ImagesPrune(ctx, managedPruneFilters())
+}
+
+// PruneContainers removes stopped GoForge containers.
 func (c *Client) PruneContainers(ctx context.Context) (container.PruneReport, error) {
-	return c.docker.ContainersPrune(ctx, filters.NewArgs())
+	args := filters.NewArgs()
+	args.Add("label", ManagedLabelFilter)
+	return c.docker.ContainersPrune(ctx, args)
 }
 
 // CleanupSystem runs both image and container pruning.
