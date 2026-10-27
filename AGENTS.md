@@ -261,3 +261,14 @@ When making code changes, consider these security implications:
 - Sanitize log output for PII
 
 * Go version must NEVER be dropped below the official latest release (currently 1.25).
+
+## Cursor Cloud specific instructions
+
+The Cloud Agent VM has no systemd. PostgreSQL 16, Docker, and the dev server are started for you.
+
+- App: `http://127.0.0.1:8080` via `make dev` (`GOFORGE_DEV_MODE=true`). `/health` and `/health/ready` report database and Docker. If port 8080 is already healthy, do not start a second server.
+- Database: `postgres://goforge:password@localhost:5432/goforge?sslmode=disable` (the dev default). `make test` uses this database when `DATABASE_URL` is unset. Postgres is started with `pg_ctlcluster`, not `service`.
+- Docker uses `fuse-overlayfs` and legacy iptables (`/etc/docker/daemon.json`). One-click services join the `traefik` network; create it with `docker network create traefik` if it is missing.
+- `internal/web/templates/**/*_templ.go` and `static/css/output.css` are gitignored. Regenerate with `make templ` and `make css`. The Tailwind CLI on `PATH` is v3.4.17; the v4 binary does not read `tailwind.config.js`.
+- Use `/usr/local/go/bin/go` (Go 1.25.14). `/usr/bin/go` is Ubuntu's Go 1.22 and cannot read the `tool` directive in `go.mod`. `make test` needs the full 1.25 toolchain; the auto-downloaded toolchain module is missing `covdata`.
+- `air` is `/usr/local/bin/air` (v1.67.0). `templ` and `golangci-lint` run through `go tool`. Local registration works without GitHub OAuth secrets.
