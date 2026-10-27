@@ -29,6 +29,7 @@ func setupSessionTestDB(t *testing.T) *sql.DB {
 			github_username TEXT,
 			github_access_token TEXT,
 			avatar_url TEXT,
+			role TEXT NOT NULL DEFAULT 'user',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)

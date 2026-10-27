@@ -67,6 +67,40 @@ func TestUserRepository_Create_WithID(t *testing.T) {
 	_ = repo.Delete(ctx, user.ID)
 }
 
+func TestUserRepository_Create_SecondAccountIsNotAdmin(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+	repo := NewUserRepository(db, nil)
+	ctx := context.Background()
+
+	first := &models.User{Email: uniqueEmail("role-first")}
+	if err := repo.Create(ctx, first); err != nil {
+		t.Fatalf("Create() first error = %v", err)
+	}
+	second := &models.User{Email: uniqueEmail("role-second")}
+	if err := repo.Create(ctx, second); err != nil {
+		t.Fatalf("Create() second error = %v", err)
+	}
+
+	gotFirst, err := repo.GetByID(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("GetByID(first) error = %v", err)
+	}
+	gotSecond, err := repo.GetByID(ctx, second.ID)
+	if err != nil {
+		t.Fatalf("GetByID(second) error = %v", err)
+	}
+	if gotSecond.Role != models.RoleUser {
+		t.Fatalf("second role = %q, want user", gotSecond.Role)
+	}
+	if gotSecond.IsAdmin() {
+		t.Fatal("second account is admin")
+	}
+	if first.Role == models.RoleAdmin && gotFirst.Role != models.RoleAdmin {
+		t.Fatalf("stored first role = %q, want admin", gotFirst.Role)
+	}
+}
+
 func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 	t.Parallel()
 	db := getTestDB(t)

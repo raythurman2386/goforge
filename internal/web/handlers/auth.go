@@ -193,6 +193,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
+// registrationOpen is true while no account exists, and otherwise follows the
+// registration flag. A failed count does not open registration by itself.
+func registrationOpen(userCount int, countErr error, enableRegistration bool) bool {
+	if countErr != nil {
+		return enableRegistration
+	}
+	if userCount == 0 {
+		return true
+	}
+	return enableRegistration
+}
+
 // registrationAllowed is true for the first account even when open registration
 // is disabled, and otherwise follows GOFORGE_ENABLE_REGISTRATION.
 func (h *AuthHandler) registrationAllowed(ctx context.Context) bool {
@@ -200,16 +212,10 @@ func (h *AuthHandler) registrationAllowed(ctx context.Context) bool {
 		return h.enableRegistration
 	}
 	n, err := h.userRepo.Count(ctx)
-	if err != nil {
-		if h.logger != nil {
-			h.logger.Error("failed to count users", "error", err)
-		}
-		return h.enableRegistration
+	if err != nil && h.logger != nil {
+		h.logger.Error("failed to count users", "error", err)
 	}
-	if n == 0 {
-		return true
-	}
-	return h.enableRegistration
+	return registrationOpen(n, err, h.enableRegistration)
 }
 
 // GitHubLogin initiates the GitHub OAuth flow.

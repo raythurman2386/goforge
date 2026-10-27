@@ -167,6 +167,10 @@ func (h *SettingsHandler) DeleteGitSource(w http.ResponseWriter, r *http.Request
 
 // PruneSystem triggers a system prune.
 func (h *SettingsHandler) PruneSystem(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+
 	if err := h.instanceService.PruneSystem(r.Context()); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to prune system")
 		return

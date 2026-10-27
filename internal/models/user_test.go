@@ -5,6 +5,44 @@ import (
 	"testing"
 )
 
+func TestBootstrapRole(t *testing.T) {
+	if got := BootstrapRole(0); got != RoleAdmin {
+		t.Fatalf("BootstrapRole(0) = %q, want admin", got)
+	}
+	if got := BootstrapRole(1); got != RoleUser {
+		t.Fatalf("BootstrapRole(1) = %q, want user", got)
+	}
+	if got := BootstrapRole(4); got != RoleUser {
+		t.Fatalf("BootstrapRole(4) = %q, want user", got)
+	}
+}
+
+func TestUser_IsAdmin(t *testing.T) {
+	if (&User{Role: RoleAdmin}).IsAdmin() != true {
+		t.Fatal("admin role should be admin")
+	}
+	if (&User{Role: RoleUser}).IsAdmin() {
+		t.Fatal("user role should not be admin")
+	}
+	var none *User
+	if none.IsAdmin() {
+		t.Fatal("nil user should not be admin")
+	}
+}
+
+func TestRole_ScanRejectsUnknown(t *testing.T) {
+	var role Role
+	if err := role.Scan("owner"); err == nil {
+		t.Fatal("Scan accepted an unknown role")
+	}
+	if err := role.Scan("admin"); err != nil {
+		t.Fatal(err)
+	}
+	if role != RoleAdmin {
+		t.Fatalf("role = %q", role)
+	}
+}
+
 func TestUser_HasPassword(t *testing.T) {
 	tests := []struct {
 		name         string

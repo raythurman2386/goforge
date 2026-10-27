@@ -53,7 +53,7 @@ SESSION_SECRET=<openssl rand -base64 32>
 CSRF_SECRET=<openssl rand -base64 32>
 ```
 
-Compose will not start until `DATABASE_URL`, `POSTGRES_PASSWORD`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET` are set. Create the first admin in the UI; registration then stays closed unless `GOFORGE_ENABLE_REGISTRATION=true`.
+Compose will not start until `DATABASE_URL`, `POSTGRES_PASSWORD`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET` are set. The first account you create is the admin. Registration then stays closed unless `GOFORGE_ENABLE_REGISTRATION=true`, and accounts created after that are users.
 
 ### Production Configuration
 

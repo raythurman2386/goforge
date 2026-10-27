@@ -7,6 +7,7 @@ CREATE TABLE users (
     github_username TEXT,
     github_access_token TEXT,
     avatar_url TEXT,
+    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
