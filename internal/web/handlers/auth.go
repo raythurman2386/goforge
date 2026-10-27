@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -48,7 +49,7 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages.Login(csrfToken, "", h.enableRegistration)
+	component := pages.Login(csrfToken, "", h.registrationAllowed(r.Context()))
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render login page")
 	}
@@ -63,7 +64,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := h.authenticator.Authenticate(r.Context(), email, password)
 	if err != nil {
 		csrfToken := auth.GetCSRFToken(r)
-		component := pages.Login(csrfToken, "Invalid email or password", h.enableRegistration)
+		component := pages.Login(csrfToken, "Invalid email or password", h.registrationAllowed(r.Context()))
 		w.WriteHeader(http.StatusUnauthorized)
 		if renderErr := component.Render(r.Context(), w); renderErr != nil {
 			RenderError(w, r, http.StatusInternalServerError, "failed to render login page")
@@ -87,7 +88,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // RegisterPage renders the registration page.
 func (h *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
-	if !h.enableRegistration {
+	if !h.registrationAllowed(r.Context()) {
 		RenderError(w, r, http.StatusForbidden, "Registration is disabled")
 		return
 	}
@@ -101,7 +102,7 @@ func (h *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
 
 // Register handles the registration form submission.
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	if !h.enableRegistration {
+	if !h.registrationAllowed(r.Context()) {
 		RenderError(w, r, http.StatusForbidden, "Registration is disabled")
 		return
 	}
@@ -192,6 +193,25 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
+// registrationAllowed is true for the first account even when open registration
+// is disabled, and otherwise follows GOFORGE_ENABLE_REGISTRATION.
+func (h *AuthHandler) registrationAllowed(ctx context.Context) bool {
+	if h.userRepo == nil {
+		return h.enableRegistration
+	}
+	n, err := h.userRepo.Count(ctx)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("failed to count users", "error", err)
+		}
+		return h.enableRegistration
+	}
+	if n == 0 {
+		return true
+	}
+	return h.enableRegistration
+}
+
 // GitHubLogin initiates the GitHub OAuth flow.
 func (h *AuthHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 	state := uuid.New().String()
@@ -255,6 +275,10 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else {
+			if !h.registrationAllowed(r.Context()) {
+				RenderError(w, r, http.StatusForbidden, "Registration is disabled")
+				return
+			}
 			// No existing user — create a new one
 			user = &models.User{
 				Email:             email,

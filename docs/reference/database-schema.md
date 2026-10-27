@@ -195,7 +195,7 @@ Records of each deployment attempt.
 | `finished_at` | `TIMESTAMPTZ` | Nullable | When deployment completed |
 | `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Record creation time |
 
-**Status values**: `pending`, `cloning`, `building`, `deploying`, `running`, `failed`, `rolled_back`, `cancelled`
+**Status values**: `pending`, `cloning`, `building`, `deploying`, `running`, `failed`, `rolled_back`, `canceled`
 
 **Trigger types**: `manual`, `webhook`, `rollback`
 
@@ -237,10 +237,10 @@ One-click service instances (PostgreSQL, Redis, etc.) deployed from templates.
 | `template_name` | `VARCHAR(100)` | NOT NULL | Template used (e.g., `postgres`) |
 | `name` | `VARCHAR(255)` | NOT NULL | Instance display name |
 | `version` | `VARCHAR(50)` | Nullable | Version deployed |
-| `config` | `JSONB` | Default `'{}'` | Configuration values |
+| `config` | `JSONB` | Default `'{}'` | Configuration values. Encrypted as `{"_goforge_enc":"..."}` when an encryption key is configured |
 | `domain` | `VARCHAR(255)` | Nullable | Assigned domain |
 | `status` | `VARCHAR(50)` | NOT NULL, CHECK, default `'pending'` | Instance status |
-| `connection_info` | `JSONB` | Default `'{}'` | Connection strings/details |
+| `connection_info` | `JSONB` | Default `'{}'` | Connection strings/details, encrypted the same way as `config` |
 | `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Creation time |
 | `updated_at` | `TIMESTAMPTZ` | Default `NOW()` | Last update time |
 
@@ -357,5 +357,9 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 009 | `create_containers` | Containers and container metrics |
 | 010 | `create_audit_logs` | Audit trail and cleanup function |
 | 011 | `add_custom_domain_to_projects` | Custom domain support for projects |
+| 012 | `create_project_service_instances` | Links projects to one-click services |
+| 013 | `create_api_tokens` | Personal API tokens |
+| 014 | `create_deployment_queue` | Persistent deployment queue |
+| 015 | `deployment_status_canceled` | Status check uses `canceled` |
 
 All migrations have corresponding `.down.sql` files for rollback support.

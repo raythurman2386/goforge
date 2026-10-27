@@ -31,6 +31,9 @@ vendor/
 .DS_Store
 Thumbs.db
 
+# Dev-mode secrets generated on first boot
+.goforge/
+
 # Environment files
 .env
 .env.local

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -251,6 +252,9 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 						return "", fmt.Errorf("unexpected port label: %s", portLabel)
 					}
 					// Verify health check is set
+					if opts.RestartPolicy != docker.RestartUnlessStopped {
+						return "", fmt.Errorf("unexpected restart policy: %s", opts.RestartPolicy)
+					}
 					if opts.HealthCheck == nil {
 						return "", errors.New("expected health check to be set")
 					}
@@ -285,11 +289,17 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 					return nil
 				}
 				md.createContainerFunc = func(ctx context.Context, opts docker.ContainerOptions) (string, error) {
-					// Verify no Traefik routing labels when no domain
-					if opts.Labels != nil {
-						return "", errors.New("expected no labels when domain is empty")
+					if opts.Labels["goforge.managed"] != "true" {
+						return "", errors.New("expected goforge.managed label")
 					}
-					// But health check should still be set
+					for key := range opts.Labels {
+						if strings.Contains(key, ".rule") {
+							return "", fmt.Errorf("unexpected routing label %s", key)
+						}
+					}
+					if opts.RestartPolicy != docker.RestartUnlessStopped {
+						return "", fmt.Errorf("unexpected restart policy: %s", opts.RestartPolicy)
+					}
 					if opts.HealthCheck == nil {
 						return "", errors.New("expected health check to be set even without domain")
 					}

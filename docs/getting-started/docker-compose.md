@@ -1,6 +1,6 @@
 # Docker Compose Setup
 
-The recommended way to run GoForge with all its dependencies is using Docker Compose. This sets up GoForge, PostgreSQL, Traefik, and optionally Cloudflare Tunnel and Redis in a single command.
+The recommended way to run GoForge with all its dependencies is using Docker Compose. This sets up GoForge, PostgreSQL, and Traefik. Cloudflare Tunnel is optional (`--profile cloudflare`). Postgres is only reachable on the Compose network.
 
 !!! tip "Full Feature Testing"
     Use Docker Compose (not `make dev`) when you need to test features that require Docker integration:
@@ -33,10 +33,9 @@ The `docker-compose.yml` defines these services:
 | Service | Description | Port |
 |---------|-------------|------|
 | `goforge` | Main application | 8080 |
-| `db` | PostgreSQL 15 | 5432 (exposed to host) |
+| `db` | PostgreSQL 15 | none on the host (5432 inside the Compose network) |
 | `traefik` | Reverse proxy with auto-SSL | 80, 443 |
 | `cloudflared` | Cloudflare Tunnel (optional, requires `--profile cloudflare`) | -- |
-| `redis` | Redis cache (starts by default) | 6379 |
 
 ## Configuration
 
@@ -45,11 +44,16 @@ The `docker-compose.yml` defines these services:
 ```bash
 # .env
 GOFORGE_DEV_MODE=true
-DATABASE_URL=postgres://goforge:password@db:5432/goforge?sslmode=disable
+DATABASE_URL=postgres://goforge:changeme@db:5432/goforge?sslmode=disable
 POSTGRES_USER=goforge
-POSTGRES_PASSWORD=password
+POSTGRES_PASSWORD=changeme
 POSTGRES_DB=goforge
+ENCRYPTION_KEY=<openssl rand -base64 32>
+SESSION_SECRET=<openssl rand -base64 32>
+CSRF_SECRET=<openssl rand -base64 32>
 ```
+
+Compose will not start until `DATABASE_URL`, `POSTGRES_PASSWORD`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET` are set. Create the first admin in the UI; registration then stays closed unless `GOFORGE_ENABLE_REGISTRATION=true`.
 
 ### Production Configuration
 

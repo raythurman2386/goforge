@@ -6,6 +6,8 @@ GoForge supports two authentication methods: local email/password and GitHub OAu
 
 Local authentication works out of the box with no additional configuration. Users register with an email and password, which is hashed using Argon2id before storage.
 
+`GOFORGE_ENABLE_REGISTRATION` defaults to false. When no users exist, the register form and a new GitHub login can still create the first admin. After that account exists, both paths stay closed unless the variable is true. Linking GitHub to an existing email still works.
+
 ### Password Hashing
 
 GoForge uses Argon2id with these parameters:

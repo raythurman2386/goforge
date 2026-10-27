@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -9,6 +10,7 @@ import (
 func TestLoad_DevMode(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("GOFORGE_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_SECRETS_FILE", filepath.Join(t.TempDir(), "dev-secrets.json"))
 	defer os.Clearenv()
 
 	cfg, err := Load()
@@ -72,6 +74,7 @@ func TestLoad_AllRequiredFields(t *testing.T) {
 func TestLoad_Defaults(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("GOFORGE_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_SECRETS_FILE", filepath.Join(t.TempDir(), "dev-secrets.json"))
 	defer os.Clearenv()
 
 	cfg, err := Load()
@@ -91,6 +94,47 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 	if cfg.BuildTimeout != 15*time.Minute {
 		t.Errorf("expected default build timeout 15m, got %v", cfg.BuildTimeout)
+	}
+	if cfg.EnableRegistration {
+		t.Error("expected registration to be closed by default")
+	}
+}
+
+func TestLoad_DevSecretsPersist(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dev-secrets.json")
+
+	os.Clearenv()
+	t.Cleanup(os.Clearenv)
+	os.Setenv("GOFORGE_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_SECRETS_FILE", path)
+
+	first, err := Load()
+	if err != nil {
+		t.Fatalf("first load: %v", err)
+	}
+
+	os.Clearenv()
+	os.Setenv("GOFORGE_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_SECRETS_FILE", path)
+
+	second, err := Load()
+	if err != nil {
+		t.Fatalf("second load: %v", err)
+	}
+
+	if first.EncryptionKey == "" || first.EncryptionKey != second.EncryptionKey {
+		t.Fatal("encryption key was not reused from the dev secrets file")
+	}
+	if first.SessionSecret != second.SessionSecret || first.CSRFSecret != second.CSRFSecret || first.WebhookSecret != second.WebhookSecret {
+		t.Fatal("dev secrets were not reused")
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat secrets file: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("secrets file mode = %o, want 600", info.Mode().Perm())
 	}
 }
 

@@ -17,7 +17,7 @@ A relational database management system.
 | Port | 5432 | Container port |
 | Database | `app` | Default database name |
 | Username | `postgres` | Admin username |
-| Password | Auto-generated | Admin password |
+| Password | Generated on the server when the field is left blank | Admin password, stored encrypted |
 | Storage | Docker volume | Persistent data storage |
 
 ### Redis
@@ -63,7 +63,7 @@ After deploying a service, GoForge displays connection details:
 - **Host:** Container name or internal IP
 - **Port:** Service port
 - **Credentials:** Username and password
-- **Connection string:** Ready-to-use connection URL
+- **Connection string:** Ready-to-use connection URL. `config` and `connection_info` are encrypted at rest and decrypted when GoForge reads them
 
 !!! tip "Connecting from deployed apps"
     Applications deployed through GoForge can connect to services using Docker's internal DNS. Use the container name as the hostname (e.g., `postgres-abc123:5432`).

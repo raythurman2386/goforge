@@ -5,16 +5,24 @@ import (
 	"database/sql"
 
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/secrets"
 )
 
 // ProjectServiceInstanceRepository handles project-service instance linking.
 type ProjectServiceInstanceRepository struct {
-	db *sql.DB
+	db        *sql.DB
+	encryptor *secrets.Encryptor
 }
 
 // NewProjectServiceInstanceRepository creates a new ProjectServiceInstanceRepository.
 func NewProjectServiceInstanceRepository(db *sql.DB) *ProjectServiceInstanceRepository {
 	return &ProjectServiceInstanceRepository{db: db}
+}
+
+// WithEncryptor decrypts config and connection_info when listing linked services.
+func (r *ProjectServiceInstanceRepository) WithEncryptor(enc *secrets.Encryptor) *ProjectServiceInstanceRepository {
+	r.encryptor = enc
+	return r
 }
 
 // Link associates a service instance with a project.
@@ -82,6 +90,8 @@ func (r *ProjectServiceInstanceRepository) ListByProjectID(ctx context.Context, 
 		if err != nil {
 			return nil, err
 		}
+		s.Config = openJSON(r.encryptor, s.Config)
+		s.ConnectionInfo = openJSON(r.encryptor, s.ConnectionInfo)
 		instances = append(instances, s)
 	}
 	if err := rows.Err(); err != nil {

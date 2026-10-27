@@ -13,18 +13,13 @@ Deployments are the process of building and running your application from source
 
 ### Webhook-Triggered Deployment
 
-GoForge supports automatic deployments via Git webhooks:
+GoForge accepts push webhooks at one shared secret (`WEBHOOK_SECRET`):
 
-1. Go to project **Settings** > **Webhooks**
-2. Copy the webhook URL
-3. Add it to your Git provider:
-   - **GitHub:** Repository Settings > Webhooks > Add webhook
-   - **GitLab:** Repository Settings > Webhooks > Add webhook
-   - **Gitea:** Repository Settings > Webhooks > Add Gitea webhook
-4. Set the content type to `application/json`
-5. Select **Push events**
+- `POST /webhooks/github`
+- `POST /webhooks/gitlab`
+- `POST /webhooks/gitea`
 
-When you push to the configured branch, GoForge automatically triggers a deployment.
+Add that URL on the Git provider and select push events. There is no per-project webhook settings page. GitHub and Gitea payloads are checked with HMAC-SHA256. GitLab sends the secret in `X-Gitlab-Token`.
 
 ### Webhook Security
 
@@ -40,7 +35,7 @@ Each deployment goes through these stages:
 
 ### 1. Pending
 
-The deployment is queued and waiting for a worker slot. Only `MAX_CONCURRENT_BUILDS` deployments can run simultaneously (default: 2).
+The deployment is queued. The worker runs one deployment at a time. `MAX_CONCURRENT_BUILDS` is loaded and currently unused.
 
 ### 2. Cloning
 
@@ -82,13 +77,7 @@ The container is running and serving traffic. Previous deployment containers are
 
 ### Real-Time Logs
 
-Deployment logs stream in real-time via Server-Sent Events:
-
-- Build output from Docker
-- Container startup logs
-- Status transition events
-
-Navigate to the deployment detail page to see live logs.
+Clone and build output is stored in `deployment_logs` and streamed on the deployment SSE topic. Opening the deployment page again replays the stored lines, then continues with new ones. The page shows clone, build, and pipeline messages. Container stdout is a separate stream on the container page.
 
 ### Deployment Status
 

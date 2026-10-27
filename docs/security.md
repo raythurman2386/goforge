@@ -173,12 +173,12 @@ Webhooks receive push events from git providers to trigger deployments.
 ## Database Security
 
 - PostgreSQL connections use the credentials in the `DATABASE_URL` environment variable
-- The default Docker Compose configuration exposes PostgreSQL port 5432 to the host
+- Docker Compose does not publish Postgres on the host. Other containers reach it on the Compose network
 
 ### Recommendations
 
-- Remove the host port mapping for PostgreSQL in production (`5432:5432` -> internal only)
-- Use strong, unique database credentials (not the default `password`)
+- Keep Postgres off the host network. Do not add a `5432:5432` mapping
+- Use strong, unique database credentials (the example `.env` password is `changeme` for a local copy only)
 - Enable SSL for PostgreSQL connections in production
 - Restrict database user privileges to only what GoForge needs
 

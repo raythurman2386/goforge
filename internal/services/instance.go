@@ -82,6 +82,10 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		return nil, err
 	}
 
+	if genErr := fillGeneratedConfig(tmpl, config); genErr != nil {
+		return nil, genErr
+	}
+
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config: %w", err)
@@ -145,10 +149,11 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 
 	// Create container
 	opts := docker.ContainerOptions{
-		Name:        containerName,
-		Image:       image,
-		Env:         envVars,
-		NetworkName: s.traefikNetwork,
+		Name:          containerName,
+		Image:         image,
+		Env:           envVars,
+		NetworkName:   s.traefikNetwork,
+		RestartPolicy: docker.RestartUnlessStopped,
 	}
 
 	// Determine the primary HTTP port from the template
@@ -157,11 +162,9 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		servicePort = tmpl.Docker.Ports[0].Container
 	}
 
-	// Generate Traefik labels for routing (only if domain is provided)
-	if domain != "" {
-		labels := proxy.GenerateServiceLabels(instance.ID, domain, s.traefikNetwork, servicePort, s.cloudflareProxyMode)
-		opts.Labels = labels.ToMap()
-	}
+	// Always mark the container as managed. Routing labels are added only when a domain is set.
+	labels := proxy.GenerateServiceLabels(instance.ID, domain, s.traefikNetwork, servicePort, s.cloudflareProxyMode)
+	opts.Labels = labels.ToMap()
 
 	// Apply health check from template
 	if hc := buildHealthCheck(tmpl.Docker.HealthCheck); hc != nil {

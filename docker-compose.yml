@@ -7,10 +7,11 @@ services:
       - GOFORGE_PORT=${GOFORGE_PORT:-8080}
       - GOFORGE_DEV_MODE=${GOFORGE_DEV_MODE:-false}
       - GOFORGE_BASE_URL=${GOFORGE_BASE_URL:-http://localhost:8080}
-      - DATABASE_URL=${DATABASE_URL:-postgres://goforge:password@db:5432/goforge?sslmode=disable}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - SESSION_SECRET=${SESSION_SECRET}
-      - CSRF_SECRET=${CSRF_SECRET}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required}
+      - CSRF_SECRET=${CSRF_SECRET:?CSRF_SECRET is required}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
@@ -18,8 +19,8 @@ services:
       - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
       - CLOUDFLARE_PROXY_MODE=${CLOUDFLARE_PROXY_MODE:-false}
       - TEMPLATES_DIR=${TEMPLATES_DIR:-./templates}
-      - MAX_CONCURRENT_BUILDS=${MAX_CONCURRENT_BUILDS:-2}
       - BUILD_TIMEOUT=${BUILD_TIMEOUT:-15m}
+      - GOFORGE_ENABLE_REGISTRATION=${GOFORGE_ENABLE_REGISTRATION:-false}
       - ENABLE_METRICS=${ENABLE_METRICS:-true}
       - METRICS_RETENTION=${METRICS_RETENTION:-168h}
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -54,7 +55,7 @@ services:
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-goforge}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_DB=${POSTGRES_DB:-goforge}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -63,8 +64,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    ports:
-      - "5432:5432"
     networks:
       - goforge_net
 
@@ -125,26 +124,10 @@ services:
     profiles:
       - cloudflare
 
-  # Redis for session storage and caching (optional but recommended)
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - goforge_net
-
 volumes:
   postgres_data:
   goforge_data:
   traefik_letsencrypt:
-  redis_data:
 
 
 networks:

@@ -9,7 +9,9 @@ GoForge is configured entirely through environment variables. This page document
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GOFORGE_DEV_MODE` | `false` | Enable development mode (auto-generates secrets, debug logging) |
+| `GOFORGE_DEV_MODE` | `false` | Enable development mode (debug logging; generates secrets when they are unset) |
+| `GOFORGE_DEV_SECRETS_FILE` | `.goforge/dev-secrets.json` | Dev-mode file that keeps generated secrets across restarts |
+| `GOFORGE_ENABLE_REGISTRATION` | `false` | Allow accounts after the first admin. The first account can always register |
 | `GOFORGE_HOST` | `0.0.0.0` | Host address to bind to |
 | `GOFORGE_PORT` | `8080` | Port to listen on |
 | `GOFORGE_BASE_URL` | `http://localhost:8080` | Public-facing base URL (used for OAuth callbacks, webhooks) |
@@ -46,7 +48,9 @@ openssl rand -base64 32
 ```
 
 !!! danger "Required in production"
-    When `GOFORGE_DEV_MODE=false`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET` must be explicitly set. The application will refuse to start without them.
+    When `GOFORGE_DEV_MODE=false`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET` must be explicitly set. The application will refuse to start without them. Docker Compose also refuses to start while those variables, `DATABASE_URL`, or `POSTGRES_PASSWORD` are empty.
+
+Dev mode writes any secrets it generates to `GOFORGE_DEV_SECRETS_FILE` (mode `0600`) and reloads them on the next start. Values already set in the environment are used as-is and are not copied into that file.
 
 ## GitHub OAuth
 
@@ -103,7 +107,7 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MAX_CONCURRENT_BUILDS` | `2` | Maximum number of concurrent deployment builds |
+| `MAX_CONCURRENT_BUILDS` | `2` | Accepted, but unused. The worker runs one deployment at a time |
 | `BUILD_TIMEOUT` | `15m` | Maximum time for a single build (Go duration format) |
 
 ## Monitoring
