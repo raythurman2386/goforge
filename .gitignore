@@ -53,6 +53,8 @@ static/css/output.css
 # Logs
 *.log
 logs/
+# Proof logs for verify-goforge are evidence, not runtime logs.
+!artifacts/verify-goforge-proof/*.log
 
 # Temporary files
 tmp/
