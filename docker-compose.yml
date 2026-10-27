@@ -44,8 +44,10 @@ services:
       - "traefik.http.routers.goforge-http.entrypoints=web"
       - "traefik.http.routers.goforge-http.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    # Loopback only. Traefik on 80/443 is the public entrypoint.
+    # 127.0.0.1 still answers http://localhost:8080 on the host.
     ports:
-      - "${GOFORGE_PORT:-8080}:${GOFORGE_PORT:-8080}"
+      - "127.0.0.1:${GOFORGE_PORT:-8080}:${GOFORGE_PORT:-8080}"
     networks:
       - goforge_net
       - traefik

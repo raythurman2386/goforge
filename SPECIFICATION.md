@@ -585,7 +585,7 @@ CREATE TABLE deployments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     environment_id UUID NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' 
-        CHECK (status IN ('pending', 'cloning', 'building', 'deploying', 'running', 'failed', 'rolled_back', 'cancelled')),
+        CHECK (status IN ('pending', 'cloning', 'building', 'deploying', 'running', 'failed', 'rolled_back', 'canceled')),
     trigger_type VARCHAR(50) NOT NULL DEFAULT 'manual'
         CHECK (trigger_type IN ('manual', 'webhook', 'rollback')),
     commit_sha VARCHAR(40),

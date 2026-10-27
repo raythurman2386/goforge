@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/raythurman2386/goforge/internal/models"
@@ -75,4 +76,81 @@ func TestContainerRepository_GetByDockerID_NotFound(t *testing.T) {
 
 func TestContainerRepository_ListByDeploymentID(t *testing.T) {
 	t.Skip("Skipping: requires full deployment chain (user->project->environment->deployment)")
+}
+
+func TestContainerRepository_OwnedByUser(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+	ctx := context.Background()
+
+	userRepo := NewUserRepository(db, nil)
+	owner := &models.User{Email: uniqueEmail("container-owner")}
+	other := &models.User{Email: uniqueEmail("container-other")}
+	if err := userRepo.Create(ctx, owner); err != nil {
+		t.Fatalf("Create(owner) error = %v", err)
+	}
+	if err := userRepo.Create(ctx, other); err != nil {
+		t.Fatalf("Create(other) error = %v", err)
+	}
+
+	project := &models.Project{
+		UserID:         owner.ID,
+		Name:           "owned-" + uniqueID(),
+		RepositoryURL:  "https://example.com/app.git",
+		DefaultBranch:  "main",
+		DockerfilePath: "Dockerfile",
+		BuildContext:   ".",
+	}
+	if err := NewProjectRepository(db).Create(ctx, project); err != nil {
+		t.Fatalf("Create(project) error = %v", err)
+	}
+	env := &models.Environment{ProjectID: project.ID, Name: "production", Replicas: 1}
+	if err := NewEnvironmentRepository(db).Create(ctx, env); err != nil {
+		t.Fatalf("Create(env) error = %v", err)
+	}
+	deployment := &models.Deployment{
+		EnvironmentID: env.ID,
+		Status:        models.DeploymentStatusPending,
+		TriggerType:   models.TriggerTypeManual,
+	}
+	if err := NewDeploymentRepository(db).Create(ctx, deployment); err != nil {
+		t.Fatalf("Create(deployment) error = %v", err)
+	}
+
+	repo := NewContainerRepository(db)
+	dockerID := "docker-" + uniqueID()
+	container := &models.Container{
+		DeploymentID: sql.NullString{String: deployment.ID, Valid: true},
+		DockerID:     dockerID,
+		Name:         "web-" + uniqueID(),
+		Image:        "nginx:latest",
+		Status:       models.ContainerStatusRunning,
+	}
+	if err := repo.Create(ctx, container); err != nil {
+		t.Fatalf("Create(container) error = %v", err)
+	}
+
+	owned, err := repo.OwnedByUser(ctx, dockerID, owner.ID)
+	if err != nil {
+		t.Fatalf("OwnedByUser(owner) error = %v", err)
+	}
+	if !owned {
+		t.Fatal("owner does not own the container")
+	}
+
+	owned, err = repo.OwnedByUser(ctx, dockerID, other.ID)
+	if err != nil {
+		t.Fatalf("OwnedByUser(other) error = %v", err)
+	}
+	if owned {
+		t.Fatal("other user owns the container")
+	}
+
+	owned, err = repo.OwnedByUser(ctx, "missing-"+uniqueID(), owner.ID)
+	if err != nil {
+		t.Fatalf("OwnedByUser(missing) error = %v", err)
+	}
+	if owned {
+		t.Fatal("missing container reported as owned")
+	}
 }

@@ -8,6 +8,8 @@ The recommended production deployment method using Docker Compose.
 - A domain name pointing to your server
 - Ports 80 and 443 available
 
+Compose publishes GoForge on `127.0.0.1:8080` for local access. Traefik on ports 80 and 443 is the public entrypoint. `.env.example` leaves `GOFORGE_DEV_MODE=false`.
+
 ## Setup
 
 ### 1. Clone and Configure
