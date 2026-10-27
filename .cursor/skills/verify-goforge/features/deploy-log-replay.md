@@ -8,6 +8,7 @@ Deploy lets a signed-in user create a project from a public Git URL, start a bui
 - `deploy-trigger` starts a deployment from the `Deploy Now` button.
 - `deploy-sse-replay` returns the earlier log lines on a second connection to the log stream.
 - `deploy-db-rows` shows those lines in `deployment_logs`.
+- `deploy-build-context` builds from the submitted build context directory.
 
 ## How to get to it (user POV)
 
@@ -35,7 +36,7 @@ curl -sS -D /tmp/goforge-verify/project.headers -o /dev/null \
   --data-urlencode "repository_url=https://github.com/raythurman2386/goforge.git" \
   --data-urlencode "default_branch=main" \
   --data-urlencode "dockerfile_path=Dockerfile" \
-  --data-urlencode "build_context=."
+  --data-urlencode "build_context=app"
 ```
 
 The response is `303` and `Location` matches `/projects/` plus an id. `GET` that URL with the same jar returns `200` and the body contains `verify-hello`.
@@ -62,12 +63,13 @@ curl -sS -N --max-time 10 \
 
 - **Replay.** Open the stream again into `artifacts/verify-goforge-proof/deploy-sse-replay.txt`. The replay file contains the log lines from the first file, not only `event: connected`.
 - **Rows.** `verify.sh psql "select count(*) from deployment_logs where deployment_id = '$DEPLOYMENT_ID'"` prints a count greater than `0`. Write the count to `artifacts/verify-goforge-proof/deploy-verdict.txt`.
+- **Build context.** `verify.sh psql "select build_context from projects where name = 'verify-hello'"` prints `app`. The image build uses the `app` directory inside the clone. On this tree write `deploy-build-context=fail` in the verdict. `RunPipeline` sets `ContextDir` to the clone root, so the root `Dockerfile` can still build.
 - **Proof.** The deployment detail `GET /projects/$PROJECT_ID/deployments/$DEPLOYMENT_ID` returns `200`. Record whether the body contains `No logs available yet` or a log line. Do not save the HTML.
 
 ## Gotchas
 
 - `Service.Log` in `internal/deploy/state.go` writes structured process logs and returns. It does not insert `deployment_logs`. `SSEHandler.DeploymentLogs` sends `event: connected` and then live hub events. It does not replay stored rows. On this tree `deploy-sse-replay` and `deploy-db-rows` fail. Record the count and that the replay file has no earlier log line. Do not treat `event: connected` as replay.
 - The manual repository field is named `repository_url_manual` until page script renames it. HTTP posts must send `repository_url`.
-- Build context is stored on the project and the pipeline clones into a work directory. `BuildImage` uses that clone root as `ContextDir`. A `build_context` other than `.` is not applied. This journey uses `.` so that gap is not the assertion.
+- `projects.build_context` is saved from the form. `RunPipeline` passes the clone root as `ContextDir` and does not read `BuildContext`. `deploy-build-context` fails on this tree. Keep the posted value `app`.
 - The log stream is behind `RequireAuth`. A missing session is `401` or a redirect to `/login`, not an empty log.
 - Status broadcasts use the deployment topic. The log pane swaps on SSE event name `log`. A status payload does not append a log line and does not change the badge until reload.
