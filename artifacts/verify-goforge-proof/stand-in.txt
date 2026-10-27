@@ -1,0 +1,10 @@
+This proof ran on a cloud VM that did not already have Docker. A host that already runs Docker Engine does not need the steps below.
+
+- docker.io, docker-compose-v2, and iproute2 were installed with apt.
+- dockerd was started by hand. The package start was denied, and systemd was not running.
+- The login shell was not in the docker group, so the helper ran under sg docker.
+- iptables-legacy FORWARD policy was DROP. A second container on goforge-verify_goforge_net saw no response from Postgres. sudo iptables-legacy -P FORWARD ACCEPT made pg_isready -h db succeed. The helper does not change iptables.
+
+revision.txt is the commit checked out when launch ran. The register drive used the helper in the working tree after the HttpOnly cookie-jar fix that is committed with these artifacts. Curl stores goforge_session on a jar line that starts with #HttpOnly_. The first drive skipped that line and reported the session missing while the dashboard still returned 200. The verdict file is from the drive after that fix.
+
+register-closed=fail is the product result on this tree. GET /auth/register returned 200 after the first user.

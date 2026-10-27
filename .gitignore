@@ -53,6 +53,7 @@ static/css/output.css
 # Logs
 *.log
 logs/
+!artifacts/verify-goforge-proof/*.log
 
 # Temporary files
 tmp/
