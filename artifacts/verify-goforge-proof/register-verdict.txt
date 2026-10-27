@@ -1,0 +1,15 @@
+harness=ok
+register-open=pass
+register-submit=pass
+register-closed=fail
+register-page-status=200
+register-post-status=303
+register-post-location=/dashboard
+session-cookie=present
+dashboard-status=200
+dashboard-heading=yes
+users-count=1
+register-again-status=200
+register-again-heading=yes
+fixture-email=verify-admin@example.test
+register-closed-reason=GET /auth/register stayed open after the first user. This tree checks GOFORGE_ENABLE_REGISTRATION, which defaults to true, and does not close registration from the users count.

@@ -61,34 +61,34 @@ reject_secret_sql() {
   esac
 }
 
-csrf_from_jar() {
-  python3 - "$1" <<'PY'
+cookie_rows() {
+  python3 - "$@" <<'PY'
 import pathlib, sys
-token = ""
-for line in pathlib.Path(sys.argv[1]).read_text(errors="replace").splitlines():
-    if not line or line.startswith("#"):
+path, want = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else ""
+found = ""
+for raw in pathlib.Path(path).read_text(errors="replace").splitlines():
+    line = raw
+    if line.startswith("#HttpOnly_"):
+        line = line[len("#HttpOnly_"):]
+    elif not line or line.startswith("#"):
         continue
     parts = line.split("\t")
-    if len(parts) >= 7 and parts[5] == "goforge_csrf":
-        token = parts[6]
-print(token, end="")
+    if len(parts) < 7 or not parts[6]:
+        continue
+    if want and parts[5] != want:
+        continue
+    found = parts[6]
+print(found, end="")
 PY
+}
+
+csrf_from_jar() {
+  cookie_rows "$1" goforge_csrf
 }
 
 jar_has_cookie() {
   local jar="$1" name="$2"
-  python3 - "$jar" "$name" <<'PY'
-import pathlib, sys
-jar, name = sys.argv[1], sys.argv[2]
-found = False
-for line in pathlib.Path(jar).read_text(errors="replace").splitlines():
-    if not line or line.startswith("#"):
-        continue
-    parts = line.split("\t")
-    if len(parts) >= 7 and parts[5] == name and parts[6]:
-        found = True
-sys.exit(0 if found else 1)
-PY
+  [[ -n "$(cookie_rows "$jar" "$name")" ]]
 }
 
 body_has() {

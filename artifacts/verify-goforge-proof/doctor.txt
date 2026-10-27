@@ -1,0 +1,10 @@
+project=goforge-verify
+container=running
+health_code=200
+ready_code=200
+database=ok
+docker=ok
+app_port=0.0.0.0:8080
+db_port=0.0.0.0:5432
+drive_auth=yes
+drive_docker=yes
