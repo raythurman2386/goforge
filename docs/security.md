@@ -72,7 +72,7 @@ GoForge implements double-submit cookie CSRF protection:
 - Users can only access their own resources (projects, environments, services)
 - Resource ownership is validated at the repository layer via `user_id` filtering
 
-Accounts have a `role` of `admin` or `user`. Registration creates users, including the first account. `GOFORGE_ADMIN_EMAIL` promotes that address on process start and when the account is created. Host actions such as Docker prune require the admin role and return 403 for anyone else. Project and service ownership is still checked separately, so a user only sees their own resources.
+Accounts have a `role` of `admin` or `user`. Registration creates users, including the first account. `GOFORGE_ADMIN_EMAIL` promotes that address on process start and when the account is created. The match is case-insensitive, and account emails are stored in lowercase. Host actions such as Docker prune require the admin role and return 403 for anyone else. Project and service ownership is still checked separately, so a user only sees their own resources. Deployment get, rollback, cancel, and status also require the deployment's environment to belong to the project in the path; a cross-project id is not found.
 
 ---
 

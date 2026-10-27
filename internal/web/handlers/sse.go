@@ -442,6 +442,12 @@ func (h *SSEHandler) verifyDeploymentOwnership(w http.ResponseWriter, r *http.Re
 		return false
 	}
 
+	// The deployment id in the path must belong to the project id in the path.
+	if pathProjectID := chi.URLParam(r, "id"); pathProjectID != "" && env.ProjectID != pathProjectID {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return false
+	}
+
 	proj, err := h.projectService.GetProject(r.Context(), env.ProjectID)
 	if err != nil || proj.UserID != user.ID {
 		http.Error(w, "access denied", http.StatusForbidden)

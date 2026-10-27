@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -14,10 +15,27 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/projects"
 )
 
+// deploymentAPI is the deployment operations this handler calls.
+// *deploy.Service implements it.
+type deploymentAPI interface {
+	CreateDeployment(ctx context.Context, d *models.Deployment) error
+	GetDeployment(ctx context.Context, id string) (*models.Deployment, error)
+	GetLogs(ctx context.Context, deploymentID string) ([]*models.DeploymentLog, error)
+	Cancel(ctx context.Context, deploymentID, reason string) error
+}
+
+// projectAPI is the project and environment reads this handler calls.
+// *project.Service implements it.
+type projectAPI interface {
+	GetProject(ctx context.Context, id string) (*models.Project, error)
+	ListEnvironments(ctx context.Context, projectID string) ([]*models.Environment, error)
+	GetEnvironment(ctx context.Context, id string) (*models.Environment, error)
+}
+
 // DeploymentHandler handles deployment related requests.
 type DeploymentHandler struct {
-	deployService   *deploy.Service
-	projectService  *project.Service
+	deployService   deploymentAPI
+	projectService  projectAPI
 	rollbackManager *deploy.RollbackManager
 	worker          *deploy.Worker
 	logger          *slog.Logger
@@ -54,12 +72,18 @@ func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Req
 
 	if envID == "" {
 		// Try to find default environment
-		envs, err := h.projectService.ListEnvironments(r.Context(), projectID)
-		if err != nil || len(envs) == 0 {
+		envs, listErr := h.projectService.ListEnvironments(r.Context(), projectID)
+		if listErr != nil || len(envs) == 0 {
 			http.Error(w, "environment not found", http.StatusBadRequest)
 			return
 		}
 		envID = envs[0].ID
+	}
+
+	env, err := h.projectService.GetEnvironment(r.Context(), envID)
+	if err != nil || env.ProjectID != projectID {
+		http.Error(w, "environment not found", http.StatusNotFound)
+		return
 	}
 
 	d := &models.Deployment{
@@ -99,17 +123,8 @@ func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get the deployment
-	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
-	if err != nil {
-		http.Error(w, "deployment not found", http.StatusNotFound)
-		return
-	}
-
-	// Get the environment
-	env, err := h.projectService.GetEnvironment(r.Context(), deployment.EnvironmentID)
-	if err != nil {
-		http.Error(w, "environment not found", http.StatusNotFound)
+	deployment, env, ok := h.deploymentForProject(w, r, projectID, deploymentID)
+	if !ok {
 		return
 	}
 
@@ -156,15 +171,13 @@ func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if h.rollbackManager == nil {
-		http.Error(w, "rollback not available", http.StatusServiceUnavailable)
+	deployment, _, ok := h.deploymentForProject(w, r, projectID, deploymentID)
+	if !ok {
 		return
 	}
 
-	// Get the deployment to find the environment
-	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
-	if err != nil {
-		http.Error(w, "deployment not found", http.StatusNotFound)
+	if h.rollbackManager == nil {
+		http.Error(w, "rollback not available", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -198,10 +211,8 @@ func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get the deployment
-	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
-	if err != nil {
-		http.Error(w, "deployment not found", http.StatusNotFound)
+	deployment, _, ok := h.deploymentForProject(w, r, projectID, deploymentID)
+	if !ok {
 		return
 	}
 
@@ -245,9 +256,8 @@ func (h *DeploymentHandler) GetDeploymentStatus(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
-	if err != nil {
-		http.Error(w, "deployment not found", http.StatusNotFound)
+	deployment, _, ok := h.deploymentForProject(w, r, projectID, deploymentID)
+	if !ok {
 		return
 	}
 
@@ -265,4 +275,21 @@ func (h *DeploymentHandler) GetDeploymentStatus(w http.ResponseWriter, r *http.R
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render deployment status", http.StatusInternalServerError)
 	}
+}
+
+// deploymentForProject loads a deployment and requires its environment to
+// belong to the project in the path. A missing row and a cross-project id
+// are both not found, matching project ownership.
+func (h *DeploymentHandler) deploymentForProject(w http.ResponseWriter, r *http.Request, projectID, deploymentID string) (*models.Deployment, *models.Environment, bool) {
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return nil, nil, false
+	}
+	env, err := h.projectService.GetEnvironment(r.Context(), deployment.EnvironmentID)
+	if err != nil || env.ProjectID != projectID {
+		http.Error(w, "deployment not found", http.StatusNotFound)
+		return nil, nil, false
+	}
+	return deployment, env, true
 }

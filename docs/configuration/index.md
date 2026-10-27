@@ -12,7 +12,7 @@ GoForge is configured entirely through environment variables. This page document
 | `GOFORGE_DEV_MODE` | `false` | Enable development mode (debug logging; generates secrets when they are unset) |
 | `GOFORGE_DEV_SECRETS_FILE` | `.goforge/dev-secrets.json` | Dev-mode file that keeps generated secrets across restarts |
 | `GOFORGE_ENABLE_REGISTRATION` | `false` | Allow accounts after the first one. The first account can always register. New accounts are users |
-| `GOFORGE_ADMIN_EMAIL` | empty | Promote this email to admin on startup and when the account is created |
+| `GOFORGE_ADMIN_EMAIL` | empty | Promote this email to admin on startup and when the account is created. Matching is case-insensitive |
 | `GOFORGE_HOST` | `0.0.0.0` | Host address to bind to |
 | `GOFORGE_PORT` | `8080` | Port to listen on |
 | `GOFORGE_BASE_URL` | `http://localhost:8080` | Public-facing base URL (used for OAuth callbacks, webhooks) |

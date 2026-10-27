@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,7 +34,7 @@ func NewUserRepository(db *sql.DB, secrets *secrets.Encryptor) *UserRepository {
 // WithAdminEmail sets the address that receives the admin role on create.
 // An empty address leaves every new account as a user.
 func (r *UserRepository) WithAdminEmail(email string) *UserRepository {
-	r.adminEmail = strings.TrimSpace(email)
+	r.adminEmail = models.NormalizeEmail(email)
 	return r
 }
 
@@ -55,6 +54,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	now := time.Now()
 	user.CreatedAt = now
 	user.UpdatedAt = now
+	user.Email = models.NormalizeEmail(user.Email)
 	user.Role = models.RoleForEmail(user.Email, r.adminEmail)
 
 	query := `
@@ -80,7 +80,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 // GrantAdmin promotes the account with this email. A blank email does nothing.
 // A missing account returns ErrNotFound so the caller can wait for registration.
 func (r *UserRepository) GrantAdmin(ctx context.Context, email string) error {
-	email = strings.TrimSpace(email)
+	email = models.NormalizeEmail(email)
 	if email == "" {
 		return nil
 	}
@@ -136,9 +136,10 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 	return user, nil
 }
 
-// GetByEmail retrieves a user by email.
+// GetByEmail retrieves a user by email. Lookup is case-insensitive.
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	query := `SELECT ` + userSelectColumns + ` FROM users WHERE email = $1`
+	query := `SELECT ` + userSelectColumns + ` FROM users WHERE lower(email) = $1`
+	email = models.NormalizeEmail(email)
 
 	user, err := scanUser(r.db.QueryRowContext(ctx, query, email))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -175,6 +176,7 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	}
 
 	user.UpdatedAt = time.Now()
+	user.Email = models.NormalizeEmail(user.Email)
 
 	query := `
 		UPDATE users SET
@@ -234,7 +236,7 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 // UpdateEmail updates the user's email address.
 func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) error {
 	query := `UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2`
-	result, err := r.db.ExecContext(ctx, query, email, id)
+	result, err := r.db.ExecContext(ctx, query, models.NormalizeEmail(email), id)
 	if err != nil {
 		return err
 	}

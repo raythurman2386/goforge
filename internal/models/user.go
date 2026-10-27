@@ -19,16 +19,22 @@ const (
 	RoleUser Role = "user"
 )
 
+// NormalizeEmail trims and lowercases an address so storage, lookup, and
+// admin grant share one case-insensitive value.
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 // RoleForEmail returns admin only when email matches the configured admin
 // address. An empty admin address never promotes anyone, including the first
-// account.
+// account. Matching ignores case and surrounding space.
 func RoleForEmail(email, adminEmail string) Role {
-	email = strings.TrimSpace(email)
-	adminEmail = strings.TrimSpace(adminEmail)
+	email = NormalizeEmail(email)
+	adminEmail = NormalizeEmail(adminEmail)
 	if email == "" || adminEmail == "" {
 		return RoleUser
 	}
-	if strings.EqualFold(email, adminEmail) {
+	if email == adminEmail {
 		return RoleAdmin
 	}
 	return RoleUser
