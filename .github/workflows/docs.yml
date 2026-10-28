@@ -105,6 +105,29 @@ jobs:
             core.info(`oidc sub=${claims.sub} ref=${claims.ref || ''} environment=${claims.environment || ''} sha=${claims.sha || ''}`)
             core.info(`artifact_id=${artifactId} pages_build_version=${context.sha}`)
 
+            for (const route of [
+              'GET /repos/{owner}/{repo}/pages/builds',
+              'GET /repos/{owner}/{repo}/pages/builds/latest'
+            ]) {
+              try {
+                const { data } = await github.request(route, { owner, repo, per_page: 3 })
+                core.info(`${route} ${JSON.stringify(data)}`)
+              } catch (error) {
+                core.info(`${route} status=${error.status} body=${JSON.stringify(error.response?.data)}`)
+              }
+            }
+
+            try {
+              const { data } = await github.request('POST /repos/{owner}/{repo}/pages', {
+                owner,
+                repo,
+                build_type: 'workflow'
+              })
+              core.warning(`POST /pages unexpectedly succeeded ${JSON.stringify(data)}`)
+            } catch (error) {
+              core.info(`POST /pages status=${error.status} body=${JSON.stringify(error.response?.data)}`)
+            }
+
             try {
               const { data } = await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
                 owner,
