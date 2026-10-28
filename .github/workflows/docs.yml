@@ -7,19 +7,22 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - '.github/workflows/docs.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
+# configure-pages and deploy-pages need pages: write and id-token: write.
 permissions:
   contents: read
   pages: write
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 jobs:
@@ -27,12 +30,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
+      # deploy-pages hides the Pages API errors array behind "Validation Failed".
+      # Surface plan, visibility, and source mismatches before the deploy job.
+      - name: Check Pages site
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            try {
+              const { data } = await github.rest.repos.getPages({ owner, repo })
+              core.info(`build_type=${data.build_type} status=${data.status} public=${data.public} url=${data.html_url}`)
+              if (data.build_type !== 'workflow') {
+                core.setFailed(
+                  `GitHub Pages build type is "${data.build_type}". ` +
+                  'actions/deploy-pages only works when Settings → Pages → Build and deployment is "GitHub Actions" (build_type "workflow").'
+                )
+              }
+            } catch (error) {
+              const status = error.status || error.response?.status || 'unknown'
+              const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
+              if (status === 404) {
+                core.setFailed(`GitHub Pages is not enabled for this repository (${body}). In Settings → Pages, set Build and deployment to GitHub Actions.`)
+                return
+              }
+              core.setFailed(`GitHub Pages request failed (${status}): ${body}`)
+            }
+
+      - name: Setup Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6
+
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -47,7 +81,7 @@ jobs:
 
       - name: Upload artifact
         if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./site
 
@@ -55,10 +89,13 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
