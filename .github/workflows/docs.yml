@@ -28,6 +28,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_artifact_id: ${{ steps.pages-artifact.outputs.artifact_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -35,13 +37,16 @@ jobs:
           fetch-depth: 0
 
       # deploy-pages hides the Pages API errors array behind "Validation Failed".
-      # Surface plan, visibility, and source mismatches before the deploy job.
+      # Record the site source before the deploy job. A private repository on
+      # GitHub Free is rejected later with HTTP 422 and no errors array.
       - name: Check Pages site
         if: github.event_name != 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
             const { owner, repo } = context.repo
+            const repoInfo = await github.rest.repos.get({ owner, repo })
+            core.info(`repository private=${repoInfo.data.private} visibility=${repoInfo.data.visibility}`)
             try {
               const { data } = await github.rest.repos.getPages({ owner, repo })
               core.info(`build_type=${data.build_type} status=${data.status} public=${data.public} url=${data.html_url}`)
@@ -80,6 +85,7 @@ jobs:
         run: mkdocs build --strict
 
       - name: Upload artifact
+        id: pages-artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
@@ -90,6 +96,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -99,3 +106,49 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      # actions/deploy-pages logs only "Validation Failed" for HTTP 422.
+      # Repeat the request so the raw body is in the log, then name the
+      # private-repository plan limit when that is what GitHub rejected.
+      - name: Explain Pages deployment failure
+        if: failure() && steps.deployment.outcome == 'failure'
+        uses: actions/github-script@v9
+        env:
+          PAGES_ARTIFACT_ID: ${{ needs.build.outputs.pages_artifact_id }}
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            const repoInfo = await github.rest.repos.get({ owner, repo })
+            const artifactId = Number(process.env.PAGES_ARTIFACT_ID)
+            let detail = 'no API response body'
+            if (Number.isInteger(artifactId) && artifactId > 0) {
+              try {
+                const idToken = await core.getIDToken()
+                await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
+                  owner,
+                  repo,
+                  artifact_id: artifactId,
+                  pages_build_version: context.sha,
+                  oidc_token: idToken
+                })
+                detail = 'a follow-up deployment request was accepted'
+              } catch (error) {
+                const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
+                detail = `status ${error.status}: ${body}`
+                core.info(`Pages deployment API ${detail}`)
+              }
+            }
+            if (!repoInfo.data.private) {
+              core.setFailed(`GitHub Pages rejected the deployment (${detail}).`)
+              return
+            }
+            core.setFailed(
+              `GitHub Pages rejected the deployment (${detail}). ` +
+              'This repository is private. GitHub Free publishes Pages only from public repositories, ' +
+              'so the site is unpublished and creating a deployment fails validation. ' +
+              'Change one setting, then re-run Deploy Documentation: ' +
+              'Settings → General → Danger Zone → Change repository visibility → Public, ' +
+              'or upgrade the owner account to GitHub Pro under Settings → Billing and licensing ' +
+              '(renew GitHub Education benefits if those provided Pro and have lapsed). ' +
+              'Pages is already set to Build and deployment: GitHub Actions.'
+            )
