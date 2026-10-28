@@ -28,6 +28,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_artifact_id: ${{ steps.pages-artifact.outputs.artifact_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -35,9 +37,10 @@ jobs:
           fetch-depth: 0
 
       # deploy-pages hides the Pages API errors array behind "Validation Failed".
-      # On pull requests this step only records the API response. The deploy job
-      # is what publishes, and it cannot run from a non-main branch.
+      # Record the site source before the deploy job. A private repository on
+      # GitHub Free is rejected later with HTTP 422 and no errors array.
       - name: Check Pages site
+        if: github.event_name != 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
@@ -46,7 +49,7 @@ jobs:
             core.info(`repository private=${repoInfo.data.private} visibility=${repoInfo.data.visibility}`)
             try {
               const { data } = await github.rest.repos.getPages({ owner, repo })
-              core.info(`pages ${JSON.stringify(data)}`)
+              core.info(`build_type=${data.build_type} status=${data.status} public=${data.public} url=${data.html_url}`)
               if (data.build_type !== 'workflow') {
                 core.setFailed(
                   `GitHub Pages build type is "${data.build_type}". ` +
@@ -83,75 +86,17 @@ jobs:
 
       - name: Upload artifact
         id: pages-artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: ./site
-
-      # Pull requests cannot deploy: the github-pages environment only allows
-      # main. Replay the deployment request with the real artifact and print
-      # the raw 422 body that actions/deploy-pages discards. Cancel immediately
-      # if GitHub accepts the request.
-      - name: Probe Pages deployment API
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v9
-        env:
-          PAGES_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}
-        with:
-          script: |
-            const { owner, repo } = context.repo
-            const artifactId = Number(process.env.PAGES_ARTIFACT_ID)
-            const idToken = await core.getIDToken()
-            const claims = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString())
-            core.info(`oidc sub=${claims.sub} ref=${claims.ref || ''} environment=${claims.environment || ''} sha=${claims.sha || ''}`)
-            core.info(`artifact_id=${artifactId} pages_build_version=${context.sha}`)
-
-            for (const route of [
-              'GET /repos/{owner}/{repo}/pages/builds',
-              'GET /repos/{owner}/{repo}/pages/builds/latest'
-            ]) {
-              try {
-                const { data } = await github.request(route, { owner, repo, per_page: 3 })
-                core.info(`${route} ${JSON.stringify(data)}`)
-              } catch (error) {
-                core.info(`${route} status=${error.status} body=${JSON.stringify(error.response?.data)}`)
-              }
-            }
-
-            try {
-              const { data } = await github.request('POST /repos/{owner}/{repo}/pages', {
-                owner,
-                repo,
-                build_type: 'workflow'
-              })
-              core.warning(`POST /pages unexpectedly succeeded ${JSON.stringify(data)}`)
-            } catch (error) {
-              core.info(`POST /pages status=${error.status} body=${JSON.stringify(error.response?.data)}`)
-            }
-
-            try {
-              const { data } = await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
-                owner,
-                repo,
-                artifact_id: artifactId,
-                pages_build_version: context.sha,
-                oidc_token: idToken
-              })
-              core.warning(`probe created deployment ${data.id}; canceling`)
-              await github.request('POST /repos/{owner}/{repo}/pages/deployments/{deployment_id}/cancel', {
-                owner,
-                repo,
-                deployment_id: data.id
-              })
-            } catch (error) {
-              const data = error.response?.data
-              core.info(`pages deployment probe status=${error.status} request-id=${error.response?.headers?.['x-github-request-id']} body=${JSON.stringify(data)}`)
-            }
 
   deploy:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -161,3 +106,49 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      # actions/deploy-pages logs only "Validation Failed" for HTTP 422.
+      # Repeat the request so the raw body is in the log, then name the
+      # private-repository plan limit when that is what GitHub rejected.
+      - name: Explain Pages deployment failure
+        if: failure() && steps.deployment.outcome == 'failure'
+        uses: actions/github-script@v9
+        env:
+          PAGES_ARTIFACT_ID: ${{ needs.build.outputs.pages_artifact_id }}
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            const repoInfo = await github.rest.repos.get({ owner, repo })
+            const artifactId = Number(process.env.PAGES_ARTIFACT_ID)
+            let detail = 'no API response body'
+            if (Number.isInteger(artifactId) && artifactId > 0) {
+              try {
+                const idToken = await core.getIDToken()
+                await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
+                  owner,
+                  repo,
+                  artifact_id: artifactId,
+                  pages_build_version: context.sha,
+                  oidc_token: idToken
+                })
+                detail = 'a follow-up deployment request was accepted'
+              } catch (error) {
+                const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
+                detail = `status ${error.status}: ${body}`
+                core.info(`Pages deployment API ${detail}`)
+              }
+            }
+            if (!repoInfo.data.private) {
+              core.setFailed(`GitHub Pages rejected the deployment (${detail}).`)
+              return
+            }
+            core.setFailed(
+              `GitHub Pages rejected the deployment (${detail}). ` +
+              'This repository is private. GitHub Free publishes Pages only from public repositories, ' +
+              'so the site is unpublished and creating a deployment fails validation. ' +
+              'Change one setting, then re-run Deploy Documentation: ' +
+              'Settings → General → Danger Zone → Change repository visibility → Public, ' +
+              'or upgrade the owner account to GitHub Pro under Settings → Billing and licensing ' +
+              '(renew GitHub Education benefits if those provided Pro and have lapsed). ' +
+              'Pages is already set to Build and deployment: GitHub Actions.'
+            )
