@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - cursor/fix-docs-pages-deploy-b599
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
@@ -86,37 +85,9 @@ jobs:
         with:
           path: ./site
 
-  # Temporary: the github-pages environment only allows main. Add this branch
-  # so the deploy job can run before merge, then remove the policy.
-  allow-deploy:
-    if: github.ref == 'refs/heads/cursor/fix-docs-pages-deploy-b599' && github.event_name != 'pull_request'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      administration: write
-    steps:
-      - name: Allow this branch to deploy
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { owner, repo } = context.repo
-            try {
-              await github.request('POST /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies', {
-                owner,
-                repo,
-                environment_name: 'github-pages',
-                name: 'cursor/fix-docs-pages-deploy-b599',
-                type: 'branch',
-              })
-            } catch (error) {
-              const status = error.status || error.response?.status || 'unknown'
-              const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
-              core.setFailed(`Could not allow this branch to deploy (${status}): ${body}`)
-            }
-
   deploy:
     if: github.event_name != 'pull_request'
-    needs: [build, allow-deploy]
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -128,33 +99,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
-
-  cleanup-deploy-policy:
-    if: always() && github.ref == 'refs/heads/cursor/fix-docs-pages-deploy-b599' && github.event_name != 'pull_request'
-    needs: [allow-deploy, deploy]
-    runs-on: ubuntu-latest
-    permissions:
-      administration: write
-    steps:
-      - name: Remove temporary branch policy
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { owner, repo } = context.repo
-            const { data } = await github.request('GET /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies', {
-              owner,
-              repo,
-              environment_name: 'github-pages',
-            })
-            for (const policy of data.branch_policies || []) {
-              if (policy.name !== 'cursor/fix-docs-pages-deploy-b599') {
-                continue
-              }
-              await github.request('DELETE /repos/{owner}/{repo}/environments/{environment_name}/deployment-branch-policies/{branch_policy_id}', {
-                owner,
-                repo,
-                environment_name: 'github-pages',
-                branch_policy_id: policy.id,
-              })
-              core.info(`Removed deployment branch policy ${policy.id}`)
-            }
