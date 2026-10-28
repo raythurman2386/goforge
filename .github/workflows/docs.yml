@@ -35,16 +35,18 @@ jobs:
           fetch-depth: 0
 
       # deploy-pages hides the Pages API errors array behind "Validation Failed".
-      # Surface plan, visibility, and source mismatches before the deploy job.
+      # On pull requests this step only records the API response. The deploy job
+      # is what publishes, and it cannot run from a non-main branch.
       - name: Check Pages site
-        if: github.event_name != 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
             const { owner, repo } = context.repo
+            const repoInfo = await github.rest.repos.get({ owner, repo })
+            core.info(`repository private=${repoInfo.data.private} visibility=${repoInfo.data.visibility}`)
             try {
               const { data } = await github.rest.repos.getPages({ owner, repo })
-              core.info(`build_type=${data.build_type} status=${data.status} public=${data.public} url=${data.html_url}`)
+              core.info(`pages ${JSON.stringify(data)}`)
               if (data.build_type !== 'workflow') {
                 core.setFailed(
                   `GitHub Pages build type is "${data.build_type}". ` +
@@ -59,6 +61,32 @@ jobs:
                 return
               }
               core.setFailed(`GitHub Pages request failed (${status}): ${body}`)
+            }
+
+            if (context.eventName !== 'pull_request') {
+              return
+            }
+
+            let idToken = ''
+            try {
+              idToken = await core.getIDToken()
+            } catch (error) {
+              core.warning(`OIDC token unavailable: ${error.message}`)
+            }
+
+            try {
+              await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
+                owner,
+                repo,
+                artifact_id: 0,
+                pages_build_version: context.sha,
+                oidc_token: idToken
+              })
+              core.warning('Unexpected success creating a Pages deployment with artifact_id 0')
+            } catch (error) {
+              const status = error.status || error.response?.status || 'unknown'
+              const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
+              core.info(`pages deployment probe status=${status} body=${body}`)
             }
 
       - name: Setup Pages
