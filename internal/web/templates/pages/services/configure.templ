@@ -31,10 +31,10 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">
-					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">
 						Configure { tmpl.DisplayName }
 					</h2>
-					<p class="mt-2 text-sm text-gray-500">Customize your deployment settings and environment variables.</p>
+					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Customize your deployment settings and environment variables.</p>
 				</div>
 			</div>
 
@@ -46,7 +46,7 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 
 				if tmpl.Web {
 					<div class="mb-4">
-						<label for="domain" class="block text-sm font-medium text-gray-700 mb-1">
+						<label for="domain" class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
 							Domain
 							<span class="text-red-500">*</span>
 						</label>
@@ -61,13 +61,13 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 						/>
 					</div>
 					if cloudflareProxyMode {
-						<div class="mt-[-1rem] mb-4 text-xs text-gray-500 space-y-1">
+						<div class="mt-[-1rem] mb-4 text-xs text-gray-500 space-y-1 dark:text-gray-400">
 							<p>Required. Cloudflare Tunnel mode: use a public first-level host such as <code>{ tmpl.Name }-app.example.com</code>. Cloudflare Universal SSL covers <code>*.example.com</code> but not <code>*.apps.example.com</code>, so a deeper name fails the TLS handshake.</p>
 							<p>Before you deploy, create a proxied CNAME for the host that points at <code>&lt;tunnel-id&gt;.cfargotunnel.com</code>, unless a proxied wildcard already does. <code>.localhost</code> hosts cannot be reached through the tunnel.</p>
-							<p><a href={ templ.SafeURL(cloudflareDomainsDocURL) } target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline">Cloudflare service domains guide</a></p>
+							<p><a href={ templ.SafeURL(cloudflareDomainsDocURL) } target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline dark:text-primary-400">Cloudflare service domains guide</a></p>
 						</div>
 					} else {
-						<div class="mt-[-1rem] mb-4 text-xs text-gray-500">
+						<div class="mt-[-1rem] mb-4 text-xs text-gray-500 dark:text-gray-400">
 							Required. Assign a custom domain (e.g., <code>gitea.localhost</code> or <code>gitea.example.com</code>) to access this service via the browser.
 						</div>
 					}
@@ -76,7 +76,7 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 					for _, field := range tmpl.Config {
 						if field.Type == "password" && field.Generate {
 							@components.Input(field.Label, field.Name, "password", "", false)
-							<p class="mt-[-1rem] mb-4 text-xs text-gray-500">Leave blank and GoForge generates a password. It is stored encrypted.</p>
+							<p class="mt-[-1rem] mb-4 text-xs text-gray-500 dark:text-gray-400">Leave blank and GoForge generates a password. It is stored encrypted.</p>
 						} else if field.Type == services.FieldTypeBool {
 							@components.Checkbox(field.Label, field.Name, field.BoolDefault())
 						} else if field.Type == services.FieldTypeSelect {
@@ -88,7 +88,7 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 						}
 					}
 
-					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3">
+					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3 dark:border-gray-800">
 						<a href="/services" class="btn-secondary">
 							Cancel
 						</a>

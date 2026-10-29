@@ -24,10 +24,10 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">
-					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">
 						Edit { instance.Name }
 					</h2>
-					<p class="mt-2 text-sm text-gray-500">Change the configuration of this { tmpl.DisplayName } service.</p>
+					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Change the configuration of this { tmpl.DisplayName } service.</p>
 				</div>
 			</div>
 			<div class="mb-6">
@@ -53,10 +53,10 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 					}
 					for _, field := range tmpl.Config {
 						if field.Immutable {
-							<p class="mb-4 text-xs text-gray-500">{ field.Label } is set once at deploy and cannot be changed here.</p>
+							<p class="mb-4 text-xs text-gray-500 dark:text-gray-400">{ field.Label } is set once at deploy and cannot be changed here.</p>
 						} else if field.Type == "password" {
 							@components.Input(field.Label, field.Name, "password", "", false)
-							<p class="mt-[-1rem] mb-4 text-xs text-gray-500">Leave blank to keep the current value.</p>
+							<p class="mt-[-1rem] mb-4 text-xs text-gray-500 dark:text-gray-400">Leave blank to keep the current value.</p>
 						} else if field.Type == services.FieldTypeBool {
 							@components.Checkbox(field.Label, field.Name, services.IsTrue(configValue(config, field.Name, field.Default)))
 						} else if field.Type == services.FieldTypeSelect {
@@ -67,7 +67,7 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 							@components.Input(field.Label, field.Name, "text", configValue(config, field.Name, field.Default), field.Required)
 						}
 					}
-					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3">
+					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3 dark:border-gray-800">
 						<a href={ templ.SafeURL("/services/" + instance.ID) } class="btn-secondary">
 							Cancel
 						</a>

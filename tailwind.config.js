@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // Dark mode follows the OS (prefers-color-scheme) only. No toggle, no stored preference.
+  darkMode: 'media',
   content: [
     "./internal/web/templates/**/*.templ",
     "./internal/web/templates/**/*_templ.go",

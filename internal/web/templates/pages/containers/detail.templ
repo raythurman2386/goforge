@@ -60,20 +60,20 @@ templ Detail(containerID string, csrfToken string) {
 		<div class="card !p-0 overflow-hidden">
 			<div class="card-header">
 				<h3 class="card-title">Container Logs</h3>
-				<span class="inline-flex items-center gap-2 text-sm text-gray-500">
+				<span class="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
 					<span class="h-2 w-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true"></span>
 					Live
 				</span>
 			</div>
 			<div
 				id="container-logs"
-				class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto"
+				class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto dark:bg-gray-950"
 				hx-ext="sse"
 				sse-connect={ fmt.Sprintf("/containers/%s/logs", containerID) }
 				sse-swap="log"
 				hx-swap="beforeend"
 			>
-				<p class="text-gray-500 italic">Waiting for logs...</p>
+				<p class="text-gray-500 italic dark:text-gray-400">Waiting for logs...</p>
 			</div>
 		</div>
 

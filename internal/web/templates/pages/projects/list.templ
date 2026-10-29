@@ -30,24 +30,24 @@ templ List(projects []*models.Project, csrfToken string) {
 				for _, p := range projects {
 					<a href={ templ.URL("/projects/" + p.ID) } class="card hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group">
 						<div class="flex items-center justify-between mb-4">
-							<div class="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-colors">
+							<div class="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-colors dark:bg-primary-900/30 dark:text-primary-400">
 								<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
 								</svg>
 							</div>
 						</div>
-						<h3 class="text-lg font-bold text-gray-900 truncate tracking-tight">{ p.Name }</h3>
-						<p class="mt-2 text-sm text-gray-500 truncate font-mono bg-gray-50 p-2 rounded-md">
+						<h3 class="text-lg font-bold text-gray-900 truncate tracking-tight dark:text-gray-100">{ p.Name }</h3>
+						<p class="mt-2 text-sm text-gray-500 truncate font-mono bg-gray-50 p-2 rounded-md dark:text-gray-400 dark:bg-gray-800/50">
 							{ p.RepositoryURL }
 						</p>
-						<div class="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-[11px] font-medium text-gray-400">
+						<div class="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-[11px] font-medium text-gray-400 dark:border-gray-800">
 							<div class="flex items-center">
 								<svg class="mr-1.5 h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 								</svg>
 								{ p.UpdatedAt.Format("Jan 02, 2006") }
 							</div>
-							<div class="flex items-center text-primary-600 group-hover:translate-x-1 transition-transform">
+							<div class="flex items-center text-primary-600 group-hover:translate-x-1 transition-transform dark:text-primary-400">
 								View Details
 								<svg class="ml-1 h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>

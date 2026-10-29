@@ -9,7 +9,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 		<div class="card-header">
 			<div>
 				<h3 class="card-title">Environment Variables</h3>
-				<p class="mt-1 max-w-2xl text-sm text-gray-500">Variables for this environment.</p>
+				<p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Variables for this environment.</p>
 			</div>
 			<div class="flex items-center gap-2">
 				if projectID != "" {
@@ -33,14 +33,14 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 		
 		<div class="card-body">
 			if len(variables) == 0 {
-				<p class="text-sm text-gray-500">No variables defined.</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400">No variables defined.</p>
 			} else {
 				<div class="space-y-2">
 					for _, v := range variables {
-						<div class="flex items-center gap-4 rounded-lg border border-gray-100 p-3 hover:bg-gray-50/60">
+						<div class="flex items-center gap-4 rounded-lg border border-gray-100 p-3 hover:bg-gray-50/60 dark:border-gray-800 dark:hover:bg-gray-800/50">
 							<div class="flex-1 grid grid-cols-2 gap-4">
-								<div class="text-sm font-mono font-medium text-gray-900">{ v.Key }</div>
-								<div class="text-sm font-mono text-gray-500 truncate">
+								<div class="text-sm font-mono font-medium text-gray-900 dark:text-gray-100">{ v.Key }</div>
+								<div class="text-sm font-mono text-gray-500 truncate dark:text-gray-400">
 									if v.IsSecret {
 										••••••••••••
 									} else {
@@ -54,7 +54,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 									hx-confirm="Delete this variable?"
 									hx-swap="none"
 									hx-headers={ `{"X-CSRF-Token": "` + csrfToken + `"}` }
-									class="icon-btn hover:text-red-600 hover:bg-red-50"
+									class="icon-btn hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/40"
 									title="Delete"
 									aria-label={ "Delete " + v.Key }
 								>
@@ -79,8 +79,8 @@ templ AddVariableModal(envID string, csrfToken string) {
 			@Input("Value", "value", "text", "", true)
 			
 			<div class="flex items-center mb-4">
-				<input id="is_secret" name="is_secret" type="checkbox" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded" />
-				<label for="is_secret" class="ml-2 block text-sm text-gray-900">
+				<input id="is_secret" name="is_secret" type="checkbox" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded dark:text-primary-400 dark:border-gray-700" />
+				<label for="is_secret" class="ml-2 block text-sm text-gray-900 dark:text-gray-100">
 					Is Secret (value will be masked)
 				</label>
 			</div>
