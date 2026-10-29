@@ -83,6 +83,12 @@ type Config struct {
 	// Empty leaves every account as a user until the operator sets it.
 	AdminEmail string
 
+	// ProtectedServices lists service instance IDs that /api/v1 refuses to
+	// stop, reconfigure, or re-image unless the API token has the protected
+	// scope. Restart stays allowed. Set with GOFORGE_PROTECTED_SERVICES as a
+	// comma-separated list.
+	ProtectedServices []string
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -144,6 +150,9 @@ func Load() (*Config, error) {
 		// Registration stays closed after the first account unless explicitly enabled.
 		EnableRegistration: getEnvBool("GOFORGE_ENABLE_REGISTRATION", false),
 		AdminEmail:         strings.TrimSpace(os.Getenv("GOFORGE_ADMIN_EMAIL")),
+
+		// API v1
+		ProtectedServices: getEnvStringSlice("GOFORGE_PROTECTED_SERVICES"),
 
 		// Dev mode
 		DevMode: devMode,

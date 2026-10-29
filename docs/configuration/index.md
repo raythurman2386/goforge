@@ -53,6 +53,14 @@ openssl rand -base64 32
 
 Dev mode writes any secrets it generates to `GOFORGE_DEV_SECRETS_FILE` (mode `0600`) and reloads them on the next start. Values already set in the environment are used as-is and are not copied into that file.
 
+## API v1 and MCP
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GOFORGE_PROTECTED_SERVICES` | empty | Comma-separated service instance IDs. Through `/api/v1` (and so the MCP server), stopping, reconfiguring, or re-imaging one of them needs a token with the `protected` scope; without it the API answers `403 protected_resource` before any Docker call. Restart is still allowed with `write`. The UI is not affected |
+
+See [API v1](../reference/api-v1.md) and [MCP server](../guides/mcp.md).
+
 ## GitHub OAuth
 
 | Variable | Default | Description |

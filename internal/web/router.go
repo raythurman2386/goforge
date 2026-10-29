@@ -35,6 +35,7 @@ func Router(
 	sseHandler *handlers.SSEHandler,
 	healthHandler *handlers.HealthHandler,
 	containerHandler *handlers.ContainerHandler,
+	apiV1 http.Handler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -51,180 +52,196 @@ func Router(
 	r.Use(chi_middleware.Recoverer)
 	// Rate limiting
 	r.Use(rateLimiter.Middleware)
-	// Session middleware is safe for all routes (just populates context)
-	r.Use(auth.Middleware(sessionManager))
-	// API token middleware — authenticates requests with Authorization: Bearer headers.
-	// Placed after session middleware so session-based auth takes priority.
-	r.Use(auth.APITokenMiddleware(apiTokenRepo, userRepo))
+
+	// Session middleware just populates context. API token middleware
+	// authenticates Authorization: Bearer headers with legacy full-scope
+	// tokens; it runs after the session middleware so session auth wins.
+	// Neither runs on /api/v1, which authenticates bearer tokens itself and
+	// ignores cookies.
+	sessionAuth := func(next http.Handler) http.Handler {
+		return auth.Middleware(sessionManager)(auth.APITokenMiddleware(apiTokenRepo, userRepo)(next))
+	}
 
 	// Global error handlers
-	r.NotFound(handlers.NotFoundHandler)
-	r.MethodNotAllowed(handlers.MethodNotAllowedHandler)
-
-	// Webhooks (No CSRF protection needed/wanted as they are machine-to-machine)
-	r.Route("/webhooks", func(r chi.Router) {
-		r.Post("/github", webhookHandler.HandleGitHub)
-		r.Post("/gitlab", webhookHandler.HandleGitLab)
-		r.Post("/gitea", webhookHandler.HandleGitea)
-	})
+	r.NotFound(sessionAuth(http.HandlerFunc(handlers.NotFoundHandler)).ServeHTTP)
+	r.MethodNotAllowed(sessionAuth(http.HandlerFunc(handlers.MethodNotAllowedHandler)).ServeHTTP)
 
 	// Write timeout for non-streaming routes. This replaces the global
 	// http.Server WriteTimeout (which must be 0 to allow SSE streams).
 	writeTimeout := 15 * time.Second
 
-	// UI Routes (Require CSRF protection)
+	// JSON API v1: bearer token only, scope-checked, outside the CSRF group.
+	if apiV1 != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(writeTimeout))
+			r.Mount("/api/v1", apiV1)
+		})
+	}
+
 	r.Group(func(r chi.Router) {
-		r.Use(auth.CSRFMiddleware)
+		r.Use(sessionAuth)
 
-		// Serve static files (no timeout — static file server manages its own I/O)
-		fileServer := http.FileServer(http.Dir("static"))
-		r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
-
-		// Health check endpoints (lightweight, but include timeout for consistency)
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.Timeout(writeTimeout))
-			r.Get("/health", healthHandler.Health)
-			r.Get("/health/ready", healthHandler.HealthReady)
+		// Webhooks (No CSRF protection needed/wanted as they are machine-to-machine)
+		r.Route("/webhooks", func(r chi.Router) {
+			r.Post("/github", webhookHandler.HandleGitHub)
+			r.Post("/gitlab", webhookHandler.HandleGitLab)
+			r.Post("/gitea", webhookHandler.HandleGitea)
 		})
 
-		// Public routes
+		// UI Routes (Require CSRF protection)
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.Timeout(writeTimeout))
-			r.Get("/", handlers.Index)
-			r.Get("/login", authHandler.LoginPage)
-			r.Post("/auth/login", authHandler.Login)
-			r.Get("/auth/register", authHandler.RegisterPage)
-			r.Post("/auth/register", authHandler.Register)
-			r.Get("/auth/github", authHandler.GitHubLogin)
-			r.Get("/auth/github/callback", authHandler.GitHubCallback)
-			r.Post("/auth/logout", authHandler.Logout)
-		})
+			r.Use(auth.CSRFMiddleware)
 
-		// Authenticated routes
-		r.Group(func(r chi.Router) {
-			r.Use(auth.RequireAuth)
+			// Serve static files (no timeout — static file server manages its own I/O)
+			fileServer := http.FileServer(http.Dir("static"))
+			r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 
-			// --- Standard request/response routes (with timeout) ---
+			// Health check endpoints (lightweight, but include timeout for consistency)
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.Timeout(writeTimeout))
+				r.Get("/health", healthHandler.Health)
+				r.Get("/health/ready", healthHandler.HealthReady)
+			})
 
-				r.Get("/dashboard", dashboardHandler.Dashboard)
-				r.Get("/dashboard/stats", dashboardHandler.DashboardStats)
-				r.Post("/dashboard/prune", dashboardHandler.Prune)
+			// Public routes
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.Timeout(writeTimeout))
+				r.Get("/", handlers.Index)
+				r.Get("/login", authHandler.LoginPage)
+				r.Post("/auth/login", authHandler.Login)
+				r.Get("/auth/register", authHandler.RegisterPage)
+				r.Post("/auth/register", authHandler.Register)
+				r.Get("/auth/github", authHandler.GitHubLogin)
+				r.Get("/auth/github/callback", authHandler.GitHubCallback)
+				r.Post("/auth/logout", authHandler.Logout)
+			})
 
-				// Git API
-				r.Route("/api/git", func(r chi.Router) {
-					// Query-param based routes for HTMX components
-					r.Get("/repos", gitHandler.ListRepositories)
-					r.Get("/branches", gitHandler.ListBranches)
-					// Path-param based routes (legacy/direct API)
-					r.Get("/sources/{sourceId}/repos", gitHandler.ListRepositories)
-					r.Get("/sources/{sourceId}/repos/{owner}/{repo}/branches", gitHandler.ListBranches)
-					r.Get("/sources/{sourceId}/repos/{owner}/{repo}/tags", gitHandler.ListTags)
-				})
+			// Authenticated routes
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAuth)
 
-				r.Route("/projects", func(r chi.Router) {
-					r.Get("/", projectHandler.ListProjects)
-					r.Get("/new", projectHandler.NewProjectPage)
-					r.Post("/", projectHandler.CreateProject)
-					r.Route("/{id}", func(r chi.Router) {
-						r.Get("/", projectHandler.GetProject)
-						r.Put("/", projectHandler.UpdateProject)
-						r.Put("/settings", projectHandler.UpdateSettings)
-						r.Delete("/", projectHandler.DeleteProject)
-						r.Get("/deployments", projectHandler.GetProject)
-						r.Get("/settings", projectHandler.GetProject)
-						r.Get("/services", projectHandler.GetProject)
-						r.Post("/services", projectHandler.LinkService)
-						r.Delete("/services/{serviceId}", projectHandler.UnlinkService)
+				// --- Standard request/response routes (with timeout) ---
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.Timeout(writeTimeout))
 
-						// Deployments (non-streaming). Detail routes live with the SSE
-						// mount below. A second mount of the same pattern 404s.
-						r.Post("/deployments", deploymentHandler.TriggerDeployment)
+					r.Get("/dashboard", dashboardHandler.Dashboard)
+					r.Get("/dashboard/stats", dashboardHandler.DashboardStats)
+					r.Post("/dashboard/prune", dashboardHandler.Prune)
 
-						// Environments
-						r.Route("/envs", func(r chi.Router) {
-							r.Get("/", envHandler.ListEnvironments)
-							r.Post("/", envHandler.CreateEnvironment)
-							r.Put("/{envId}", envHandler.UpdateEnvironment)
-							r.Get("/new", envHandler.NewEnvironmentModal)
-							r.Post("/{envId}/variables/sync", envHandler.SyncEnvFromRepo)
+					// Git API
+					r.Route("/api/git", func(r chi.Router) {
+						// Query-param based routes for HTMX components
+						r.Get("/repos", gitHandler.ListRepositories)
+						r.Get("/branches", gitHandler.ListBranches)
+						// Path-param based routes (legacy/direct API)
+						r.Get("/sources/{sourceId}/repos", gitHandler.ListRepositories)
+						r.Get("/sources/{sourceId}/repos/{owner}/{repo}/branches", gitHandler.ListBranches)
+						r.Get("/sources/{sourceId}/repos/{owner}/{repo}/tags", gitHandler.ListTags)
+					})
+
+					r.Route("/projects", func(r chi.Router) {
+						r.Get("/", projectHandler.ListProjects)
+						r.Get("/new", projectHandler.NewProjectPage)
+						r.Post("/", projectHandler.CreateProject)
+						r.Route("/{id}", func(r chi.Router) {
+							r.Get("/", projectHandler.GetProject)
+							r.Put("/", projectHandler.UpdateProject)
+							r.Put("/settings", projectHandler.UpdateSettings)
+							r.Delete("/", projectHandler.DeleteProject)
+							r.Get("/deployments", projectHandler.GetProject)
+							r.Get("/settings", projectHandler.GetProject)
+							r.Get("/services", projectHandler.GetProject)
+							r.Post("/services", projectHandler.LinkService)
+							r.Delete("/services/{serviceId}", projectHandler.UnlinkService)
+
+							// Deployments (non-streaming). Detail routes live with the SSE
+							// mount below. A second mount of the same pattern 404s.
+							r.Post("/deployments", deploymentHandler.TriggerDeployment)
+
+							// Environments
+							r.Route("/envs", func(r chi.Router) {
+								r.Get("/", envHandler.ListEnvironments)
+								r.Post("/", envHandler.CreateEnvironment)
+								r.Put("/{envId}", envHandler.UpdateEnvironment)
+								r.Get("/new", envHandler.NewEnvironmentModal)
+								r.Post("/{envId}/variables/sync", envHandler.SyncEnvFromRepo)
+							})
 						})
 					})
-				})
 
-				// Global environment variable routes
-				r.Route("/envs/{envId}", func(r chi.Router) {
-					r.Route("/variables", func(r chi.Router) {
-						r.Get("/", envHandler.GetVariables)
-						r.Post("/", envHandler.AddVariable)
-						r.Get("/new", envHandler.NewVariableModal)
-						r.Delete("/{varId}", envHandler.DeleteVariable)
+					// Global environment variable routes
+					r.Route("/envs/{envId}", func(r chi.Router) {
+						r.Route("/variables", func(r chi.Router) {
+							r.Get("/", envHandler.GetVariables)
+							r.Post("/", envHandler.AddVariable)
+							r.Get("/new", envHandler.NewVariableModal)
+							r.Delete("/{varId}", envHandler.DeleteVariable)
+						})
+					})
+
+					// Service Catalog
+					r.Route("/services", func(r chi.Router) {
+						r.Get("/", serviceHandler.Catalog)
+						r.Get("/instances", serviceHandler.InstanceList)
+						r.Post("/", serviceHandler.Deploy) // Fallback if specific template route isn't used
+						r.Get("/{template}/configure", serviceHandler.Configure)
+						r.Post("/{template}", serviceHandler.Deploy)
+
+						// Instance management
+						r.Route("/{id:[a-f0-9-]{36}}", func(r chi.Router) {
+							r.Get("/", serviceHandler.Show)
+							r.Delete("/", serviceHandler.Delete)
+							r.Post("/restart", serviceHandler.Restart)
+							r.Get("/secret", serviceHandler.RevealSecret)
+							r.Get("/edit", serviceHandler.EditConfig)
+							r.Post("/edit", serviceHandler.UpdateConfig)
+							r.Post("/update", serviceHandler.UpdateImage)
+						})
+					})
+
+					// Settings
+					r.Route("/settings", func(r chi.Router) {
+						r.Get("/profile", settingsHandler.Profile)
+						r.Put("/profile", settingsHandler.UpdateProfile)
+						r.Put("/password", settingsHandler.UpdatePassword)
+						r.Post("/prune", settingsHandler.PruneSystem)
+						r.Route("/tokens", func(r chi.Router) {
+							r.Get("/", settingsHandler.ListAPITokens)
+							r.Get("/new", settingsHandler.NewAPITokenModal)
+							r.Post("/", settingsHandler.CreateAPIToken)
+							r.Delete("/{id}", settingsHandler.DeleteAPIToken)
+						})
+						r.Route("/git", func(r chi.Router) {
+							r.Get("/", settingsHandler.GitSources)
+							r.Post("/", settingsHandler.CreateGitSource)
+							r.Get("/new", settingsHandler.NewGitSourceModal)
+							r.Delete("/{id}", settingsHandler.DeleteGitSource)
+						})
+					})
+
+					// Containers. Per-container routes live with the SSE mount below.
+					r.Route("/containers", func(r chi.Router) {
+						r.Get("/", containerHandler.List)
+						r.Get("/api", containerHandler.ListAPI)
 					})
 				})
 
-				// Service Catalog
-				r.Route("/services", func(r chi.Router) {
-					r.Get("/", serviceHandler.Catalog)
-					r.Get("/instances", serviceHandler.InstanceList)
-					r.Post("/", serviceHandler.Deploy) // Fallback if specific template route isn't used
-					r.Get("/{template}/configure", serviceHandler.Configure)
-					r.Post("/{template}", serviceHandler.Deploy)
-
-					// Instance management
-					r.Route("/{id:[a-f0-9-]{36}}", func(r chi.Router) {
-						r.Get("/", serviceHandler.Show)
-						r.Delete("/", serviceHandler.Delete)
-						r.Post("/restart", serviceHandler.Restart)
-						r.Get("/secret", serviceHandler.RevealSecret)
-						r.Get("/edit", serviceHandler.EditConfig)
-						r.Post("/edit", serviceHandler.UpdateConfig)
-						r.Post("/update", serviceHandler.UpdateImage)
-					})
+				// One mount per pattern. Streaming routes stay outside the write timeout.
+				// Page routes on the same pattern take the timeout individually.
+				r.Route("/projects/{id}/deployments/{deploymentID}", func(r chi.Router) {
+					r.With(middleware.Timeout(writeTimeout)).Get("/", deploymentHandler.GetDeployment)
+					r.With(middleware.Timeout(writeTimeout)).Get("/status", deploymentHandler.GetDeploymentStatus)
+					r.With(middleware.Timeout(writeTimeout)).Post("/rollback", deploymentHandler.RollbackDeployment)
+					r.With(middleware.Timeout(writeTimeout)).Post("/cancel", deploymentHandler.CancelDeployment)
+					r.Get("/logs", sseHandler.DeploymentLogs)
 				})
-
-				// Settings
-				r.Route("/settings", func(r chi.Router) {
-					r.Get("/profile", settingsHandler.Profile)
-					r.Put("/profile", settingsHandler.UpdateProfile)
-					r.Put("/password", settingsHandler.UpdatePassword)
-					r.Post("/prune", settingsHandler.PruneSystem)
-					r.Route("/tokens", func(r chi.Router) {
-						r.Get("/", settingsHandler.ListAPITokens)
-						r.Get("/new", settingsHandler.NewAPITokenModal)
-						r.Post("/", settingsHandler.CreateAPIToken)
-						r.Delete("/{id}", settingsHandler.DeleteAPIToken)
-					})
-					r.Route("/git", func(r chi.Router) {
-						r.Get("/", settingsHandler.GitSources)
-						r.Post("/", settingsHandler.CreateGitSource)
-						r.Get("/new", settingsHandler.NewGitSourceModal)
-						r.Delete("/{id}", settingsHandler.DeleteGitSource)
-					})
+				r.Route("/containers/{id}", func(r chi.Router) {
+					r.With(middleware.Timeout(writeTimeout)).Get("/", containerHandler.Detail)
+					r.With(middleware.Timeout(writeTimeout)).Post("/stop", containerHandler.Stop)
+					r.With(middleware.Timeout(writeTimeout)).Post("/restart", containerHandler.Restart)
+					r.Get("/stats", sseHandler.ContainerStats)
+					r.Get("/logs", sseHandler.ContainerLogs)
 				})
-
-				// Containers. Per-container routes live with the SSE mount below.
-				r.Route("/containers", func(r chi.Router) {
-					r.Get("/", containerHandler.List)
-					r.Get("/api", containerHandler.ListAPI)
-				})
-			})
-
-			// One mount per pattern. Streaming routes stay outside the write timeout.
-			// Page routes on the same pattern take the timeout individually.
-			r.Route("/projects/{id}/deployments/{deploymentID}", func(r chi.Router) {
-				r.With(middleware.Timeout(writeTimeout)).Get("/", deploymentHandler.GetDeployment)
-				r.With(middleware.Timeout(writeTimeout)).Get("/status", deploymentHandler.GetDeploymentStatus)
-				r.With(middleware.Timeout(writeTimeout)).Post("/rollback", deploymentHandler.RollbackDeployment)
-				r.With(middleware.Timeout(writeTimeout)).Post("/cancel", deploymentHandler.CancelDeployment)
-				r.Get("/logs", sseHandler.DeploymentLogs)
-			})
-			r.Route("/containers/{id}", func(r chi.Router) {
-				r.With(middleware.Timeout(writeTimeout)).Get("/", containerHandler.Detail)
-				r.With(middleware.Timeout(writeTimeout)).Post("/stop", containerHandler.Stop)
-				r.With(middleware.Timeout(writeTimeout)).Post("/restart", containerHandler.Restart)
-				r.Get("/stats", sseHandler.ContainerStats)
-				r.Get("/logs", sseHandler.ContainerLogs)
 			})
 		})
 	})

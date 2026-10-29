@@ -50,3 +50,5 @@ Last driven live on minis after #28: register-admin and login-projects. The othe
 - [Container stop and restart ownership](./container-ownership.md) covers stop and restart for the owning account and `403` for a second account.
 - [Cancel a deployment](./cancel-deployment.md) covers canceling an in-flight deploy and the status staying `canceled`.
 - [One-click service credentials](./service-credentials.md) covers a Postgres service whose stored config and connection info are sealed, while the UI still shows the connection string.
+- [JSON API v1 with scoped tokens](./api-v1.md) covers scoped token creation, bearer-only access, masked reads, dry run by default, `approval_ref` in the audit log, protected-service refusal, and ownership parity. Written from source; not driven live yet.
+- [GoForge MCP tools](./mcp-tools.md) covers the stdio MCP server's tool inventory, a read call, a dry run, and protected refusal. Written from source; not driven live yet.

@@ -33,6 +33,11 @@ func setupTestRouterDB(t *testing.T) *sql.DB {
 
 func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler {
 	t.Helper()
+	return setupTestRouterWithAPI(t, db, cfg, nil)
+}
+
+func setupTestRouterWithAPI(t *testing.T, db *sql.DB, cfg *config.Config, apiV1 http.Handler) http.Handler {
+	t.Helper()
 
 	// Repos
 	userRepo := repositories.NewUserRepository(db, nil)
@@ -75,7 +80,7 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 	ch := handlers.NewContainerHandler(nil, nil, nil, logger) // Container handler with nil dependencies for testing
 	rl := middleware.NewRateLimiter(100, 200, nil)
 	t.Cleanup(rl.Stop)
-	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch)
+	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch, apiV1)
 }
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{
@@ -269,5 +274,41 @@ func TestRouter_DeploymentAndContainerRoutesExist(t *testing.T) {
 		if resp.StatusCode == http.StatusNotFound {
 			t.Errorf("POST %s = 404", path)
 		}
+	}
+}
+
+// TestRouter_APIv1OutsideCSRFAndSession checks that /api/v1 is mounted
+// outside the CSRF group and without the session middleware, while the HTML
+// routes keep CSRF.
+func TestRouter_APIv1OutsideCSRFAndSession(t *testing.T) {
+	cfg := &config.Config{DevMode: true, Port: 8080, LogLevel: "info"}
+	db := setupTestRouterDB(t)
+	defer db.Close()
+
+	var reached bool
+	var sawUser bool
+	stub := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		sawUser = r.Context().Value(auth.UserContextKey) != nil
+		w.WriteHeader(http.StatusTeapot)
+	})
+	router := setupTestRouterWithAPI(t, db, cfg, http.StripPrefix("/api/v1", stub))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/services/x/restart", nil)
+	req.Header.Set("Authorization", "Bearer some-token")
+	req.AddCookie(&http.Cookie{Name: "session", Value: "anything"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if !reached || rec.Code != http.StatusTeapot {
+		t.Fatalf("POST /api/v1 without CSRF token: reached=%v status=%d, want the API handler", reached, rec.Code)
+	}
+	if sawUser {
+		t.Error("session middleware ran on /api/v1")
+	}
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/auth/logout", nil))
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("POST /auth/logout without CSRF token = %d, want 403", rec.Code)
 	}
 }

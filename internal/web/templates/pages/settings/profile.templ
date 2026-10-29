@@ -143,6 +143,11 @@ templ APITokenRow(token *models.APIToken) {
 					• Expires { formatDate(token.ExpiresAt.Time) }
 				}
 			</p>
+			<p class="mt-1 flex flex-wrap gap-1">
+				for _, scope := range tokenScopes(token) {
+					<span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{ scope }</span>
+				}
+			</p>
 		</div>
 		<button 
 			hx-delete={ "/settings/tokens/" + token.ID }
@@ -228,6 +233,23 @@ templ AddAPITokenModal(csrfToken string) {
 				</select>
 			</div>
 
+			<fieldset class="mb-4">
+				<legend class="label">Scopes</legend>
+				<p class="text-xs text-gray-500 mb-2">Leave all unchecked for a full token that also works on the web routes. A scoped token works only on <code>/api/v1</code>.</p>
+				<label class="flex items-center gap-2 text-sm text-gray-700">
+					<input type="checkbox" name="scopes" value="read"/>
+					read: list and inspect projects, services, containers, logs
+				</label>
+				<label class="flex items-center gap-2 text-sm text-gray-700">
+					<input type="checkbox" name="scopes" value="write"/>
+					write: gated deploys, restarts, env vars, service changes
+				</label>
+				<label class="flex items-center gap-2 text-sm text-gray-700">
+					<input type="checkbox" name="scopes" value="protected"/>
+					protected: stop, reconfigure, or re-image protected services
+				</label>
+			</fieldset>
+
 			<div class="mt-8 flex justify-end space-x-3">
 				<button type="button" onclick="document.getElementById('modal').remove()" class="btn-secondary">
 					Cancel
@@ -236,6 +258,14 @@ templ AddAPITokenModal(csrfToken string) {
 			</div>
 		</form>
 	}
+}
+
+// tokenScopes returns the scopes shown on a token row.
+func tokenScopes(token *models.APIToken) []string {
+	if len(token.Scopes) == 0 {
+		return []string{models.ScopeFull}
+	}
+	return token.Scopes
 }
 
 func formatDate(t time.Time) string {

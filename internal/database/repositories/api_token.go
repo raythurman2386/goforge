@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -25,10 +26,13 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 	if token.ID == "" {
 		token.ID = uuid.New().String()
 	}
+	if len(token.Scopes) == 0 {
+		token.Scopes = []string{models.ScopeFull}
+	}
 
 	query := `
-		INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at, scopes)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -38,6 +42,7 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 		token.TokenHash,
 		token.ExpiresAt,
 		token.CreatedAt,
+		pq.Array(token.Scopes),
 	)
 	return err
 }
@@ -45,7 +50,7 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 // GetByID retrieves an API token by ID.
 func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes
 		FROM api_tokens
 		WHERE id = $1
 	`
@@ -59,6 +64,7 @@ func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.AP
 		&token.LastUsedAt,
 		&token.ExpiresAt,
 		&token.CreatedAt,
+		pq.Array(&token.Scopes),
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -72,7 +78,7 @@ func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.AP
 // GetByTokenHash retrieves an API token by its hash (for authentication).
 func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes
 		FROM api_tokens
 		WHERE token_hash = $1
 	`
@@ -86,6 +92,7 @@ func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*
 		&token.LastUsedAt,
 		&token.ExpiresAt,
 		&token.CreatedAt,
+		pq.Array(&token.Scopes),
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -99,7 +106,7 @@ func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*
 // ListByUserID retrieves all API tokens for a user.
 func (r *APITokenRepository) ListByUserID(ctx context.Context, userID string) ([]*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes
 		FROM api_tokens
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -122,6 +129,7 @@ func (r *APITokenRepository) ListByUserID(ctx context.Context, userID string) ([
 			&token.LastUsedAt,
 			&token.ExpiresAt,
 			&token.CreatedAt,
+			pq.Array(&token.Scopes),
 		)
 		if err != nil {
 			return nil, err

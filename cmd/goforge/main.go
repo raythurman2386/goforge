@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/raythurman2386/goforge/internal/apiv1"
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/database"
@@ -319,6 +320,33 @@ func runServer() error {
 	rateLimiter := middleware.NewRateLimiter(30, 60, trustedProxies)
 	defer rateLimiter.Stop()
 
+	// JSON API v1 for the GoForge MCP server (bearer tokens with scopes).
+	apiV1 := apiv1.New(apiv1.Deps{
+		Tokens:      apiTokenRepo,
+		Users:       userRepo,
+		Projects:    projectService,
+		Deployments: deployService,
+		DeployList:  deploymentRepo,
+		Queue:       deployWorker,
+		Rollback:    rollbackManager,
+		Instances:   instanceService,
+		Catalog:     catalog,
+		Links:       projectServiceInstanceRepo,
+		Containers:  containerRepo,
+		Docker:      dockerClient,
+		Stats:       monitorCollector,
+		Audit:       auditLogRepo,
+		GitSources:  gitSourceRepo,
+		GitBrowser:  gitService,
+		DB:          db,
+		Logger:      logger.WithComponent(log, "api_v1"),
+		Version:     "0.1.0",
+		ClientIP: func(r *http.Request) string {
+			return httputil.ClientIP(r.RemoteAddr, r.Header.Get("X-Forwarded-For"), r.Header.Get("X-Real-IP"), trustedProxies)
+		},
+		ProtectedServices: cfg.ProtectedServices,
+	}).Routes()
+
 	// Create router
 	router := web.Router(
 		cfg,
@@ -338,6 +366,7 @@ func runServer() error {
 		sseHandler,
 		healthHandler,
 		containerHandler,
+		apiV1,
 	)
 
 	// Configure server

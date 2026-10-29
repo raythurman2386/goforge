@@ -527,12 +527,12 @@ func (h *ProjectHandler) injectServiceEnvVars(ctx context.Context, projectID, se
 		return
 	}
 
-	connInfo, err := inst.GetConnectionInfo()
+	linkVars, err := services.LinkEnvVars(inst)
 	if err != nil {
 		h.logger.Warn("injectServiceEnvVars: failed to get connection info", "service_id", inst.ID, "error", err)
 		return
 	}
-	if len(connInfo) == 0 {
+	if len(linkVars) == 0 {
 		return
 	}
 
@@ -557,8 +557,7 @@ func (h *ProjectHandler) injectServiceEnvVars(ctx context.Context, projectID, se
 		existingKeys[v.Key] = true
 	}
 
-	for connKey, connVal := range connInfo {
-		varName := services.ServiceEnvVarName(inst.Name, inst.TemplateName, connKey)
+	for varName, connVal := range linkVars {
 		if existingKeys[varName] {
 			continue
 		}
