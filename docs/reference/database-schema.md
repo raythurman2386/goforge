@@ -2,7 +2,7 @@
 
 GoForge uses PostgreSQL with UUID primary keys (via the `uuid-ossp` extension). All tables use `TIMESTAMPTZ` for timestamps.
 
-Migrations are located in `internal/database/migrations/postgres/` and are applied in order (001-011).
+Migrations are located in `internal/database/migrations/postgres/` and are applied in order (001-019). The runtime applies them at startup; `goforge migrate up` applies them by hand.
 
 ---
 
@@ -15,6 +15,7 @@ erDiagram
     users ||--o{ projects : owns
     users ||--o{ service_instances : owns
     users ||--o{ audit_logs : generates
+    users ||--o{ api_tokens : owns
     projects ||--o{ environments : has
     projects }o--o| git_sources : uses
     environments ||--o{ env_variables : has
@@ -36,18 +37,19 @@ Stores user accounts. Supports both email/password and GitHub OAuth authenticati
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | `UUID` | PK, default `uuid_generate_v4()` | Unique identifier |
-| `email` | `VARCHAR(255)` | UNIQUE, NOT NULL | User email address |
+| `email` | `VARCHAR(255)` | UNIQUE, NOT NULL | User email address, stored lowercase and trimmed |
 | `password_hash` | `VARCHAR(255)` | Nullable | Argon2id hash (null for OAuth-only users) |
 | `github_id` | `BIGINT` | UNIQUE, nullable | GitHub user ID |
 | `github_username` | `VARCHAR(255)` | Nullable | GitHub username |
 | `github_access_token` | `TEXT` | Nullable | GitHub OAuth access token |
 | `avatar_url` | `TEXT` | Nullable | Profile avatar URL |
+| `role` | `VARCHAR(20)` | NOT NULL, default `'user'`, CHECK in (`admin`, `user`) | Account role. Only `GOFORGE_ADMIN_EMAIL` grants `admin` |
 | `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Account creation time |
 | `updated_at` | `TIMESTAMPTZ` | Default `NOW()` | Last update time |
 
-**Indexes**: `idx_users_email` (email), `idx_users_github_id` (github_id)
+**Indexes**: `idx_users_email` (email), `idx_users_github_id` (github_id), `users_email_lower_key` (UNIQUE on `lower(email)`)
 
-**Migration**: `001_create_users`
+**Migrations**: `001_create_users`, `016_user_role` (adds `role`), `017_user_email_case` (folds existing emails to lowercase and makes email unique ignoring case; fails if two accounts already collide ignoring case)
 
 ---
 
@@ -325,6 +327,51 @@ Tracks user actions for auditing and compliance.
 
 ---
 
+### api_tokens
+
+Personal API tokens. Only a hash of the token is stored; the raw token is shown once at creation.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `UUID` | PK, default `uuid_generate_v4()` | Unique identifier |
+| `user_id` | `UUID` | FK -> users(id) ON DELETE CASCADE, NOT NULL | Owning user |
+| `name` | `VARCHAR(255)` | NOT NULL | Token name |
+| `token_hash` | `VARCHAR(255)` | UNIQUE, NOT NULL | Hash of the token |
+| `scopes` | `TEXT[]` | NOT NULL, default `'{full}'`, CHECK non-empty subset of `full`, `read`, `write`, `protected` | What the token may do. See [API v1](api-v1.md#tokens-and-scopes) |
+| `last_used_at` | `TIMESTAMPTZ` | Nullable | Last use |
+| `expires_at` | `TIMESTAMPTZ` | Nullable | Expiry (null for no expiry) |
+| `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Creation time |
+
+**Indexes**: `idx_api_tokens_user_id` (user_id), `idx_api_tokens_token_hash` (token_hash)
+
+**Migrations**: `013_create_api_tokens`, `018_api_token_scopes` (adds `scopes`; existing tokens become `{full}`)
+
+---
+
+### backup_runs
+
+One row per backup run, from the nightly scheduler or `goforge backup run`. Holds counts and a short redacted error only. The per-object list with SHA-256 sums lives in the run's `manifest.json` in the bucket. See [Backup & Restore](../deployment/backup.md).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `UUID` | PK, default `uuid_generate_v4()` | Unique identifier |
+| `trigger` | `VARCHAR(20)` | NOT NULL, CHECK in (`schedule`, `manual`) | What started the run |
+| `status` | `VARCHAR(20)` | NOT NULL, default `'running'`, CHECK in (`running`, `succeeded`, `failed`) | Run status |
+| `run_key` | `TEXT` | NOT NULL | Run path under the bucket prefix: `<YYYY-MM-DD>/<YYYYMMDDTHHMMSSZ>` |
+| `started_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Start time |
+| `finished_at` | `TIMESTAMPTZ` | Nullable | End time (null while running) |
+| `objects` | `INTEGER` | NOT NULL, default `0` | Objects uploaded |
+| `bytes` | `BIGINT` | NOT NULL, default `0` | Bytes uploaded |
+| `skipped` | `INTEGER` | NOT NULL, default `0` | Targets skipped (for example stopped services) |
+| `pruned` | `INTEGER` | NOT NULL, default `0` | Old runs removed by retention |
+| `error_summary` | `TEXT` | Nullable | Short redacted error for a failed run |
+
+**Indexes**: `idx_backup_runs_started_at` (started_at DESC), `idx_backup_runs_status_started_at` (status, started_at DESC)
+
+**Migration**: `019_backup_runs`
+
+---
+
 ## Database Functions
 
 ### cleanup_old_data()
@@ -361,5 +408,9 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 013 | `create_api_tokens` | Personal API tokens |
 | 014 | `create_deployment_queue` | Persistent deployment queue |
 | 015 | `deployment_status_canceled` | Status check uses `canceled` |
+| 016 | `user_role` | `users.role` (`admin` or `user`, default `user`) |
+| 017 | `user_email_case` | Lowercase emails, unique ignoring case |
+| 018 | `api_token_scopes` | `api_tokens.scopes` (`full`, `read`, `write`, `protected`) |
+| 019 | `backup_runs` | One row per backup run |
 
 All migrations have corresponding `.down.sql` files for rollback support.

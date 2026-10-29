@@ -7,15 +7,20 @@ This page documents the complete directory layout of the GoForge codebase.
 ```
 goforge/
 ├── cmd/goforge/           # Application entry point
-│   └── main.go            # CLI setup (serve, migrate commands)
+│   └── main.go            # CLI setup (serve, migrate, backup run)
+├── cmd/goforge-mcp/       # MCP server over stdio
+│   └── main.go            # Calls /api/v1 with a scoped token
 ├── internal/              # Private application packages
+│   ├── apiv1/             # Bearer-token JSON API under /api/v1
 │   ├── auth/              # Authentication and authorization
+│   ├── backup/            # Nightly S3 backups and backup runs
 │   ├── config/            # Configuration loading
 │   ├── database/          # Database connection and repositories
 │   ├── deploy/            # Deployment pipeline
 │   ├── docker/            # Docker SDK wrapper
 │   ├── git/               # Git provider integrations
 │   ├── logger/            # Structured logging
+│   ├── mcpserver/         # MCP tools for cmd/goforge-mcp
 │   ├── models/            # Domain models
 │   ├── monitor/           # Container metrics
 │   ├── pagination/        # Pagination utilities
@@ -45,7 +50,51 @@ The application entry point using Cobra for CLI structure.
 
 | File | Purpose |
 |------|---------|
-| `main.go` | Root command, `serve` subcommand (HTTP server), `migrate` subcommands (up, down, status, create) |
+| `main.go` | Root command, `serve` subcommand (HTTP server and nightly backup scheduler), `migrate` subcommands (up, down, status, create), `backup run` (one backup now, `trigger=manual`) |
+
+### `cmd/goforge-mcp/`
+
+The MCP server binary. Built with `make build-mcp` or the Dockerfile `mcp` target. See [MCP Server](../guides/mcp.md).
+
+| File | Purpose |
+|------|---------|
+| `main.go` | Loads config, then serves MCP over stdio. Holds no Docker socket and no database connection; every call goes to `/api/v1` with a scoped bearer token |
+
+### `internal/apiv1/`
+
+JSON API for automation under `/api/v1`. Bearer token only, outside the CSRF group. See [API v1](../reference/api-v1.md).
+
+| File | Purpose |
+|------|---------|
+| `handler.go` | Route definitions |
+| `auth.go` | Bearer token auth and scope checks; session cookies are ignored |
+| `gate.go` | Dry-run default, `approval_ref`, and audit-before-change for mutations |
+| `ownership.go` | Ownership checks that answer like the UI routes (`404` for another user's resources) |
+| `reads.go` | Read routes; secrets are masked |
+| `mutations.go` | Gated write routes |
+| `backups.go` | `GET /api/v1/backups` (admin) |
+| `dto.go` | Response types |
+| `respond.go` | JSON responses and stable error codes |
+| `deps.go` | Package doc and dependencies |
+
+### `internal/backup/`
+
+Nightly, backup-only copies of GoForge state to S3-compatible storage. See [Backup & Restore](../deployment/backup.md).
+
+| File | Purpose |
+|------|---------|
+| `doc.go` | Package overview and object layout |
+| `setup.go` | Builds the runner from config; `ErrDisabled` when `BACKUP_S3_BUCKET` is unset |
+| `scheduler.go` | Runs the runner at each scheduled time inside `goforge serve` |
+| `runner.go` | One run: advisory lock, `backup_runs` row, targets, manifest, retention |
+| `target.go` | Target and artifact types |
+| `appdb.go` | GoForge database dump with the local `pg_dump` |
+| `instances.go` | Postgres, Gitea, and Vaultwarden service targets via `docker exec` |
+| `store.go` | S3 object store |
+| `layout.go` | Run keys and object layout |
+| `retention.go` | Which old runs to prune |
+| `redact.go` | Removes secret values from errors and logs |
+| `status.go` | Last-run status for Settings and the API |
 
 ### `internal/auth/`
 
@@ -93,6 +142,8 @@ Database connectivity, migrations, and data access.
 | `git_source.go` | GitSource | CRUD, find by project, token encryption |
 | `service_instance.go` | ServiceInstance | CRUD, list by user |
 | `audit_log.go` | AuditLog | Create, list with pagination and filters |
+| `api_token.go` | APIToken | Create, get by ID or token hash, list by user, delete, record last use |
+| `backup_run.go` | BackupRun | Start, finish, list, latest succeeded, mark interrupted runs, advisory lock |
 
 ### `internal/deploy/`
 
@@ -134,6 +185,18 @@ Git provider integrations.
 | `gitlab.go` | GitLab API (repos, branches, tags) |
 | `gitea.go` | Gitea API (repos, branches, tags) |
 | `ssh.go` | Ed25519 SSH key generation, SSH auth |
+
+### `internal/mcpserver/`
+
+The MCP server used by `cmd/goforge-mcp`. See [MCP Server](../guides/mcp.md).
+
+| File | Purpose |
+|------|---------|
+| `config.go` | Package doc and configuration (API URL, token, `GOFORGE_MCP_ALLOW_WRITES`) |
+| `server.go` | MCP server setup and tool registration |
+| `client.go` | HTTP client for `/api/v1` |
+| `reads.go` | Read tools |
+| `writes.go` | Gated write tools, registered only when writes are allowed |
 
 ### `internal/models/`
 

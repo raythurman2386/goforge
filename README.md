@@ -19,6 +19,9 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 - **Cloudflare Tunnel:** Secure public access without opening inbound ports.
 - **Monitoring:** Real-time container resource monitoring (CPU, Memory).
 - **Real-time Updates:** SSE-powered deployment logs and status updates.
+- **One-click Services:** PostgreSQL, Redis, Gitea, Vaultwarden, MinIO, and more from YAML templates in `templates/`, including shared Postgres and Redis for several apps. See [Services](docs/guides/services.md).
+- **API v1 and MCP:** a bearer-token JSON API at `/api/v1` with scoped tokens and gated, audited writes, and `goforge-mcp`, an MCP server over stdio that calls it. See [API v1](docs/reference/api-v1.md) and [MCP server](docs/guides/mcp.md).
+- **Nightly Backups:** the GoForge database and Postgres, Gitea, and Vaultwarden services uploaded to S3-compatible storage (R2, B2, MinIO) every night, plus `goforge backup run` on demand. Restore is a manual runbook. See [Backup & Restore](docs/deployment/backup.md).
 
 ## Getting Started
 
@@ -74,9 +77,11 @@ make dev       # sets GOFORGE_DEV_MODE=true for this local process only
 ## Commands
 
 - `make build`: Build the production binary.
+- `make build-mcp`: Build the `goforge-mcp` binary.
 - `make dev`: Run with hot reload (requires `air`).
 - `make test`: Run all tests.
 - `make lint`: Run golangci-lint.
+- `make check`: Run every check CI runs (fmt-check, vet, lint, test). Run it before you push.
 - `make templ`: Generate templ templates.
 
 ## Production Deployment
@@ -108,7 +113,7 @@ To run GoForge in production using Systemd:
 
 GoForge follows a clean architecture with:
 - **Cmd:** Entry point and CLI commands.
-- **Internal:** Core logic separated into `auth`, `project`, `docker`, `git`, `deploy`, `proxy`, `sse`, and `monitor`.
+- **Internal:** Core logic separated into `auth`, `project`, `docker`, `git`, `deploy`, `proxy`, `services`, `backup`, `apiv1`, `mcpserver`, `sse`, and `monitor`.
 - **Web:** HTMX + Templ frontend with a RESTful-ish backend.
 - **Database:** Repository pattern supporting PostgreSQL.
 
@@ -151,7 +156,7 @@ GoForge follows a clean architecture with:
    - Audit logs are partially implemented - complete before production use
 
 6. **Data Protection**
-   - Regular backups of PostgreSQL database
+   - Turn on the built-in nightly backups (`BACKUP_S3_BUCKET` and friends) or run your own. See [Backup & Restore](docs/deployment/backup.md). Restore is manual
    - `ENCRYPTION_KEY` encrypts these values at rest with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, and one-click service `config` and `connection_info`
    - Rows written in plaintext by an older version stay readable and are encrypted the next time they are updated
    - Non-secret project variables are stored in plaintext
@@ -165,4 +170,4 @@ If you discover a security vulnerability, please follow our [Security Policy](SE
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a PR. AI agents start at [AGENTS.md](AGENTS.md).

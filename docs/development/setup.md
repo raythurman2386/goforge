@@ -39,12 +39,9 @@ make templ
 make install-tools
 ```
 
-This installs:
+This installs `air` for hot reload.
 
-- `golangci-lint` -- Linter suite
-- `air` -- Hot reload
-
-Note: `templ` is managed via `go tool` and doesn't need manual installation if you use `make templ`.
+`templ` and `golangci-lint` are pinned in `go.mod` and run through `go tool`, so `make templ` and `make lint` need no separate install.
 
 ### 4. Start PostgreSQL
 

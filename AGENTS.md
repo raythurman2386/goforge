@@ -1,6 +1,9 @@
 # AGENTS.md - AI Coding Agent Guidelines
 
 This document provides guidelines for AI coding agents working in the GoForge codebase.
+Humans start at [CONTRIBUTING.md](CONTRIBUTING.md), which holds the house rules, test
+types, migration and template rules, and the PR format. Agents follow it too.
+`GEMINI.md` points here; edit this file, not that one.
 
 ## Project Overview
 
@@ -13,6 +16,7 @@ monitoring. Tech stack: Go 1.25+, PostgreSQL, Docker, HTMX 2, templ, TailwindCSS
 ```bash
 # Build
 make build                          # Build production binary (runs templ + css first)
+make build-mcp                      # Build bin/goforge-mcp
 make dev                            # Run with hot reload via air
 
 # Format and Lint
@@ -34,6 +38,14 @@ go test -v -run "TestName/subtest" ./path/to/package/...
 
 # Run tests in a specific package
 go test -v ./internal/docker/...
+
+# Integration tests (//go:build integration): need Docker, create and remove
+# throwaway containers. Never run them against prod containers or databases.
+go test -tags integration -run TestGiteaPostStartBootstrap ./internal/services/
+DATABASE_URL=postgres://... go test -tags integration -run Integration ./internal/backup/
+
+# Docs (run when docs/ or mkdocs.yml changes)
+mkdocs build --strict
 
 # Code generation
 make templ                          # Generate templ templates (*_templ.go files)
@@ -160,20 +172,28 @@ func TestDeploymentService_CreateDeployment(t *testing.T) {
 ## Project Structure
 
 ```
-cmd/goforge/              # Entry point (main.go)
+cmd/goforge/              # Entry point (main.go): serve, migrate, backup run
+cmd/goforge-mcp/          # MCP server over stdio; calls /api/v1 with a scoped token
 internal/
+  apiv1/                 # Bearer-token JSON API under /api/v1 (scopes, gated writes)
   auth/                  # Authentication (GitHub OAuth, sessions, CSRF)
+  backup/                # Nightly S3 backups, `goforge backup run`
   config/                # Configuration loading from env
   database/              # PostgreSQL connection, migrations, repositories
   deploy/                # Deployment pipeline and orchestration
   docker/                # Docker SDK wrapper (build, container, logs)
   git/                   # Git providers (GitHub, GitLab, Gitea)
+  logger/                # Structured logging
+  mcpserver/             # MCP tools used by cmd/goforge-mcp
   models/                # Domain models (structs)
   monitor/               # Resource monitoring (CPU, memory, disk)
+  pagination/            # Pagination helpers
   project/               # Project and environment management
   proxy/                 # Traefik integration
+  secrets/               # AES-GCM encryption at rest (ENCRYPTION_KEY)
   services/              # One-click service catalog
   sse/                   # Server-Sent Events hub
+  webhook/               # Git webhook handling
   web/
     handlers/            # HTTP handlers
     templates/
@@ -222,6 +242,16 @@ The project uses golangci-lint with 30+ linters. Key ones to be aware of:
 - `errorlint`: Use `errors.Is`/`errors.As` for error comparison
 
 Generated `*_templ.go` files are excluded from linting.
+
+## Verifying changes
+
+- `make check` must pass before you push.
+- For UI or HTTP-visible behavior, drive the change with the
+  `.cursor/skills/verify-goforge/` skill (`scripts/verify.sh launch`, then the
+  feature file). Never commit its proofs.
+- Add a line to `CHANGELOG.md` under `## [Unreleased]` for user-visible changes,
+  and update the matching page in `docs/` in the same PR.
+- PR bodies use the template sections: What changed, Tests, Proof, Deferred.
 
 ## Commit Messages
 

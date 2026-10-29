@@ -88,10 +88,10 @@ go install github.com/air-verse/air@latest
 
 ### golangci-lint
 
-For running the full linter suite locally.
+For running the full linter suite locally. It is pinned in `go.mod` and runs through `go tool`, so there is nothing to install:
 
 ```bash
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+make lint   # runs go tool golangci-lint run ./...
 ```
 
 ## System Requirements

@@ -99,7 +99,19 @@ docker compose up -d goforge
 
 ## Backup
 
-### Database Backup
+### Built-in nightly backups
+
+Use the built-in backups for production. With `BACKUP_S3_BUCKET` and the other `BACKUP_*` variables set, `goforge serve` uploads the GoForge database and running Postgres, Gitea, and Vaultwarden services to S3-compatible storage every night (default `02:00 America/Chicago`) and prunes old runs. Run one now with:
+
+```bash
+docker compose exec goforge ./goforge backup run
+```
+
+Settings → Profile shows admins the last run. Restore is a manual runbook. See [Backup & Restore](backup.md). Keep a copy of `.env`, including `ENCRYPTION_KEY`, off the server; backups never include it.
+
+### Manual database backup
+
+For an ad-hoc copy outside the nightly run:
 
 ```bash
 # Create backup
@@ -109,7 +121,9 @@ docker compose exec db pg_dump -U goforge goforge > backup_$(date +%Y%m%d).sql
 docker compose exec -T db psql -U goforge goforge < backup_20260101.sql
 ```
 
-### Volume Backup
+### Volume backup
+
+Traefik certificates and raw volumes are not in the built-in backups. Copy them by hand if you need them:
 
 ```bash
 # Stop services first for consistent backup

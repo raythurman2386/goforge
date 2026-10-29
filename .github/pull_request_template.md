@@ -1,42 +1,36 @@
-## Description
+<!-- See CONTRIBUTING.md. Keep one topic per PR. Reference the issue: Fixes #123 -->
 
-<!-- Brief description of the changes -->
+## What changed
 
-## Type of Change
-
-- [ ] Bug fix (non-breaking change that fixes an issue)
-- [ ] New feature (non-breaking change that adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
-- [ ] Documentation update
-- [ ] Refactoring (no functional changes)
-- [ ] Performance improvement
-- [ ] Test update
-
-## Related Issues
-
-<!-- Link any related issues: Fixes #123, Closes #456 -->
-
-## Changes Made
-
-<!-- List the main changes -->
+<!-- What this PR changes and why. Link the issue. -->
 
 -
--
--
 
-## Testing
+## Tests
 
-<!-- How has this been tested? -->
+<!-- Tests added or changed, and the commands you ran. -->
 
-- [ ] Unit tests pass (`make test`)
-- [ ] Linting passes (`make lint`)
-- [ ] Manual testing performed
+- [ ] `make check` passes (fmt-check, vet, lint, test)
+- [ ] New or changed behavior has a test that fails without the change
+- [ ] Integration tests run if relevant (`go test -tags integration ...`, throwaway containers only)
+- [ ] `mkdocs build --strict` passes (if `docs/` or `mkdocs.yml` changed)
 
-## Checklist
+## Proof
 
-- [ ] Code follows the project's style guidelines
-- [ ] Self-review of code performed
-- [ ] Comments added for complex logic
-- [ ] Documentation updated if needed
-- [ ] No new warnings generated
-- [ ] Tests added for new functionality
+<!--
+What you ran and what you saw: command output, a verify-goforge drive, a curl
+transcript, or screenshots for UI changes. Paste or link it here; never commit
+proof files. No secrets, tokens, or .env values.
+-->
+
+## Docs and changelog
+
+- [ ] `CHANGELOG.md` updated under `## [Unreleased]` (or not user-visible)
+- [ ] Docs in `docs/` updated for behavior, config, or API changes
+- [ ] New environment variables added to `.env.example` and `docs/configuration/index.md`
+- [ ] Migrations are new numbered up/down pairs and `docs/reference/database-schema.md` is updated
+- [ ] No secrets in code, logs, `docker.command`, or committed files
+
+## Deferred
+
+<!-- Anything left out on purpose, with a follow-up issue if one exists. -->

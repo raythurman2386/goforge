@@ -213,7 +213,7 @@ Webhooks receive push events from git providers to trigger deployments.
 - [ ] Enable HTTPS via Traefik with valid SSL certificates
 - [ ] Remove PostgreSQL host port mapping in Docker Compose
 - [ ] Run GoForge as a non-root user
-- [ ] Set up regular database backups
+- [ ] Turn on nightly backups (see [Backup & Restore](deployment/backup.md)) and keep `ENCRYPTION_KEY` off the server
 - [ ] Review and restrict Docker socket access
 - [ ] Configure firewall rules to limit access (allow outbound to Cloudflare only)
 - [ ] Set up log monitoring and alerting for security events
