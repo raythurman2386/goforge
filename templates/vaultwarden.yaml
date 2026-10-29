@@ -1,6 +1,6 @@
 name: vaultwarden
 display_name: Vaultwarden
-description: Lightweight Bitwarden-compatible password manager server. Bitwarden clients and the web vault need HTTPS, so give it a public HTTPS domain. Turn signups off after creating your account.
+description: Lightweight Bitwarden-compatible password manager server. Bitwarden clients and the web vault need HTTPS, so give it a public HTTPS domain. Turn signups off in /admin after creating your account.
 icon: vaultwarden
 category: security
 web: true

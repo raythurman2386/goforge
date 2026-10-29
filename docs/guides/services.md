@@ -53,13 +53,16 @@ A Bitwarden-compatible password manager server.
 | Version | latest | `vaultwarden/server` tag |
 | Port | 80 | Container port |
 | Domain | `vaultwarden.localhost` | Public host. Sets `DOMAIN` to `<protocol>://<domain>` |
-| Allow Signups | `true` | `SIGNUPS_ALLOWED`. Set to `false` after you create your account |
+| Allow Signups | `true` | `SIGNUPS_ALLOWED` at first start. Turn it off in `/admin` after you create your account |
 | Admin Panel Token | Generated on the server when the field is left blank | `ADMIN_TOKEN` for `/admin`, stored encrypted and shown on the service page |
 | Storage | Docker volume | `/data` (SQLite vault, attachments, keys) |
 
 Bitwarden clients and the web vault need HTTPS, so give Vaultwarden a public HTTPS domain.
 
-To close signups after the first account, redeploy with **Allow Signups** set to `false`, or open `/admin` with the admin token and turn off **Allow new signups**. Settings saved in `/admin` are written to `/data/config.json` and override the environment.
+To close signups after the first account, open `/admin`, sign in with the admin token, turn off **Allow new signups** under General settings, and save. Settings saved in `/admin` are written to `/data/config.json` and override the environment.
+
+!!! warning "Do not redeploy to change settings"
+    GoForge has no edit action for a running service. A new deploy is a new instance with a new, empty `/data` volume, so deleting and redeploying Vaultwarden loses the vault. Change settings in `/admin` instead.
 
 ### Public HTTPS behind Cloudflare Tunnel
 

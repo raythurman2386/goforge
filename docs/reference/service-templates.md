@@ -190,7 +190,7 @@ REDIS_PASSWORD: "{{ .Config.password }}"
 
 | Field | Type | Default | Required | Description |
 |-------|------|---------|----------|-------------|
-| `signups_allowed` | text | `true` | Yes | `SIGNUPS_ALLOWED`. Set `false` once your account exists |
+| `signups_allowed` | text | `true` | Yes | `SIGNUPS_ALLOWED` at first start. Turn signups off later in `/admin` |
 | `admin_token` | password | (generated, 48 chars) | Yes | `ADMIN_TOKEN` for `/admin` |
 
 **Environment variables**:
