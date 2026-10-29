@@ -33,6 +33,10 @@ type ContainerOptions struct {
 	Binds         []string
 	HealthCheck   *container.HealthConfig
 	RestartPolicy string
+	// Memory is the hard memory limit in bytes. Zero means no limit.
+	Memory int64
+	// NanoCPUs is the CPU quota in units of 1e-9 CPUs. Zero means no limit.
+	NanoCPUs int64
 }
 
 // CreateContainer creates and starts a new container.
@@ -52,6 +56,10 @@ func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (st
 	hostConfig := &container.HostConfig{
 		PortBindings: make(nat.PortMap),
 		Binds:        opts.Binds,
+		Resources: container.Resources{
+			Memory:   opts.Memory,
+			NanoCPUs: opts.NanoCPUs,
+		},
 	}
 	if opts.RestartPolicy != "" {
 		hostConfig.RestartPolicy = container.RestartPolicy{Name: container.RestartPolicyMode(opts.RestartPolicy)}

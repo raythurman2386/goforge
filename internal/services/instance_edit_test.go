@@ -40,6 +40,7 @@ func editTestTemplate() *ServiceTemplate {
 			{Name: "signups_allowed", Type: "text", Default: "true", Required: true},
 			{Name: "admin_token", Type: "password", Generate: true, Length: 48, Required: true},
 		},
+		Resources: ResourceConfig{CPU: "0.25", Memory: "256m"},
 		Docker: DockerConfig{
 			Image: "vaultwarden/server:{{ .Version }}",
 			Ports: []PortConfig{{Container: 80, Protocol: "tcp"}},
@@ -208,6 +209,12 @@ func TestUpdateInstanceConfig_ReusesNamedVolumes(t *testing.T) {
 	}
 	if after.Name != before.Name {
 		t.Errorf("container name changed: %q -> %q", before.Name, after.Name)
+	}
+	if before.NanoCPUs != 250_000_000 || before.Memory != 256*1024*1024 {
+		t.Errorf("deploy limits: NanoCPUs=%d Memory=%d, want 0.25 CPU and 256m", before.NanoCPUs, before.Memory)
+	}
+	if after.NanoCPUs != before.NanoCPUs || after.Memory != before.Memory {
+		t.Errorf("recreate limits: NanoCPUs=%d Memory=%d, want same as deploy (%d, %d)", after.NanoCPUs, after.Memory, before.NanoCPUs, before.Memory)
 	}
 
 	if !slices.Equal(h.stopped, []string{"docker-1"}) || !slices.Equal(h.removed, []string{"docker-1"}) {
