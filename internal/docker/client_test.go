@@ -28,6 +28,7 @@ type mockDockerAPI struct {
 	containerRestartFunc func(ctx context.Context, containerID string, options container.StopOptions) error
 	containerStopFunc    func(ctx context.Context, containerID string, options container.StopOptions) error
 	containerRemoveFunc  func(ctx context.Context, containerID string, options container.RemoveOptions) error
+	containerRenameFunc  func(ctx context.Context, containerID, newName string) error
 	containerStatsFunc   func(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
 	containerLogsFunc    func(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 	containersPrune      func(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
@@ -105,6 +106,13 @@ func (m *mockDockerAPI) ContainerStop(ctx context.Context, containerID string, o
 func (m *mockDockerAPI) ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error {
 	if m.containerRemoveFunc != nil {
 		return m.containerRemoveFunc(ctx, containerID, options)
+	}
+	return nil
+}
+
+func (m *mockDockerAPI) ContainerRename(ctx context.Context, containerID, newName string) error {
+	if m.containerRenameFunc != nil {
+		return m.containerRenameFunc(ctx, containerID, newName)
 	}
 	return nil
 }

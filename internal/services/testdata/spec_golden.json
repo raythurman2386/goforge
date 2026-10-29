@@ -1,0 +1,617 @@
+{
+  "gitea": {
+    "image": "gitea/gitea:1.25.5",
+    "env": [
+      "GITEA__SERVER__DOMAIN=goforge-service-00000000-0000-0000-0000-000000000042",
+      "GITEA__SERVER__HTTP_PORT=3000",
+      "GITEA__SERVER__PROTOCOL=http",
+      "GITEA__SERVER__ROOT_URL=http://goforge-service-00000000-0000-0000-0000-000000000042:3000/",
+      "GITEA__SERVER__SSH_PORT=22",
+      "GITEA__SERVICE__DISABLE_REGISTRATION=true",
+      "GITEA__SERVICE__REQUIRE_SIGNIN_VIEW=true",
+      "GITEA____APP_NAME=Gitea: Git with a cup of tea",
+      "GITEA__security__INSTALL_LOCK=true",
+      "GITEA__security__SECRET_KEY=fixed-secret_key",
+      "USER_GID=1000",
+      "USER_UID=1000"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:3000/api/healthz"
+    ]
+  },
+  "gitea+domain": {
+    "image": "gitea/gitea:1.25.5",
+    "env": [
+      "GITEA__SERVER__DOMAIN=gitea-app.example.com",
+      "GITEA__SERVER__HTTP_PORT=3000",
+      "GITEA__SERVER__PROTOCOL=http",
+      "GITEA__SERVER__ROOT_URL=https://gitea-app.example.com/",
+      "GITEA__SERVER__SSH_PORT=22",
+      "GITEA__SERVICE__DISABLE_REGISTRATION=true",
+      "GITEA__SERVICE__REQUIRE_SIGNIN_VIEW=true",
+      "GITEA____APP_NAME=Gitea: Git with a cup of tea",
+      "GITEA__security__INSTALL_LOCK=true",
+      "GITEA__security__SECRET_KEY=fixed-secret_key",
+      "USER_GID=1000",
+      "USER_UID=1000"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`gitea-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3000"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:3000/api/healthz"
+    ]
+  },
+  "mariadb": {
+    "image": "mariadb:11",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mariadb"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "healthcheck.sh",
+      "--connect",
+      "--innodb_initialized"
+    ]
+  },
+  "mariadb+domain": {
+    "image": "mariadb:11",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mariadb"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mariadb-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3306"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "healthcheck.sh",
+      "--connect",
+      "--innodb_initialized"
+    ]
+  },
+  "minio": {
+    "image": "minio/minio:latest",
+    "env": [
+      "MINIO_ROOT_PASSWORD=fixed-password",
+      "MINIO_ROOT_USER=minioadmin"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "curl",
+      "-f",
+      "http://localhost:9000/minio/health/live"
+    ]
+  },
+  "minio+domain": {
+    "image": "minio/minio:latest",
+    "env": [
+      "MINIO_ROOT_PASSWORD=fixed-password",
+      "MINIO_ROOT_USER=minioadmin"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`minio-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "9000"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "curl",
+      "-f",
+      "http://localhost:9000/minio/health/live"
+    ]
+  },
+  "mongodb": {
+    "image": "mongo:7",
+    "env": [
+      "MONGO_INITDB_DATABASE=app",
+      "MONGO_INITDB_ROOT_PASSWORD=fixed-password",
+      "MONGO_INITDB_ROOT_USERNAME=mongo"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data/db"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mongosh",
+      "--eval",
+      "db.adminCommand('ping')"
+    ]
+  },
+  "mongodb+domain": {
+    "image": "mongo:7",
+    "env": [
+      "MONGO_INITDB_DATABASE=app",
+      "MONGO_INITDB_ROOT_PASSWORD=fixed-password",
+      "MONGO_INITDB_ROOT_USERNAME=mongo"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mongodb-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "27017"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data/db"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mongosh",
+      "--eval",
+      "db.adminCommand('ping')"
+    ]
+  },
+  "mysql": {
+    "image": "mysql:9",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mysql"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mysqladmin",
+      "ping",
+      "-h",
+      "localhost"
+    ]
+  },
+  "mysql+domain": {
+    "image": "mysql:9",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mysql"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mysql-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3306"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mysqladmin",
+      "ping",
+      "-h",
+      "localhost"
+    ]
+  },
+  "nocodb": {
+    "image": "nocodb/nocodb:latest",
+    "env": [
+      "NC_JWT_SECRET=fixed-jwt_secret"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/usr/app/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:8080/api/v1/health"
+    ]
+  },
+  "nocodb+domain": {
+    "image": "nocodb/nocodb:latest",
+    "env": [
+      "NC_JWT_SECRET=fixed-jwt_secret"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`nocodb-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/usr/app/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:8080/api/v1/health"
+    ]
+  },
+  "postgres": {
+    "image": "postgres:16",
+    "env": [
+      "POSTGRES_DB=app",
+      "POSTGRES_PASSWORD=fixed-password",
+      "POSTGRES_USER=postgres"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/postgresql/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD-SHELL",
+      "pg_isready -U {{ .Config.username }}"
+    ]
+  },
+  "postgres+domain": {
+    "image": "postgres:16",
+    "env": [
+      "POSTGRES_DB=app",
+      "POSTGRES_PASSWORD=fixed-password",
+      "POSTGRES_USER=postgres"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`postgres-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "5432"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/postgresql/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD-SHELL",
+      "pg_isready -U {{ .Config.username }}"
+    ]
+  },
+  "redis": {
+    "image": "redis:7",
+    "env": [
+      "REDIS_PASSWORD=fixed-password"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 268435456,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD-SHELL",
+      "redis-cli ping | grep PONG"
+    ]
+  },
+  "redis+domain": {
+    "image": "redis:7",
+    "env": [
+      "REDIS_PASSWORD=fixed-password"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`redis-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "6379"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 268435456,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD-SHELL",
+      "redis-cli ping | grep PONG"
+    ]
+  },
+  "solidcraft": {
+    "image": "ghcr.io/tangency-labs/solidcraft-web:latest",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://127.0.0.1:8080/"
+    ]
+  },
+  "solidcraft+domain": {
+    "image": "ghcr.io/tangency-labs/solidcraft-web:latest",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`solidcraft-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://127.0.0.1:8080/"
+    ]
+  },
+  "uptimekuma": {
+    "image": "louislam/uptime-kuma:1",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/app/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 268435456,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "extra/healthcheck"
+    ]
+  },
+  "uptimekuma+domain": {
+    "image": "louislam/uptime-kuma:1",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`uptimekuma-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3001"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/app/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 268435456,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "extra/healthcheck"
+    ]
+  },
+  "vaultwarden": {
+    "image": "vaultwarden/server:latest",
+    "env": [
+      "ADMIN_TOKEN=\u003cargon2id\u003e",
+      "DOMAIN=",
+      "SIGNUPS_ALLOWED=true"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 268435456,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "curl",
+      "-fsS",
+      "http://localhost:80/alive"
+    ]
+  },
+  "vaultwarden+domain": {
+    "image": "vaultwarden/server:latest",
+    "env": [
+      "ADMIN_TOKEN=\u003cargon2id\u003e",
+      "DOMAIN=https://vaultwarden-app.example.com",
+      "SIGNUPS_ALLOWED=true"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`vaultwarden-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 268435456,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "curl",
+      "-fsS",
+      "http://localhost:80/alive"
+    ]
+  }
+}

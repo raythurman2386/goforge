@@ -220,7 +220,8 @@ func TestDeployGitea_CloudflareProxyModeKeepsHTTPListener(t *testing.T) {
 		"GITEA__SERVER__ROOT_URL":              "https://" + domain + "/",
 		"GITEA__SERVER__DOMAIN":                domain,
 		"GITEA__SERVER__HTTP_PORT":             "3000",
-		"GITEA__SERVER__SSH_PORT":              "22",
+		"GITEA__SERVER__SSH_PORT":              "2223", // published host port, not container 22
+		"GITEA__SERVER__SSH_DOMAIN":            "minis",
 		"GITEA____APP_NAME":                    "Example Git",
 		"GITEA__SERVICE__DISABLE_REGISTRATION": "true",
 		"GITEA__SERVICE__REQUIRE_SIGNIN_VIEW":  "true",
