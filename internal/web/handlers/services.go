@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -139,6 +140,82 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render detail page")
 	}
+}
+
+// EditConfig renders the edit form for a deployed service instance,
+// prefilled from its stored config. Password fields start blank.
+func (h *ServiceHandler) EditConfig(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	instance, err := h.instanceService.GetInstance(r.Context(), id)
+	if err != nil {
+		RenderError(w, r, http.StatusNotFound, "service instance not found")
+		return
+	}
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok || user.ID != instance.UserID {
+		RenderError(w, r, http.StatusForbidden, "access denied")
+		return
+	}
+
+	tmpl, err := h.catalog.GetTemplate(instance.TemplateName)
+	if err != nil {
+		RenderError(w, r, http.StatusNotFound, "service template not found; this service cannot be edited")
+		return
+	}
+
+	config, err := instance.GetConfig()
+	if err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "failed to read service config")
+		return
+	}
+
+	csrfToken := auth.GetCSRFToken(r)
+	component := pages_services.Edit(instance, tmpl, config, csrfToken)
+	if err := component.Render(r.Context(), w); err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "failed to render edit page")
+	}
+}
+
+// UpdateConfig saves edited config and recreates the service container.
+// The instance keeps its ID, so the same named volumes are mounted again.
+func (h *ServiceHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	instance, err := h.instanceService.GetInstance(r.Context(), id)
+	if err != nil {
+		RenderError(w, r, http.StatusNotFound, "service instance not found")
+		return
+	}
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok || user.ID != instance.UserID {
+		RenderError(w, r, http.StatusForbidden, "access denied")
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		RenderError(w, r, http.StatusBadRequest, "invalid form data")
+		return
+	}
+	// The service keeps only name, domain, and template fields from this map.
+	updates := make(map[string]interface{}, len(r.PostForm))
+	for key, values := range r.PostForm {
+		if len(values) > 0 {
+			updates[key] = values[0]
+		}
+	}
+
+	if _, err := h.instanceService.UpdateInstanceConfig(r.Context(), id, updates); err != nil {
+		if errors.Is(err, services.ErrInstanceBusy) {
+			RenderError(w, r, http.StatusConflict, err.Error())
+			return
+		}
+		h.logger.Error("failed to update service config", "instance_id", id, "error", err)
+		RenderError(w, r, http.StatusInternalServerError, "failed to update service configuration")
+		return
+	}
+
+	http.Redirect(w, r, "/services/"+id, http.StatusSeeOther)
 }
 
 // Delete handles service instance deletion.

@@ -62,6 +62,14 @@ func (m *mockInstanceRepository) Delete(ctx context.Context, id string) error {
 type mockContainerRepository struct {
 	createFunc                 func(ctx context.Context, c *models.Container) error
 	getByServiceInstanceIDFunc func(ctx context.Context, instanceID string) (*models.Container, error)
+	deleteFunc                 func(ctx context.Context, id string) error
+}
+
+func (m *mockContainerRepository) Delete(ctx context.Context, id string) error {
+	if m.deleteFunc != nil {
+		return m.deleteFunc(ctx, id)
+	}
+	return nil
 }
 
 func (m *mockContainerRepository) Create(ctx context.Context, c *models.Container) error {

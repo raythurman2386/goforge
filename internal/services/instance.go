@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"text/template"
 	"time"
 
@@ -31,6 +32,7 @@ type InstanceRepository interface {
 type ContainerRepository interface {
 	Create(ctx context.Context, c *models.Container) error
 	GetByServiceInstanceID(ctx context.Context, instanceID string) (*models.Container, error)
+	Delete(ctx context.Context, id string) error
 }
 
 // DockerClient defines the interface for Docker operations.
@@ -126,9 +128,51 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		return nil, fmt.Errorf("failed to create instance record: %w", err)
 	}
 
-	// Prepare interpolation data
+	spec, err := s.buildContainerSpec(tmpl, instance, config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Run deployment in background
+	// We do not pass ctx to the goroutine because it is a request context that
+	// will be canceled when the HTTP handler returns.
+	//nolint:contextcheck // Intentional use of background context for async work
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		s.startServiceContainer(bgCtx, tmpl, spec, nil)
+	}()
+
+	return instance, nil
+}
+
+// ErrInstanceBusy is returned when a config edit is requested while the
+// instance is still deploying or being recreated.
+var ErrInstanceBusy = errors.New("service instance is still deploying; wait for it to finish")
+
+// VolumeName returns the Docker named volume for one template volume of an
+// instance. It depends only on the instance ID and the template volume name,
+// so recreating the container for the same instance mounts the same data.
+func VolumeName(instanceID, volume string) string {
+	return fmt.Sprintf("goforge-vol-%s-%s", instanceID, volume)
+}
+
+// containerSpec is everything needed to create a service container for an instance.
+type containerSpec struct {
+	instanceID string
+	opts       docker.ContainerOptions
+	data       map[string]interface{}
+}
+
+// buildContainerSpec renders the template for instance with config. Deploy and
+// config edits share it so a recreated container gets the same name, network,
+// labels, health check, and named volumes as the original.
+func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *models.ServiceInstance, config map[string]interface{}) (*containerSpec, error) {
+	domain := ""
+	if instance.Domain.Valid {
+		domain = instance.Domain.String
+	}
 	containerName := fmt.Sprintf("goforge-service-%s", instance.ID)
-	protocol := publicProtocol(domain)
 
 	data := map[string]interface{}{
 		"Config":        config,
@@ -136,10 +180,9 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		"InstanceID":    instance.ID,
 		"ContainerName": containerName,
 		"Domain":        domain,
-		"Protocol":      protocol,
+		"Protocol":      publicProtocol(domain),
 	}
 
-	// Interpolate Docker config
 	image, err := s.interpolate(tmpl.Docker.Image, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to interpolate image: %w", err)
@@ -154,7 +197,6 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		envVars = append(envVars, k+"="+val)
 	}
 
-	// Create container
 	opts := docker.ContainerOptions{
 		Name:          containerName,
 		Image:         image,
@@ -173,68 +215,191 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	labels := proxy.GenerateServiceLabels(instance.ID, domain, s.traefikNetwork, servicePort, s.cloudflareProxyMode)
 	opts.Labels = labels.ToMap()
 
-	// Apply health check from template
 	if hc := buildHealthCheck(tmpl.Docker.HealthCheck); hc != nil {
 		opts.HealthCheck = hc
 	}
 
-	// Add volumes (Binds)
+	// Named volumes keyed by instance ID. Never derive these from anything an
+	// edit can change, or a recreate would mount empty volumes.
 	for _, v := range tmpl.Docker.Volumes {
-		// Use named volumes prefixed with goforge-
-		volumeName := fmt.Sprintf("goforge-vol-%s-%s", instance.ID, v.Name)
-		opts.Binds = append(opts.Binds, fmt.Sprintf("%s:%s", volumeName, v.Path))
+		opts.Binds = append(opts.Binds, fmt.Sprintf("%s:%s", VolumeName(instance.ID, v.Name), v.Path))
 	}
 
-	// Capture immutable values needed by the background goroutine.
-	instanceID := instance.ID
+	return &containerSpec{instanceID: instance.ID, opts: opts, data: data}, nil
+}
 
-	// Run deployment in background
-	// We do not pass ctx to the goroutine because it is a request context that
-	// will be canceled when the HTTP handler returns.
+// startServiceContainer creates the container described by spec, records it,
+// and marks the instance running. When replaced is non-nil its DB row is
+// removed once the new container exists.
+func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, replaced *models.Container) {
+	instanceID := spec.instanceID
+
+	dockerID, err := s.dockerClient.CreateContainer(ctx, spec.opts)
+	if err != nil {
+		s.logger.Error("failed to create container", "error", err, "instance_id", instanceID)
+		s.setInstanceStatus(ctx, instanceID, models.ServiceStatusFailed)
+		return
+	}
+
+	if replaced != nil {
+		if delErr := s.containerRepo.Delete(ctx, replaced.ID); delErr != nil {
+			s.logger.Warn("failed to delete replaced container record", "error", delErr, "instance_id", instanceID, "container_id", replaced.ID)
+		}
+	}
+
+	if err = s.containerRepo.Create(ctx, &models.Container{
+		ServiceInstanceID: sql.NullString{String: instanceID, Valid: true},
+		DockerID:          dockerID,
+		Name:              spec.opts.Name,
+		Image:             spec.opts.Image,
+		Status:            models.ContainerStatusRunning,
+	}); err != nil {
+		s.logger.Error("failed to record container in DB", "error", err, "instance_id", instanceID)
+	}
+
+	// Fetch a fresh copy to avoid racing with the returned pointer
+	inst, err := s.instanceRepo.GetByID(ctx, instanceID)
+	if err != nil {
+		s.logger.Error("failed to fetch instance for status update", "error", err, "instance_id", instanceID)
+		return
+	}
+
+	inst.Status = models.ServiceStatusRunning
+
+	// Render connection string templates and store in ConnectionInfo
+	if connJSON := s.renderConnectionInfo(tmpl, spec.data, instanceID); connJSON != nil {
+		inst.ConnectionInfo = connJSON
+	}
+
+	if err = s.instanceRepo.Update(ctx, inst); err != nil {
+		s.logger.Error("failed to update instance status to running", "error", err, "instance_id", instanceID)
+	}
+}
+
+// UpdateInstanceConfig applies edited config to a deployed instance and
+// recreates its container. The instance ID does not change, so the new
+// container mounts the same goforge-vol-<instanceID>-<name> volumes and keeps
+// its data. Only the container is removed; volumes are never touched.
+//
+// updates holds raw form values. Keys other than name, domain, and the
+// template's config fields are ignored. An empty password field keeps the
+// stored value.
+func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, updates map[string]interface{}) (*models.ServiceInstance, error) {
+	instance, err := s.instanceRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting {
+		return nil, ErrInstanceBusy
+	}
+
+	tmpl, err := s.catalog.GetTemplate(instance.TemplateName)
+	if err != nil {
+		return nil, err
+	}
+
+	current, err := instance.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse stored config: %w", err)
+	}
+
+	config := mergeEditedConfig(tmpl, current, updates)
+	if genErr := fillGeneratedConfig(tmpl, config); genErr != nil {
+		return nil, genErr
+	}
+
+	name, ok := config["name"].(string)
+	if !ok || name == "" {
+		return nil, errors.New("config missing name")
+	}
+	var domain string
+	if d, ok := config["domain"].(string); ok {
+		domain = d
+	}
+
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	instance.Name = name
+	instance.Config = configJSON
+	instance.Domain = sql.NullString{String: domain, Valid: domain != ""}
+
+	// Render before touching anything so a bad template leaves the running container alone.
+	spec, err := s.buildContainerSpec(tmpl, instance, config)
+	if err != nil {
+		return nil, err
+	}
+
+	instance.Status = models.ServiceStatusPending
+	if err = s.instanceRepo.Update(ctx, instance); err != nil {
+		return nil, fmt.Errorf("failed to save instance config: %w", err)
+	}
+
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
-		// Create a new context since the request context will be canceled
 		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-
-		dockerID, err := s.dockerClient.CreateContainer(bgCtx, opts)
-		if err != nil {
-			s.logger.Error("failed to create container", "error", err, "instance_id", instanceID)
-			s.setInstanceStatus(bgCtx, instanceID, models.ServiceStatusFailed)
-			return
-		}
-
-		// Record container in DB
-		if err = s.containerRepo.Create(bgCtx, &models.Container{
-			ServiceInstanceID: sql.NullString{String: instanceID, Valid: true},
-			DockerID:          dockerID,
-			Name:              opts.Name,
-			Image:             image,
-			Status:            models.ContainerStatusRunning,
-		}); err != nil {
-			s.logger.Error("failed to record container in DB", "error", err, "instance_id", instanceID)
-		}
-
-		// Fetch a fresh copy to avoid racing with the returned pointer
-		inst, err := s.instanceRepo.GetByID(bgCtx, instanceID)
-		if err != nil {
-			s.logger.Error("failed to fetch instance for status update", "error", err, "instance_id", instanceID)
-			return
-		}
-
-		inst.Status = models.ServiceStatusRunning
-
-		// Render connection string templates and store in ConnectionInfo
-		if connJSON := s.renderConnectionInfo(tmpl, data, instanceID); connJSON != nil {
-			inst.ConnectionInfo = connJSON
-		}
-
-		if err = s.instanceRepo.Update(bgCtx, inst); err != nil {
-			s.logger.Error("failed to update instance status to running", "error", err, "instance_id", instanceID)
-		}
+		s.recreateContainer(bgCtx, tmpl, spec)
 	}()
 
 	return instance, nil
+}
+
+// recreateContainer stops and removes the instance's current container (not
+// its named volumes) and starts a new one from spec.
+func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec) {
+	old, err := s.containerRepo.GetByServiceInstanceID(ctx, spec.instanceID)
+	if err != nil || old == nil {
+		s.logger.Warn("no container record for instance; creating a new container", "instance_id", spec.instanceID, "error", err)
+		old = nil
+	}
+
+	if old != nil {
+		if stopErr := s.dockerClient.StopContainer(ctx, old.DockerID); stopErr != nil {
+			s.logger.Warn("failed to stop container", "docker_id", old.DockerID, "error", stopErr)
+		}
+		// Docker keeps named volumes on container removal; RemoveVolumes only
+		// drops anonymous ones. The goforge-vol-* volumes stay for the new container.
+		if removeErr := s.dockerClient.RemoveContainer(ctx, old.DockerID); removeErr != nil {
+			s.logger.Warn("failed to remove container", "docker_id", old.DockerID, "error", removeErr)
+		}
+	}
+
+	s.startServiceContainer(ctx, tmpl, spec, old)
+}
+
+// mergeEditedConfig returns current with the editable fields from updates
+// applied. Editable fields are name, domain, and the template's config
+// fields. A blank password field keeps its stored value.
+func mergeEditedConfig(tmpl *ServiceTemplate, current, updates map[string]interface{}) map[string]interface{} {
+	merged := make(map[string]interface{}, len(current))
+	for k, v := range current {
+		merged[k] = v
+	}
+
+	setString := func(key string, keepIfBlank bool) {
+		raw, ok := updates[key]
+		if !ok {
+			return
+		}
+		val := strings.TrimSpace(fmt.Sprintf("%v", raw))
+		if val == "" && keepIfBlank {
+			return
+		}
+		merged[key] = val
+	}
+
+	setString("name", true)
+	setString("domain", false)
+	for _, field := range tmpl.Config {
+		if field.Name == "name" || field.Name == "domain" {
+			continue
+		}
+		setString(field.Name, field.Type == "password")
+	}
+	return merged
 }
 
 // setInstanceStatus fetches the instance and updates its status.

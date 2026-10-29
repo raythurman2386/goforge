@@ -1,0 +1,72 @@
+package pages_services
+
+import (
+	"fmt"
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/services"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
+)
+
+// configValue returns the stored value for key, or fallback when unset.
+func configValue(config map[string]interface{}, key string, fallback interface{}) string {
+	if v, ok := config[key]; ok && v != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	if fallback == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", fallback)
+}
+
+templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, config map[string]interface{}, csrfToken string) {
+	@layouts.AppLayout("Edit "+instance.Name, csrfToken, nil) {
+		<div class="max-w-3xl mx-auto">
+			<div class="md:flex md:items-center md:justify-between mb-8">
+				<div class="flex-1 min-w-0">
+					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+						Edit { instance.Name }
+					</h2>
+					<p class="mt-2 text-sm text-gray-500">Change the configuration of this { tmpl.DisplayName } service.</p>
+				</div>
+			</div>
+			<div class="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+				<p class="font-semibold">Saving recreates the container.</p>
+				<p class="mt-1">The service restarts with the new settings. Its data volumes are kept and mounted again:</p>
+				if len(tmpl.Docker.Volumes) > 0 {
+					<ul class="mt-2 list-disc pl-5 font-mono text-xs">
+						for _, v := range tmpl.Docker.Volumes {
+							<li>{ services.VolumeName(instance.ID, v.Name) } → { v.Path }</li>
+						}
+					</ul>
+				}
+				<p class="mt-2">Some images read credentials only on first start. Changing a database password here does not change it inside existing data.</p>
+			</div>
+			<div class="card">
+				<form class="space-y-8" action={ templ.SafeURL("/services/" + instance.ID + "/edit") } method="POST">
+					<input type="hidden" name="csrf_token" value={ csrfToken }/>
+					@components.Input("Service Name", "name", "text", configValue(config, "name", instance.Name), true)
+					if tmpl.Web {
+						@components.Input("Domain", "domain", "text", configValue(config, "domain", instance.Domain.String), true)
+					}
+					for _, field := range tmpl.Config {
+						if field.Type == "password" {
+							@components.Input(field.Label, field.Name, "password", "", false)
+							<p class="mt-[-1rem] mb-4 text-xs text-gray-500">Leave blank to keep the current value.</p>
+						} else if field.Type == "number" {
+							@components.Input(field.Label, field.Name, "number", configValue(config, field.Name, field.Default), field.Required)
+						} else {
+							@components.Input(field.Label, field.Name, "text", configValue(config, field.Name, field.Default), field.Required)
+						}
+					}
+					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3">
+						<a href={ templ.SafeURL("/services/" + instance.ID) } class="btn-secondary">
+							Cancel
+						</a>
+						@components.Button("Save and Recreate", "primary")
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
