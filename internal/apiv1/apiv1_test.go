@@ -31,6 +31,7 @@ const (
 	ownDocker   = "dock-own"
 	protDocker  = "dock-prot"
 	otherDocker = "dock-other"
+	dbErrDocker = "dock-dberr" // owned, but its row lookup fails
 )
 
 // ---- fakes: each embeds its interface so unused methods panic ----
@@ -133,7 +134,7 @@ func (f *fakeInstances) UpdateInstanceImage(_ context.Context, id string) (*mode
 type fakeContainers struct{ Containers }
 
 func (fakeContainers) OwnedByUser(_ context.Context, dockerID, userID string) (bool, error) {
-	return userID == ownerID && (dockerID == ownDocker || dockerID == protDocker), nil
+	return userID == ownerID && (dockerID == ownDocker || dockerID == protDocker || dockerID == dbErrDocker), nil
 }
 
 func (fakeContainers) GetByDockerID(_ context.Context, dockerID string) (*models.Container, error) {
@@ -143,6 +144,8 @@ func (fakeContainers) GetByDockerID(_ context.Context, dockerID string) (*models
 	case protDocker:
 		return &models.Container{ID: "c2", DockerID: protDocker, Name: "goforge-service-" + protSvcID,
 			ServiceInstanceID: sql.NullString{String: protSvcID, Valid: true}}, nil
+	case dbErrDocker:
+		return nil, errors.New("connection reset by peer")
 	}
 	return nil, repositories.ErrNotFound
 }
@@ -480,6 +483,30 @@ func TestProtectedRefusal(t *testing.T) {
 	}
 	if len(h.docker.stopped) != 1 {
 		t.Fatal("stop did not run with protected scope")
+	}
+}
+
+// A container row that cannot be read after the ownership check must not be
+// treated as an unprotected, unredacted container: the API answers 500.
+func TestContainerLookupErrorFailsClosed(t *testing.T) {
+	h := newHarness(t)
+	realRun := `{"dry_run":false,"approval_ref":"t1254u"}`
+	cases := []struct{ method, path, token, body string }{
+		{http.MethodPost, "/containers/" + dbErrDocker + "/stop", "tok-write", ""},
+		{http.MethodPost, "/containers/" + dbErrDocker + "/stop", "tok-write", realRun},
+		{http.MethodPost, "/containers/" + dbErrDocker + "/stop", "tok-protected", realRun},
+		{http.MethodPost, "/containers/" + dbErrDocker + "/restart", "tok-write", realRun},
+		{http.MethodGet, "/containers/" + dbErrDocker, "tok-read", ""},
+		{http.MethodGet, "/containers/" + dbErrDocker + "/logs", "tok-read", ""},
+	}
+	for _, c := range cases {
+		rec, out := h.do(t, c.method, c.path, c.token, c.body)
+		if rec.Code != http.StatusInternalServerError || errCode(out) != codeInternal {
+			t.Errorf("%s %s %s: got %d %v, want 500 %s", c.token, c.method, c.path, rec.Code, out, codeInternal)
+		}
+	}
+	if len(h.docker.stopped)+len(h.docker.restarted)+len(h.audit.rows) != 0 {
+		t.Fatal("lookup error reached docker or audit")
 	}
 }
 

@@ -122,7 +122,7 @@ server-side list. `GET /services` and `GET /services/{id}` show
 | `GET` | `/api/v1/projects` | Your projects |
 | `GET` | `/api/v1/projects/{id}` | One project with environments and linked services |
 | `GET` | `/api/v1/projects/{id}/environments` | Its environments |
-| `GET` | `/api/v1/projects/{id}/environments/{envId}/variables` | Variables; secret values are `********` |
+| `GET` | `/api/v1/projects/{id}/environments/{envId}/variables` | Variables; secret values are `••••••••` |
 | `GET` | `/api/v1/projects/{id}/deployments?env_id=&limit=` | Deployments, newest first (limit 20, max 500) |
 | `GET` | `/api/v1/projects/{id}/deployments/{deploymentId}` | One deployment |
 | `GET` | `/api/v1/projects/{id}/deployments/{deploymentId}/logs?tail=` | Last log lines (200, max 5000) |

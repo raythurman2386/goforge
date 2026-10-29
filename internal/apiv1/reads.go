@@ -474,12 +474,7 @@ func (h *Handler) getContainer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var out trackedContainerDTO
-	if c != nil {
-		out = h.toTrackedContainer(c)
-	} else {
-		out = trackedContainerDTO{DockerID: dockerID}
-	}
+	out := h.toTrackedContainer(c)
 	out.Docker = h.inspect(r.Context(), dockerID)
 	writeJSON(w, http.StatusOK, out)
 }

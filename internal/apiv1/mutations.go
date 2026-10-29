@@ -855,10 +855,8 @@ func (h *Handler) stopContainer(w http.ResponseWriter, r *http.Request) {
 		h.finish(w, r, g, m, auditID, nil, err, http.StatusInternalServerError, "failed to stop container")
 		return
 	}
-	if c != nil {
-		if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); err != nil {
-			h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
-		}
+	if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); err != nil {
+		h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
 	}
 	h.finish(w, r, g, m, auditID, map[string]string{"docker_id": dockerID, "status": string(models.ContainerStatusExited)}, nil, 0, "")
 }
@@ -893,10 +891,8 @@ func (h *Handler) restartContainer(w http.ResponseWriter, r *http.Request) {
 		h.finish(w, r, g, m, auditID, nil, err, http.StatusInternalServerError, "failed to restart container")
 		return
 	}
-	if c != nil {
-		if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusRunning); err != nil {
-			h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
-		}
+	if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusRunning); err != nil {
+		h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
 	}
 	h.finish(w, r, g, m, auditID, map[string]string{"docker_id": dockerID, "status": string(models.ContainerStatusRunning)}, nil, 0, "")
 }

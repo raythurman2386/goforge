@@ -157,5 +157,7 @@ MCP checks its list first; GoForge checks again and answers
 ## Not covered yet
 
 Later versions may let the MCP own Postgres tenants on the shared Postgres,
-Redis ACL users on the shared Redis, and backups. v1 has none of these, and no
-delete, prune, or secret-reveal tool.
+Redis ACL users on the shared Redis, and backups. v1 has none of these. It
+also has no project, service, or volume delete, no prune, and no secret-reveal
+tool. The only deleting tools are `delete_env_var` and `unlink_service`, and
+they are gated writes like the other 12.

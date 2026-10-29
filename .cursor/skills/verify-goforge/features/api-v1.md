@@ -7,7 +7,7 @@ An admin creates an API token with `read`, `write`, or `protected` scopes on the
 - `api-token-scoped-create` creates a token with chosen scopes, and the row shows scope chips.
 - `api-bearer-only` returns `401` `unauthorized` for a session cookie with no bearer token, and `401` for a scoped token on a UI route.
 - `api-read-scope` returns `200` on reads and `403` `insufficient_scope` on mutations for a `read` token.
-- `api-masked-reads` shows secret env vars and service passwords as `********`.
+- `api-masked-reads` shows secret env vars and service passwords as `••••••••`.
 - `api-dry-run-default` answers a mutation without `dry_run` with a plan and no change.
 - `api-approval-required` answers `"dry_run": false` without `approval_ref` with `400` `approval_ref_required`.
 - `api-audit-approval` writes an `api_v1.<action>` row whose `details.approval_ref` matches.
@@ -34,10 +34,10 @@ Preconditions:
 - **Create tokens.** With `jar-a.txt` and header `X-CSRF-Token`, `POST /settings/tokens/` with form fields `name=verify-read`, `expires_in=1`, `scopes=read`. The status is `201` and `HX-Trigger` is `tokenCreated`. Take the token from the `<code>` element into `/tmp/goforge-verify/state/token-read`. Repeat for `scopes=write` (`token-write`) and `scopes=write&scopes=protected` (`token-protected`). `GET /settings/tokens/` shows the scope chips.
 - **Bearer only.** `GET /api/v1/whoami` with only `jar-a.txt` is `401`. With `token-read` it is `200` and `scopes` is `["read"]`. `GET /projects` with `token-read` as a bearer is `401`.
 - **Read scope.** `POST /api/v1/services/$ID/restart` with `token-read` is `403` and `error.code` is `insufficient_scope`.
-- **Masked reads.** `GET /api/v1/services/$ID` with `token-read`: every secret config value is `********`. Save only the field names and a `masked=true|false` boolean.
+- **Masked reads.** `GET /api/v1/services/$ID` with `token-read`: every secret config value is `••••••••`. Save only the field names and a `masked=true|false` boolean.
 - **Dry run.** `POST /api/v1/services/$ID/restart` with `token-write` and no body is `200`, `dry_run` is `true`, and `StartedAt` of the container is unchanged (`docker inspect`).
 - **Approval.** The same call with `{"dry_run":false}` is `400` `approval_ref_required`. With `{"dry_run":false,"approval_ref":"verify-1"}` it is `200` and `audit_id` is set. `verify.sh psql "select action, details->>'approval_ref' from audit_logs where id = '<audit_id>'"` returns `api_v1.restart_service|verify-1`.
-- **Protected.** With `token-write`, `PATCH /api/v1/services/$ID/config` with `{"config":{}}` and `POST /api/v1/services/$ID/image` are each `403` `protected_resource`. With `token-protected` the dry run of each is `200`. The restart above is the `api-protected-restart` pass.
+- **Protected.** With `token-write`, `PATCH /api/v1/services/$ID/config` with `{"config":{"name":"verify-pg-renamed"}}` and `POST /api/v1/services/$ID/image` are each `403` `protected_resource`. With `token-protected` the dry run of each is `200` with `dry_run` `true`; the config dry run's `changes` names only `name`, and `verify.sh psql "select name from service_instances where id = '$ID'"` still returns `verify-pg`. The restart above is the `api-protected-restart` pass.
 - **Ownership.** With a `read` token for the second account, `GET /api/v1/projects/<A's project>` is `404` and `GET /api/v1/services/$ID` is `403`.
 - **Proof.** Write the feature id, status, and `error.code` of each step to `/tmp/goforge-verify/proof/api-v1-verdict.txt`. Never write a token, a cookie, or a config value.
 
@@ -49,3 +49,4 @@ Preconditions:
 - `GOFORGE_PROTECTED_SERVICES` is read at start. Changing it needs the verify app container recreated, as in the preconditions.
 - Projects, environments, and deployments of another account are `404`; services and containers are `403`. Same as the UI.
 - The rate limit is per client IP and shared with the UI.
+- The protected config dry run needs a field that can change. `{"config":{}}` is `400` `bad_request` (config must name a field). Every Postgres template field (`database`, `username`, `password`) is immutable, so changing one is `422`. `name` is editable on every template, so it is the field to use.

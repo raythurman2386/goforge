@@ -73,7 +73,10 @@ func (h *Handler) loadInstance(w http.ResponseWriter, r *http.Request, id string
 
 // loadContainer checks ownership through the containers table. An untracked
 // or foreign container is 403, the same as the HTML stop and restart routes.
-// The returned row is nil only if it vanished between the two queries.
+// It fails closed: if the row cannot be read after the ownership check, the
+// answer is 500, never a nil row. Callers use the row to find the service
+// behind the container, which decides the protected check on stop and the
+// secret redaction of logs.
 func (h *Handler) loadContainer(w http.ResponseWriter, r *http.Request) (string, *models.Container, bool) {
 	user, _ := caller(r)
 	if h.deps.Containers == nil {
@@ -87,8 +90,10 @@ func (h *Handler) loadContainer(w http.ResponseWriter, r *http.Request) (string,
 		return "", nil, false
 	}
 	c, err := h.deps.Containers.GetByDockerID(r.Context(), dockerID)
-	if err != nil {
-		c = nil
+	if err != nil || c == nil {
+		h.logger.Error("api v1: container row lookup failed after ownership check", "docker_id", dockerID, "error", err)
+		internalError(w, "failed to load container")
+		return "", nil, false
 	}
 	return dockerID, c, true
 }
