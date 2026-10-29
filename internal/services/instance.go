@@ -227,12 +227,19 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 		envVars = append(envVars, k+"="+val)
 	}
 
+	nanoCPUs, memory, err := tmpl.Resources.Limits()
+	if err != nil {
+		return nil, fmt.Errorf("template %s resources: %w", tmpl.Name, err)
+	}
+
 	opts := docker.ContainerOptions{
 		Name:          containerName,
 		Image:         image,
 		Env:           envVars,
 		NetworkName:   s.traefikNetwork,
 		RestartPolicy: docker.RestartUnlessStopped,
+		Memory:        memory,
+		NanoCPUs:      nanoCPUs,
 	}
 
 	// Determine the primary HTTP port from the template
