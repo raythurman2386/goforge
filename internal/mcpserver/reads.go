@@ -159,6 +159,9 @@ func (s *Server) registerReads() {
 			return get("/containers/" + seg(in.ContainerID) + "/stats"), required("container_id", in.ContainerID)
 		})
 
+	addTool(s, "get_backup_status", "Nightly S3 backup status (admin only): enabled, schedule, next run, last run, last success, recent runs. Read-only; there is no run-now tool.", readOnly,
+		func(context.Context, noInput) (*call, error) { return get("/backups"), nil })
+
 	addTool(s, "list_audit_log", "Your audit log rows, newest first. Admins can pass all_users.", readOnly,
 		func(_ context.Context, in auditInput) (*call, error) {
 			c := get("/audit-log")

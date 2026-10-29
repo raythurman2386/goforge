@@ -154,3 +154,43 @@ func TestServiceInstanceRepository_Delete(t *testing.T) {
 		t.Errorf("GetByID() after delete error = %v, want ErrNotFound", err)
 	}
 }
+
+func TestServiceInstanceRepository_ListAll(t *testing.T) {
+	t.Parallel()
+	db := getTestDB(t)
+	repo := NewServiceInstanceRepository(db)
+	ctx := context.Background()
+
+	userRepo := NewUserRepository(db, nil)
+	templates := []string{"postgres", "gitea"}
+	want := make([]string, 0, len(templates))
+	for _, tmpl := range templates {
+		user := &models.User{Email: uniqueEmail("svc-listall-" + tmpl)}
+		if err := userRepo.Create(ctx, user); err != nil {
+			t.Fatalf("create user: %v", err)
+		}
+		s := &models.ServiceInstance{UserID: user.ID, TemplateName: tmpl, Name: tmpl + "-" + uniqueID(), Status: models.ServiceStatusRunning}
+		if err := repo.Create(ctx, s); err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+		want = append(want, s.ID)
+	}
+
+	list, err := repo.ListAll(ctx)
+	if err != nil {
+		t.Fatalf("ListAll() error = %v", err)
+	}
+	found := map[string]*models.ServiceInstance{}
+	for _, s := range list {
+		found[s.ID] = s
+	}
+	for _, id := range want {
+		s, ok := found[id]
+		if !ok {
+			t.Fatalf("ListAll() missing %s (instances from every user must be listed)", id)
+		}
+		if s.TemplateName == "" || s.Name == "" || s.Status != models.ServiceStatusRunning || s.Config != nil {
+			t.Errorf("ListAll() row = %+v", s)
+		}
+	}
+}

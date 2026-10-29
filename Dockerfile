@@ -48,8 +48,9 @@ ENTRYPOINT ["/usr/local/bin/goforge-mcp"]
 # Final stage
 FROM alpine:latest
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+# Install runtime dependencies. postgresql17-client provides pg_dump for the
+# nightly app DB backup (it reads servers up to PostgreSQL 17).
+RUN apk add --no-cache ca-certificates tzdata postgresql17-client
 
 # Set working directory
 WORKDIR /app

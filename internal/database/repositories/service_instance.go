@@ -230,3 +230,27 @@ func (r *ServiceInstanceRepository) CountByUserID(ctx context.Context, userID st
 	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
 	return count, err
 }
+
+// ListAll returns every service instance across all users with only ID,
+// UserID, TemplateName, Name, and Status set. Config and connection info are
+// not read, so nothing is decrypted. Used by backups.
+func (r *ServiceInstanceRepository) ListAll(ctx context.Context) ([]*models.ServiceInstance, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, user_id, template_name, name, status
+		FROM service_instances
+		ORDER BY created_at, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var instances []*models.ServiceInstance
+	for rows.Next() {
+		s := &models.ServiceInstance{}
+		if err := rows.Scan(&s.ID, &s.UserID, &s.TemplateName, &s.Name, &s.Status); err != nil {
+			return nil, err
+		}
+		instances = append(instances, s)
+	}
+	return instances, rows.Err()
+}

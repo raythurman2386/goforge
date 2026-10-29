@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types"
 
 	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/deploy"
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -131,6 +132,11 @@ type GitBrowser interface {
 	ListBranches(ctx context.Context, source *models.GitSource, fullName string) ([]*git.Branch, error)
 }
 
+// Backups reads the backup status. It never returns credentials.
+type Backups interface {
+	Status(ctx context.Context) (*backup.Status, error)
+}
+
 // DBHealth checks the database connection.
 type DBHealth interface {
 	HealthCheck(ctx context.Context) error
@@ -157,6 +163,7 @@ type Deps struct {
 	GitSources  GitSources
 	GitBrowser  GitBrowser
 	DB          DBHealth
+	Backups     Backups
 	Logger      *slog.Logger
 	Version     string
 	// ClientIP returns the caller address recorded in audit_logs. Nil uses
