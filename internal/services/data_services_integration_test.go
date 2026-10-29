@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 
@@ -203,6 +204,43 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 			} else {
 				t.Logf("pid1 %q uid %s conf %s", lines[0], lines[1], lines[2])
 			}
+
+			// The conf file is recreated on every start. Without rm -f, a
+			// second start fails: sticky /tmp plus fs.protected_regular=1
+			// denies root writing the redis-owned file (exit 2).
+			t.Run("restart", func(t *testing.T) {
+				for n := 1; n <= 2; n++ {
+					if rErr := api.ContainerRestart(ctx, dockerID, container.StopOptions{}); rErr != nil {
+						t.Fatalf("restart %d: %v", n, rErr)
+					}
+					hctx, hcancel := context.WithTimeout(ctx, 2*time.Minute)
+					hErr := dc.WaitHealthy(hctx, dockerID, time.Second)
+					hcancel()
+					st, sErr := api.ContainerInspect(ctx, dockerID)
+					if sErr != nil {
+						t.Fatal(sErr)
+					}
+					if hErr != nil || !st.State.Running {
+						t.Fatalf("restart %d: running=%v exit=%d healthy err=%v", n, st.State.Running, st.State.ExitCode, hErr)
+					}
+					ip := st.NetworkSettings.Networks[netName].IPAddress
+					raddr := net.JoinHostPort(ip, "6379")
+					if got := resp(t, raddr, "PING"); !strings.HasPrefix(got, "-NOAUTH") {
+						t.Errorf("restart %d: unauthenticated PING = %q, want -NOAUTH", n, got)
+					}
+					if got := resp(t, raddr, "AUTH", authPass, "PING"); got != "+OK|+PONG" {
+						t.Errorf("restart %d: AUTH; PING = %q, want +OK|+PONG", n, got)
+					}
+					cr, cErr := dc.Exec(ctx, dockerID, docker.ExecOptions{Cmd: []string{"stat", "-c", "%a %U", "/tmp/goforge-redis.conf"}})
+					if cErr != nil {
+						t.Fatal(cErr)
+					}
+					if got := strings.TrimSpace(cr.Output); got != "600 redis" {
+						t.Errorf("restart %d: conf mode = %q, want 600 redis", n, got)
+					}
+					t.Logf("restart %d: running, -NOAUTH, +OK|+PONG, conf 600 redis", n)
+				}
+			})
 		})
 	}
 

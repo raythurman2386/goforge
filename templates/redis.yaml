@@ -30,6 +30,9 @@ docker:
   # password stays out of the command line (docker inspect, ps on the host);
   # it is read from the environment inside the container. The file is
   # mode 600 under /tmp in the container, not in the data volume.
+  # The file is recreated on every start (restart, stop/start, daemon
+  # reboot). Keep the rm -f: /tmp is sticky and fs.protected_regular=1 makes
+  # root's ">" into the old redis-owned file fail with Permission denied.
   # docker-entrypoint.sh still drops to the redis user.
   command:
     - sh
@@ -42,6 +45,7 @@ docker:
       fi
       umask 077
       conf=/tmp/goforge-redis.conf
+      rm -f "$conf"
       escaped=$(printf '%s' "$REDIS_PASSWORD" | sed 's/[\\"]/\\&/g')
       printf 'requirepass "%s"\n' "$escaped" > "$conf"
       if [ "$(id -u)" = 0 ]; then chown redis "$conf"; fi
