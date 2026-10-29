@@ -13,12 +13,14 @@ const (
 
 // fillGeneratedConfig sets empty generate:true fields to a server-side password
 // before the config is stored or interpolated into the container environment.
-func fillGeneratedConfig(tmpl *ServiceTemplate, config map[string]interface{}) error {
+// deploying is false for a config edit, which never fills immutable fields:
+// an instance that predates such a field keeps running without it.
+func fillGeneratedConfig(tmpl *ServiceTemplate, config map[string]interface{}, deploying bool) error {
 	if tmpl == nil || config == nil {
 		return nil
 	}
 	for _, field := range tmpl.Config {
-		if !field.Generate {
+		if !field.Generate || (field.Immutable && !deploying) {
 			continue
 		}
 		if existing, ok := config[field.Name].(string); ok && existing != "" {

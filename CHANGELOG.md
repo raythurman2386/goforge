@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GetFileContent` implementation for Gitea and GitLab git providers
 - Service restart handler (`POST /services/{id}/restart`)
 - Real-time container resource monitoring (stats) to standard Git Projects
+- Service template `post_start` hooks: commands GoForge runs with `docker exec` once a new or recreated container is healthy. A failed hook, or one still running at the 10-minute deadline, marks the instance `failed`; hook env is never logged (#43)
+- Service template `immutable` config fields (set once at deploy, never changed by an edit) and `docker.optional_environment` (left out when empty) (#43)
+- Gitea template creates the first admin (`admin_username`, default `gitea-admin`; `admin_email`, default `admin@<Domain>`; generated 32-char `admin_password`, masked on the service page) and generates a 64-char `SECRET_KEY` at deploy (#43)
 - Service template config field types `bool` (checkbox, always `true`/`false`) and `select` (drop-down of `options`), validated on deploy and on config edit (#44)
 
 ### Changed
@@ -37,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed orphaned `CustomDomain` model and `internal/domain` logic that had no database repository
 
 ### Fixed
+- Gitea served its public install page until someone submitted it. It now starts with `INSTALL_LOCK=true`, so the installer never appears, and GoForge creates the admin account (#43)
+- A template field missing from an older instance's stored config rendered as `<no value>` in the container environment. It now renders as an empty string (#43)
 - Gitea template set `GITEA__APP_NAME`, which Gitea ignores (no section separator). It now sets `GITEA____APP_NAME`
 - SSE streaming connections (deployment logs, container stats/logs) killed after 15 seconds by global `WriteTimeout`; replaced with per-route timeout middleware so SSE routes stream indefinitely
 - Stale documentation references to old project name "GoCool"/"gocool"

@@ -44,6 +44,11 @@ func (t *ServiceTemplate) validateFields() error {
 			}
 		}
 	}
+	for i, h := range t.PostStart {
+		if len(h.Command) == 0 {
+			errs = append(errs, fmt.Errorf("post_start[%d] %s: command is required", i, h.Name))
+		}
+	}
 	return errors.Join(errs...)
 }
 

@@ -1,6 +1,6 @@
 name: gitea
 display_name: Gitea
-description: Self-hosted Git service written in Go. Gitea listens on HTTP port 3000 and GoForge routes the Domain to it through Traefik, so give it a public HTTPS host such as <name>-app.example.com (proxied Cloudflare CNAME to your tunnel). Gitea keeps PROTOCOL=http behind the proxy and ROOT_URL is the https:// browser URL. SSH (port 22) is not routed by Traefik or published on the host, so clone over HTTPS. Create the admin account on the first-run install page.
+description: Self-hosted Git service written in Go. Gitea listens on HTTP port 3000 and GoForge routes the Domain to it through Traefik, so give it a public HTTPS host such as <name>-app.example.com (proxied Cloudflare CNAME to your tunnel). Gitea keeps PROTOCOL=http behind the proxy and ROOT_URL is the https:// browser URL. SSH (port 22) is not routed by Traefik or published on the host, so clone over HTTPS. The install page is locked from the first start, and GoForge creates the admin account (gitea-admin by default) with a generated password shown masked on the service page.
 icon: gitea
 category: devtools
 web: true
@@ -25,6 +25,37 @@ config:
     label: Require Sign-in to View
     type: bool
     default: true
+    required: true
+  # The first admin account. GoForge creates it after the first healthy start
+  # (see post_start below) and never changes it afterwards: change the
+  # password, email, or name in Gitea itself. "admin" is reserved by Gitea.
+  - name: admin_username
+    label: Admin Username
+    type: text
+    default: "gitea-admin"
+    required: true
+  - name: admin_email
+    label: Admin Email (blank uses admin@<Domain>)
+    type: text
+    default: ""
+    required: false
+  - name: admin_password
+    label: Admin Password
+    type: password
+    generate: true
+    length: 32
+    immutable: true
+    required: true
+  # Gitea encrypts stored secrets (2FA, mirror credentials) with SECRET_KEY.
+  # It must never change after first start, so it is generated once at deploy
+  # and cannot be edited. Instances deployed before this field keep the key
+  # Gitea wrote to app.ini.
+  - name: secret_key
+    label: Secret Key
+    type: password
+    generate: true
+    length: 64
+    immutable: true
     required: true
 
 resources:
@@ -52,6 +83,12 @@ docker:
     GITEA__SERVER__ROOT_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}/{{ else }}http://{{ .ContainerName }}:3000/{{ end }}"
     GITEA__SERVICE__DISABLE_REGISTRATION: "{{ .Config.disable_registration }}"
     GITEA__SERVICE__REQUIRE_SIGNIN_VIEW: "{{ .Config.require_signin_view }}"
+    # Lock the installer from the first start so the install page is never served.
+    GITEA__security__INSTALL_LOCK: "true"
+  optional_environment:
+    # Left out when empty so an instance deployed before secret_key existed
+    # keeps the SECRET_KEY already in its app.ini instead of having it wiped.
+    GITEA__security__SECRET_KEY: "{{ .Config.secret_key }}"
   volumes:
     - name: data
       path: /data
@@ -60,6 +97,38 @@ docker:
     interval: 10s
     timeout: 5s
     retries: 5
+
+# Create the first admin once Gitea is healthy. Runs on every container
+# create (deploy, config edit, image update) and does nothing when any admin
+# account already exists, so it never touches an existing instance's users.
+# Gitea's CLI only takes the password as --password, so it is in that
+# command's argv (readable from the host's /proc without hidepid) while it runs.
+post_start:
+  - name: create-admin
+    user: git
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        admins=$(gitea admin user list --admin)
+        if [ "$(printf '%s\n' "$admins" | tail -n +2 | grep -c . || true)" -gt 0 ]; then
+          echo "an admin account already exists; nothing to do"
+          exit 0
+        fi
+        if [ -z "$GITEA_ADMIN_PASSWORD" ]; then
+          echo "no admin account exists and admin_password is empty" >&2
+          exit 1
+        fi
+        gitea admin user create --admin \
+          --username "$GITEA_ADMIN_USERNAME" \
+          --email "$GITEA_ADMIN_EMAIL" \
+          --password "$GITEA_ADMIN_PASSWORD" \
+          --must-change-password=false
+    env:
+      GITEA_ADMIN_USERNAME: "{{ .Config.admin_username }}"
+      GITEA_ADMIN_EMAIL: "{{ if .Config.admin_email }}{{ .Config.admin_email }}{{ else if .Domain }}admin@{{ .Domain }}{{ else }}admin@{{ .ContainerName }}{{ end }}"
+      GITEA_ADMIN_PASSWORD: "{{ .Config.admin_password }}"
 
 connection:
   internal: "http://{{ .ContainerName }}:3000"

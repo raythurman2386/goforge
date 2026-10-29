@@ -97,6 +97,22 @@ type mockDockerClient struct {
 	imageExistsFunc      func(ctx context.Context, image string) (bool, error)
 	ensureImageFunc      func(ctx context.Context, image string) error
 	pullImageFunc        func(ctx context.Context, image string) error
+	waitHealthyFunc      func(ctx context.Context, id string, poll time.Duration) error
+	execFunc             func(ctx context.Context, id string, opts docker.ExecOptions) (docker.ExecResult, error)
+}
+
+func (m *mockDockerClient) WaitHealthy(ctx context.Context, id string, poll time.Duration) error {
+	if m.waitHealthyFunc != nil {
+		return m.waitHealthyFunc(ctx, id, poll)
+	}
+	return nil
+}
+
+func (m *mockDockerClient) Exec(ctx context.Context, id string, opts docker.ExecOptions) (docker.ExecResult, error) {
+	if m.execFunc != nil {
+		return m.execFunc(ctx, id, opts)
+	}
+	return docker.ExecResult{}, nil
 }
 
 func (m *mockDockerClient) PullImage(ctx context.Context, image string) error {

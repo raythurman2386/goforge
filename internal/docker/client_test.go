@@ -33,6 +33,10 @@ type mockDockerAPI struct {
 	containersPrune      func(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
 	pingFunc             func(ctx context.Context) (types.Ping, error)
 	closeFunc            func() error
+	containerInspectFunc func(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	execCreateFunc       func(ctx context.Context, containerID string, options container.ExecOptions) (types.IDResponse, error)
+	execAttachFunc       func(ctx context.Context, execID string, options container.ExecAttachOptions) (types.HijackedResponse, error)
+	execInspectFunc      func(ctx context.Context, execID string) (container.ExecInspect, error)
 }
 
 func (m *mockDockerAPI) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
@@ -149,7 +153,31 @@ func (m *mockDockerAPI) ContainerList(ctx context.Context, options container.Lis
 }
 
 func (m *mockDockerAPI) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	if m.containerInspectFunc != nil {
+		return m.containerInspectFunc(ctx, containerID)
+	}
 	return types.ContainerJSON{}, nil
+}
+
+func (m *mockDockerAPI) ContainerExecCreate(ctx context.Context, containerID string, options container.ExecOptions) (types.IDResponse, error) {
+	if m.execCreateFunc != nil {
+		return m.execCreateFunc(ctx, containerID, options)
+	}
+	return types.IDResponse{ID: "mock-exec-id"}, nil
+}
+
+func (m *mockDockerAPI) ContainerExecAttach(ctx context.Context, execID string, options container.ExecAttachOptions) (types.HijackedResponse, error) {
+	if m.execAttachFunc != nil {
+		return m.execAttachFunc(ctx, execID, options)
+	}
+	return types.HijackedResponse{}, errors.New("exec attach not mocked")
+}
+
+func (m *mockDockerAPI) ContainerExecInspect(ctx context.Context, execID string) (container.ExecInspect, error) {
+	if m.execInspectFunc != nil {
+		return m.execInspectFunc(ctx, execID)
+	}
+	return container.ExecInspect{}, nil
 }
 
 func TestClient_EnsureImage(t *testing.T) {

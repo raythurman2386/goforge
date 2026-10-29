@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -46,7 +47,23 @@ type DockerClient interface {
 	RemoveContainer(ctx context.Context, id string) error
 	RestartContainer(ctx context.Context, id string) error
 	CleanupSystem(ctx context.Context) error
+	// WaitHealthy blocks until the container's health check passes (or, with
+	// no health check, until it runs), polling every poll.
+	WaitHealthy(ctx context.Context, id string, poll time.Duration) error
+	// Exec runs a command in a running container and returns its exit code.
+	Exec(ctx context.Context, id string, opts docker.ExecOptions) (docker.ExecResult, error)
 }
+
+// healthPollInterval is how often a post_start wait checks container health.
+const healthPollInterval = 2 * time.Second
+
+// backgroundWorkTimeout bounds a background deploy, config edit, or image
+// update, including every post_start hook.
+const backgroundWorkTimeout = 10 * time.Minute
+
+// statusWriteTimeout bounds the final status write after background work,
+// which gets a fresh deadline because the work may have used up its own.
+const statusWriteTimeout = 10 * time.Second
 
 // InstanceService handles service instance management.
 type InstanceService struct {
@@ -57,6 +74,8 @@ type InstanceService struct {
 	traefikNetwork      string
 	cloudflareProxyMode bool
 	logger              *slog.Logger
+	healthPoll          time.Duration
+	bgTimeout           time.Duration
 }
 
 // NewInstanceService creates a new instance service.
@@ -77,6 +96,8 @@ func NewInstanceService(
 		traefikNetwork:      traefikNetwork,
 		cloudflareProxyMode: cloudflareProxyMode,
 		logger:              logger,
+		healthPoll:          healthPollInterval,
+		bgTimeout:           backgroundWorkTimeout,
 	}
 }
 
@@ -113,7 +134,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		return nil, err
 	}
 
-	if genErr := fillGeneratedConfig(tmpl, config); genErr != nil {
+	if genErr := fillGeneratedConfig(tmpl, config, true); genErr != nil {
 		return nil, genErr
 	}
 	// Reject a bad bool or select value before any record or container exists.
@@ -166,7 +187,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	// will be canceled when the HTTP handler returns.
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 
 		if err := s.ensureServiceImage(bgCtx, image, pullPreferRemote, logAttrs); err != nil {
@@ -197,6 +218,15 @@ type containerSpec struct {
 	instanceID string
 	opts       docker.ContainerOptions
 	data       map[string]interface{}
+	hooks      []renderedHook
+	// secrets are the instance's secret config values, for redacting hook output.
+	secrets []string
+}
+
+// renderedHook is a post_start hook with its templates rendered.
+type renderedHook struct {
+	name string
+	exec docker.ExecOptions
 }
 
 // buildContainerSpec renders the template for instance with config. Deploy and
@@ -210,7 +240,7 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 	containerName := fmt.Sprintf("goforge-service-%s", instance.ID)
 
 	data := map[string]interface{}{
-		"Config":        config,
+		"Config":        templateConfig(tmpl, config),
 		"Version":       instance.Version.String,
 		"InstanceID":    instance.ID,
 		"ContainerName": containerName,
@@ -230,6 +260,20 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 			return nil, fmt.Errorf("failed to interpolate env %s: %w", k, interpErr)
 		}
 		envVars = append(envVars, k+"="+val)
+	}
+	for k, v := range tmpl.Docker.OptionalEnvironment {
+		val, interpErr := s.interpolate(v, data)
+		if interpErr != nil {
+			return nil, fmt.Errorf("failed to interpolate optional env %s: %w", k, interpErr)
+		}
+		if val != "" {
+			envVars = append(envVars, k+"="+val)
+		}
+	}
+
+	hooks, err := s.renderPostStart(tmpl, data)
+	if err != nil {
+		return nil, err
 	}
 
 	nanoCPUs, memory, err := tmpl.Resources.Limits()
@@ -267,7 +311,131 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 		opts.Binds = append(opts.Binds, fmt.Sprintf("%s:%s", VolumeName(instance.ID, v.Name), v.Path))
 	}
 
-	return &containerSpec{instanceID: instance.ID, opts: opts, data: data}, nil
+	return &containerSpec{instanceID: instance.ID, opts: opts, data: data, hooks: hooks, secrets: SecretValues(tmpl, config)}, nil
+}
+
+// templateConfig returns config with every field the template declares
+// present, so a field missing from an older instance's stored config renders
+// as "" instead of text/template's "<no value>". config is not modified.
+func templateConfig(tmpl *ServiceTemplate, config map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(config)+len(tmpl.Config))
+	for k, v := range config {
+		out[k] = v
+	}
+	for _, f := range tmpl.Config {
+		if v, ok := out[f.Name]; !ok || v == nil {
+			out[f.Name] = ""
+		}
+	}
+	return out
+}
+
+// renderPostStart renders the template's post_start hooks with data.
+func (s *InstanceService) renderPostStart(tmpl *ServiceTemplate, data map[string]interface{}) ([]renderedHook, error) {
+	if len(tmpl.PostStart) == 0 {
+		return nil, nil
+	}
+	hooks := make([]renderedHook, 0, len(tmpl.PostStart))
+	for i, h := range tmpl.PostStart {
+		name := h.Name
+		if name == "" {
+			name = fmt.Sprintf("post_start[%d]", i)
+		}
+		cmd := make([]string, 0, len(h.Command))
+		for _, arg := range h.Command {
+			val, err := s.interpolate(arg, data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to interpolate post_start %s command: %w", name, err)
+			}
+			cmd = append(cmd, val)
+		}
+		keys := make([]string, 0, len(h.Env))
+		for k := range h.Env {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		env := make([]string, 0, len(keys))
+		for _, k := range keys {
+			val, err := s.interpolate(h.Env[k], data)
+			if err != nil {
+				// The template error names the key, not the rendered value.
+				return nil, fmt.Errorf("failed to interpolate post_start %s env %s: %w", name, k, err)
+			}
+			env = append(env, k+"="+val)
+		}
+		hooks = append(hooks, renderedHook{name: name, exec: docker.ExecOptions{Cmd: cmd, User: h.User, Env: env}})
+	}
+	return hooks, nil
+}
+
+// errPostStartFailed marks a post_start hook that ran and failed or could not run.
+var errPostStartFailed = errors.New("post_start hook failed")
+
+// runPostStartHooks waits for the container to become healthy, then runs each
+// hook in order and stops at the first failure. It logs the hook name, exit
+// code, and duration. It never logs hook env, and failure output is logged
+// only after every secret and hook env value is masked.
+func (s *InstanceService) runPostStartHooks(ctx context.Context, dockerID string, spec *containerSpec, logAttrs []any) error {
+	redact := hookRedactions(spec)
+	s.logger.Info("waiting for service container to become healthy before post_start", append(logAttrs, "hooks", len(spec.hooks))...)
+	waitStart := time.Now()
+	if err := s.dockerClient.WaitHealthy(ctx, dockerID, s.healthPoll); err != nil {
+		s.logger.Error("service container not healthy; post_start skipped", append(logAttrs, "error", RedactSecrets(err.Error(), redact), "waited", time.Since(waitStart).Round(time.Millisecond).String())...)
+		return fmt.Errorf("%w: container not healthy: %w", errPostStartFailed, err)
+	}
+
+	for _, h := range spec.hooks {
+		start := time.Now()
+		s.logger.Info("running post_start hook", append(logAttrs, "hook", h.name, "user", h.exec.User)...)
+		res, err := s.dockerClient.Exec(ctx, dockerID, h.exec)
+		duration := time.Since(start).Round(time.Millisecond).String()
+		if err != nil {
+			s.logger.Error("post_start hook could not run", append(logAttrs, "hook", h.name, "duration", duration, "error", RedactSecrets(err.Error(), redact))...)
+			return fmt.Errorf("%w: %s: %w", errPostStartFailed, h.name, err)
+		}
+		if res.ExitCode != 0 {
+			s.logger.Error("post_start hook failed", append(logAttrs, "hook", h.name, "exit_code", res.ExitCode, "duration", duration, "output", hookOutputTail(RedactSecrets(res.Output, redact)))...)
+			return fmt.Errorf("%w: %s exited %d", errPostStartFailed, h.name, res.ExitCode)
+		}
+		s.logger.Info("post_start hook finished", append(logAttrs, "hook", h.name, "exit_code", 0, "duration", duration)...)
+	}
+	return nil
+}
+
+// hookRedactions returns every value to mask in hook logs: the instance's
+// secret config values plus every hook env value, longest first.
+func hookRedactions(spec *containerSpec) []string {
+	seen := make(map[string]bool)
+	var out []string
+	add := func(v string) {
+		if v == "" || seen[v] {
+			return
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	for _, v := range spec.secrets {
+		add(v)
+	}
+	for _, h := range spec.hooks {
+		for _, kv := range h.exec.Env {
+			if _, v, ok := strings.Cut(kv, "="); ok {
+				add(v)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return len(out[i]) > len(out[j]) })
+	return out
+}
+
+// hookOutputTail keeps the end of hook output, where the error usually is.
+func hookOutputTail(out string) string {
+	const limit = 2048
+	out = strings.TrimSpace(out)
+	if len(out) > limit {
+		return "..." + out[len(out)-limit:]
+	}
+	return out
 }
 
 // startServiceContainer creates the container described by spec, records it,
@@ -301,22 +469,38 @@ func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *Servi
 		s.logger.Error("failed to record container in DB", "error", err, "instance_id", instanceID)
 	}
 
+	status := models.ServiceStatusRunning
+	if len(spec.hooks) > 0 {
+		if hookErr := s.runPostStartHooks(ctx, dockerID, spec, logAttrs); hookErr != nil {
+			status = models.ServiceStatusFailed
+		}
+	}
+
+	// A hung hook runs until ctx ends. Record the outcome with a fresh
+	// deadline so the instance never stays pending.
+	statusCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), statusWriteTimeout)
+	defer cancel()
+
 	// Fetch a fresh copy to avoid racing with the returned pointer
-	inst, err := s.instanceRepo.GetByID(ctx, instanceID)
+	inst, err := s.instanceRepo.GetByID(statusCtx, instanceID)
 	if err != nil {
 		s.logger.Error("failed to fetch instance for status update", "error", err, "instance_id", instanceID)
 		return
 	}
 
-	inst.Status = models.ServiceStatusRunning
+	inst.Status = status
 
 	// Render connection string templates and store in ConnectionInfo
 	if connJSON := s.renderConnectionInfo(tmpl, spec.data, instanceID); connJSON != nil {
 		inst.ConnectionInfo = connJSON
 	}
 
-	if err = s.instanceRepo.Update(ctx, inst); err != nil {
-		s.logger.Error("failed to update instance status to running", "error", err, "instance_id", instanceID)
+	if err = s.instanceRepo.Update(statusCtx, inst); err != nil {
+		s.logger.Error("failed to update instance status", "error", err, "instance_id", instanceID, "status", status)
+		return
+	}
+	if status == models.ServiceStatusFailed {
+		s.logger.Error("service marked failed: post_start did not complete; container and volumes left in place", logAttrs...)
 		return
 	}
 	s.logger.Info("service running", logAttrs...)
@@ -350,7 +534,7 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 	}
 
 	config := mergeEditedConfig(tmpl, current, updates)
-	if genErr := fillGeneratedConfig(tmpl, config); genErr != nil {
+	if genErr := fillGeneratedConfig(tmpl, config, false); genErr != nil {
 		return nil, genErr
 	}
 	// Reject a bad bool or select value while the running container is untouched.
@@ -390,7 +574,7 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 		s.recreateContainer(bgCtx, tmpl, spec, pullPreferRemote, prevStatus)
 	}()
@@ -438,7 +622,7 @@ func (s *InstanceService) UpdateInstanceImage(ctx context.Context, id string) (*
 
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 		s.recreateContainer(bgCtx, tmpl, spec, pullRequired, prevStatus)
 	}()
@@ -506,7 +690,7 @@ func mergeEditedConfig(tmpl *ServiceTemplate, current, updates map[string]interf
 	setString("name", true)
 	setString("domain", false)
 	for _, field := range tmpl.Config {
-		if field.Name == "name" || field.Name == "domain" {
+		if field.Name == "name" || field.Name == "domain" || field.Immutable {
 			continue
 		}
 		setString(field.Name, field.Type == FieldTypePassword)

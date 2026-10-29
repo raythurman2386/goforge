@@ -50,7 +50,9 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 						@components.Input("Domain", "domain", "text", configValue(config, "domain", instance.Domain.String), true)
 					}
 					for _, field := range tmpl.Config {
-						if field.Type == "password" {
+						if field.Immutable {
+							<p class="mb-4 text-xs text-gray-500">{ field.Label } is set once at deploy and cannot be changed here.</p>
+						} else if field.Type == "password" {
 							@components.Input(field.Label, field.Name, "password", "", false)
 							<p class="mt-[-1rem] mb-4 text-xs text-gray-500">Leave blank to keep the current value.</p>
 						} else if field.Type == services.FieldTypeBool {
