@@ -38,6 +38,8 @@ type ContainerRepository interface {
 // DockerClient defines the interface for Docker operations.
 type DockerClient interface {
 	CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error)
+	EnsureImage(ctx context.Context, image string) error
+	ImageExists(ctx context.Context, image string) (bool, error)
 	StartContainer(ctx context.Context, id string) error
 	StopContainer(ctx context.Context, id string) error
 	RemoveContainer(ctx context.Context, id string) error
@@ -149,6 +151,11 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		return nil, err
 	}
 
+	instanceID := instance.ID
+	image := spec.opts.Image
+	logAttrs := []any{"instance_id", instanceID, "template", tmplName, "image", image, "domain", domain}
+	s.logger.Info("service deploy requested", append(logAttrs, "name", name)...)
+
 	// Run deployment in background
 	// We do not pass ctx to the goroutine because it is a request context that
 	// will be canceled when the HTTP handler returns.
@@ -156,7 +163,14 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		s.startServiceContainer(bgCtx, tmpl, spec, nil)
+
+		if err := s.ensureServiceImage(bgCtx, image, logAttrs); err != nil {
+			s.logger.Error("failed to pull service image", append(logAttrs, "error", err)...)
+			s.setInstanceStatus(bgCtx, instanceID, models.ServiceStatusFailed)
+			return
+		}
+
+		s.startServiceContainer(bgCtx, tmpl, spec, nil, logAttrs)
 	}()
 
 	return instance, nil
@@ -247,7 +261,7 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 // startServiceContainer creates the container described by spec, records it,
 // and marks the instance running. When replaced is non-nil its DB row is
 // removed once the new container exists.
-func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, replaced *models.Container) {
+func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, replaced *models.Container, logAttrs []any) {
 	instanceID := spec.instanceID
 
 	dockerID, err := s.dockerClient.CreateContainer(ctx, spec.opts)
@@ -256,6 +270,8 @@ func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *Servi
 		s.setInstanceStatus(ctx, instanceID, models.ServiceStatusFailed)
 		return
 	}
+	// CreateContainer creates and starts the container in one call.
+	s.logger.Info("service container created and started", append(logAttrs, "container", spec.opts.Name, "docker_id", dockerID)...)
 
 	if replaced != nil {
 		if delErr := s.containerRepo.Delete(ctx, replaced.ID); delErr != nil {
@@ -289,7 +305,9 @@ func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *Servi
 
 	if err = s.instanceRepo.Update(ctx, inst); err != nil {
 		s.logger.Error("failed to update instance status to running", "error", err, "instance_id", instanceID)
+		return
 	}
+	s.logger.Info("service running", logAttrs...)
 }
 
 // UpdateInstanceConfig applies edited config to a deployed instance and
@@ -383,7 +401,17 @@ func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTe
 		}
 	}
 
-	s.startServiceContainer(ctx, tmpl, spec, old)
+	domain := ""
+	if d, ok := spec.data["Domain"].(string); ok {
+		domain = d
+	}
+	logAttrs := []any{"instance_id", spec.instanceID, "template", tmpl.Name, "image", spec.opts.Image, "domain", domain}
+	if err := s.ensureServiceImage(ctx, spec.opts.Image, logAttrs); err != nil {
+		s.logger.Error("failed to pull service image", append(logAttrs, "error", err)...)
+		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed)
+		return
+	}
+	s.startServiceContainer(ctx, tmpl, spec, old, logAttrs)
 }
 
 // mergeEditedConfig returns current with the editable fields from updates
@@ -416,6 +444,27 @@ func mergeEditedConfig(tmpl *ServiceTemplate, current, updates map[string]interf
 		setString(field.Name, field.Type == "password")
 	}
 	return merged
+}
+
+// ensureServiceImage pulls image when it is not present locally and logs the
+// outcome so operators can see pull vs cache hit during one-click deploys.
+func (s *InstanceService) ensureServiceImage(ctx context.Context, image string, logAttrs []any) error {
+	exists, err := s.dockerClient.ImageExists(ctx, image)
+	if err != nil {
+		s.logger.Warn("failed to check for service image", append(logAttrs, "error", err)...)
+	}
+	if exists {
+		s.logger.Info("service image present locally", logAttrs...)
+		return nil
+	}
+
+	s.logger.Info("pulling service image", logAttrs...)
+	start := time.Now()
+	if err := s.dockerClient.EnsureImage(ctx, image); err != nil {
+		return err
+	}
+	s.logger.Info("pulled service image", append(logAttrs, "duration", time.Since(start).Round(time.Millisecond).String())...)
+	return nil
 }
 
 // setInstanceStatus fetches the instance and updates its status.

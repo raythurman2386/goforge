@@ -63,11 +63,13 @@ type fakeDocker struct{}
 func (fakeDocker) CreateContainer(context.Context, docker.ContainerOptions) (string, error) {
 	return "docker-2", nil
 }
-func (fakeDocker) StartContainer(context.Context, string) error   { return nil }
-func (fakeDocker) StopContainer(context.Context, string) error    { return nil }
-func (fakeDocker) RemoveContainer(context.Context, string) error  { return nil }
-func (fakeDocker) RestartContainer(context.Context, string) error { return nil }
-func (fakeDocker) CleanupSystem(context.Context) error            { return nil }
+func (fakeDocker) StartContainer(context.Context, string) error      { return nil }
+func (fakeDocker) StopContainer(context.Context, string) error       { return nil }
+func (fakeDocker) RemoveContainer(context.Context, string) error     { return nil }
+func (fakeDocker) RestartContainer(context.Context, string) error    { return nil }
+func (fakeDocker) CleanupSystem(context.Context) error               { return nil }
+func (fakeDocker) EnsureImage(context.Context, string) error         { return nil }
+func (fakeDocker) ImageExists(context.Context, string) (bool, error) { return true, nil }
 
 func newEditHandler(t *testing.T, status models.ServiceInstanceStatus) (*ServiceHandler, *fakeInstanceRepo) {
 	t.Helper()
