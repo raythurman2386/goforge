@@ -501,7 +501,7 @@ func mergeEditedConfig(tmpl *ServiceTemplate, current, updates map[string]interf
 		if field.Name == "name" || field.Name == "domain" {
 			continue
 		}
-		setString(field.Name, field.Type == "password")
+		setString(field.Name, field.Type == FieldTypePassword)
 	}
 	return merged
 }
@@ -631,8 +631,14 @@ func buildHealthCheck(hc HealthCheckConfig) *container.HealthConfig {
 	}
 }
 
+// templateFuncs are available to every template string. argon2id turns a
+// stored secret into the PHC hash a service such as Vaultwarden expects.
+var templateFuncs = template.FuncMap{
+	"argon2id": argon2idPHC,
+}
+
 func (s *InstanceService) interpolate(text string, data interface{}) (string, error) {
-	tmpl, err := template.New("service").Parse(text)
+	tmpl, err := template.New("service").Funcs(templateFuncs).Parse(text)
 	if err != nil {
 		return "", err
 	}
@@ -748,4 +754,16 @@ func (s *InstanceService) UpdateInstance(ctx context.Context, instance *models.S
 // GetContainer retrieves the container for a service instance.
 func (s *InstanceService) GetContainer(ctx context.Context, instanceID string) (*models.Container, error) {
 	return s.containerRepo.GetByServiceInstanceID(ctx, instanceID)
+}
+
+// Template returns the catalog template for name, or nil if unavailable.
+func (s *InstanceService) Template(name string) *ServiceTemplate {
+	if s == nil || s.catalog == nil {
+		return nil
+	}
+	tmpl, err := s.catalog.GetTemplate(name)
+	if err != nil {
+		return nil
+	}
+	return tmpl
 }

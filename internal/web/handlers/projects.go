@@ -269,7 +269,12 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	linkedServices, availableServices := h.fetchServiceLinks(r.Context(), p.ID, user.ID, tab)
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, linkedServices, availableServices, tab, csrfToken)
+	maskedConn := make(map[string]map[string]string, len(linkedServices))
+	for _, svc := range linkedServices {
+		maskedConn[svc.ID] = services.MaskedConnectionInfo(h.instanceService.Template(svc.TemplateName), svc)
+	}
+
+	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, linkedServices, availableServices, maskedConn, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render project detail page")
 	}

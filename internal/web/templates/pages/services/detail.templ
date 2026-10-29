@@ -1,7 +1,8 @@
 package pages_services
 
 import (
-	"fmt"
+	"net/url"
+
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
@@ -112,28 +113,93 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 				<p class="mt-1 text-sm text-gray-500">Use these details to connect to and manage your service.</p>
 			</div>
 			<div class="divide-y divide-gray-100">
-				if config, err := instance.GetConfig(); err == nil {
-					for k, v := range config {
-						<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4 hover:bg-gray-50/50 transition-colors">
-							<dt class="text-sm font-bold text-gray-500 uppercase tracking-widest">{ k }</dt>
-							<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-white p-2 border border-gray-100 rounded-md shadow-sm select-all">
-								{ fmt.Sprintf("%v", v) }
-							</dd>
-						</div>
-					}
-				}
-				if info, err := instance.GetConnectionInfo(); err == nil {
-					for k, v := range info {
-						<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4 hover:bg-gray-50/50 transition-colors">
-							<dt class="text-sm font-bold text-gray-500 uppercase tracking-widest">{ k }</dt>
-							<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-white p-2 border border-gray-100 rounded-md shadow-sm select-all">
-								{ v }
-							</dd>
-						</div>
-					}
+				for _, row := range detailRows(instance, tmpl) {
+					@detailRow(instance.ID, row)
 				}
 			</div>
 		</div>
 		</div>
+		@secretControlsScript()
 	}
 }
+
+// detailRows lists config rows, then connection rows, with secrets masked.
+func detailRows(instance *models.ServiceInstance, tmpl *services.ServiceTemplate) []services.DetailRow {
+	config, connection := services.DetailRows(tmpl, instance)
+	return append(config, connection...)
+}
+
+func secretURL(instanceID string, row services.DetailRow) string {
+	q := url.Values{"source": {row.Source}, "key": {row.Key}}
+	return "/services/" + instanceID + "/secret?" + q.Encode()
+}
+
+templ detailRow(instanceID string, row services.DetailRow) {
+	<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4 hover:bg-gray-50/50 transition-colors">
+		<dt class="text-sm font-bold text-gray-500 uppercase tracking-widest">{ row.Key }</dt>
+		if row.Secret {
+			<dd
+				class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-white p-2 border border-gray-100 rounded-md shadow-sm flex items-center justify-between gap-3"
+				data-secret
+				data-secret-url={ secretURL(instanceID, row) }
+				data-secret-mask={ row.Display }
+			>
+				<span class="break-all" data-secret-value>{ row.Display }</span>
+				<span class="flex shrink-0 gap-2 font-sans">
+					<button type="button" class="text-xs font-semibold text-primary-700 hover:text-primary-900" data-secret-action="toggle" aria-label={ "Show " + row.Key }>Show</button>
+					<button type="button" class="text-xs font-semibold text-primary-700 hover:text-primary-900" data-secret-action="copy" aria-label={ "Copy " + row.Key }>Copy</button>
+				</span>
+			</dd>
+		} else {
+			<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-white p-2 border border-gray-100 rounded-md shadow-sm select-all">
+				{ row.Display }
+			</dd>
+		}
+	</div>
+}
+
+// secretControlsScript wires Show and Copy on masked rows. The value is
+// fetched on demand and never rendered into the page. The listener is
+// delegated so the pending-state poll swap keeps working.
+templ secretControlsScript() {
+	<script>
+		(function () {
+			if (window.goforgeSecretControls) { return; }
+			window.goforgeSecretControls = true;
+			function fetchSecret(row) {
+				return fetch(row.getAttribute('data-secret-url'), { credentials: 'same-origin', cache: 'no-store' })
+					.then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.text(); });
+			}
+			function flash(btn, text, restore) {
+				btn.textContent = text;
+				setTimeout(function () { btn.textContent = restore; }, 2000);
+			}
+			document.addEventListener('click', function (e) {
+				var btn = e.target.closest('[data-secret-action]');
+				if (!btn) { return; }
+				var row = btn.closest('[data-secret]');
+				var out = row.querySelector('[data-secret-value]');
+				if (btn.getAttribute('data-secret-action') === 'toggle') {
+					if (out.getAttribute('data-revealed') === 'true') {
+						out.textContent = row.getAttribute('data-secret-mask');
+						out.removeAttribute('data-revealed');
+						btn.textContent = 'Show';
+						return;
+					}
+					fetchSecret(row).then(function (v) {
+						out.textContent = v;
+						out.setAttribute('data-revealed', 'true');
+						btn.textContent = 'Hide';
+					}).catch(function () { flash(btn, 'Error', 'Show'); });
+					return;
+				}
+				fetchSecret(row).then(function (v) {
+					if (!navigator.clipboard) { throw new Error('clipboard unavailable'); }
+					return navigator.clipboard.writeText(v);
+				}).then(function () { flash(btn, 'Copied!', 'Copy'); })
+					.catch(function () { flash(btn, 'Copy failed', 'Copy'); });
+			});
+		})();
+	</script>
+}
+

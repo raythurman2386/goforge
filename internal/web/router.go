@@ -176,6 +176,7 @@ func Router(
 						r.Get("/", serviceHandler.Show)
 						r.Delete("/", serviceHandler.Delete)
 						r.Post("/restart", serviceHandler.Restart)
+						r.Get("/secret", serviceHandler.RevealSecret)
 						r.Get("/edit", serviceHandler.EditConfig)
 						r.Post("/edit", serviceHandler.UpdateConfig)
 						r.Post("/update", serviceHandler.UpdateImage)

@@ -191,8 +191,8 @@ func TestDeployVaultwarden_CloudflareProxyModeUsesHTTPSDomain(t *testing.T) {
 	if got := env["SIGNUPS_ALLOWED"]; got != "false" {
 		t.Errorf("SIGNUPS_ALLOWED = %q, want false", got)
 	}
-	if got := len(env["ADMIN_TOKEN"]); got != 48 {
-		t.Errorf("generated ADMIN_TOKEN length = %d, want 48", got)
+	if got := env["ADMIN_TOKEN"]; !strings.HasPrefix(got, "$argon2id$") {
+		t.Errorf("ADMIN_TOKEN = %q, want an Argon2id PHC hash of the generated token", got)
 	}
 	if opts.Image != "vaultwarden/server:latest" {
 		t.Errorf("image = %q, want vaultwarden/server:latest", opts.Image)
@@ -266,5 +266,24 @@ func TestDeployGitea_NoDomainUsesContainerURL(t *testing.T) {
 	}
 	if got := env["GITEA__SERVICE__DISABLE_REGISTRATION"]; got != "false" {
 		t.Errorf("DISABLE_REGISTRATION = %q, want false", got)
+	}
+}
+
+// Vaultwarden warns about a plain ADMIN_TOKEN. The container gets an Argon2id
+// PHC hash; the plain token stays in GoForge config for the /admin login.
+func TestDeployVaultwarden_AdminTokenIsArgon2idHash(t *testing.T) {
+	t.Parallel()
+	opts := deployRepoTemplate(t, "vaultwarden", false, map[string]interface{}{
+		"name":            "vault",
+		"domain":          "",
+		"signups_allowed": "true",
+		"admin_token":     "plain-admin-token",
+	})
+	got := envMap(opts)["ADMIN_TOKEN"]
+	if got == "plain-admin-token" {
+		t.Fatal("ADMIN_TOKEN passed to the container in plain text")
+	}
+	if !verifyPHC(t, got, "plain-admin-token") {
+		t.Errorf("ADMIN_TOKEN %q does not verify against the stored token", got)
 	}
 }
