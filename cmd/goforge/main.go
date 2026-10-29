@@ -290,6 +290,7 @@ func runServer() error {
 
 	// Initialize service catalog
 	catalog := services.NewCatalog(cfg.TemplatesDir)
+	catalog.SetLogger(logger.WithComponent(log, "catalog"))
 	if err := catalog.LoadTemplates(); err != nil {
 		log.Error("failed to load service templates", "error", err)
 	}

@@ -1,6 +1,6 @@
 # Service Templates Reference
 
-GoForge uses YAML template files to define one-click deployable services. Templates are stored in the `templates/` directory at the project root.
+GoForge uses YAML template files to define one-click deployable services. Templates are stored in the `templates/` directory at the project root. GoForge reads them from `TEMPLATES_DIR` (default `./templates`) at startup and reloads them when files change. See [Adding Custom Service Templates](../guides/services.md#adding-custom-service-templates).
 
 ---
 
