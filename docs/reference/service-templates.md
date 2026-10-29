@@ -229,8 +229,10 @@ REDIS_PASSWORD: "{{ .Config.password }}"
 ```yaml
 DOMAIN: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ end }}"
 SIGNUPS_ALLOWED: "{{ .Config.signups_allowed }}"
-ADMIN_TOKEN: "{{ .Config.admin_token }}"
+ADMIN_TOKEN: "{{ argon2id .Config.admin_token }}"
 ```
+
+The container gets an Argon2id PHC hash of the token, so Vaultwarden does not warn about a plain `ADMIN_TOKEN`. Sign in to `/admin` with the plain token from the service page.
 
 WebSocket notifications are served on the main port by Vaultwarden 1.29 and later, so no `WEBSOCKET_ENABLED` or second port is needed.
 
@@ -371,7 +373,8 @@ connection:
 - **image**: Prefer a pinned version tag or a digest (`name@sha256:...`) over `latest`. GoForge pulls tag references on every deploy and recreate, so a moved `latest` changes what runs the next time the container is created. Digest references are pulled only when missing. The **Update image** action on a service page pulls and recreates on demand
 - **name**: Use lowercase, single word. Must be unique across all templates
 - **versions**: List most recent first. Use string format even for numeric versions
-- **password fields**: Set `generate: true` to auto-generate secure passwords
+- **password fields**: Set `generate: true` to auto-generate secure passwords. Fields of type `password` are masked on the service page behind **Show** and **Copy**, and so is any connection string that contains one
+- **argon2id**: `{{ argon2id .Config.field }}` renders an Argon2id PHC hash (OWASP preset: 19 MiB, 2 passes, 1 lane) with a fresh salt for services that take a hashed secret. An empty value stays empty
 - **health_check**: Always include a health check for reliable startup detection
 - **volumes**: Always use named volumes for data persistence
 - **resources**: Set reasonable defaults; users cannot currently override these through the UI
