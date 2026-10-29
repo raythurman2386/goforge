@@ -15,6 +15,11 @@
 # createdb, or createrole). The database is owned by the role, and PUBLIC
 # loses CONNECT on it so other tenants cannot open it.
 #
+# Fails closed: if a database named <app> already exists and is owned by
+# anyone else (for example the instance's own POSTGRES_DB, owned by the
+# admin), the script exits non-zero before touching any role, ownership, or
+# grant.
+#
 # Set DOCKER to override the docker command, for example DOCKER="sudo -n docker".
 set -eu
 
@@ -67,6 +72,9 @@ quoted=$(printf '%s' "$password" | sed -e 's/\\/\\\\/g' -e "s/'/''/g")
 	printf '%s\n' '\set ON_ERROR_STOP on' "\\set app '$app'"
 	printf "\\\\set pw '%s'\n" "$quoted"
 	cat <<'SQL'
+SELECT format('DO $x$BEGIN RAISE EXCEPTION %L; END$x$',
+       format('pg-tenant: database %s exists and is owned by %s, not %s; refusing to change it', datname, pg_get_userbyid(datdba), :'app'))
+  FROM pg_database WHERE datname = :'app' AND pg_get_userbyid(datdba) <> :'app' \gexec
 SELECT format('CREATE ROLE %I LOGIN', :'app')
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'app') \gexec
 SELECT format('ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L', :'app', :'pw') \gexec
@@ -75,6 +83,9 @@ SELECT format('CREATE DATABASE %I OWNER %I', :'app', :'app')
 SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', :'app') \gexec
 SELECT format('GRANT CONNECT, TEMPORARY ON DATABASE %I TO %I', :'app', :'app') \gexec
 SQL
-} | $docker_cmd exec -i "$container" sh -c 'exec psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
+} | $docker_cmd exec -i "$container" sh -c 'exec psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null || {
+	echo "pg-tenant: failed for $app on $container" >&2
+	exit 1
+}
 
 echo "pg-tenant: role and database $app ready on $container"

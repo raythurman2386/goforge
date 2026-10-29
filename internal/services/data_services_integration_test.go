@@ -354,7 +354,27 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 			if _, code := login(t, a, "rotated-pass", a); code != 0 {
 				t.Error("rotated password does not work")
 			}
-			t.Log("pg-tenant.sh: idempotent, quoted password, LOGIN only, owns its database, other tenants denied CONNECT, rotation works")
+			// A tenant named after an existing database it does not own (the
+			// instance's default POSTGRES_DB "app", owned by pgadmin) must fail
+			// closed and leave ownership, grants, and roles alone.
+			cmd := exec.CommandContext(ctx, "sh", "../../scripts/shared-data/pg-tenant.sh", spec.opts.Name, "app")
+			cmd.Env = append(os.Environ(), "DOCKER="+dockerCmd)
+			cmd.Stdin = strings.NewReader("app-pass")
+			if out, cErr := cmd.CombinedOutput(); cErr == nil {
+				t.Errorf("pg-tenant.sh app succeeded on a pgadmin-owned database: %s", out)
+			} else if !strings.Contains(string(out), "owned by pgadmin") {
+				t.Errorf("pg-tenant.sh app error = %q, want owned by pgadmin", out)
+			}
+			if owner, _ := sh(t, dockerID, admin+`"select pg_get_userbyid(datdba) from pg_database where datname = 'app'"`, nil, false); owner != "pgadmin" {
+				t.Errorf("owner of app = %q, want pgadmin", owner)
+			}
+			if n, _ := sh(t, dockerID, admin+`"select count(*) from pg_roles where rolname = 'app'"`, nil, false); n != "0" {
+				t.Errorf("role app count = %q, want 0 (no role created on refusal)", n)
+			}
+			if acl, _ := sh(t, dockerID, admin+`"select coalesce(datacl::text, '') from pg_database where datname = 'app'"`, nil, false); acl != "" {
+				t.Errorf("app datacl = %q, want default (untouched)", acl)
+			}
+			t.Log("pg-tenant.sh: idempotent, quoted password, LOGIN only, owns its database, other tenants denied CONNECT, rotation works, foreign-owned database refused")
 		})
 	})
 }
