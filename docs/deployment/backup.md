@@ -39,6 +39,24 @@ sudo crontab -e
 0 3 * * 0 find /backup -name "goforge_*.sql.gz" -mtime +30 -delete
 ```
 
+## Shared Postgres (shared-pg) nightly dump
+
+A runbook, not something GoForge installs. Choose retention and where the files go yourself; this keeps dumps on the same host only.
+
+```bash
+# One custom-format dump per database, as the instance admin, from the host.
+ctr=goforge-service-<shared-pg id>
+out=/var/backups/shared-pg/$(date +%Y%m%d)
+sudo install -d -m 700 "$out"
+for db in $(sudo docker exec "$ctr" sh -c 'psql -X -tA -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select datname from pg_database where not datistemplate"'); do
+  sudo docker exec "$ctr" sh -c 'pg_dump -U "$POSTGRES_USER" -Fc -d "$1"' sh "$db" | sudo tee "$out/$db.dump" >/dev/null
+done
+# Roles and passwords (hashes) are cluster-wide, not in pg_dump:
+sudo docker exec "$ctr" sh -c 'pg_dumpall -U "$POSTGRES_USER" --roles-only' | sudo tee "$out/roles.sql" >/dev/null
+```
+
+Restore one app: `pg_restore -U "$POSTGRES_USER" -d <app> --clean --if-exists` with the dump on stdin (`docker exec -i`), after `roles.sql` if the role is missing. Schedule it with a cron entry or systemd timer once retention is decided.
+
 ## Restore
 
 ### Database Restore

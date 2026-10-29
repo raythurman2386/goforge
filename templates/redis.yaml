@@ -5,9 +5,10 @@ icon: redis
 category: database
 
 versions:
+  - "7.4"
   - "7"
   - "6"
-default_version: "7"
+default_version: "7.4"
 
 config:
   - name: password
@@ -16,9 +17,11 @@ config:
     generate: true
     required: true
 
+# The container limit stays well above maxmemory (256mb in the command):
+# Redis needs room for client buffers and the fork of an AOF rewrite.
 resources:
   cpu: "0.25"
-  memory: "256m"
+  memory: "512m"
 
 docker:
   image: "redis:{{ .Version }}"
@@ -34,6 +37,11 @@ docker:
   # reboot). Keep the rm -f: /tmp is sticky and fs.protected_regular=1 makes
   # root's ">" into the old redis-owned file fail with Permission denied.
   # docker-entrypoint.sh still drops to the redis user.
+  # Redis here is for sessions and queues, not a cache: AOF is on
+  # (appendfsync everysec, files under /data/appendonlydir) and a full
+  # instance refuses writes (noeviction) instead of dropping keys.
+  # Do not add aclfile next to requirepass: loading an ACL file resets the
+  # default user to nopass (checked on redis 7.4), which turns auth off.
   command:
     - sh
     - -c
@@ -47,7 +55,11 @@ docker:
       conf=/tmp/goforge-redis.conf
       rm -f "$conf"
       escaped=$(printf '%s' "$REDIS_PASSWORD" | sed 's/[\\"]/\\&/g')
-      printf 'requirepass "%s"\n' "$escaped" > "$conf"
+      {
+        printf 'requirepass "%s"\n' "$escaped"
+        printf '%s\n' 'dir /data' 'appendonly yes' 'appendfsync everysec' \
+          'maxmemory 256mb' 'maxmemory-policy noeviction'
+      } > "$conf"
       if [ "$(id -u)" = 0 ]; then chown redis "$conf"; fi
       exec docker-entrypoint.sh redis-server "$conf"
   environment:
