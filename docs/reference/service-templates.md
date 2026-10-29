@@ -213,6 +213,57 @@ WebSocket notifications are served on the main port by Vaultwarden 1.29 and late
 
 ---
 
+### Gitea
+
+**File**: `templates/gitea.yaml`
+
+| Property | Value |
+|----------|-------|
+| Name | `gitea` |
+| Category | `devtools` |
+| Web | Yes (Domain field, Traefik route) |
+| Versions | 1.25.5, latest |
+| Default version | 1.25.5 |
+| Default resources | 0.5 CPU, 512MB memory |
+| Container ports | 3000/tcp (HTTP, routed by Traefik), 22/tcp (SSH, not routed or published) |
+
+**Configuration fields**:
+
+| Field | Type | Default | Required | Description |
+|-------|------|---------|----------|-------------|
+| `app_name` | text | `Gitea: Git with a cup of tea` | Yes | `APP_NAME` |
+| `disable_registration` | text | `true` | Yes | `[service] DISABLE_REGISTRATION`, `true` or `false` |
+| `require_signin_view` | text | `true` | Yes | `[service] REQUIRE_SIGNIN_VIEW`, `true` or `false` |
+
+**Environment variables**:
+
+```yaml
+USER_UID: "1000"
+USER_GID: "1000"
+GITEA____APP_NAME: "{{ .Config.app_name }}"
+GITEA__SERVER__PROTOCOL: "http"
+GITEA__SERVER__HTTP_PORT: "3000"
+GITEA__SERVER__SSH_PORT: "22"
+GITEA__SERVER__DOMAIN: "{{ if .Domain }}{{ .Domain }}{{ else }}{{ .ContainerName }}{{ end }}"
+GITEA__SERVER__ROOT_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}/{{ else }}http://{{ .ContainerName }}:3000/{{ end }}"
+GITEA__SERVICE__DISABLE_REGISTRATION: "{{ .Config.disable_registration }}"
+GITEA__SERVICE__REQUIRE_SIGNIN_VIEW: "{{ .Config.require_signin_view }}"
+```
+
+Gitea maps `GITEA__<SECTION>__<KEY>` to `app.ini` on every start. The section name is case-insensitive. Keys in the root section need an empty section, so `APP_NAME` is `GITEA____APP_NAME` (four underscores). `GITEA__APP_NAME` has no key part and Gitea ignores it.
+
+`PROTOCOL` stays `http` for every domain. TLS ends at Traefik or Cloudflare, and `PROTOCOL=https` would make Gitea expect TLS on port 3000. `ROOT_URL` uses `{{ .Protocol }}`, so a public domain such as `gitea-app.example.com` gets `https://gitea-app.example.com/`, including in Cloudflare proxy mode.
+
+**Health check**: `wget --spider -q http://localhost:3000/api/healthz`
+
+**Connection**: internal `http://<container>:3000`, external `<protocol>://<domain>`
+
+**Volume**: `data` -> `/data`
+
+The first visit opens Gitea's install page. Create the admin account there. See [One-Click Services](../guides/services.md#gitea).
+
+---
+
 ## Creating Custom Templates
 
 To add a new service template:

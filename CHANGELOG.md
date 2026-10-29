@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - One-click SolidCraft (`solidcraft`) and Vaultwarden (`vaultwarden`) service templates
+- Gitea template fields for registration (`disable_registration`) and sign-in to view (`require_signin_view`), both `true` by default, and Gitea docs for public `-app` hosts behind Cloudflare Tunnel
 - First-Time User Experience (FTUX) onboarding flow with a step-by-step dashboard guide
 - Clear empty state warnings when attempting to create a project without a Git Source connected
 - Initial project setup
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-time container resource monitoring (stats) to standard Git Projects
 
 ### Changed
+- Gitea template pins `gitea/gitea:1.25.5` by default (`latest` still offered), sets `PROTOCOL=http` and `DOMAIN` explicitly so Gitea listens on HTTP behind Traefik while `ROOT_URL` is the `https://` browser URL
 - Service templates get `Protocol` = `https` for public domains in Cloudflare proxy mode (Cloudflare ends TLS), so `DOMAIN`/`ROOT_URL` style settings match the browser URL
 - Renamed project to GoForge
 - Simplified `doRequest` in Gitea and GitLab clients (removed redundant URL construction)
@@ -33,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed orphaned `CustomDomain` model and `internal/domain` logic that had no database repository
 
 ### Fixed
+- Gitea template set `GITEA__APP_NAME`, which Gitea ignores (no section separator). It now sets `GITEA____APP_NAME`
 - SSE streaming connections (deployment logs, container stats/logs) killed after 15 seconds by global `WriteTimeout`; replaced with per-route timeout middleware so SSE routes stream indefinitely
 - Stale documentation references to old project name "GoCool"/"gocool"
 - Outdated security warnings in database schema docs (encryption is now implemented)
