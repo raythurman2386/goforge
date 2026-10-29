@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -17,7 +18,64 @@ const (
 	UserContextKey contextKey = "user"
 	// SessionContextKey is the key for the session in the request context.
 	SessionContextKey contextKey = "session"
+	// APITokenContextKey is the key for the authenticating API token, when the
+	// request was authenticated with a bearer token instead of a session.
+	APITokenContextKey contextKey = "api_token"
 )
+
+// Errors returned by AuthenticateBearer.
+var (
+	// ErrNoBearerToken means the request has no usable Authorization: Bearer header.
+	ErrNoBearerToken = errors.New("no bearer token")
+	// ErrInvalidAPIToken means the bearer token is unknown, expired, or its user is gone.
+	ErrInvalidAPIToken = errors.New("invalid or expired API token")
+)
+
+// GetAPITokenFromContext returns the API token that authenticated the request,
+// or nil for session-authenticated and anonymous requests.
+func GetAPITokenFromContext(ctx context.Context) *models.APIToken {
+	if token, ok := ctx.Value(APITokenContextKey).(*models.APIToken); ok {
+		return token
+	}
+	return nil
+}
+
+// BearerToken returns the raw token from an Authorization: Bearer header.
+func BearerToken(r *http.Request) string {
+	authHeader := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+}
+
+// HashAPIToken returns the hex SHA-256 digest stored in api_tokens.token_hash.
+func HashAPIToken(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
+
+// AuthenticateBearer resolves the request's bearer token to its active token
+// row and user. Last-used is updated best-effort.
+func AuthenticateBearer(r *http.Request, tokens TokenLookup, users UserLookup) (*models.User, *models.APIToken, error) {
+	raw := BearerToken(r)
+	if raw == "" {
+		return nil, nil, ErrNoBearerToken
+	}
+
+	apiToken, err := tokens.GetByTokenHash(r.Context(), HashAPIToken(raw))
+	if err != nil || apiToken == nil || !apiToken.IsActive() {
+		return nil, nil, ErrInvalidAPIToken
+	}
+
+	user, err := users.GetByID(r.Context(), apiToken.UserID)
+	if err != nil || user == nil {
+		return nil, nil, ErrInvalidAPIToken
+	}
+
+	_ = tokens.UpdateLastUsed(r.Context(), apiToken.ID) //nolint:errcheck // best-effort update
+	return user, apiToken, nil
+}
 
 // GetUserFromContext retrieves the user from the context.
 func GetUserFromContext(ctx context.Context) *models.User {
@@ -68,6 +126,10 @@ type UserLookup interface {
 // APITokenMiddleware authenticates requests that carry an Authorization: Bearer
 // header with an API token. If the request already has a user in context (from
 // session cookie auth) or has no Bearer token, it passes through unchanged.
+//
+// Only tokens with the legacy full scope are accepted here. Tokens limited to
+// read, write, or protected are for /api/v1 only, so their scopes cannot be
+// bypassed through the HTML and HTMX routes.
 func APITokenMiddleware(tokens TokenLookup, users UserLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,38 +139,22 @@ func APITokenMiddleware(tokens TokenLookup, users UserLookup) func(http.Handler)
 				return
 			}
 
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			user, apiToken, err := AuthenticateBearer(r, tokens, users)
+			if errors.Is(err, ErrNoBearerToken) {
 				next.ServeHTTP(w, r)
 				return
 			}
-
-			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-			if rawToken == "" {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			// Hash the token and look it up
-			hash := sha256.Sum256([]byte(rawToken))
-			tokenHash := hex.EncodeToString(hash[:])
-
-			apiToken, err := tokens.GetByTokenHash(r.Context(), tokenHash)
-			if err != nil || !apiToken.IsActive() {
+			if err != nil {
 				http.Error(w, "invalid or expired API token", http.StatusUnauthorized)
 				return
 			}
-
-			user, err := users.GetByID(r.Context(), apiToken.UserID)
-			if err != nil {
-				http.Error(w, "invalid API token", http.StatusUnauthorized)
+			if !apiToken.IsFull() {
+				http.Error(w, "scoped API tokens are only valid on /api/v1", http.StatusUnauthorized)
 				return
 			}
 
-			// Update last used timestamp (best-effort, don't block on error)
-			_ = tokens.UpdateLastUsed(r.Context(), apiToken.ID) //nolint:errcheck // best-effort update
-
 			ctx := context.WithValue(r.Context(), UserContextKey, user)
+			ctx = context.WithValue(ctx, APITokenContextKey, apiToken)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

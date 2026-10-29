@@ -3,6 +3,8 @@ package services
 import (
 	"strings"
 	"unicode"
+
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 // ServiceEnvVarName returns the environment variable name to use when injecting a
@@ -68,4 +70,18 @@ func sanitizeEnvName(s string) string {
 	}
 	result := b.String()
 	return strings.TrimRight(result, "_")
+}
+
+// LinkEnvVars returns the env vars that linking inst to a project injects,
+// keyed by variable name. Values are connection strings and are secret.
+func LinkEnvVars(inst *models.ServiceInstance) (map[string]string, error) {
+	connInfo, err := inst.GetConnectionInfo()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(connInfo))
+	for connKey, connVal := range connInfo {
+		out[ServiceEnvVarName(inst.Name, inst.TemplateName, connKey)] = connVal
+	}
+	return out, nil
 }

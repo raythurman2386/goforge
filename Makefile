@@ -1,4 +1,4 @@
-.PHONY: all build dev test lint fmt vet clean css templ migrate help
+.PHONY: all build build-mcp docker-build-mcp dev test lint fmt vet clean css templ migrate help
 
 # Go parameters
 GOCMD=go
@@ -32,6 +32,10 @@ help:
 ## build: Build production binary
 build: templ css
 	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/goforge
+
+## build-mcp: Build the GoForge MCP server (stdio)
+build-mcp:
+	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o bin/goforge-mcp ./cmd/goforge-mcp
 
 ## dev: Run with hot reload (requires air)
 dev:
@@ -137,6 +141,10 @@ install-tools:
 ## docker-build: Build Docker image
 docker-build:
 	docker build -t goforge:latest .
+
+## docker-build-mcp: Build the MCP server image (target mcp)
+docker-build-mcp:
+	docker build --target mcp -t goforge-mcp:latest .
 
 ## docker-run: Run in Docker
 docker-run:

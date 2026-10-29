@@ -30,6 +30,21 @@ COPY . .
 # We run `make build` which handles `templ generate` and `css` generation
 RUN make build
 
+# MCP server build (target: mcp). Defined before the final stage so a plain
+# `docker build .` still produces the GoForge app image.
+FROM builder AS mcp-builder
+RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /app/bin/goforge-mcp ./cmd/goforge-mcp
+
+# MCP server image: `docker build --target mcp -t goforge-mcp .`
+# Speaks MCP over stdin/stdout and calls GoForge over HTTP. It needs no
+# Docker socket, no database, and no published port.
+FROM alpine:latest AS mcp
+RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 mcp
+COPY --from=mcp-builder /app/bin/goforge-mcp /usr/local/bin/goforge-mcp
+USER mcp
+ENV GOFORGE_MCP_URL=http://goforge:8080
+ENTRYPOINT ["/usr/local/bin/goforge-mcp"]
+
 # Final stage
 FROM alpine:latest
 

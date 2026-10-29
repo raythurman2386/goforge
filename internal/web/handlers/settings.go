@@ -372,6 +372,16 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if err := r.ParseForm(); err != nil {
+		RenderError(w, r, http.StatusBadRequest, "invalid form data")
+		return
+	}
+	scopes, ok := models.NormalizeScopes(r.PostForm["scopes"])
+	if !ok {
+		RenderError(w, r, http.StatusBadRequest, "Unknown token scope")
+		return
+	}
+
 	// Generate random token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -397,6 +407,7 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 		UserID:    user.ID,
 		Name:      name,
 		TokenHash: tokenHash,
+		Scopes:    scopes,
 		ExpiresAt: expiresAt,
 		CreatedAt: time.Now(),
 	}

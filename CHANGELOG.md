@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- JSON API `/api/v1` for automation (t1250u): bearer token only, outside the CSRF group, session cookies ignored; JSON errors with stable codes; ownership answers match the UI (#28). Reads mask secret env vars and service config; there is no secret-reveal route. Mutations are dry runs unless `"dry_run": false`, a real run needs `approval_ref`, and an `api_v1.<action>` audit row (approval_ref, token id) is written before anything changes; a failed audit insert blocks the change
+- API token scopes `read`, `write`, `protected` (migration `018_api_token_scopes`); chosen on Settings → Profile → API Tokens. Existing and unscoped tokens are `full`. Scoped tokens only work on `/api/v1` (t1250u)
+- `GOFORGE_PROTECTED_SERVICES`: service instance IDs whose stop, config edit, and image update through `/api/v1` need the `protected` scope (`403 protected_resource` before any Docker call); restart stays allowed with `write` (t1250u)
+- `cmd/goforge-mcp`: MCP server over stdio (go-sdk v1.8.0) with 22 read tools and, with `GOFORGE_MCP_ALLOW_WRITES=true`, 14 gated write tools; calls `/api/v1` with a scoped token, holds no Docker socket or database. `make build-mcp`, `make docker-build-mcp`, Dockerfile target `mcp`. Docs: `docs/reference/api-v1.md`, `docs/guides/mcp.md` (SSH + stdio) (t1250u)
 - One-click SolidCraft (`solidcraft`) and Vaultwarden (`vaultwarden`) service templates
 - Gitea template fields for registration (`disable_registration`) and sign-in to view (`require_signin_view`), both `true` by default, and Gitea docs for public `-app` hosts behind Cloudflare Tunnel
 - First-Time User Experience (FTUX) onboarding flow with a step-by-step dashboard guide
@@ -29,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs: shared data services (shared-pg / shared-redis with no Domain and no published port) and a shared-pg nightly `pg_dump` runbook (not installed) (#59)
 
 ### Changed
+- Router: global middleware is recovery and rate limit only; session and API-token auth wrap the UI routes, and `/api/v1` mounts beside them. `docs/reference/api-routes.md` brought in line with the routes (t1250u)
+- Dependencies: `golang.org/x/crypto`, `x/oauth2`, `x/sync`, `x/time`, `x/tools` minor bumps pulled in by `github.com/modelcontextprotocol/go-sdk` v1.8.0 (t1250u)
 - PostgreSQL template defaults to 17 (16, 15, 14 still offered), admin username `pgadmin` instead of `postgres`, a 32-char generated password, and 1 CPU / 1GiB; `database`, `username`, and `password` are immutable because the image applies them only on first init (#59)
 - Redis template defaults to 7.4 (7 and 6 still offered) and is set up for sessions and queues: `appendonly yes`, `appendfsync everysec`, `maxmemory 256mb`, `maxmemory-policy noeviction`, written into the per-start conf file next to `requirepass`; container memory 512MiB (#59)
 - Recreating a service container that publishes a host port (config edit, image update) renames the old container aside and removes it only after the new one starts; if the new one cannot start, the old one is restored and started again (#42)

@@ -132,3 +132,57 @@ func (r *AuditLogRepository) ListByResource(ctx context.Context, resourceType, r
 	}
 	return logs, nil
 }
+
+// AuditFilter narrows ListFiltered. Empty fields match everything.
+type AuditFilter struct {
+	UserID       string
+	ResourceType string
+	ResourceID   string
+	Action       string
+	Limit        int
+	Offset       int
+}
+
+// ListFiltered retrieves audit log entries matching every non-empty filter
+// field, newest first.
+func (r *AuditLogRepository) ListFiltered(ctx context.Context, f AuditFilter) ([]*models.AuditLog, error) {
+	query := `
+		SELECT id, user_id, action, resource_type, resource_id,
+			details, ip_address, user_agent, created_at
+		FROM audit_logs
+		WHERE ($1 = '' OR user_id::text = $1)
+			AND ($2 = '' OR resource_type = $2)
+			AND ($3 = '' OR resource_id::text = $3)
+			AND ($4 = '' OR action = $4)
+		ORDER BY created_at DESC
+		LIMIT $5 OFFSET $6`
+
+	rows, err := r.db.QueryContext(ctx, query, f.UserID, f.ResourceType, f.ResourceID, f.Action, f.Limit, f.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []*models.AuditLog
+	for rows.Next() {
+		l := &models.AuditLog{}
+		if err := rows.Scan(
+			&l.ID,
+			&l.UserID,
+			&l.Action,
+			&l.ResourceType,
+			&l.ResourceID,
+			&l.Details,
+			&l.IPAddress,
+			&l.UserAgent,
+			&l.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return logs, nil
+}

@@ -7,16 +7,27 @@ This is a complete reference of all HTTP routes exposed by the GoForge server.
 All routes pass through the following middleware (in order):
 
 1. **Recoverer** - Catches panics and returns 500
-2. **RateLimit** - 30 requests/second, burst of 60
-3. **Session** - Populates user/session in request context (safe for all routes)
+2. **RateLimit** - 30 requests/second, burst of 60, per client IP
+
+The JSON API under `/api/v1` stops here. It authenticates bearer tokens itself,
+ignores session cookies, checks token scopes, and is outside the CSRF group. See
+[API v1](api-v1.md).
+
+Every other route (webhooks, UI, and the 404/405 handlers) also uses:
+
+3. **Session** - Populates user/session in request context
+4. **APIToken** - If there is no session user and the request carries
+   `Authorization: Bearer <token>`, authenticates a legacy `full` token and
+   sets the user. An invalid token, or a scoped token (`read`, `write`,
+   `protected`), gets `401`: scoped tokens only work on `/api/v1`.
 
 Routes under the UI group additionally use:
 
-4. **CSRFMiddleware** - CSRF token validation for state-changing methods (POST, PUT, DELETE, PATCH)
+5. **CSRFMiddleware** - CSRF token validation for state-changing methods (POST, PUT, DELETE, PATCH)
 
 Authenticated routes additionally use:
 
-5. **RequireAuth** - Redirects to `/login` (or returns `HX-Redirect` header for HTMX requests)
+6. **RequireAuth** - Redirects to `/login` (or returns `HX-Redirect` header for HTMX requests)
 
 ---
 
@@ -66,6 +77,8 @@ All routes below require an active session (enforced by `RequireAuth` middleware
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
 | `GET` | `/dashboard` | `dashboardHandler.Dashboard` | Main dashboard view |
+| `GET` | `/dashboard/stats` | `dashboardHandler.DashboardStats` | Dashboard stats partial (HTMX polling) |
+| `POST` | `/dashboard/prune` | `dashboardHandler.Prune` | Prune unused Docker resources from the dashboard |
 
 ### Git API
 
@@ -92,6 +105,9 @@ Used by HTMX components for dynamic repository/branch selection.
 | `DELETE` | `/projects/{id}` | `projectHandler.DeleteProject` | Delete project and resources |
 | `GET` | `/projects/{id}/deployments` | `projectHandler.GetProject` | Project deployments tab |
 | `GET` | `/projects/{id}/settings` | `projectHandler.GetProject` | Project settings tab |
+| `GET` | `/projects/{id}/services` | `projectHandler.GetProject` | Project linked-services tab |
+| `POST` | `/projects/{id}/services` | `projectHandler.LinkService` | Link a service instance and inject its connection variables |
+| `DELETE` | `/projects/{id}/services/{serviceId}` | `projectHandler.UnlinkService` | Unlink a service instance |
 
 ### Deployments
 
@@ -112,6 +128,7 @@ Used by HTMX components for dynamic repository/branch selection.
 | `POST` | `/projects/{id}/envs` | `envHandler.CreateEnvironment` | Create an environment |
 | `PUT` | `/projects/{id}/envs/{envId}` | `envHandler.UpdateEnvironment` | Update an environment |
 | `GET` | `/projects/{id}/envs/new` | `envHandler.NewEnvironmentModal` | New environment modal (HTMX) |
+| `POST` | `/projects/{id}/envs/{envId}/variables/sync` | `envHandler.SyncEnvFromRepo` | Add variables declared in the repo's `.env.example` |
 
 ### Environment Variables
 
@@ -120,18 +137,23 @@ Used by HTMX components for dynamic repository/branch selection.
 | `GET` | `/envs/{envId}/variables` | `envHandler.GetVariables` | List environment variables |
 | `POST` | `/envs/{envId}/variables` | `envHandler.AddVariable` | Add a variable |
 | `GET` | `/envs/{envId}/variables/new` | `envHandler.NewVariableModal` | New variable modal (HTMX) |
+| `DELETE` | `/envs/{envId}/variables/{varId}` | `envHandler.DeleteVariable` | Delete a variable |
 
 ### Service Catalog
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
 | `GET` | `/services` | `serviceHandler.Catalog` | Browse service catalog |
+| `GET` | `/services/instances` | `serviceHandler.InstanceList` | Your service instances |
 | `POST` | `/services` | `serviceHandler.Deploy` | Deploy a service (fallback) |
 | `GET` | `/services/{template}/configure` | `serviceHandler.Configure` | Service configuration form |
 | `POST` | `/services/{template}` | `serviceHandler.Deploy` | Deploy a service by template |
 | `GET` | `/services/{id}` | `serviceHandler.Show` | View service instance (`{id}` is UUID) |
 | `DELETE` | `/services/{id}` | `serviceHandler.Delete` | Delete a service instance |
 | `POST` | `/services/{id}/restart` | `serviceHandler.Restart` | Restart a service instance |
+| `GET` | `/services/{id}/secret` | `serviceHandler.RevealSecret` | Reveal one secret config or connection value (UI only; there is no API v1 or MCP equivalent) |
+| `GET` | `/services/{id}/edit` | `serviceHandler.EditConfig` | Edit config form |
+| `POST` | `/services/{id}/edit` | `serviceHandler.UpdateConfig` | Save config and recreate the container (named volumes kept) |
 | `POST` | `/services/{id}/update` | `serviceHandler.UpdateImage` | Pull the image again and recreate the container (same config and volumes) |
 
 !!! note "Route Disambiguation"
@@ -158,7 +180,7 @@ Used by HTMX components for dynamic repository/branch selection.
 | `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password |
 | `GET` | `/settings/tokens` | `settingsHandler.ListAPITokens` | List API tokens (HTMX partial) |
 | `GET` | `/settings/tokens/new` | `settingsHandler.NewAPITokenModal` | New token modal (HTMX) |
-| `POST` | `/settings/tokens` | `settingsHandler.CreateAPIToken` | Create API token |
+| `POST` | `/settings/tokens` | `settingsHandler.CreateAPIToken` | Create API token (optional `scopes`: `read`, `write`, `protected`; none means `full`) |
 | `DELETE` | `/settings/tokens/{id}` | `settingsHandler.DeleteAPIToken` | Revoke API token |
 | `POST` | `/settings/prune` | `settingsHandler.PruneSystem` | Prune Docker system resources |
 | `GET` | `/settings/git` | `settingsHandler.GitSources` | List configured git sources |
@@ -168,12 +190,21 @@ Used by HTMX components for dynamic repository/branch selection.
 
 ---
 
+## JSON API v1
+
+`/api/v1/*` is the bearer-token JSON API used by the GoForge MCP server. It is
+documented in [API v1](api-v1.md).
+
+---
+
 ## Error Handlers
 
 | Status | Handler | Description |
 |--------|---------|-------------|
 | 404 | `handlers.NotFoundHandler` | Custom not found page |
 | 405 | `handlers.MethodNotAllowedHandler` | Method not allowed response |
+
+Under `/api/v1` both answer JSON: `{"error":{"code":"not_found",...}}`.
 
 ---
 
@@ -201,10 +232,13 @@ All state-changing methods (`POST`, `PUT`, `DELETE`, `PATCH`) under the UI route
 
 The CSRF token is stored in a cookie named `goforge_csrf` and is accessible to JavaScript (not HttpOnly) for HTMX integration.
 
-Webhook routes (`/webhooks/*`) are explicitly excluded from CSRF protection.
+Webhook routes (`/webhooks/*`) and the JSON API (`/api/v1/*`) are excluded from
+CSRF protection. `/api/v1` accepts only `Authorization: Bearer` and ignores
+cookies, so a browser cannot be tricked into calling it with a session.
 
 ---
 
 ## Source
 
-Route definitions: `internal/web/router.go`
+Route definitions: `internal/web/router.go` (UI, webhooks) and
+`internal/apiv1/handler.go` (`/api/v1`)

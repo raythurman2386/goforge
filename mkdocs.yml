@@ -92,6 +92,7 @@ nav:
     - Custom Domains: guides/custom-domains.md
     - Git Integration: guides/git-integration.md
     - Monitoring: guides/monitoring.md
+    - MCP Server: guides/mcp.md
   - Deployment:
     - Production Setup: deployment/index.md
     - Docker Compose: deployment/docker-compose.md
@@ -107,6 +108,7 @@ nav:
     - Templates & Frontend: development/frontend.md
   - Reference:
     - API Routes: reference/api-routes.md
+    - API v1: reference/api-v1.md
     - Database Schema: reference/database-schema.md
     - Service Templates: reference/service-templates.md
   - Security: security.md
