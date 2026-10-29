@@ -67,7 +67,7 @@ connection:
 | `password` | Password input. With `generate: true`, a blank field gets a server-generated password | As entered or generated, stored encrypted |
 | `number` | Number input | As entered |
 | `bool` | Checkbox. `default: true` starts it checked | Always `true` or `false` |
-| `select` | Drop-down of `options`. An optional select also offers a blank choice | One of `options`, or empty for an optional field left blank |
+| `select` | Drop-down of `options`. An optional select also offers a blank choice | One of `options`, or, for an optional field left blank, the field's `default` if one is set (empty only when there is no default) |
 
 Use `bool` for on/off settings instead of a `text` field with a `"true" or "false"` hint, and `select` for a fixed set of values:
 
