@@ -96,6 +96,14 @@ type mockDockerClient struct {
 	cleanupSystemFunc    func(ctx context.Context) error
 	imageExistsFunc      func(ctx context.Context, image string) (bool, error)
 	ensureImageFunc      func(ctx context.Context, image string) error
+	pullImageFunc        func(ctx context.Context, image string) error
+}
+
+func (m *mockDockerClient) PullImage(ctx context.Context, image string) error {
+	if m.pullImageFunc != nil {
+		return m.pullImageFunc(ctx, image)
+	}
+	return nil
 }
 
 func (m *mockDockerClient) ImageExists(ctx context.Context, image string) (bool, error) {

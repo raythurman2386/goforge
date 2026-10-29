@@ -69,6 +69,7 @@ func (fakeDocker) RemoveContainer(context.Context, string) error     { return ni
 func (fakeDocker) RestartContainer(context.Context, string) error    { return nil }
 func (fakeDocker) CleanupSystem(context.Context) error               { return nil }
 func (fakeDocker) EnsureImage(context.Context, string) error         { return nil }
+func (fakeDocker) PullImage(context.Context, string) error           { return nil }
 func (fakeDocker) ImageExists(context.Context, string) (bool, error) { return true, nil }
 
 func newEditHandler(t *testing.T, status models.ServiceInstanceStatus) (*ServiceHandler, *fakeInstanceRepo) {

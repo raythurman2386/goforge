@@ -337,6 +337,7 @@ connection:
 
 ### Template Guidelines
 
+- **image**: Prefer a pinned version tag or a digest (`name@sha256:...`) over `latest`. GoForge pulls tag references on every deploy and recreate, so a moved `latest` changes what runs the next time the container is created. Digest references are pulled only when missing. The **Update image** action on a service page pulls and recreates on demand
 - **name**: Use lowercase, single word. Must be unique across all templates
 - **versions**: List most recent first. Use string format even for numeric versions
 - **password fields**: Set `generate: true` to auto-generate secure passwords

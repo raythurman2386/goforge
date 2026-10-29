@@ -61,6 +61,18 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 							</svg>
 							Edit configuration
 						</a>
+						<button
+							hx-post={ "/services/" + instance.ID + "/update" }
+							hx-confirm="Pull the latest image for this service and recreate its container? Data volumes and configuration are kept. The service is briefly unavailable while it restarts."
+							hx-swap="none"
+							class="btn-secondary"
+							title="Pull the image again and recreate the container"
+						>
+							<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+							</svg>
+							Update image
+						</button>
 					}
 					<button hx-post={ "/services/" + instance.ID + "/restart" } hx-swap="none" class="btn-secondary">
 						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

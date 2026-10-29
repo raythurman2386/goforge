@@ -27,6 +27,9 @@ type editHarness struct {
 	removed    []string
 	deletedRow []string
 	createErr  error
+	pulled     []string
+	pullErr    error
+	events     []string // docker calls in order: pull, stop, remove, create
 	done       chan struct{}
 	svc        *InstanceService
 }
@@ -125,20 +128,30 @@ func newEditHarness(t *testing.T) *editHarness {
 			if h.createErr != nil {
 				return "", h.createErr
 			}
+			h.events = append(h.events, "create")
 			h.created = append(h.created, opts)
 			return "docker-" + string(rune('0'+len(h.created))), nil
 		},
 		stopContainerFunc: func(_ context.Context, id string) error {
 			h.mu.Lock()
 			defer h.mu.Unlock()
+			h.events = append(h.events, "stop")
 			h.stopped = append(h.stopped, id)
 			return nil
 		},
 		removeContainerFunc: func(_ context.Context, id string) error {
 			h.mu.Lock()
 			defer h.mu.Unlock()
+			h.events = append(h.events, "remove")
 			h.removed = append(h.removed, id)
 			return nil
+		},
+		pullImageFunc: func(_ context.Context, image string) error {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.events = append(h.events, "pull")
+			h.pulled = append(h.pulled, image)
+			return h.pullErr
 		},
 	}
 
