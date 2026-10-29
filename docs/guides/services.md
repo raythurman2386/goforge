@@ -64,11 +64,36 @@ To close signups after the first account, open `/admin`, sign in with the admin 
 !!! warning "Do not redeploy to change settings"
     GoForge has no edit action for a running service. A new deploy is a new instance with a new, empty `/data` volume, so deleting and redeploying Vaultwarden loses the vault. Change settings in `/admin` instead.
 
+### Gitea
+
+A self-hosted Git service.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Version | 1.25.5 | `gitea/gitea` tag. `latest` is also offered |
+| Port | 3000 | HTTP port Traefik routes to. Port 22 (SSH) is declared but not reachable, see below |
+| Domain | `gitea.localhost` | Public host, for example `gitea-app.example.com`. Sets `DOMAIN` and `ROOT_URL` |
+| Application Name | `Gitea: Git with a cup of tea` | `APP_NAME` shown in the page title |
+| Disable Registration | `true` | `[service] DISABLE_REGISTRATION`. Only admins can create accounts |
+| Require Sign-in to View | `true` | `[service] REQUIRE_SIGNIN_VIEW`. Anonymous visitors see only the sign-in page |
+| Storage | Docker volume | `/data` (SQLite database, repositories, `app.ini`) |
+
+Gitea always listens on plain HTTP (`PROTOCOL=http`). Traefik, and Cloudflare in proxy mode, end TLS in front of it. Only `ROOT_URL` carries the browser URL: `https://<domain>/` for a public host, `http://<domain>/` for a `.localhost` host. Do not set Gitea's `PROTOCOL` to `https`. Gitea then expects TLS on port 3000 and the Traefik route returns errors.
+
+When you enter a Domain, GoForge adds the Traefik labels itself: a ``Host(`<domain>`)`` router on the `web` entrypoint in Cloudflare proxy mode or for a `.localhost` host (otherwise `websecure` with a Let's Encrypt certificate and an HTTP to HTTPS redirect) and a load balancer on port 3000, the first port in the template. For a public host, create the proxied Cloudflare CNAME first (see [Public HTTPS behind Cloudflare Tunnel](#public-https-behind-cloudflare-tunnel)).
+
+**First start.** Gitea opens its install page at `ROOT_URL` until someone submits it. The page is public, so finish it right after the deploy turns `running`. Keep SQLite, check that **Server Domain** and **Gitea Base URL** match your Domain, and fill in **Administrator Account Settings**. With registration disabled, the install page is the only way to create the first account from the browser. GoForge has no shell into the container.
+
+**SSH.** GoForge does not publish container ports on the host, and Traefik routes only HTTP. Port 22 is not reachable from outside the Docker network, so clone and push over HTTPS with a personal access token. SSH clone URLs that Gitea shows do not work.
+
+!!! warning "Do not redeploy to change settings"
+    As with Vaultwarden, a new deploy is a new instance with a new, empty `/data` volume, so repositories and users are lost. Change settings in **Site Administration** instead. Fields set from the environment (domain, URLs, registration) are rewritten into `app.ini` on every container start.
+
 ### Public HTTPS behind Cloudflare Tunnel
 
 With `CLOUDFLARE_PROXY_MODE=true`, Cloudflare ends TLS and forwards HTTP to Traefik. GoForge routes the service on the `web` entrypoint, and templates still get `Protocol` = `https` for any domain that is not `localhost` or `*.localhost`, because that is the URL a browser uses.
 
-Use a first-level host such as `vaultwarden-app.example.com`. Cloudflare Universal SSL covers `*.example.com` but not `*.apps.example.com`. Create a proxied CNAME for the host that points at your tunnel (`<tunnel-id>.cfargotunnel.com`) before you deploy, then enter the host in the **Domain** field.
+Use a first-level host such as `vaultwarden-app.example.com` or `gitea-app.example.com`. Cloudflare Universal SSL covers `*.example.com` but not `*.apps.example.com`. Create a proxied CNAME for the host that points at your tunnel (`<tunnel-id>.cfargotunnel.com`) before you deploy, then enter the host in the **Domain** field.
 
 ## Deploying a Service
 

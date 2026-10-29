@@ -1,19 +1,30 @@
 name: gitea
 display_name: Gitea
-description: A painless self-hosted Git service - lightweight GitHub/GitLab alternative written in Go.
+description: Self-hosted Git service written in Go. Gitea listens on HTTP port 3000 and GoForge routes the Domain to it through Traefik, so give it a public HTTPS host such as <name>-app.example.com (proxied Cloudflare CNAME to your tunnel). Gitea keeps PROTOCOL=http behind the proxy and ROOT_URL is the https:// browser URL. SSH (port 22) is not routed by Traefik or published on the host, so clone over HTTPS. Create the admin account on the first-run install page.
 icon: gitea
 category: devtools
 web: true
 
 versions:
+  - "1.25.5"
   - "latest"
-default_version: "latest"
+default_version: "1.25.5"
 
 config:
   - name: app_name
     label: Application Name
     type: text
     default: "Gitea: Git with a cup of tea"
+    required: true
+  - name: disable_registration
+    label: Disable Registration ("true" or "false")
+    type: text
+    default: "true"
+    required: true
+  - name: require_signin_view
+    label: Require Sign-in to View ("true" or "false")
+    type: text
+    default: "true"
     required: true
 
 resources:
@@ -30,10 +41,17 @@ docker:
   environment:
     USER_UID: "1000"
     USER_GID: "1000"
-    GITEA__APP_NAME: "{{ .Config.app_name }}"
+    # Root-section keys need an empty section: GITEA____KEY. GITEA__APP_NAME is ignored.
+    GITEA____APP_NAME: "{{ .Config.app_name }}"
+    # Gitea serves plain HTTP. Traefik (and Cloudflare in proxy mode) end TLS in front of it.
+    # PROTOCOL=https would make Gitea expect TLS on :3000 and break the route.
+    GITEA__SERVER__PROTOCOL: "http"
     GITEA__SERVER__HTTP_PORT: "3000"
     GITEA__SERVER__SSH_PORT: "22"
+    GITEA__SERVER__DOMAIN: "{{ if .Domain }}{{ .Domain }}{{ else }}{{ .ContainerName }}{{ end }}"
     GITEA__SERVER__ROOT_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}/{{ else }}http://{{ .ContainerName }}:3000/{{ end }}"
+    GITEA__SERVICE__DISABLE_REGISTRATION: "{{ .Config.disable_registration }}"
+    GITEA__SERVICE__REQUIRE_SIGNIN_VIEW: "{{ .Config.require_signin_view }}"
   volumes:
     - name: data
       path: /data
