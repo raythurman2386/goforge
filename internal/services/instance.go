@@ -501,7 +501,7 @@ func mergeEditedConfig(tmpl *ServiceTemplate, current, updates map[string]interf
 		if field.Name == "name" || field.Name == "domain" {
 			continue
 		}
-		setString(field.Name, field.Type == "password")
+		setString(field.Name, field.Type == FieldTypePassword)
 	}
 	return merged
 }
@@ -631,8 +631,14 @@ func buildHealthCheck(hc HealthCheckConfig) *container.HealthConfig {
 	}
 }
 
+// templateFuncs are available to every template string. argon2id turns a
+// stored secret into the PHC hash a service such as Vaultwarden expects.
+var templateFuncs = template.FuncMap{
+	"argon2id": argon2idPHC,
+}
+
 func (s *InstanceService) interpolate(text string, data interface{}) (string, error) {
-	tmpl, err := template.New("service").Parse(text)
+	tmpl, err := template.New("service").Funcs(templateFuncs).Parse(text)
 	if err != nil {
 		return "", err
 	}

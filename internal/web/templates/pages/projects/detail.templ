@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
@@ -383,7 +384,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 											{ string(svc.Status) }
 										</span>
 									</div>
-									if connInfo, err := svc.GetConnectionInfo(); err == nil && len(connInfo) > 0 {
+									if connInfo := services.MaskedConnectionInfo(nil, svc); len(connInfo) > 0 {
 										<div class="mt-2 space-y-1">
 											for key, val := range connInfo {
 												<div class="flex items-center space-x-2">

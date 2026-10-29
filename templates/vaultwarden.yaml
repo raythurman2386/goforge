@@ -34,7 +34,7 @@ docker:
   environment:
     DOMAIN: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ end }}"
     SIGNUPS_ALLOWED: "{{ .Config.signups_allowed }}"
-    ADMIN_TOKEN: "{{ .Config.admin_token }}"
+    ADMIN_TOKEN: "{{ argon2id .Config.admin_token }}"
   volumes:
     - name: data
       path: /data

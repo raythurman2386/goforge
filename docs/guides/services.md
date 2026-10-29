@@ -54,7 +54,7 @@ A Bitwarden-compatible password manager server.
 | Port | 80 | Container port |
 | Domain | `vaultwarden.localhost` | Public host. Sets `DOMAIN` to `<protocol>://<domain>` |
 | Allow Signups | `true` | `SIGNUPS_ALLOWED` at first start. Turn it off in `/admin` after you create your account |
-| Admin Panel Token | Generated on the server when the field is left blank | `ADMIN_TOKEN` for `/admin`, stored encrypted and shown on the service page |
+| Admin Panel Token | Generated on the server when the field is left blank | Sign-in token for `/admin`, stored encrypted and masked on the service page. The container gets an Argon2id hash as `ADMIN_TOKEN` |
 | Storage | Docker volume | `/data` (SQLite vault, attachments, keys) |
 
 Bitwarden clients and the web vault need HTTPS, so give Vaultwarden a public HTTPS domain.

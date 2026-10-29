@@ -158,6 +158,37 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// RevealSecret returns one masked Connection Details value as plain text for
+// the page's Show and Copy buttons, so secrets are not in the page HTML.
+func (h *ServiceHandler) RevealSecret(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	instance, err := h.instanceService.GetInstance(r.Context(), id)
+	if err != nil {
+		http.Error(w, "service instance not found", http.StatusNotFound)
+		return
+	}
+	user, ok := r.Context().Value(auth.UserContextKey).(*models.User)
+	if !ok || user.ID != instance.UserID {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+	tmpl, err := h.catalog.GetTemplate(instance.TemplateName)
+	if err != nil {
+		tmpl = nil
+	}
+	value, found := services.SecretValue(tmpl, instance, r.URL.Query().Get("source"), r.URL.Query().Get("key"))
+	if !found {
+		http.Error(w, "secret not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if _, err := w.Write([]byte(value)); err != nil {
+		h.logger.Warn("failed to write secret response", "instance_id", id, "error", err)
+	}
+}
+
 // EditConfig renders the edit form for a deployed service instance,
 // prefilled from its stored config. Password fields start blank.
 func (h *ServiceHandler) EditConfig(w http.ResponseWriter, r *http.Request) {
