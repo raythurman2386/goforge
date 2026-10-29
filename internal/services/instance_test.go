@@ -92,6 +92,7 @@ type mockDockerClient struct {
 	startContainerFunc   func(ctx context.Context, id string) error
 	stopContainerFunc    func(ctx context.Context, id string) error
 	removeContainerFunc  func(ctx context.Context, id string) error
+	renameContainerFunc  func(ctx context.Context, id, newName string) error
 	restartContainerFunc func(ctx context.Context, id string) error
 	cleanupSystemFunc    func(ctx context.Context) error
 	imageExistsFunc      func(ctx context.Context, image string) (bool, error)
@@ -160,6 +161,13 @@ func (m *mockDockerClient) StopContainer(ctx context.Context, id string) error {
 func (m *mockDockerClient) RemoveContainer(ctx context.Context, id string) error {
 	if m.removeContainerFunc != nil {
 		return m.removeContainerFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockDockerClient) RenameContainer(ctx context.Context, id, newName string) error {
+	if m.renameContainerFunc != nil {
+		return m.renameContainerFunc(ctx, id, newName)
 	}
 	return nil
 }

@@ -45,6 +45,9 @@ type DockerClient interface {
 	StartContainer(ctx context.Context, id string) error
 	StopContainer(ctx context.Context, id string) error
 	RemoveContainer(ctx context.Context, id string) error
+	// RenameContainer renames a container. A recreate that publishes host
+	// ports parks the old container under another name until the new one starts.
+	RenameContainer(ctx context.Context, id, newName string) error
 	RestartContainer(ctx context.Context, id string) error
 	CleanupSystem(ctx context.Context) error
 	// WaitHealthy blocks until the container's health check passes (or, with
@@ -158,6 +161,14 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		domain = d
 	}
 
+	// Reject a bad published host port before any record or container exists.
+	if _, portErr := s.renderPortBindings(tmpl, s.templateData(tmpl, &models.ServiceInstance{
+		Version: sql.NullString{String: tmpl.DefaultVersion, Valid: true},
+		Domain:  sql.NullString{String: domain, Valid: domain != ""},
+	}, config)); portErr != nil {
+		return nil, portErr
+	}
+
 	instance := &models.ServiceInstance{
 		UserID:       userID,
 		TemplateName: tmplName,
@@ -233,20 +244,9 @@ type renderedHook struct {
 // config edits share it so a recreated container gets the same name, network,
 // labels, health check, and named volumes as the original.
 func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *models.ServiceInstance, config map[string]interface{}) (*containerSpec, error) {
-	domain := ""
-	if instance.Domain.Valid {
-		domain = instance.Domain.String
-	}
-	containerName := fmt.Sprintf("goforge-service-%s", instance.ID)
-
-	data := map[string]interface{}{
-		"Config":        templateConfig(tmpl, config),
-		"Version":       instance.Version.String,
-		"InstanceID":    instance.ID,
-		"ContainerName": containerName,
-		"Domain":        domain,
-		"Protocol":      publicProtocol(domain),
-	}
+	data := s.templateData(tmpl, instance, config)
+	containerName := dataString(data, "ContainerName")
+	domain := dataString(data, "Domain")
 
 	image, err := s.interpolate(tmpl.Docker.Image, data)
 	if err != nil {
@@ -281,6 +281,11 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 		return nil, fmt.Errorf("template %s resources: %w", tmpl.Name, err)
 	}
 
+	portMappings, err := s.renderPortBindings(tmpl, data)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := docker.ContainerOptions{
 		Name:          containerName,
 		Image:         image,
@@ -289,6 +294,7 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 		RestartPolicy: docker.RestartUnlessStopped,
 		Memory:        memory,
 		NanoCPUs:      nanoCPUs,
+		PortMappings:  portMappings,
 	}
 
 	// Determine the primary HTTP port from the template
@@ -314,9 +320,26 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 	return &containerSpec{instanceID: instance.ID, opts: opts, data: data, hooks: hooks, secrets: SecretValues(tmpl, config)}, nil
 }
 
+// templateData is the data every template string of an instance renders with.
+func (s *InstanceService) templateData(tmpl *ServiceTemplate, instance *models.ServiceInstance, config map[string]interface{}) map[string]interface{} {
+	domain := ""
+	if instance.Domain.Valid {
+		domain = instance.Domain.String
+	}
+	return map[string]interface{}{
+		"Config":        templateConfig(tmpl, config),
+		"Version":       instance.Version.String,
+		"InstanceID":    instance.ID,
+		"ContainerName": fmt.Sprintf("goforge-service-%s", instance.ID),
+		"Domain":        domain,
+		"Protocol":      publicProtocol(domain),
+	}
+}
+
 // templateConfig returns config with every field the template declares
-// present, so a field missing from an older instance's stored config renders
-// as "" instead of text/template's "<no value>". config is not modified.
+// present, so a field missing from an older instance's stored config never
+// renders as text/template's "<no value>". A missing field takes its declared
+// default, or "" when it has none. config is not modified.
 func templateConfig(tmpl *ServiceTemplate, config map[string]interface{}) map[string]interface{} {
 	out := make(map[string]interface{}, len(config)+len(tmpl.Config))
 	for k, v := range config {
@@ -324,7 +347,11 @@ func templateConfig(tmpl *ServiceTemplate, config map[string]interface{}) map[st
 	}
 	for _, f := range tmpl.Config {
 		if v, ok := out[f.Name]; !ok || v == nil {
-			out[f.Name] = ""
+			if f.Default != nil {
+				out[f.Name] = f.Default
+			} else {
+				out[f.Name] = ""
+			}
 		}
 	}
 	return out
@@ -442,16 +469,38 @@ func hookOutputTail(out string) string {
 // and marks the instance running. When replaced is non-nil its DB row is
 // removed once the new container exists.
 func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, replaced *models.Container, logAttrs []any) {
-	instanceID := spec.instanceID
+	dockerID, err := s.createServiceContainer(ctx, spec, logAttrs)
+	if err != nil {
+		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed)
+		return
+	}
+	s.finishServiceContainer(ctx, tmpl, spec, dockerID, replaced, logAttrs)
+}
 
+// createServiceContainer creates and starts the container for spec. A
+// container that was created but could not start (for example, its host port
+// is taken) is removed so it does not hold the name.
+func (s *InstanceService) createServiceContainer(ctx context.Context, spec *containerSpec, logAttrs []any) (string, error) {
 	dockerID, err := s.dockerClient.CreateContainer(ctx, spec.opts)
 	if err != nil {
-		s.logger.Error("failed to create container", "error", err, "instance_id", instanceID)
-		s.setInstanceStatus(ctx, instanceID, models.ServiceStatusFailed)
-		return
+		s.logger.Error("failed to create container", "error", err, "instance_id", spec.instanceID)
+		if dockerID != "" {
+			if rmErr := s.dockerClient.RemoveContainer(ctx, dockerID); rmErr != nil {
+				s.logger.Warn("failed to remove container that did not start", "docker_id", dockerID, "error", rmErr)
+			}
+		}
+		return "", err
 	}
 	// CreateContainer creates and starts the container in one call.
 	s.logger.Info("service container created and started", append(logAttrs, "container", spec.opts.Name, "docker_id", dockerID)...)
+	return dockerID, nil
+}
+
+// finishServiceContainer records a started container, runs post_start hooks,
+// and writes the instance status and connection info.
+func (s *InstanceService) finishServiceContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, dockerID string, replaced *models.Container, logAttrs []any) {
+	instanceID := spec.instanceID
+	var err error
 
 	if replaced != nil {
 		if delErr := s.containerRepo.Delete(ctx, replaced.ID); delErr != nil {
@@ -465,6 +514,7 @@ func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *Servi
 		Name:              spec.opts.Name,
 		Image:             spec.opts.Image,
 		Status:            models.ContainerStatusRunning,
+		Ports:             portMappingsJSON(spec.opts.PortMappings),
 	}); err != nil {
 		s.logger.Error("failed to record container in DB", "error", err, "instance_id", instanceID)
 	}
@@ -656,6 +706,9 @@ func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTe
 		if stopErr := s.dockerClient.StopContainer(ctx, old.DockerID); stopErr != nil {
 			s.logger.Warn("failed to stop container", "docker_id", old.DockerID, "error", stopErr)
 		}
+		if len(spec.opts.PortMappings) > 0 && s.replaceParked(ctx, tmpl, spec, old, logAttrs) {
+			return
+		}
 		// Docker keeps named volumes on container removal; RemoveVolumes only
 		// drops anonymous ones. The goforge-vol-* volumes stay for the new container.
 		if removeErr := s.dockerClient.RemoveContainer(ctx, old.DockerID); removeErr != nil {
@@ -664,6 +717,45 @@ func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTe
 	}
 
 	s.startServiceContainer(ctx, tmpl, spec, old, logAttrs)
+}
+
+// replaceParked swaps the stopped container old for a new one built from a
+// spec that publishes host ports. A new container can fail to start when its
+// host port is taken, so old is renamed aside instead of removed, and removed
+// only once the new container runs. If the new container cannot start, old
+// gets its name back and is started again, and the instance is marked failed
+// because the edit did not apply. It returns false, having changed nothing,
+// when old cannot be renamed; the caller then replaces it the usual way.
+func (s *InstanceService) replaceParked(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, old *models.Container, logAttrs []any) bool {
+	parked := fmt.Sprintf("%s-replaced-%d", spec.opts.Name, time.Now().Unix())
+	if err := s.dockerClient.RenameContainer(ctx, old.DockerID, parked); err != nil {
+		s.logger.Warn("could not park the old container; removing it before create", append(logAttrs, "docker_id", old.DockerID, "error", err)...)
+		return false
+	}
+
+	dockerID, err := s.createServiceContainer(ctx, spec, logAttrs)
+	if err != nil {
+		restored := true
+		if renameErr := s.dockerClient.RenameContainer(ctx, old.DockerID, spec.opts.Name); renameErr != nil {
+			restored = false
+			s.logger.Error("failed to rename the old container back", append(logAttrs, "docker_id", old.DockerID, "parked_as", parked, "error", renameErr)...)
+		} else if startErr := s.dockerClient.StartContainer(ctx, old.DockerID); startErr != nil {
+			restored = false
+			s.logger.Error("failed to restart the old container", append(logAttrs, "docker_id", old.DockerID, "error", startErr)...)
+		}
+		if restored {
+			s.logger.Error("new container did not start; previous container restored and running with the previous configuration", append(logAttrs, "docker_id", old.DockerID, "error", err)...)
+		}
+		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed)
+		return true
+	}
+
+	// Docker keeps named volumes on container removal; the new container already mounts them.
+	if removeErr := s.dockerClient.RemoveContainer(ctx, old.DockerID); removeErr != nil {
+		s.logger.Warn("failed to remove the replaced container", append(logAttrs, "docker_id", old.DockerID, "parked_as", parked, "error", removeErr)...)
+	}
+	s.finishServiceContainer(ctx, tmpl, spec, dockerID, old, logAttrs)
+	return true
 }
 
 // mergeEditedConfig returns current with the editable fields from updates

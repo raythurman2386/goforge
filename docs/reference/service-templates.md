@@ -42,9 +42,12 @@ resources:
 # Docker Configuration
 docker:
   image: string           # Docker image with version template
-  ports:                  # Port mappings
+  ports:                  # Container ports. The first is the HTTP port Traefik routes to
     - container: integer  # Container port
       protocol: string    # Protocol (tcp/udp)
+      publish: bool       # Publish on the host (optional, default false)
+      host_port: string   # Host port, Go template (required with publish), e.g. "{{ .Config.ssh_port }}"
+      host_ip: string     # Host address (optional, default 127.0.0.1). Loopback only; 0.0.0.0 and :: are refused
   environment:            # Environment variables (Go templates)
     KEY: "{{ .Config.fieldname }}"
   optional_environment:   # Like environment, but left out when the value renders empty
@@ -75,7 +78,29 @@ connection:
 
 A field with `immutable: true` gets its value at deploy (generated there when `generate: true` and left blank) and keeps it. **Edit configuration** does not show it and ignores it if a form sends it, and an edit never generates it. An instance deployed before the field was added to the template stays without it. Use it for values a service writes into its own data on first start and that must not change later, such as an encryption key or the first admin password.
 
-Pair an immutable field with `optional_environment` when an empty value must not reach the container. GoForge leaves a variable in `optional_environment` out when it renders to an empty string, so an older instance without the field keeps whatever the service already stored. A field that the template declares but the stored config lacks renders as an empty string, never as `<no value>`.
+Pair an immutable field with `optional_environment` when an empty value must not reach the container. GoForge leaves a variable in `optional_environment` out when it renders to an empty string, so an older instance without the field keeps whatever the service already stored. A field that the template declares but the stored config lacks renders as its `default`, or as an empty string when it has none, never as `<no value>`.
+
+### Published ports
+
+GoForge never publishes a container port on the host unless the template says so with `publish: true`. Traefik routes only the first port, over HTTP; publish a port for a protocol Traefik does not carry, such as Gitea's SSH.
+
+```yaml
+docker:
+  ports:
+    - container: 3000          # HTTP, routed by Traefik
+      protocol: tcp
+    - container: 22            # SSH, published on 127.0.0.1:<ssh_port>
+      protocol: tcp
+      publish: true
+      host_port: "{{ .Config.ssh_port }}"
+      host_ip: "127.0.0.1"
+```
+
+- `host_port` is required with `publish` and is a Go template with the same variables as `environment`. It must render to a port from 1 to 65535; anything else rejects the deploy or edit before a container is touched.
+- `host_ip` defaults to `127.0.0.1`. It must be a loopback address (`127.0.0.1`, `::1`). `0.0.0.0`, `::`, and every other address are refused when the catalog loads, because Docker publishes bypass the host firewall. Reach a loopback port from elsewhere with an SSH jump to the host.
+- `host_port` or `host_ip` without `publish: true` is an error.
+- The binding is stored on the container record and shown on the service page under **Connection Details** (`published 22/tcp` → `127.0.0.1:2223`).
+- Two instances with the same host port collide. When **Edit configuration** or **Update image** recreates a container that publishes a port, GoForge renames the old container aside instead of removing it, and removes it only once the new one runs. If the new container cannot start (for example, its host port is taken), the old container gets its name back and starts again, and the instance is marked `failed`.
 
 ### Post-start hooks
 
@@ -299,7 +324,7 @@ WebSocket notifications are served on the main port by Vaultwarden 1.29 and late
 | Versions | 1.25.5, latest |
 | Default version | 1.25.5 |
 | Default resources | 0.5 CPU, 512MB memory |
-| Container ports | 3000/tcp (HTTP, routed by Traefik), 22/tcp (SSH, not routed or published) |
+| Container ports | 3000/tcp (HTTP, routed by Traefik), 22/tcp (SSH, published on `127.0.0.1:<ssh_port>`) |
 
 **Configuration fields**:
 
@@ -312,6 +337,8 @@ WebSocket notifications are served on the main port by Vaultwarden 1.29 and late
 | `admin_email` | text | blank | No | First admin email. Blank uses `admin@<Domain>`, or `admin@<container name>` without a Domain |
 | `admin_password` | password, immutable | (generated, 32 chars) | Yes | First admin password, masked on the service page |
 | `secret_key` | password, immutable | (generated, 64 chars) | Yes | `[security] SECRET_KEY` |
+| `ssh_port` | number | `2223` | Yes | Host port SSH is published on (`127.0.0.1` only) and `[server] SSH_PORT` |
+| `ssh_domain` | text | `minis` | No | `[server] SSH_DOMAIN`, the host in SSH clone URLs. Blank uses `DOMAIN` |
 
 **Environment variables**:
 
@@ -321,7 +348,7 @@ USER_GID: "1000"
 GITEA____APP_NAME: "{{ .Config.app_name }}"
 GITEA__SERVER__PROTOCOL: "http"
 GITEA__SERVER__HTTP_PORT: "3000"
-GITEA__SERVER__SSH_PORT: "22"
+GITEA__SERVER__SSH_PORT: "{{ .Config.ssh_port }}"
 GITEA__SERVER__DOMAIN: "{{ if .Domain }}{{ .Domain }}{{ else }}{{ .ContainerName }}{{ end }}"
 GITEA__SERVER__ROOT_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}/{{ else }}http://{{ .ContainerName }}:3000/{{ end }}"
 GITEA__SERVICE__DISABLE_REGISTRATION: "{{ .Config.disable_registration }}"
@@ -329,9 +356,13 @@ GITEA__SERVICE__REQUIRE_SIGNIN_VIEW: "{{ .Config.require_signin_view }}"
 GITEA__security__INSTALL_LOCK: "true"
 # optional_environment: left out when empty (instances deployed before secret_key existed)
 GITEA__security__SECRET_KEY: "{{ .Config.secret_key }}"
+# optional_environment: left out when blank, so Gitea uses DOMAIN
+GITEA__SERVER__SSH_DOMAIN: "{{ .Config.ssh_domain }}"
 ```
 
 Gitea maps `GITEA__<SECTION>__<KEY>` to `app.ini` on every start. The section name is case-insensitive. Keys in the root section need an empty section, so `APP_NAME` is `GITEA____APP_NAME` (four underscores). `GITEA__APP_NAME` has no key part and Gitea ignores it.
+
+`SSH_PORT` is the published host port, not container port 22: Gitea's OpenSSH still listens on 22 inside the container, and `SSH_PORT` only sets the port in clone URLs. An instance deployed before `ssh_port` and `ssh_domain` existed renders `2223` and `minis` until you edit them.
 
 `PROTOCOL` stays `http` for every domain. TLS ends at Traefik or Cloudflare, and `PROTOCOL=https` would make Gitea expect TLS on port 3000. `ROOT_URL` uses `{{ .Protocol }}`, so a public domain such as `gitea-app.example.com` gets `https://gitea-app.example.com/`, including in Cloudflare proxy mode.
 

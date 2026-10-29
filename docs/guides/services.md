@@ -71,7 +71,7 @@ A self-hosted Git service.
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Version | 1.25.5 | `gitea/gitea` tag. `latest` is also offered |
-| Port | 3000 | HTTP port Traefik routes to. Port 22 (SSH) is declared but not reachable, see below |
+| Port | 3000 | HTTP port Traefik routes to. Port 22 (SSH) is published on `127.0.0.1` only, see below |
 | Domain | `gitea.localhost` | Public host, for example `gitea-app.example.com`. Sets `DOMAIN` and `ROOT_URL` |
 | Application Name | `Gitea: Git with a cup of tea` | `APP_NAME` shown in the page title |
 | Disable Registration | `true` | `[service] DISABLE_REGISTRATION`. Only admins can create accounts |
@@ -80,6 +80,8 @@ A self-hosted Git service.
 | Admin Email | blank | Email of the first admin. Blank uses `admin@<Domain>`, or `admin@<container name>` when no Domain is set |
 | Admin Password | Generated (32 chars) when left blank | Password of the first admin, stored encrypted and masked on the service page behind **Show** and **Copy** |
 | Secret Key | Generated (64 chars) when left blank | `[security] SECRET_KEY`, which Gitea uses to encrypt stored secrets. Set once at deploy |
+| SSH Port | `2223` | Host port for Gitea SSH, bound on `127.0.0.1` only. Also `[server] SSH_PORT`, the port in SSH clone URLs |
+| SSH Domain | `minis` | `[server] SSH_DOMAIN`, the host in SSH clone URLs, for example a Tailscale MagicDNS name. Blank uses the Domain |
 | Storage | Docker volume | `/data` (SQLite database, repositories, `app.ini`) |
 
 Gitea always listens on plain HTTP (`PROTOCOL=http`). Traefik, and Cloudflare in proxy mode, end TLS in front of it. Only `ROOT_URL` carries the browser URL: `https://<domain>/` for a public host, `http://<domain>/` for a `.localhost` host. Do not set Gitea's `PROTOCOL` to `https`. Gitea then expects TLS on port 3000 and the Traefik route returns errors.
@@ -94,7 +96,20 @@ The hook gets the password through exec environment variables, so it is not in t
 
 **Secret key.** Gitea encrypts stored secrets, such as two-factor keys and mirror credentials, with `SECRET_KEY`. GoForge generates one at deploy and passes it as `GITEA__security__SECRET_KEY` on every start, so it stays the same across **Edit configuration** and **Update image**. It must never change, which is why it cannot be edited. A Gitea instance deployed before this field existed has no stored key. GoForge then leaves the variable out, and Gitea keeps the `SECRET_KEY` already in its `app.ini`. The admin hook still runs on every recreate of such an instance and does nothing because an admin exists.
 
-**SSH.** GoForge does not publish container ports on the host, and Traefik routes only HTTP. Port 22 is not reachable from outside the Docker network, so clone and push over HTTPS with a personal access token. SSH clone URLs that Gitea shows do not work.
+**SSH.** Traefik routes only HTTP, so GoForge publishes Gitea's SSH port (container port 22) on the host at `127.0.0.1:<SSH Port>`, `2223` by default. It binds loopback only: the port is not reachable from the LAN, the tailnet, or the internet, and GoForge refuses to publish a template port on `0.0.0.0` or `::`. Reach it from another machine by jumping through the host's own SSH server, which already accepts your key:
+
+```
+# ~/.ssh/config on your laptop
+Host gitea-ssh
+    HostName 127.0.0.1
+    Port 2223
+    User git
+    ProxyJump you@minis
+```
+
+Then `git clone gitea-ssh:owner/repo.git`, or `ssh -J you@minis -p 2223 git@127.0.0.1` to test. Add your public key in Gitea under **Settings → SSH / GPG Keys** first. Gitea's clone URLs show `ssh://git@<SSH Domain>:<SSH Port>/owner/repo.git`; with **SSH Domain** set to the host's tailnet name and a matching `Host` entry (or `ProxyJump`), they work as shown. HTTPS with a personal access token keeps working as before.
+
+Pick an **SSH Port** that nothing else on the host uses: not `22` (the host's sshd) and not a port a rollback or other container publishes. Changing **SSH Port** with **Edit configuration**, or the first **Edit configuration** or **Update image** of a Gitea instance deployed before this setting existed, recreates the container and binds the port. If the port is taken, the new container cannot start: GoForge puts the previous container back, starts it again with its previous settings, and marks the instance `failed` so you can pick another port. Nothing is removed.
 
 !!! warning "Do not redeploy to change settings or upgrade"
     As with Vaultwarden, a new deploy is a new instance with a new, empty `/data` volume, so repositories and users are lost. Use **Edit configuration** or **Update image** on the service page instead: both recreate the container on the same volume and keep the secret key. Settings that come from the environment (domain, URLs, registration, install lock, secret key) are rewritten into `app.ini` on every container start, so change those in GoForge. Change everything else in **Site Administration**.

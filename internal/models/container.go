@@ -31,6 +31,8 @@ type PortMapping struct {
 	Host      int    `json:"host"`
 	Container int    `json:"container"`
 	Protocol  string `json:"protocol,omitempty"`
+	// HostIP is the host address the port is bound on, such as 127.0.0.1.
+	HostIP string `json:"host_ip,omitempty"`
 }
 
 // Container represents a Docker container.

@@ -113,7 +113,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 				<p class="mt-1 text-sm text-gray-500">Use these details to connect to and manage your service.</p>
 			</div>
 			<div class="divide-y divide-gray-100">
-				for _, row := range detailRows(instance, tmpl) {
+				for _, row := range detailRows(instance, container, tmpl) {
 					@detailRow(instance.ID, row)
 				}
 			</div>
@@ -123,10 +123,12 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 	}
 }
 
-// detailRows lists config rows, then connection rows, with secrets masked.
-func detailRows(instance *models.ServiceInstance, tmpl *services.ServiceTemplate) []services.DetailRow {
+// detailRows lists config rows, then connection rows, with secrets masked,
+// then the host ports the container publishes.
+func detailRows(instance *models.ServiceInstance, container *models.Container, tmpl *services.ServiceTemplate) []services.DetailRow {
 	config, connection := services.DetailRows(tmpl, instance)
-	return append(config, connection...)
+	rows := append(config, connection...)
+	return append(rows, services.PublishedPortRows(container)...)
 }
 
 func secretURL(instanceID string, row services.DetailRow) string {

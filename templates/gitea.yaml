@@ -1,6 +1,6 @@
 name: gitea
 display_name: Gitea
-description: Self-hosted Git service written in Go. Gitea listens on HTTP port 3000 and GoForge routes the Domain to it through Traefik, so give it a public HTTPS host such as <name>-app.example.com (proxied Cloudflare CNAME to your tunnel). Gitea keeps PROTOCOL=http behind the proxy and ROOT_URL is the https:// browser URL. SSH (port 22) is not routed by Traefik or published on the host, so clone over HTTPS. The install page is locked from the first start, and GoForge creates the admin account (gitea-admin by default) with a generated password shown masked on the service page.
+description: Self-hosted Git service written in Go. Gitea listens on HTTP port 3000 and GoForge routes the Domain to it through Traefik, so give it a public HTTPS host such as <name>-app.example.com (proxied Cloudflare CNAME to your tunnel). Gitea keeps PROTOCOL=http behind the proxy and ROOT_URL is the https:// browser URL. SSH (container port 22) is not routed by Traefik; GoForge publishes it on the host at 127.0.0.1:<SSH Port> (2223 by default), loopback only, so clone over HTTPS or over SSH through a jump to the host (ssh -J you@<SSH Domain>). Clone URLs show <SSH Domain>:<SSH Port>. The install page is locked from the first start, and GoForge creates the admin account (gitea-admin by default) with a generated password shown masked on the service page.
 icon: gitea
 category: devtools
 web: true
@@ -46,6 +46,22 @@ config:
     length: 32
     immutable: true
     required: true
+  # Host port for Gitea SSH. GoForge publishes container port 22 on
+  # 127.0.0.1:<ssh_port> only (never 0.0.0.0), so reach it through an SSH jump
+  # to the host. Not 22 (the host's own sshd) and not 2222 (the pre-GoForge
+  # gitea-backup rollback). Changing it recreates the container on the new port.
+  - name: ssh_port
+    label: SSH Port (host, 127.0.0.1 only)
+    type: number
+    default: 2223
+    required: true
+  # Host name Gitea shows in SSH clone URLs, for example a Tailscale MagicDNS
+  # name. Blank falls back to the Domain.
+  - name: ssh_domain
+    label: SSH Domain (shown in clone URLs)
+    type: text
+    default: "minis"
+    required: false
   # Gitea encrypts stored secrets (2FA, mirror credentials) with SECRET_KEY.
   # It must never change after first start, so it is generated once at deploy
   # and cannot be edited. Instances deployed before this field keep the key
@@ -67,8 +83,13 @@ docker:
   ports:
     - container: 3000
       protocol: tcp
+    # SSH: published on loopback only. host_ip defaults to 127.0.0.1;
+    # 0.0.0.0 and :: are refused.
     - container: 22
       protocol: tcp
+      publish: true
+      host_port: "{{ .Config.ssh_port }}"
+      host_ip: "127.0.0.1"
   environment:
     USER_UID: "1000"
     USER_GID: "1000"
@@ -78,7 +99,9 @@ docker:
     # PROTOCOL=https would make Gitea expect TLS on :3000 and break the route.
     GITEA__SERVER__PROTOCOL: "http"
     GITEA__SERVER__HTTP_PORT: "3000"
-    GITEA__SERVER__SSH_PORT: "22"
+    # The port shown in SSH clone URLs: the published host port. Gitea's
+    # OpenSSH still listens on 22 inside the container.
+    GITEA__SERVER__SSH_PORT: "{{ .Config.ssh_port }}"
     GITEA__SERVER__DOMAIN: "{{ if .Domain }}{{ .Domain }}{{ else }}{{ .ContainerName }}{{ end }}"
     GITEA__SERVER__ROOT_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}/{{ else }}http://{{ .ContainerName }}:3000/{{ end }}"
     GITEA__SERVICE__DISABLE_REGISTRATION: "{{ .Config.disable_registration }}"
@@ -86,6 +109,8 @@ docker:
     # Lock the installer from the first start so the install page is never served.
     GITEA__security__INSTALL_LOCK: "true"
   optional_environment:
+    # Left out when blank so Gitea falls back to DOMAIN.
+    GITEA__SERVER__SSH_DOMAIN: "{{ .Config.ssh_domain }}"
     # Left out when empty so an instance deployed before secret_key existed
     # keeps the SECRET_KEY already in its app.ini instead of having it wiped.
     GITEA__security__SECRET_KEY: "{{ .Config.secret_key }}"

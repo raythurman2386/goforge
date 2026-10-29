@@ -28,6 +28,7 @@ type dockerAPI interface {
 	ContainerRestart(ctx context.Context, containerID string, options container.StopOptions) error
 	ContainerStop(ctx context.Context, containerID string, options container.StopOptions) error
 	ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error
+	ContainerRename(ctx context.Context, containerID, newContainerName string) error
 	ContainerStats(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
 	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 	ContainersPrune(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)

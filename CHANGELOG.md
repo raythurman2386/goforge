@@ -22,8 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Service template `immutable` config fields (set once at deploy, never changed by an edit) and `docker.optional_environment` (left out when empty) (#43)
 - Gitea template creates the first admin (`admin_username`, default `gitea-admin`; `admin_email`, default `admin@<Domain>`; generated 32-char `admin_password`, masked on the service page) and generates a 64-char `SECRET_KEY` at deploy (#43)
 - Service template config field types `bool` (checkbox, always `true`/`false`) and `select` (drop-down of `options`), validated on deploy and on config edit (#44)
+- Service template ports can be published on the host with `publish`, `host_port` (Go template), and `host_ip` (default `127.0.0.1`, loopback only; `0.0.0.0` and `::` are refused). Published ports are recorded on the container and shown on the service page (#42)
+- Gitea publishes SSH (container port 22) on `127.0.0.1:<ssh_port>`; new fields `ssh_port` (default `2223`) and `ssh_domain` (default `minis`) set `[server] SSH_PORT` and `SSH_DOMAIN` so clone URLs match (#42)
 
 ### Changed
+- Recreating a service container that publishes a host port (config edit, image update) renames the old container aside and removes it only after the new one starts; if the new one cannot start, the old one is restored and started again (#42)
+- A config field missing from an older instance's stored config renders its template `default` instead of an empty string (#42)
+- `docker.ContainerOptions.PortMappings` is a list of bindings with an explicit host IP; an empty or unspecified (`0.0.0.0`, `::`) host IP is refused (#42)
 - Vaultwarden `signups_allowed` and Gitea `disable_registration` / `require_signin_view` are `bool` checkboxes instead of free text, so a typo can no longer reach the container environment (#44)
 - Gitea template pins `gitea/gitea:1.25.5` by default (`latest` still offered), sets `PROTOCOL=http` and `DOMAIN` explicitly so Gitea listens on HTTP behind Traefik while `ROOT_URL` is the `https://` browser URL
 - Service templates get `Protocol` = `https` for public domains in Cloudflare proxy mode (Cloudflare ends TLS), so `DOMAIN`/`ROOT_URL` style settings match the browser URL

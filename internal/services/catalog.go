@@ -89,10 +89,22 @@ type DockerConfig struct {
 	HealthCheck         HealthCheckConfig `yaml:"health_check" json:"health_check"`
 }
 
-// PortConfig defines a port mapping.
+// PortConfig defines a container port. The first port is the HTTP port
+// Traefik routes the Domain to. Any port can also be published on the host
+// with Publish: GoForge binds it on HostIP:HostPort. Ports are never
+// published unless the template says so.
 type PortConfig struct {
 	Container int    `yaml:"container" json:"container"`
 	Protocol  string `yaml:"protocol" json:"protocol"`
+	// Publish binds the port on the host. It requires HostPort.
+	Publish bool `yaml:"publish,omitempty" json:"publish,omitempty"`
+	// HostPort is a Go template rendered like docker.environment, so it can
+	// read a config field such as {{ .Config.ssh_port }}. It must render to
+	// a port number from 1 to 65535.
+	HostPort string `yaml:"host_port,omitempty" json:"host_port,omitempty"`
+	// HostIP is the host address to bind. It defaults to 127.0.0.1 and must
+	// be a loopback address; 0.0.0.0 and :: are refused.
+	HostIP string `yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
 }
 
 // VolumeConfig defines a volume mount.
@@ -234,10 +246,11 @@ func (c *Catalog) load() error {
 			errs = append(errs, fmt.Errorf("failed to parse template %s: %w", entry.Name(), err))
 			continue
 		}
-		if err := tmpl.validateFields(); err != nil {
+		if err := errors.Join(tmpl.validateFields(), tmpl.validatePorts()); err != nil {
 			errs = append(errs, fmt.Errorf("invalid template %s: %w", entry.Name(), err))
 			continue
 		}
+		tmpl.applyPortDefaults()
 
 		loaded[tmpl.Name] = &tmpl
 	}
