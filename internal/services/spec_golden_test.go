@@ -160,8 +160,10 @@ func TestBuildContainerSpec_MatchesMain(t *testing.T) {
 // w, the golden snapshot for key: a variant without a domain gets
 // traefik.enable=false (no Traefik router for data services), and the redis
 // and postgres templates got a new command and health check, and minio's
-// command, a string GoForge used to ignore, is now applied. Everything else
-// must still match main.
+// command, a string GoForge used to ignore, is now applied. For A1 shared
+// data services, postgres defaults to 17 with a pgadmin admin on 1 CPU / 1GiB,
+// and redis defaults to 7.4 on 512MiB (AOF and maxmemory live in the command).
+// Everything else must still match main.
 func wantSinceMain(key string, w, g specSnapshot) specSnapshot {
 	if !strings.HasSuffix(key, "+domain") {
 		labels := make(map[string]string, len(w.Labels))
@@ -174,8 +176,18 @@ func wantSinceMain(key string, w, g specSnapshot) specSnapshot {
 	switch strings.TrimSuffix(key, "+domain") {
 	case templateNameRedis:
 		w.Command, w.HealthCheck = g.Command, g.HealthCheck
+		w.Image, w.Memory = "redis:7.4", 512<<20
 	case templateNamePostgres:
 		w.HealthCheck = g.HealthCheck
+		w.Image, w.Memory, w.NanoCPUs = "postgres:17", 1<<30, 1_000_000_000
+		env := make([]string, len(w.Env))
+		for i, kv := range w.Env {
+			if kv == "POSTGRES_USER=postgres" {
+				kv = "POSTGRES_USER=pgadmin"
+			}
+			env[i] = kv
+		}
+		w.Env = env
 	case "minio":
 		w.Command = g.Command
 	}

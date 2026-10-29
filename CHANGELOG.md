@@ -25,8 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Service template ports can be published on the host with `publish`, `host_port` (Go template), and `host_ip` (default `127.0.0.1`, loopback only; `0.0.0.0` and `::` are refused). Published ports are recorded on the container and shown on the service page (#42)
 - Gitea publishes SSH (container port 22) on `127.0.0.1:<ssh_port>`; new fields `ssh_port` (default `2223`) and `ssh_domain` (default `minis`) set `[server] SSH_PORT` and `SSH_DOMAIN` so clone URLs match (#42)
 - Service template `docker.command`: a list that replaces the image CMD, rendered like `environment`. Templates must not render secrets into it (#58)
+- `scripts/shared-data/pg-tenant.sh`: idempotently creates or updates one app's `LOGIN` role and owned database on a GoForge postgres instance, password on stdin, `CONNECT` revoked from `PUBLIC`. Not run by GoForge (#59)
+- Docs: shared data services (shared-pg / shared-redis with no Domain and no published port) and a shared-pg nightly `pg_dump` runbook (not installed) (#59)
 
 ### Changed
+- PostgreSQL template defaults to 17 (16, 15, 14 still offered), admin username `pgadmin` instead of `postgres`, a 32-char generated password, and 1 CPU / 1GiB; `database`, `username`, and `password` are immutable because the image applies them only on first init (#59)
+- Redis template defaults to 7.4 (7 and 6 still offered) and is set up for sessions and queues: `appendonly yes`, `appendfsync everysec`, `maxmemory 256mb`, `maxmemory-policy noeviction`, written into the per-start conf file next to `requirepass`; container memory 512MiB (#59)
 - Recreating a service container that publishes a host port (config edit, image update) renames the old container aside and removes it only after the new one starts; if the new one cannot start, the old one is restored and started again (#42)
 - A config field missing from an older instance's stored config renders its template `default` instead of an empty string (#42)
 - `docker.ContainerOptions.PortMappings` is a list of bindings with an explicit host IP; an empty or unspecified (`0.0.0.0`, `::`) host IP is refused (#42)

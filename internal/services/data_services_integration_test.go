@@ -14,6 +14,8 @@ import (
 	"log/slog"
 	"net"
 	"net/url"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +32,10 @@ import (
 // templates on a throwaway network and volume through the real Docker client.
 // Redis must refuse an unauthenticated PING and accept the password from
 // connection_info; both must report healthy and carry traefik.enable=false.
+// Redis must run with AOF, maxmemory 256mb and noeviction, and keep auth and
+// its data across two restarts. Postgres must be 17 with the pgadmin admin,
+// and scripts/shared-data/pg-tenant.sh must provision throwaway tenants
+// idempotently (it shells out to docker; set GOFORGE_IT_DOCKER to override).
 // Run it with:
 //
 //	sudo -n env "PATH=$PATH" mise x go@1.26.6 -- go test -tags integration \
@@ -134,6 +140,21 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 		return dockerID, info.NetworkSettings.Networks[netName].IPAddress, spec
 	}
 
+	// sh runs script in the container and returns its trimmed output; a
+	// non-zero exit fails the test unless allowFail.
+	sh := func(t *testing.T, dockerID, script string, env []string, allowFail bool) (string, int) {
+		t.Helper()
+		res, eErr := dc.Exec(ctx, dockerID, docker.ExecOptions{Cmd: []string{"sh", "-c", script}, Env: env})
+		if eErr != nil {
+			t.Fatal(eErr)
+		}
+		if res.ExitCode != 0 && !allowFail {
+			t.Fatalf("exec %q exited %d: %s", script, res.ExitCode, res.Output)
+		}
+		return strings.TrimSpace(res.Output), res.ExitCode
+	}
+	const rcli = `REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning `
+
 	// Generated passwords are alphanumeric; the second case proves the
 	// config-file escaping for a user-chosen password.
 	for _, tc := range []struct {
@@ -205,6 +226,27 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 				t.Logf("pid1 %q uid %s conf %s", lines[0], lines[1], lines[2])
 			}
 
+			// Sessions/queues settings from the conf file.
+			for k, want := range map[string]string{"appendonly": "yes", "maxmemory": "268435456", "maxmemory-policy": "noeviction", "appendfsync": "everysec", "dir": "/data"} {
+				out, _ := sh(t, dockerID, rcli+"config get "+k, nil, false)
+				if got := strings.Split(out, "\n"); len(got) != 2 || got[1] != want {
+					t.Errorf("CONFIG GET %s = %q, want %s", k, out, want)
+				}
+			}
+			if out, _ := sh(t, dockerID, "ls /data/appendonlydir", nil, false); !strings.Contains(out, ".aof") {
+				t.Errorf("/data/appendonlydir = %q, want AOF files", out)
+			}
+			// noeviction: with a tiny limit a write is refused, not evicted.
+			sh(t, dockerID, rcli+"set it:keep v1 && "+rcli+"config set maxmemory 1", nil, false)
+			if out, _ := sh(t, dockerID, rcli+"set it:big $(head -c 65536 /dev/zero | tr '\\0' x)", nil, true); !strings.HasPrefix(out, "OOM") {
+				t.Errorf("SET over maxmemory = %q, want OOM (noeviction)", out)
+			}
+			sh(t, dockerID, rcli+"config set maxmemory 256mb", nil, false)
+			if out, _ := sh(t, dockerID, rcli+"get it:keep", nil, false); out != "v1" {
+				t.Errorf("GET it:keep = %q after OOM, want v1 (not evicted)", out)
+			}
+			t.Log("appendonly yes, maxmemory 256mb, noeviction refuses writes with OOM and keeps keys")
+
 			// The conf file is recreated on every start. Without rm -f, a
 			// second start fails: sticky /tmp plus fs.protected_regular=1
 			// denies root writing the redis-owned file (exit 2).
@@ -238,7 +280,13 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 					if got := strings.TrimSpace(cr.Output); got != "600 redis" {
 						t.Errorf("restart %d: conf mode = %q, want 600 redis", n, got)
 					}
-					t.Logf("restart %d: running, -NOAUTH, +OK|+PONG, conf 600 redis", n)
+					if out, _ := sh(t, dockerID, rcli+"get it:keep", nil, false); out != "v1" {
+						t.Errorf("restart %d: GET it:keep = %q, want v1 (AOF)", n, out)
+					}
+					if out, _ := sh(t, dockerID, rcli+"config get appendonly", nil, false); !strings.HasSuffix(out, "yes") {
+						t.Errorf("restart %d: appendonly = %q, want yes", n, out)
+					}
+					t.Logf("restart %d: running, -NOAUTH, +OK|+PONG, conf 600 redis, key kept, appendonly yes", n)
 				}
 			})
 		})
@@ -246,8 +294,68 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 
 	t.Run("postgres", func(t *testing.T) {
 		// Health check used to be the literal "pg_isready -U {{ .Config.username }}".
-		start(t, "postgres", "itdata-pg-"+tag, map[string]interface{}{"name": "pg-it"})
+		dockerID, _, spec := start(t, "postgres", "itdata-pg-"+tag, map[string]interface{}{"name": "pg-it"})
 		t.Log("postgres healthy with pg_isready -U $POSTGRES_USER -d $POSTGRES_DB")
+		if spec.opts.Image != "postgres:17" {
+			t.Errorf("image = %s, want postgres:17", spec.opts.Image)
+		}
+		const admin = `psql -X -tA -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c `
+		out, _ := sh(t, dockerID, admin+`"select current_setting('server_version_num')::int / 10000, current_user, (select rolsuper from pg_roles where rolname = current_user)"`, nil, false)
+		if out != "17|pgadmin|t" {
+			t.Errorf("major|user|superuser = %q, want 17|pgadmin|t", out)
+		} else {
+			t.Log("server 17, admin pgadmin (superuser)")
+		}
+
+		t.Run("pg-tenant", func(t *testing.T) {
+			dockerCmd := os.Getenv("GOFORGE_IT_DOCKER")
+			if dockerCmd == "" {
+				dockerCmd = "docker"
+			}
+			provision := func(t *testing.T, app, password string) {
+				t.Helper()
+				cmd := exec.CommandContext(ctx, "sh", "../../scripts/shared-data/pg-tenant.sh", spec.opts.Name, app)
+				cmd.Env = append(os.Environ(), "DOCKER="+dockerCmd)
+				cmd.Stdin = strings.NewReader(password)
+				if b, cErr := cmd.CombinedOutput(); cErr != nil {
+					t.Fatalf("pg-tenant.sh %s: %v: %s", app, cErr, b)
+				}
+			}
+			// login connects over TCP to the container's own address, where
+			// pg_hba requires a password (the local socket is trust).
+			login := func(t *testing.T, user, password, db string) (string, int) {
+				t.Helper()
+				return sh(t, dockerID, `psql -X -tA -h "$(hostname -i | cut -d' ' -f1)" -U "$U" -d "$D" -c 'select current_user, current_database()'`,
+					[]string{"PGPASSWORD=" + password, "U=" + user, "D=" + db}, true)
+			}
+			const a, b = "it_tenant_a", "it_tenant_b"
+			pwA := `p'w\x"y $z`
+			provision(t, a, pwA)
+			provision(t, a, pwA) // idempotent
+			provision(t, b, "tenant-b-pass")
+			if out, code := login(t, a, pwA, a); code != 0 || out != a+"|"+a {
+				t.Errorf("tenant a login = %d %q, want %s|%s", code, out, a, a)
+			}
+			if _, code := login(t, a, "wrong", a); code == 0 {
+				t.Error("tenant a logged in with a wrong password")
+			}
+			if out, code := login(t, b, "tenant-b-pass", a); code == 0 || !strings.Contains(out, "permission denied") {
+				t.Errorf("tenant b on tenant a's database = %d %q, want permission denied", code, out)
+			}
+			attrs, _ := sh(t, dockerID, admin+`"select rolsuper, rolcreatedb, rolcreaterole from pg_roles where rolname = '`+a+`'"`, nil, false)
+			owner, _ := sh(t, dockerID, admin+`"select pg_get_userbyid(datdba) from pg_database where datname = '`+a+`'"`, nil, false)
+			if attrs != "f|f|f" || owner != a {
+				t.Errorf("tenant a attrs %q owner %q, want f|f|f owned by %s", attrs, owner, a)
+			}
+			provision(t, a, "rotated-pass")
+			if _, code := login(t, a, pwA, a); code == 0 {
+				t.Error("old password still works after rotation")
+			}
+			if _, code := login(t, a, "rotated-pass", a); code != 0 {
+				t.Error("rotated password does not work")
+			}
+			t.Log("pg-tenant.sh: idempotent, quoted password, LOGIN only, owns its database, other tenants denied CONNECT, rotation works")
+		})
 	})
 }
 

@@ -182,18 +182,22 @@ Templates use Go's `text/template` syntax. The following variables are available
 |----------|-------|
 | Name | `postgres` |
 | Category | `database` |
-| Versions | 16, 15, 14 |
-| Default version | 16 |
-| Default resources | 0.5 CPU, 512MB memory |
+| Versions | 17, 16, 15, 14 |
+| Default version | 17 |
+| Default resources | 1 CPU, 1GiB memory |
 | Container port | 5432/tcp |
 
 **Configuration fields**:
 
 | Field | Type | Default | Required | Description |
 |-------|------|---------|----------|-------------|
-| `database` | text | `app` | Yes | Database name |
-| `username` | text | `postgres` | Yes | Database username |
-| `password` | password | (generated) | Yes | Database password |
+| `database` | text, immutable | `app` | Yes | Database created at first start |
+| `username` | text, immutable | `pgadmin` | Yes | Admin (superuser) role created at first start |
+| `password` | password, immutable | (generated, 32 chars) | Yes | Admin password |
+
+The image applies `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD` only when it initialises an empty volume, so all three are immutable: set at deploy, never changed by **Edit configuration**. To rotate the admin password, run `ALTER ROLE` inside Postgres and update your clients; the stored value then no longer matches. Instances deployed before these fields were immutable keep their stored values.
+
+A major version change (for example 16 to 17) needs a dump and restore; a newer server does not start on an older data directory.
 
 **Environment variables**:
 
@@ -209,6 +213,8 @@ POSTGRES_PASSWORD: "{{ .Config.password }}"
 
 **Volume**: `data` -> `/var/lib/postgresql/data`
 
+**App roles**: `scripts/shared-data/pg-tenant.sh <container> <app>` creates or updates one app's `LOGIN` role and database (owned by the role, `CONNECT` revoked from `PUBLIC`), reading the password from stdin. It is idempotent and rotates the password when it changes. See [Shared data services](../guides/services.md#shared-data-services).
+
 ---
 
 ### Redis
@@ -219,9 +225,9 @@ POSTGRES_PASSWORD: "{{ .Config.password }}"
 |----------|-------|
 | Name | `redis` |
 | Category | `database` |
-| Versions | 7, 6 |
-| Default version | 7 |
-| Default resources | 0.25 CPU, 256MB memory |
+| Versions | 7.4, 7, 6 |
+| Default version | 7.4 |
+| Default resources | 0.25 CPU, 512MiB memory (Redis `maxmemory` is 256mb) |
 | Container port | 6379/tcp |
 
 **Configuration fields**:
@@ -238,7 +244,9 @@ REDIS_PASSWORD: "{{ .Config.password }}"
 
 **Command**: the official `redis` image ignores `REDIS_PASSWORD`, so the template's `command` writes `requirepass` into `/tmp/goforge-redis.conf` (mode 600, inside the container, not in the volume) and runs `docker-entrypoint.sh redis-server /tmp/goforge-redis.conf`. The password is read from the environment, so it is not in the container command or the host process list. A client that does not `AUTH` gets `NOAUTH`.
 
-**Persistence**: Redis defaults: RDB snapshots in `/data`. AOF is off.
+The conf file is rewritten on every container start (restart, stop/start, daemon reboot). Keep the `rm -f` before the write: `/tmp` is sticky and `fs.protected_regular=1` makes root's `>` into the old redis-owned file fail with `Permission denied`, so a second start would exit 2 (Gatekeeper P8). Do not add `aclfile` next to `requirepass`: loading an ACL file resets the `default` user to `nopass`, which turns auth off (checked on 7.4).
+
+**Persistence and memory**: Redis is set up for sessions and queues, not as a cache. The conf sets `dir /data`, `appendonly yes`, `appendfsync everysec` (AOF files in `/data/appendonlydir`, alongside RDB snapshots), `maxmemory 256mb`, and `maxmemory-policy noeviction`: a full instance answers writes with `OOM` instead of dropping keys. The 512MiB container limit leaves room for client buffers and the fork of an AOF rewrite.
 
 **Health check**: `REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep PONG`
 

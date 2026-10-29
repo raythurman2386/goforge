@@ -4,32 +4,49 @@ description: The world's most advanced open source relational database.
 icon: postgres
 category: database
 
+# A major version change needs a dump and restore: a newer server will not
+# start on an older data directory. Pick the version at deploy.
 versions:
+  - "17"
   - "16"
   - "15"
   - "14"
-default_version: "16"
+default_version: "17"
 
+# The postgres image applies POSTGRES_DB, POSTGRES_USER and POSTGRES_PASSWORD
+# only when it initialises an empty data volume, so changing them later would
+# leave connection_info pointing at an account that does not exist. They are
+# immutable: set once at deploy, never changed by a config edit. Change the
+# password inside Postgres (ALTER ROLE) if you must rotate it.
+# The admin user is pgadmin, not the image default "postgres"; it is still the
+# cluster superuser. Apps get their own role and database (see
+# scripts/shared-data/pg-tenant.sh), never this account.
 config:
   - name: database
     label: Database Name
     type: text
     default: "app"
+    immutable: true
     required: true
   - name: username
-    label: Username
+    label: Admin Username
     type: text
-    default: "postgres"
+    default: "pgadmin"
+    immutable: true
     required: true
   - name: password
-    label: Password
+    label: Admin Password
     type: password
     generate: true
+    length: 32
+    immutable: true
     required: true
 
+# Template resources apply on every create and recreate. No GoForge-managed
+# postgres instance existed when this was raised from 0.5 CPU / 512m.
 resources:
-  cpu: "0.5"
-  memory: "512m"
+  cpu: "1"
+  memory: "1g"
 
 docker:
   image: "postgres:{{ .Version }}"

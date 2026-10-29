@@ -152,3 +152,89 @@ func TestMinioTemplate_Command(t *testing.T) {
 		t.Errorf("Cmd = %q, want %q", got, want)
 	}
 }
+
+// TestRedisTemplate_SessionsAndQueues: Redis is for sessions and queues, so
+// the conf turns AOF on, caps memory below the container limit, and refuses
+// writes when full instead of evicting. It never loads an ACL file, which
+// would reset the default user to nopass.
+func TestRedisTemplate_SessionsAndQueues(t *testing.T) {
+	t.Parallel()
+	spec := renderRepoSpec(t, templateNameRedis, "")
+	if spec.opts.Image != "redis:7.4" {
+		t.Errorf("Image = %q, want redis:7.4", spec.opts.Image)
+	}
+	script := spec.opts.Cmd[2]
+	for _, want := range []string{"'appendonly yes'", "'appendfsync everysec'", "'maxmemory 256mb'", "'maxmemory-policy noeviction'", "'dir /data'", `rm -f "$conf"`} {
+		if !strings.Contains(script, want) {
+			t.Errorf("command script missing %s:\n%s", want, script)
+		}
+	}
+	if strings.Contains(script, "aclfile") {
+		t.Error("command script loads an aclfile, which resets requirepass")
+	}
+	const maxmemory = 256 << 20
+	if spec.opts.Memory < 2*maxmemory {
+		t.Errorf("container memory %d, want at least twice maxmemory (%d) for AOF rewrite headroom", spec.opts.Memory, 2*maxmemory)
+	}
+}
+
+// TestPostgresTemplate_SharedDefaults: Postgres 17 by default, a pgadmin
+// admin account, and the init-only settings (database, username, password)
+// are immutable so a config edit cannot point connection_info at an account
+// the data volume never created.
+func TestPostgresTemplate_SharedDefaults(t *testing.T) {
+	t.Parallel()
+	spec := renderRepoSpec(t, templateNamePostgres, "")
+	if spec.opts.Image != "postgres:17" {
+		t.Errorf("Image = %q, want postgres:17", spec.opts.Image)
+	}
+	for _, want := range []string{"POSTGRES_USER=pgadmin", "POSTGRES_DB=app", "POSTGRES_PASSWORD=fixed-password"} {
+		if !containsString(spec.opts.Env, want) {
+			t.Errorf("Env = %q, want %s", spec.opts.Env, want)
+		}
+	}
+	if spec.opts.NanoCPUs != 1_000_000_000 || spec.opts.Memory != 1<<30 {
+		t.Errorf("resources = %d NanoCPUs, %d bytes, want 1 CPU, 1GiB", spec.opts.NanoCPUs, spec.opts.Memory)
+	}
+	hc := strings.Join(spec.opts.HealthCheck.Test, " ")
+	if !strings.Contains(hc, `"$POSTGRES_USER"`) || !strings.Contains(hc, `"$POSTGRES_DB"`) {
+		t.Errorf("health check %q, want pg_isready with $POSTGRES_USER and $POSTGRES_DB", hc)
+	}
+
+	tmpl, err := loadRepoCatalog(t).GetTemplate(templateNamePostgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := map[string]ConfigField{}
+	for _, f := range tmpl.Config {
+		fields[f.Name] = f
+	}
+	for _, name := range []string{"database", "username", "password"} {
+		if !fields[name].Immutable {
+			t.Errorf("field %s is not immutable", name)
+		}
+	}
+	if pw := fields["password"]; !pw.Generate || pw.Length < 32 {
+		t.Errorf("password field generate=%v length=%d, want generated, length >= 32", pw.Generate, pw.Length)
+	}
+	if !containsString(tmpl.Versions, "17") || tmpl.DefaultVersion != "17" {
+		t.Errorf("versions %v default %q, want 17 offered and default", tmpl.Versions, tmpl.DefaultVersion)
+	}
+}
+
+// TestPostgresTemplate_EditKeepsInitSettings: a config edit cannot change the
+// immutable database, username, or password of an existing instance.
+func TestPostgresTemplate_EditKeepsInitSettings(t *testing.T) {
+	t.Parallel()
+	tmpl, err := loadRepoCatalog(t).GetTemplate(templateNamePostgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := map[string]interface{}{"name": "shared-pg", "database": "app", "username": "pgadmin", "password": "orig"}
+	merged := mergeEditedConfig(tmpl, current, map[string]interface{}{"database": "other", "username": "postgres", "password": "changed"})
+	for k, want := range map[string]string{"database": "app", "username": "pgadmin", "password": "orig"} {
+		if merged[k] != want {
+			t.Errorf("%s = %v after edit, want %s", k, merged[k], want)
+		}
+	}
+}

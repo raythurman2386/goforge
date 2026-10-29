@@ -13,11 +13,12 @@ A relational database management system.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Version | 16 | PostgreSQL major version |
+| Version | 17 | PostgreSQL major version. Changing major versions later needs a dump and restore |
 | Port | 5432 | Container port |
-| Database | `app` | Default database name |
-| Username | `postgres` | Admin username |
-| Password | Generated on the server when the field is left blank | Admin password, stored encrypted |
+| Database | `app` | Database created at first start. Set at deploy, cannot be edited |
+| Username | `pgadmin` | Admin (superuser) role. Set at deploy, cannot be edited |
+| Password | Generated on the server (32 chars) when the field is left blank | Admin password, stored encrypted. Set at deploy, cannot be edited |
+| Resources | 1 CPU, 1GiB | Container limits |
 | Storage | Docker volume | Persistent data storage |
 
 ### Redis
@@ -26,10 +27,11 @@ An in-memory data store for caching, sessions, and message queues.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Version | 7 | Redis major version |
+| Version | 7.4 | Redis version |
 | Port | 6379 | Container port |
-| Password | Generated on the server when the field is left blank | Required for every client (`requirepass`), stored encrypted |
-| Persistence | RDB snapshots (Redis default) | AOF is off |
+| Password | Generated on the server when the field is left blank | Required for every client (`requirepass`), stored encrypted. Never in the container command or health check argv |
+| Persistence | AOF (`appendonly yes`, `everysec`) plus RDB snapshots | Files in the `data` volume (`/data`) |
+| Memory | `maxmemory 256mb`, `noeviction`; container limit 512MiB | A full instance refuses writes with `OOM` instead of evicting keys (sessions and queues) |
 
 ### SolidCraft
 
@@ -119,6 +121,30 @@ Pick an **SSH Port** that nothing else on the host uses: not `22` (the host's ss
 With `CLOUDFLARE_PROXY_MODE=true`, Cloudflare ends TLS and forwards HTTP to Traefik. GoForge routes the service on the `web` entrypoint, and templates still get `Protocol` = `https` for any domain that is not `localhost` or `*.localhost`, because that is the URL a browser uses.
 
 Use a first-level host such as `vaultwarden-app.example.com` or `gitea-app.example.com`. Cloudflare Universal SSL covers `*.example.com` but not `*.apps.example.com`. Create a proxied CNAME for the host that points at your tunnel (`<tunnel-id>.cfargotunnel.com`) before you deploy, then enter the host in the **Domain** field.
+
+## Shared data services
+
+One PostgreSQL and one Redis instance can serve several apps on the host ("shared-pg" and "shared-redis"). They are ordinary catalog instances:
+
+1. Deploy **PostgreSQL** named `shared-pg` and **Redis** named `shared-redis` with the default versions (17 and 7.4).
+2. Leave **Domain** empty and do not publish any port. They are reachable only from containers on the GoForge (`traefik`) network, as `goforge-service-<id>:5432` and `:6379`.
+3. Check that Traefik does not route them:
+
+    ```bash
+    docker inspect --format '{{ index .Config.Labels "traefik.enable" }} {{ json .HostConfig.PortBindings }}' goforge-service-<id>
+    # false {}
+    ```
+
+4. Give each app its own Postgres role and database, never the `pgadmin` account:
+
+    ```bash
+    printf '%s' "$APP_DB_PASSWORD" | scripts/shared-data/pg-tenant.sh goforge-service-<shared-pg id> <app>
+    # app connects as postgres://<app>:<password>@goforge-service-<id>:5432/<app>
+    ```
+
+    The script is idempotent (run it again to rotate the password), gives the role `LOGIN` only, makes it the owner of its database, and revokes `CONNECT` from `PUBLIC` so other apps cannot open it.
+
+Redis apps share the `default` user for now. Per-app Redis ACL users (`~<app>:*` key patterns) are planned; they need the default user's password moved from `requirepass` into the ACL file, because loading an ACL file resets `requirepass`.
 
 ## Deploying a Service
 
