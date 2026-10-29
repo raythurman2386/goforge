@@ -13,6 +13,9 @@ templ Base(title, csrfToken string) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ title } - GoForge</title>
+			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
+			<link rel="icon" href="/favicon.ico" sizes="any"/>
+			<link rel="preload" href="/static/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script src="/static/js/htmx.min.js"></script>
 			<script src="/static/js/htmx-sse.js"></script>

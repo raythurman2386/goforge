@@ -1,21 +1,32 @@
 package components
 
+// Modal is the one dialog shell. Every modal fragment is appended to <body>
+// with id="modal". static/js/app.js closes it on Escape, on a backdrop click,
+// and on any [data-modal-close] button, and moves focus into it on open.
+//
+// app.js also handles requests made from inside the dialog: an error shows
+// its text in #modal-error, and a success closes the dialog.
 templ Modal(title string) {
-	<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300">
-		<div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full transform transition-all border border-gray-200" hx-on::after-request="if(event.detail.successful) { this.remove(); } else { var errDiv = this.querySelector('#modal-error'); if (errDiv) { errDiv.textContent = event.detail.xhr.responseText || 'An error occurred. Please try again.'; errDiv.classList.remove('hidden'); } }">
+	<div id="modal" data-modal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300">
+		<div
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="modal-title"
+			tabindex="-1"
+			class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto transform transition-all border border-gray-200 focus:outline-none"
+		>
 			<div class="flex justify-between items-center px-6 py-4 border-b border-gray-100">
-				<h3 class="text-xl font-bold text-gray-900 tracking-tight">{ title }</h3>
-				<button onclick="document.getElementById('modal').remove()" class="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
-					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<h3 id="modal-title" class="text-xl font-bold text-gray-900 tracking-tight">{ title }</h3>
+				<button type="button" data-modal-close aria-label="Close dialog" class="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
+					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
 					</svg>
 				</button>
 			</div>
-			<div id="modal-error" class="hidden mx-6 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg"></div>
+			<div id="modal-error" role="alert" class="hidden mx-6 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg"></div>
 			<div class="px-6 py-6">
 				{ children... }
 			</div>
 		</div>
 	</div>
 }
-

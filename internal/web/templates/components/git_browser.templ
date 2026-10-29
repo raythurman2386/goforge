@@ -6,7 +6,7 @@ import (
 
 templ GitRepositoryBrowser(sources []*models.GitSource) {
 	<div class="mb-4">
-		<label class="block text-sm font-medium text-gray-700 mb-1">Git Source</label>
+		<label class="label">Git Source</label>
 		<select name="git_source_id" 
 			class="select"
 			hx-get="/api/git/repos"
@@ -23,12 +23,12 @@ templ GitRepositoryBrowser(sources []*models.GitSource) {
 	</div>
 
 	<div id="manual-repo-input">
-		<label class="block text-sm font-medium text-gray-700 mb-1">Repository URL</label>
+		<label class="label">Repository URL</label>
 		<input type="text" name="repository_url_manual" id="repository_url_manual" class="input" />
 	</div>
 
 	<div id="repo-select-container" style="display:none;" class="mb-4">
-		<label class="block text-sm font-medium text-gray-700 mb-1">Repository</label>
+		<label class="label">Repository</label>
 		<select id="repository_url_select"
 			name="repository_url"
 			class="select"

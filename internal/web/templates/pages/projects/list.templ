@@ -8,30 +8,23 @@ import (
 
 templ List(projects []*models.Project, csrfToken string) {
 	@layouts.AppLayout("Projects", csrfToken) {
-		<div class="md:flex md:items-center md:justify-between mb-8">
-			<div class="flex-1 min-w-0">
-				<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-					Projects
-				</h2>
-				<p class="mt-2 text-sm text-gray-500">View and manage your application projects.</p>
-			</div>
-			<div class="mt-4 flex md:mt-0 md:ml-4">
+		@components.PageHeader("Projects", "View and manage your application projects.") {
 				<button hx-get="/projects/new" hx-target="body" hx-push-url="true" class="btn-primary">
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 					</svg>
 					New Project
 				</button>
-			</div>
-		</div>
+		}
 
 		if len(projects) == 0 {
-			@components.EmptyState(
-				"No projects",
-				"Get started by creating your first project.",
-				"Create Project",
-				"/projects/new",
-			)
+			@components.EmptyState(components.EmptyStateProps{
+				Title:       "No projects",
+				Description: "Get started by creating your first project.",
+				ButtonText:  "Create Project",
+				ButtonURL:   "/projects/new",
+				Icon:        "folder",
+			})
 		} else {
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				for _, p := range projects {

@@ -1,24 +1,83 @@
 package components
 
-templ EmptyState(title, description, buttonText, buttonURL string) {
-	<div class="text-center py-20 card bg-gray-50/30 border-dashed border-2 border-gray-200 shadow-none">
-		<div class="w-20 h-20 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto mb-6">
-			<svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-3m-9 0H3m9 9v1m0-4v1m0-4v1"></path>
+// EmptyStateProps configures EmptyState. Set at most one action: ButtonURL
+// for a plain link, HxGet for a fragment (such as a modal) appended to
+// <body>, or HxPost for an action. Icon picks a glyph: "inbox" (default),
+// "folder", "rocket", "key", "code", or "server". Compact drops the dashed
+// card for use inside an existing card.
+type EmptyStateProps struct {
+	Title       string
+	Description string
+	ButtonText  string
+	ButtonURL   string
+	HxGet       string
+	HxPost      string
+	Icon        string
+	Compact     bool
+}
+
+templ EmptyState(p EmptyStateProps) {
+	<div
+		class={ "text-center",
+			templ.KV("py-16 card bg-gray-50/30 border-dashed border-2 border-gray-200 shadow-none", !p.Compact),
+			templ.KV("py-8", p.Compact) }
+	>
+		<div
+			class={ "bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto",
+				templ.KV("w-16 h-16 mb-5", !p.Compact),
+				templ.KV("w-12 h-12 mb-3", p.Compact) }
+		>
+			<svg class={ "text-gray-400", templ.KV("h-8 w-8", !p.Compact), templ.KV("h-6 w-6", p.Compact) } fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				@emptyIcon(p.Icon)
 			</svg>
 		</div>
-		<h3 class="text-xl font-bold text-gray-900 tracking-tight">{ title }</h3>
-		<p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">{ description }</p>
-		if buttonText != "" {
-			<div class="mt-8">
-				<a href={ templ.URL(buttonURL) } class="btn-primary">
-					<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-					</svg>
-					{ buttonText }
-				</a>
+		<h3 class={ "font-bold text-gray-900 tracking-tight", templ.KV("text-xl", !p.Compact), templ.KV("text-base", p.Compact) }>{ p.Title }</h3>
+		if p.Description != "" {
+			<p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">{ p.Description }</p>
+		}
+		if p.ButtonText != "" {
+			<div class={ templ.KV("mt-8", !p.Compact), templ.KV("mt-4", p.Compact) }>
+				if p.HxGet != "" {
+					<button type="button" hx-get={ p.HxGet } hx-target="body" hx-swap="beforeend" class="btn-primary">
+						@plusIcon()
+						{ p.ButtonText }
+					</button>
+				} else if p.HxPost != "" {
+					<button type="button" hx-post={ p.HxPost } hx-disabled-elt="this" hx-indicator="find .htmx-indicator" class="btn-primary">
+						@plusIcon()
+						{ p.ButtonText }
+						@Spinner()
+					</button>
+				} else {
+					<a href={ templ.SafeURL(p.ButtonURL) } class="btn-primary">
+						@plusIcon()
+						{ p.ButtonText }
+					</a>
+				}
 			</div>
 		}
 	</div>
 }
 
+templ plusIcon() {
+	<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+	</svg>
+}
+
+templ emptyIcon(name string) {
+	switch name {
+		case "folder":
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+		case "rocket":
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+		case "key":
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+		case "code":
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+		case "server":
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+		default:
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-3m-9 0H3m9 9v1m0-4v1m0-4v1"></path>
+	}
+}

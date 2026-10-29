@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Inter, self-hosted (OFL-1.1, see static/fonts/LICENSE.txt). */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/static/fonts/InterVariable.woff2") format("woff2");
+}
+
 @layer base {
   html {
     @apply antialiased scroll-smooth;
@@ -29,8 +38,18 @@
     @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm hover:shadow-red-200/50 hover:shadow-lg;
   }
 
-  .btn-ghost {
-    @apply btn bg-transparent hover:bg-gray-100 text-gray-600 hover:text-gray-900 focus:ring-gray-500;
+  .btn-warning {
+    @apply btn bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500 shadow-sm;
+  }
+
+  /* Size modifier: combine with a variant, e.g. class="btn-primary btn-sm". */
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  /* Square icon-only button for table rows and toolbars. Needs an aria-label. */
+  .icon-btn {
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/40 disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .input {
@@ -53,12 +72,25 @@
     @apply bg-white rounded-xl shadow-sm border border-gray-200/60 p-6;
   }
 
-  .glass {
-    @apply bg-white/70 backdrop-blur-md border border-white/20;
+  /* Header row of a padding-free card (class="card !p-0"). */
+  .card-header {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-6 py-4;
   }
 
-  .glass-dark {
-    @apply bg-gray-900/80 backdrop-blur-lg border border-white/10;
+  .card-body {
+    @apply px-6 py-5;
+  }
+
+  .card-title {
+    @apply text-base font-semibold leading-6 text-gray-900;
+  }
+
+  .table-th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500;
+  }
+
+  .table-td {
+    @apply px-4 py-3 text-sm;
   }
 
   .sidebar-link {

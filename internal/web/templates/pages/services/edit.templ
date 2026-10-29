@@ -30,7 +30,8 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 					<p class="mt-2 text-sm text-gray-500">Change the configuration of this { tmpl.DisplayName } service.</p>
 				</div>
 			</div>
-			<div class="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+			<div class="mb-6">
+			@components.Alert("warning") {
 				<p class="font-semibold">Saving recreates the container.</p>
 				<p class="mt-1">The service restarts with the new settings. Its data volumes are kept and mounted again:</p>
 				if len(tmpl.Docker.Volumes) > 0 {
@@ -41,6 +42,7 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 					</ul>
 				}
 				<p class="mt-2">Some images read credentials only on first start. Changing a database password here does not change it inside existing data.</p>
+			}
 			</div>
 			<div class="card">
 				<form class="space-y-8" action={ templ.SafeURL("/services/" + instance.ID + "/edit") } method="POST">

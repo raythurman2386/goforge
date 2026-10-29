@@ -1,14 +1,16 @@
-// GoForge shell behavior: sidebar active link, toasts, and HTMX error toasts.
+// GoForge shell behavior: sidebar active link, toasts, HTMX error toasts, and
+// the components.Modal dialog.
 // Loaded from layouts.Base after htmx. No build step; plain ES2017.
 (function () {
 	"use strict";
 
 	var TOAST_MS = 5000;
 	var MAX_MESSAGE = 300;
+	// Keep in sync with components.Toast.
 	var LEVEL_CLASSES = {
-		success: "bg-green-500 text-white",
-		error: "bg-red-500 text-white",
-		info: "bg-blue-500 text-white",
+		success: "border-primary-200 bg-primary-50 text-primary-800",
+		error: "border-red-200 bg-red-50 text-red-800",
+		info: "border-blue-200 bg-blue-50 text-blue-800",
 	};
 
 	// --- Toasts --------------------------------------------------------------
@@ -37,7 +39,7 @@
 		el.dataset.toastMessage = message;
 		if (level === "error") el.setAttribute("role", "alert");
 		el.className =
-			"rounded-md p-4 shadow-lg flex items-center space-x-3 " +
+			"flex items-center gap-3 rounded-lg border p-4 text-sm font-medium shadow-lg " +
 			(LEVEL_CLASSES[level] || LEVEL_CLASSES.info);
 
 		var text = document.createElement("span");
@@ -45,7 +47,7 @@
 		var close = document.createElement("button");
 		close.type = "button";
 		close.setAttribute("aria-label", "Dismiss");
-		close.className = "text-white hover:text-gray-200";
+		close.className = "opacity-60 hover:opacity-100";
 		close.textContent = "\u00d7";
 		close.addEventListener("click", function () {
 			el.remove();
@@ -110,6 +112,75 @@
 		showToast("Could not reach GoForge. Check your connection and try again.", "error");
 	});
 
+	// --- Modal ----------------------------------------------------------------
+
+	// components.Modal renders <div id="modal" data-modal> around a
+	// role="dialog" panel. Only one is open at a time; take the last one.
+	function openModal() {
+		var all = document.querySelectorAll("[data-modal]");
+		return all.length ? all[all.length - 1] : null;
+	}
+
+	function closeModal(modal) {
+		if (!modal) return;
+		var back = modal._returnFocus;
+		modal.remove();
+		if (back && document.contains(back) && back.focus) back.focus();
+	}
+
+	function focusModal(modal) {
+		if (!modal || modal.dataset.modalReady) return;
+		modal.dataset.modalReady = "1";
+		modal._returnFocus = document.activeElement;
+		var target = modal.querySelector(
+			"[autofocus], input:not([type=hidden]):not([disabled]), select, textarea, button:not([data-modal-close])"
+		);
+		(target || modal.querySelector("[role=dialog]") || modal).focus();
+	}
+
+	document.addEventListener("click", function (evt) {
+		var closer = evt.target.closest && evt.target.closest("[data-modal-close]");
+		if (closer) {
+			closeModal(closer.closest("[data-modal]"));
+			return;
+		}
+		// A click on the backdrop itself (not the panel) closes the dialog.
+		if (evt.target.hasAttribute && evt.target.hasAttribute("data-modal")) {
+			closeModal(evt.target);
+		}
+	});
+
+	document.addEventListener("keydown", function (evt) {
+		if (evt.key === "Escape") {
+			var modal = openModal();
+			if (modal) {
+				evt.preventDefault();
+				closeModal(modal);
+			}
+		}
+	});
+
+	document.addEventListener("htmx:afterSettle", function () {
+		focusModal(openModal());
+	});
+
+	// A request from inside the dialog closes it on success and shows the
+	// error text in #modal-error on failure.
+	document.addEventListener("htmx:afterRequest", function (evt) {
+		var elt = evt.detail.elt;
+		var dialog = elt && elt.closest && elt.closest("[data-modal] [role=dialog]");
+		if (!dialog) return;
+		if (evt.detail.successful) {
+			closeModal(dialog.closest("[data-modal]"));
+			return;
+		}
+		var errDiv = dialog.querySelector("#modal-error");
+		if (errDiv) {
+			errDiv.textContent = errorMessage(evt.detail.xhr);
+			errDiv.classList.remove("hidden");
+		}
+	});
+
 	// --- Sidebar active link ------------------------------------------------
 
 	// Mark the [data-nav] link with the longest prefix match for the current
@@ -132,6 +203,7 @@
 	function init() {
 		markActiveNav();
 		watchToastRegion();
+		focusModal(openModal());
 	}
 
 	if (document.readyState === "loading") {

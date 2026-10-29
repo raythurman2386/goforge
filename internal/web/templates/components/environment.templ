@@ -49,7 +49,7 @@ templ CreateEnvironmentModal(projectID string, csrfToken string) {
 			<p class="text-xs text-gray-500 mb-4">Examples: staging, qa, feature-x</p>
 			
 			<div class="mt-8 flex justify-end space-x-3">
-				<button type="button" onclick="document.getElementById('modal').remove()" class="btn-secondary">
+				<button type="button" data-modal-close class="btn-secondary">
 					Cancel
 				</button>
 				@Button("Create", "primary")

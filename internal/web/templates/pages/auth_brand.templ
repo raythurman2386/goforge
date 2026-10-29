@@ -1,0 +1,18 @@
+package pages
+
+// authHeader is the logo mark and heading shared by the login and register pages.
+templ authHeader(title, subtitle string) {
+	<div class="text-center">
+		<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 shadow-lg shadow-primary-500/30">
+			<svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+			</svg>
+		</div>
+		<h2 class="mt-6 text-3xl font-extrabold tracking-tight text-gray-900">
+			{ title }
+		</h2>
+		<p class="mt-2 text-sm text-gray-600">
+			{ subtitle }
+		</p>
+	</div>
+}

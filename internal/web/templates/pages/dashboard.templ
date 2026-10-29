@@ -3,6 +3,7 @@ package pages
 import (
 	"fmt"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
@@ -29,13 +30,12 @@ func formatBytes(bytes int64) string {
 templ DashboardStatsLoader() {
 	<div id="dashboard-stats" hx-get="/dashboard/stats" hx-trigger="load">
 		<div class="mt-8">
-			<div class="animate-pulse">
-				<div class="h-6 bg-gray-200 rounded w-48 mb-4"></div>
+			<div role="status" aria-label="Loading stats">
+				@components.Skeleton("h-6 w-48 mb-4")
 				<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-					<div class="card h-24 bg-gray-100"></div>
-					<div class="card h-24 bg-gray-100"></div>
-					<div class="card h-24 bg-gray-100"></div>
-					<div class="card h-24 bg-gray-100"></div>
+					for range 4 {
+						@components.Skeleton("h-24 !rounded-xl")
+					}
 				</div>
 			</div>
 		</div>
@@ -48,7 +48,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 			<!-- Resource Usage Section -->
 			<div class="mt-8">
 				<h2 class="text-lg font-semibold text-gray-900">Resource Usage</h2>
-				<div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+				<dl class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 					<div class="card">
 						<dt class="text-sm font-medium text-gray-500 truncate">Total Projects</dt>
 						<dd class="mt-1 text-3xl font-semibold text-gray-900">{ fmt.Sprintf("%d", stats.TotalProjects) }</dd>
@@ -65,7 +65,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 						<dt class="text-sm font-medium text-gray-500 truncate">CPU Usage</dt>
 						<dd class="mt-1 text-3xl font-semibold text-gray-900">{ fmt.Sprintf("%.1f%%", stats.TotalCPUUsage) }</dd>
 					</div>
-				</div>
+				</dl>
 			</div>
 
 			<!-- Memory Usage Section -->
@@ -116,29 +116,29 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 						</form>
 						}
 					</div>
-					<div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-						<div class="card bg-blue-50 border-blue-200">
-							<dt class="text-sm font-medium text-blue-700 truncate">Images</dt>
-							<dd class="mt-1 text-2xl font-semibold text-blue-900">{ formatBytes(stats.DiskUsage.ImagesSize) }</dd>
+					<dl class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+						<div class="card">
+							<dt class="text-sm font-medium text-gray-500 truncate">Images</dt>
+							<dd class="mt-1 text-2xl font-semibold text-gray-900">{ formatBytes(stats.DiskUsage.ImagesSize) }</dd>
 						</div>
-						<div class="card bg-green-50 border-green-200">
-							<dt class="text-sm font-medium text-green-700 truncate">Containers</dt>
-							<dd class="mt-1 text-2xl font-semibold text-green-900">{ formatBytes(stats.DiskUsage.ContainersSize) }</dd>
+						<div class="card">
+							<dt class="text-sm font-medium text-gray-500 truncate">Containers</dt>
+							<dd class="mt-1 text-2xl font-semibold text-gray-900">{ formatBytes(stats.DiskUsage.ContainersSize) }</dd>
 						</div>
-						<div class="card bg-purple-50 border-purple-200">
-							<dt class="text-sm font-medium text-purple-700 truncate">Volumes</dt>
-							<dd class="mt-1 text-2xl font-semibold text-purple-900">{ formatBytes(stats.DiskUsage.VolumesSize) }</dd>
+						<div class="card">
+							<dt class="text-sm font-medium text-gray-500 truncate">Volumes</dt>
+							<dd class="mt-1 text-2xl font-semibold text-gray-900">{ formatBytes(stats.DiskUsage.VolumesSize) }</dd>
 						</div>
-						<div class="card bg-orange-50 border-orange-200">
-							<dt class="text-sm font-medium text-orange-700 truncate">Build Cache</dt>
-							<dd class="mt-1 text-2xl font-semibold text-orange-900">{ formatBytes(stats.DiskUsage.BuildCacheSize) }</dd>
+						<div class="card">
+							<dt class="text-sm font-medium text-gray-500 truncate">Build Cache</dt>
+							<dd class="mt-1 text-2xl font-semibold text-gray-900">{ formatBytes(stats.DiskUsage.BuildCacheSize) }</dd>
 						</div>
-					</div>
+					</dl>
 					if stats.DiskUsage.ReclaimableSize > 0 {
-						<div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-							<p class="text-sm text-yellow-800">
-								<strong>Reclaimable Space:</strong> { formatBytes(stats.DiskUsage.ReclaimableSize) } can be freed by pruning.
-							</p>
+						<div class="mt-4">
+							@components.Alert("warning") {
+								<p><strong>Reclaimable Space:</strong> { formatBytes(stats.DiskUsage.ReclaimableSize) } can be freed by pruning.</p>
+							}
 						</div>
 					}
 				</div>

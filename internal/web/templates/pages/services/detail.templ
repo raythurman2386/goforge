@@ -37,13 +37,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 						<span class="inline-flex items-center px-2 py-0.5 rounded bg-primary-50 text-[10px] font-bold text-primary-700 uppercase tracking-widest leading-none border border-primary-100">
 							{ tmpl.DisplayName }
 						</span>
-						<span class={ "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider leading-none",
-							templ.KV("bg-emerald-100 text-emerald-800", instance.Status == models.ServiceStatusRunning),
-							templ.KV("bg-amber-100 text-amber-800", instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting),
-							templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed),
-							templ.KV("bg-gray-100 text-gray-600", instance.Status == models.ServiceStatusStopped) }>
-							{ string(instance.Status) }
-						</span>
+						@components.StatusBadge("service", string(instance.Status))
 						if isPending(instance) {
 							<span class="inline-flex items-center text-xs text-amber-600">
 								<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3" fill="none" viewBox="0 0 24 24">

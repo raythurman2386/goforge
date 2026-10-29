@@ -1,0 +1,95 @@
+package components
+
+import "strings"
+
+// StatusBadge is the one status pill for deployments, service instances, and
+// containers. kind is "deployment", "service", or "container"; status is the
+// raw status string. The tone classes below are literal strings on purpose:
+// Tailwind only keeps classes it can find verbatim in scanned files.
+templ StatusBadge(kind, status string) {
+	<span class={ "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset whitespace-nowrap", statusBadgeClass(statusTone(kind, status)) } data-status={ status }>
+		if statusInFlight(kind, status) {
+			<svg class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+				<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+			</svg>
+		} else {
+			<span class={ "h-1.5 w-1.5 rounded-full", statusDotClass(statusTone(kind, status)) } aria-hidden="true"></span>
+		}
+		{ statusLabel(status) }
+	</span>
+}
+
+// Status tones.
+const (
+	toneSuccess = "success"
+	toneDanger  = "danger"
+	toneWarning = "warning"
+	toneNeutral = "neutral"
+)
+
+func statusTone(kind, status string) string {
+	switch strings.ToLower(status) {
+	case "running", "healthy":
+		return toneSuccess
+	case "failed", "dead", "unhealthy":
+		return toneDanger
+	case "exited":
+		if kind == "container" {
+			return toneDanger
+		}
+		return toneNeutral
+	case "pending", "starting", "cloning", "building", "deploying", "paused", "restarting":
+		return toneWarning
+	default:
+		// stopped, canceled, rolled_back, created, and unknown values.
+		return toneNeutral
+	}
+}
+
+// statusInFlight reports whether the badge shows a spinner instead of a dot.
+func statusInFlight(kind, status string) bool {
+	switch strings.ToLower(status) {
+	case "cloning", "building", "deploying", "starting", "restarting":
+		return true
+	}
+	return false
+}
+
+func statusBadgeClass(tone string) string {
+	switch tone {
+	case toneSuccess:
+		return "bg-green-50 text-green-700 ring-green-600/20"
+	case toneDanger:
+		return "bg-red-50 text-red-700 ring-red-600/20"
+	case toneWarning:
+		return "bg-amber-50 text-amber-800 ring-amber-600/20"
+	default:
+		return "bg-gray-50 text-gray-700 ring-gray-500/20"
+	}
+}
+
+func statusDotClass(tone string) string {
+	switch tone {
+	case toneSuccess:
+		return "bg-green-500"
+	case toneDanger:
+		return "bg-red-500"
+	case toneWarning:
+		return "bg-amber-500"
+	default:
+		return "bg-gray-400"
+	}
+}
+
+// statusLabel turns "rolled_back" into "Rolled Back".
+func statusLabel(status string) string {
+	if status == "" {
+		return "Unknown"
+	}
+	words := strings.Fields(strings.ReplaceAll(status, "_", " "))
+	for i, w := range words {
+		words[i] = strings.ToUpper(w[:1]) + strings.ToLower(w[1:])
+	}
+	return strings.Join(words, " ")
+}

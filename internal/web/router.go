@@ -95,6 +95,10 @@ func Router(
 			// Serve static files (no timeout — static file server manages its own I/O)
 			fileServer := http.FileServer(http.Dir("static"))
 			r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
+			// Browsers request /favicon.ico regardless of <link rel="icon">.
+			r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, "static/favicon.ico")
+			})
 
 			// Health check endpoints (lightweight, but include timeout for consistency)
 			r.Group(func(r chi.Router) {

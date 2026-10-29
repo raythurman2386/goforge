@@ -8,30 +8,23 @@ import (
 
 templ GitSources(sources []*models.GitSource, csrfToken string) {
 	@layouts.AppLayout("Git Sources", csrfToken) {
-		<div class="md:flex md:items-center md:justify-between mb-8">
-			<div class="flex-1 min-w-0">
-				<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-					Git Sources
-				</h2>
-				<p class="mt-2 text-sm text-gray-500">Manage your git provider integrations and access tokens.</p>
-			</div>
-			<div class="mt-4 flex md:mt-0 md:ml-4">
+		@components.PageHeader("Git Sources", "Manage your git provider integrations and access tokens.") {
 				<button hx-get="/settings/git/new" hx-target="body" hx-swap="beforeend" class="btn-primary">
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 					</svg>
 					Add Source
 				</button>
-			</div>
-		</div>
+		}
 
 		if len(sources) == 0 {
-			@components.EmptyState(
-				"No git sources",
-				"Connect your GitHub, GitLab or other git providers.",
-				"Add Source",
-				"/settings/git/new",
-			)
+			@components.EmptyState(components.EmptyStateProps{
+				Title:       "No git sources",
+				Description: "Connect your GitHub, GitLab or other git providers.",
+				ButtonText:  "Add Source",
+				HxGet:       "/settings/git/new",
+				Icon:        "code",
+			})
 		} else {
 			<div class="card overflow-hidden !p-0">
 				<ul role="list" class="divide-y divide-gray-100">
@@ -102,7 +95,7 @@ templ AddGitSourceModal(csrfToken string) {
 			@components.Input("Access Token", "access_token", "password", "", true)
 
 			<div class="mt-8 flex justify-end space-x-3">
-				<button type="button" onclick="document.getElementById('modal').remove()" class="btn-secondary">
+				<button type="button" data-modal-close class="btn-secondary">
 					Cancel
 				</button>
 				@components.Button("Add Source", "primary")

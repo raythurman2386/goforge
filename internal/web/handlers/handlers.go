@@ -13,6 +13,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/web/httputil"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/errors"
 )
 
@@ -52,7 +53,10 @@ func RenderError(w http.ResponseWriter, r *http.Request, status int, message str
 	if r.Header.Get("HX-Request") == htmxTrue {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(status)
-		fmt.Fprintf(w, `<div class="rounded-md bg-red-50 p-4"><div class="flex"><div class="flex-shrink-0"><svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg></div><div class="ml-3"><p class="text-sm font-medium text-red-800">%s</p></div></div></div>`, html.EscapeString(message))
+		// templ escapes the message; app.js reads the fragment's text for the toast.
+		if err := components.AlertMessage("error", message).Render(r.Context(), w); err != nil {
+			fmt.Fprint(w, html.EscapeString(message))
+		}
 		return
 	}
 
