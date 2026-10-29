@@ -67,6 +67,8 @@ GoForge can generate labels for these Traefik middleware options:
 
 ### Example Labels
 
+A one-click service without a Domain, such as Postgres or Redis, gets `traefik.enable=false` and no router, so Traefik never builds its default `Host(<container name>)` route to it.
+
 For a deployed application at `myapp.example.com`:
 
 ```

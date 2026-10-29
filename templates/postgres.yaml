@@ -44,7 +44,9 @@ docker:
     - name: data
       path: /var/lib/postgresql/data
   health_check:
-    test: ["CMD-SHELL", "pg_isready -U {{ .Config.username }}"]
+    # Health checks are not rendered as templates; read the user and
+    # database from the container environment instead.
+    test: ["CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
     interval: 10s
     timeout: 5s
     retries: 5

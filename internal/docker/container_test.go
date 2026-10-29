@@ -146,3 +146,35 @@ func TestRenameContainer(t *testing.T) {
 		t.Errorf("rename(%q, %q), want (abc, svc-replaced)", gotID, gotName)
 	}
 }
+
+func TestCreateContainer_Cmd(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		cmd  []string
+	}{
+		{name: "command replaces image CMD", cmd: []string{"sh", "-c", "exec redis-server /tmp/r.conf"}},
+		{name: "no command keeps image CMD", cmd: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var got *container.Config
+			c := &Client{docker: &mockDockerAPI{
+				containerCreateFunc: func(_ context.Context, cfg *container.Config, _ *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
+					got = cfg
+					return container.CreateResponse{ID: "c1"}, nil
+				},
+			}}
+			if _, err := c.CreateContainer(context.Background(), ContainerOptions{Name: "svc", Image: "redis:7", Cmd: tt.cmd}); err != nil {
+				t.Fatalf("CreateContainer() error = %v", err)
+			}
+			if got == nil {
+				t.Fatal("ContainerCreate was not called")
+			}
+			if !slices.Equal([]string(got.Cmd), tt.cmd) {
+				t.Errorf("Config.Cmd = %q, want %q", got.Cmd, tt.cmd)
+			}
+		})
+	}
+}

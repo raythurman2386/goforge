@@ -38,7 +38,9 @@ docker:
   volumes:
     - name: data
       path: /data
-  command: server /data --console-address ':9001'
+  # Before docker.command existed this line was a string GoForge ignored, so
+  # the image ran its default CMD. The image entrypoint prepends "minio".
+  command: ["server", "/data", "--console-address", ":9001"]
   health_check:
     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
     interval: 10s

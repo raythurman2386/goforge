@@ -28,8 +28,8 @@ An in-memory data store for caching, sessions, and message queues.
 |---------|---------|-------------|
 | Version | 7 | Redis major version |
 | Port | 6379 | Container port |
-| Password | Optional | Auth password |
-| Persistence | AOF + RDB | Data persistence mode |
+| Password | Generated on the server when the field is left blank | Required for every client (`requirepass`), stored encrypted |
+| Persistence | RDB snapshots (Redis default) | AOF is off |
 
 ### SolidCraft
 

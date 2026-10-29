@@ -52,11 +52,12 @@ docker:
     KEY: "{{ .Config.fieldname }}"
   optional_environment:   # Like environment, but left out when the value renders empty
     KEY: "{{ .Config.fieldname }}"
+  command: [string]       # Replaces the image CMD (optional, Go templates). Never template a secret into it
   volumes:                # Persistent volumes
     - name: string        # Volume name suffix
       path: string        # Mount path in container
   health_check:           # Docker health check
-    test: [string]        # Health check command
+    test: [string]        # Health check command. Not a Go template; read config from the container env
     interval: duration    # Check interval
     timeout: duration     # Check timeout
     retries: integer      # Retry count
@@ -202,7 +203,7 @@ POSTGRES_USER: "{{ .Config.username }}"
 POSTGRES_PASSWORD: "{{ .Config.password }}"
 ```
 
-**Health check**: `pg_isready -U <username>`
+**Health check**: `pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"`
 
 **Connection string**: `postgres://<username>:<password>@<container>:5432/<database>`
 
@@ -235,7 +236,11 @@ POSTGRES_PASSWORD: "{{ .Config.password }}"
 REDIS_PASSWORD: "{{ .Config.password }}"
 ```
 
-**Health check**: `redis-cli ping | grep PONG`
+**Command**: the official `redis` image ignores `REDIS_PASSWORD`, so the template's `command` writes `requirepass` into `/tmp/goforge-redis.conf` (mode 600, inside the container, not in the volume) and runs `docker-entrypoint.sh redis-server /tmp/goforge-redis.conf`. The password is read from the environment, so it is not in the container command or the host process list. A client that does not `AUTH` gets `NOAUTH`.
+
+**Persistence**: Redis defaults: RDB snapshots in `/data`. AOF is off.
+
+**Health check**: `REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep PONG`
 
 **Connection string**: `redis://:<password>@<container>:6379`
 

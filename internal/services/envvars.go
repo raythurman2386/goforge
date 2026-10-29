@@ -26,7 +26,10 @@ func ServiceEnvVarName(instanceName, templateName, connKey string) string {
 	return prefix + "_" + suffix
 }
 
-const templateNameRedis = "redis"
+const (
+	templateNameRedis    = "redis"
+	templateNamePostgres = "postgres"
+)
 
 // conventionalSuffix returns the conventional env var suffix for a service's connection key.
 func conventionalSuffix(templateName, connKey string) string {
@@ -34,7 +37,7 @@ func conventionalSuffix(templateName, connKey string) string {
 		return strings.ToUpper(strings.ReplaceAll(connKey, ".", "_"))
 	}
 	switch strings.ToLower(templateName) {
-	case "postgres", "postgresql", "mysql", "mariadb", "mongodb":
+	case templateNamePostgres, "postgresql", "mysql", "mariadb", "mongodb":
 		return "DATABASE_URL"
 	case templateNameRedis:
 		return "REDIS_URL"

@@ -25,6 +25,7 @@ const specGoldenPath = "testdata/spec_golden.json"
 // specSnapshot is the comparable part of docker.ContainerOptions.
 type specSnapshot struct {
 	Image         string            `json:"image"`
+	Command       []string          `json:"command,omitempty"`
 	Env           []string          `json:"env"`
 	Labels        map[string]string `json:"labels"`
 	Binds         []string          `json:"binds"`
@@ -81,7 +82,7 @@ func renderSnapshots(t *testing.T) map[string]specSnapshot {
 			}
 			sort.Strings(env)
 			snap := specSnapshot{
-				Image: spec.opts.Image, Env: env, Labels: spec.opts.Labels, Binds: spec.opts.Binds,
+				Image: spec.opts.Image, Command: spec.opts.Cmd, Env: env, Labels: spec.opts.Labels, Binds: spec.opts.Binds,
 				NetworkName: spec.opts.NetworkName, RestartPolicy: spec.opts.RestartPolicy,
 				Memory: spec.opts.Memory, NanoCPUs: spec.opts.NanoCPUs,
 			}
@@ -134,6 +135,7 @@ func TestBuildContainerSpec_MatchesMain(t *testing.T) {
 			t.Errorf("%s: missing", key)
 			continue
 		}
+		w = wantSinceMain(key, w, g)
 		if !strings.HasPrefix(key, "gitea") {
 			if gj, wj := mustJSON(t, g), mustJSON(t, w); gj != wj {
 				t.Errorf("%s: container options changed\n got: %s\nwant: %s", key, gj, wj)
@@ -152,6 +154,32 @@ func TestBuildContainerSpec_MatchesMain(t *testing.T) {
 			t.Errorf("%s: container options changed\n got: %s\nwant: %s", key, gj, wj)
 		}
 	}
+}
+
+// wantSinceMain applies the intended changes since the golden was written to
+// w, the golden snapshot for key: a variant without a domain gets
+// traefik.enable=false (no Traefik router for data services), and the redis
+// and postgres templates got a new command and health check, and minio's
+// command, a string GoForge used to ignore, is now applied. Everything else
+// must still match main.
+func wantSinceMain(key string, w, g specSnapshot) specSnapshot {
+	if !strings.HasSuffix(key, "+domain") {
+		labels := make(map[string]string, len(w.Labels))
+		for k, v := range w.Labels {
+			labels[k] = v
+		}
+		labels["traefik.enable"] = "false"
+		w.Labels = labels
+	}
+	switch strings.TrimSuffix(key, "+domain") {
+	case templateNameRedis:
+		w.Command, w.HealthCheck = g.Command, g.HealthCheck
+	case templateNamePostgres:
+		w.HealthCheck = g.HealthCheck
+	case "minio":
+		w.Command = g.Command
+	}
+	return w
 }
 
 func withoutSSHEnv(env []string) []string {
