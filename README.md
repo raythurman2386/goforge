@@ -12,7 +12,7 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
 ## Features
 
-- **Authentication:** Local email/password and GitHub OAuth.
+- **Authentication:** Local email/password and GitHub OAuth. Registration closes after the first account unless you open it. Accounts are `user` until `GOFORGE_ADMIN_EMAIL` grants `admin`.
 - **Project Management:** CRUD operations for projects and environments.
 - **Docker Integration:** Build and deploy containers directly from git repositories.
 - **Traefik Integration:** Automatic routing with Docker labels (internal only).
@@ -22,14 +22,9 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
 ## Getting Started
 
-### Prerequisites
+### Quickstart with Docker Compose
 
-- Go 1.25+
-- Docker Engine
-- PostgreSQL
-- `templ` CLI (`go install github.com/a-h/templ/cmd/templ@latest`)
-
-### Setup
+This is the supported way to run GoForge. You need Docker Engine with the Compose plugin and `openssl`.
 
 1.  **Clone the repository:**
     ```bash
@@ -37,27 +32,44 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
     cd goforge
     ```
 
-2.  **Install dependencies:**
+2.  **Create `.env` from the example:**
     ```bash
-    go mod download
+    cp .env.example .env
     ```
 
-3.  **Configure environment:**
-    Create a `.env` file or use environment variables. In development mode, secrets are generated automatically.
-    ```bash
-    export GOFORGE_DEV_MODE=true
-    ```
+3.  **Fill in the required values in `.env`:**
+    - `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET`: generate each with `openssl rand -base64 32`. Compose refuses to start while the first three are empty.
+    - `POSTGRES_PASSWORD`: set a real password and use the same value in `DATABASE_URL`.
+    - `GOFORGE_ADMIN_EMAIL`: the email of the operator account. Matching ignores case. Leave it empty and nobody is admin.
+    - Leave `GOFORGE_DEV_MODE=false`.
 
-4.  **Run migrations:**
+4.  **Start the stack:**
     ```bash
-    make migrate
+    docker compose up -d --build
+    curl -s http://localhost:8080/health/ready
     ```
+    Ready returns `"database":"ok"` once migrations have run. Migrations run automatically at startup.
 
-5.  **Start the development server:**
-    ```bash
-    make dev
-    ```
-    The server will be available at `http://localhost:8080`.
+5.  **Create the first account:** open `http://localhost:8080` and register. Use the `GOFORGE_ADMIN_EMAIL` address to get the admin role. If you set `GOFORGE_ADMIN_EMAIL` after that account exists, restart GoForge and startup promotes it.
+
+### What the defaults do
+
+- **Registration:** the first account can always register. After that, `/auth/register` returns `403` unless `GOFORGE_ENABLE_REGISTRATION=true`.
+- **Admin role:** every account is created as `user`. The account whose email matches `GOFORGE_ADMIN_EMAIL` becomes `admin`, at account creation or at the next startup. The admin role is required for host operations such as Docker prune.
+- **Ports:** Compose publishes the app on `127.0.0.1:8080` only. Traefik on ports 80 and 443 is the public entrypoint. Postgres is not published on the host.
+- **Dev mode:** `GOFORGE_DEV_MODE` defaults to `false`. Dev mode generates missing secrets and relaxes config validation. Turn it on only on a local machine.
+
+### Developing from source
+
+Prerequisites: Go 1.25+, Docker Engine, a PostgreSQL you can reach with `DATABASE_URL`, and `air` for hot reload (`make install-tools`). `templ` and `golangci-lint` run through `go tool`.
+
+```bash
+go mod download
+make migrate   # uses DATABASE_URL
+make dev       # sets GOFORGE_DEV_MODE=true for this local process only
+```
+
+`make dev` and `make run` turn on dev mode for that one process, so you do not export `GOFORGE_DEV_MODE` yourself. Never copy a dev-mode environment to a server. The server listens on `http://localhost:8080`.
 
 ## Commands
 
@@ -117,6 +129,7 @@ GoForge follows a clean architecture with:
 
 3. **Network Security**
    - GoForge is designed to work with **Cloudflare Tunnel** (recommended)
+   - Compose publishes the app on `127.0.0.1` only. Traefik on 80 and 443 is the public entrypoint
    - No inbound ports needed - tunnel connects outbound to Cloudflare
    - Restrict access to the Docker socket
    - Use TLS/SSL for all external connections (handled by Cloudflare)
@@ -129,6 +142,9 @@ GoForge follows a clean architecture with:
    - Regularly update base images and dependencies
 
 5. **Authentication & Authorization**
+   - Registration is closed after the first account by default (`GOFORGE_ENABLE_REGISTRATION=false`)
+   - Two roles exist: `admin` and `user`. Only `GOFORGE_ADMIN_EMAIL` grants `admin`. There are no teams or per-project roles yet
+   - A project or deployment owned by another account returns `404`
    - Use strong passwords for local accounts
    - Review OAuth permissions requested by GitHub integration
    - Consider implementing 2FA (not yet implemented)
@@ -136,8 +152,10 @@ GoForge follows a clean architecture with:
 
 6. **Data Protection**
    - Regular backups of PostgreSQL database
-   - Encrypt sensitive data at rest (encryption planned for future)
-   - Secure connection strings for linked services
+   - `ENCRYPTION_KEY` encrypts these values at rest with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, and one-click service `config` and `connection_info`
+   - Rows written in plaintext by an older version stay readable and are encrypted the next time they are updated
+   - Non-secret project variables are stored in plaintext
+   - Back up `ENCRYPTION_KEY`. Without it the encrypted values cannot be read
 
 ### Reporting Security Issues
 

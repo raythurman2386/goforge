@@ -6,8 +6,9 @@ This directory is the maintained source for verifying the user-facing behavior o
 
 - One Compose project, `goforge-verify`, started by `.cursor/skills/verify-goforge/scripts/verify.sh launch`.
 - UI base URL `http://127.0.0.1:8080`.
-- State directory `/tmp/goforge-verify` holds `stack.env` and cookie jars. Evidence does not.
-- Evidence directory `artifacts/verify-goforge-proof/` at the repo root.
+- State directory `/tmp/goforge-verify/state` holds `stack.env`, cookie jars, and fixture passwords.
+- Evidence directory `/tmp/goforge-verify/proof`, outside the repo. Never commit it.
+- Registration is closed after the first account and `GOFORGE_ADMIN_EMAIL=verify-admin@example.test` unless the launch overrode them.
 - `verify.sh doctor` reports `drive_auth=yes` before any drive.
 - Deploy, container, and service drives also need `drive_docker=yes`.
 - Never drive an instance that this verification run did not start.
@@ -17,9 +18,9 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Start from the baseline state unless the feature file adds a precondition.
 - The UI is HTMX. Drive it with curl against the form routes and headings named in the feature file. There is no Playwright suite in this repo.
 - Treat every command as literal. Keep paths, field names, and status values unchanged.
-- Session and CSRF values stay in `/tmp/goforge-verify`. Do not print them and do not copy jars into the evidence directory.
+- Session and CSRF values stay in `/tmp/goforge-verify/state`. Do not print them and do not copy jars into the evidence directory.
 - A second view of a mutation is SQL through `verify.sh psql`, or a later GET with the same cookie.
-- Cleanup may remove containers, volumes, and `/tmp/goforge-verify`. It must leave the evidence directory in place.
+- Cleanup may remove containers, volumes, and `/tmp/goforge-verify/state`. It must leave `/tmp/goforge-verify/proof` in place.
 
 ## Proof and skip reporting
 
@@ -40,8 +41,12 @@ Each feature file starts with an H1 and one paragraph of user-visible behavior. 
 
 ## Features
 
-- [Register the bootstrap account](./register-admin.md) covers the first account, the dashboard session, and registration closing after that account exists.
+Last driven live on minis after #28: register-admin and login-projects. The other feature files were updated from source after #28 and have not been re-driven since.
+
+
+- [Register the bootstrap account](./register-admin.md) covers the first account, the dashboard session, the `GOFORGE_ADMIN_EMAIL` admin grant, and registration closing after that account exists.
+- [Log in and create a project](./login-projects.md) covers login, the projects list, and creating a project.
 - [Deploy with log replay](./deploy-log-replay.md) covers creating a project, starting a deploy, and seeing the same log lines after a reconnect.
-- [Container stop and restart ownership](./container-ownership.md) covers stop and restart for the owning account and denial for a second account.
+- [Container stop and restart ownership](./container-ownership.md) covers stop and restart for the owning account and `403` for a second account.
 - [Cancel a deployment](./cancel-deployment.md) covers canceling an in-flight deploy and the status staying `canceled`.
 - [One-click service credentials](./service-credentials.md) covers a Postgres service whose stored config and connection info are sealed, while the UI still shows the connection string.

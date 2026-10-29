@@ -44,6 +44,9 @@ Thumbs.db
 dist/
 build/
 
+# Local verification evidence (keep proofs out of the repo; use /tmp/goforge-verify/proof)
+artifacts/
+
 # Generated files
 internal/web/templates/**/*_templ.go
 static/css/output.css
@@ -56,7 +59,6 @@ static/css/output.css
 # Logs
 *.log
 logs/
-!artifacts/verify-goforge-proof/*.log
 
 # Temporary files
 tmp/

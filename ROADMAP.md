@@ -159,10 +159,10 @@ The focus for the next release is hardening the platform and improving the devel
 - [ ] **Lifecycle Management:** Implement actual restart logic and proper container stopping in service instances.
 
 ### 3. Team & Security
-- [ ] **Team Management:** Invite users, Role-based Access Control (RBAC). *(Moved to Critical Phase)*
+- [ ] **Team Management:** Invite users, Role-based Access Control (RBAC). *(Moved to Critical Phase. The `admin`/`user` role and `GOFORGE_ADMIN_EMAIL` grant shipped in #28; teams, invites, and per-project roles have not.)*
 - [ ] **Audit Logs:** Track who did what and when (13.4). *(Moved to Critical Phase - partially implemented)*
 - [ ] **2FA:** Two-factor authentication for local accounts.
-- [ ] **Data Encryption:** Encrypt project variables marked as secret and OAuth access tokens at rest.
+- [x] **Data Encryption:** Encrypt project variables marked as secret and OAuth access tokens at rest. *(AES-GCM with `ENCRYPTION_KEY`. Git source tokens and SSH keys and one-click service credentials are encrypted too. Legacy plaintext rows are encrypted on their next update.)*
 - [ ] **API Key Management:** Secure storage and rotation of service API keys
 
 ### 4. Developer Experience
@@ -225,7 +225,9 @@ The focus for the next release is hardening the platform and improving the devel
 Before tagging V1.0, the following **must** be completed:
 
 **Critical User Flows (All Working End-to-End):**
-- [x] User can register/login via email or GitHub
+- [x] User can register/login via email or GitHub *(registration closes after the first account unless `GOFORGE_ENABLE_REGISTRATION=true`)*
+- [x] Operator gets the admin role through `GOFORGE_ADMIN_EMAIL` (case-insensitive); everyone else is `user` (#28)
+- [x] Another account's project or deployment returns `404` (#28)
 - [x] User can create a project with Git repository
 - [x] User can deploy the project successfully
 - [x] User can view deployment logs in real-time
@@ -237,7 +239,7 @@ Before tagging V1.0, the following **must** be completed:
 
 **Documentation:**
 - [ ] API documentation for all endpoints
-- [ ] User guide for first-time setup
+- [ ] User guide for first-time setup *(README now has a Compose quickstart)*
 - [ ] Deployment troubleshooting guide
 - [ ] Environment variable naming conventions doc
 

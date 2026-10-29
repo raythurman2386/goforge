@@ -1,6 +1,6 @@
 # Deploy with log replay
 
-Deploy lets a signed-in user create a project from a public Git URL, start a build, and read the same log lines again after the stream reconnects.
+Deploy lets a signed-in user create a project from a public Git URL, start a build, and read the same log lines again after the stream reconnects. The build uses the project's Dockerfile path and build context.
 
 ## Sub-features
 
@@ -22,14 +22,14 @@ Deploy lets a signed-in user create a project from a public Git URL, start a bui
 Preconditions:
 
 - `verify.sh doctor` reports `drive_auth=yes` and `drive_docker=yes`.
-- `drive-register` has already created the bootstrap session. Reuse `/tmp/goforge-verify/jar-a.txt`.
+- `drive-register` has already created the bootstrap session. Copy `/tmp/goforge-verify/state/jar-login.txt` from `drive-login` to `/tmp/goforge-verify/state/jar-a.txt`, or log in again into that jar.
 - The public repository `https://github.com/raythurman2386/goforge.git` is reachable from the `goforge` container.
 
 - **Create the project.** Read `goforge_csrf` from `jar-a.txt` into a shell variable. Do not print it. Post the form.
 
 ```bash
-curl -sS -D /tmp/goforge-verify/project.headers -o /dev/null \
-  -b /tmp/goforge-verify/jar-a.txt -c /tmp/goforge-verify/jar-a.txt \
+curl -sS -D /tmp/goforge-verify/state/project.headers -o /dev/null \
+  -b /tmp/goforge-verify/state/jar-a.txt -c /tmp/goforge-verify/state/jar-a.txt \
   -X POST http://127.0.0.1:8080/projects \
   --data-urlencode "csrf_token=$csrf" \
   --data-urlencode "name=verify-hello" \
@@ -44,8 +44,8 @@ The response is `303` and `Location` matches `/projects/` plus an id. `GET` that
 - **Start the deploy.** Read the production environment id with `verify.sh psql "select e.id from environments e join projects p on p.id = e.project_id where p.name = 'verify-hello'"`. Post `Deploy Now`.
 
 ```bash
-curl -sS -D /tmp/goforge-verify/deploy.headers -o /dev/null \
-  -b /tmp/goforge-verify/jar-a.txt -c /tmp/goforge-verify/jar-a.txt \
+curl -sS -D /tmp/goforge-verify/state/deploy.headers -o /dev/null \
+  -b /tmp/goforge-verify/state/jar-a.txt -c /tmp/goforge-verify/state/jar-a.txt \
   -H "X-CSRF-Token: $csrf" \
   -X POST "http://127.0.0.1:8080/projects/$PROJECT_ID/deployments?env_id=$ENV_ID"
 ```
@@ -56,20 +56,21 @@ The response is `200` and the `HX-Redirect` header is `/projects/$PROJECT_ID/dep
 
 ```bash
 curl -sS -N --max-time 10 \
-  -b /tmp/goforge-verify/jar-a.txt \
+  -b /tmp/goforge-verify/state/jar-a.txt \
   "http://127.0.0.1:8080/projects/$PROJECT_ID/deployments/$DEPLOYMENT_ID/logs" \
-  > artifacts/verify-goforge-proof/deploy-sse-first.txt
+  > /tmp/goforge-verify/proof/deploy-sse-first.txt
 ```
 
-- **Replay.** Open the stream again into `artifacts/verify-goforge-proof/deploy-sse-replay.txt`. The replay file contains the log lines from the first file, not only `event: connected`.
-- **Rows.** `verify.sh psql "select count(*) from deployment_logs where deployment_id = '$DEPLOYMENT_ID'"` prints a count greater than `0`. Write the count to `artifacts/verify-goforge-proof/deploy-verdict.txt`.
-- **Build context.** `verify.sh psql "select build_context from projects where name = 'verify-hello'"` prints `app`. The image build uses the `app` directory inside the clone. On this tree write `deploy-build-context=fail` in the verdict. `RunPipeline` sets `ContextDir` to the clone root, so the root `Dockerfile` can still build.
+- **Replay.** Open the stream again into `/tmp/goforge-verify/proof/deploy-sse-replay.txt`. The replay file contains the log lines from the first file, not only `event: connected`.
+- **Rows.** `verify.sh psql "select count(*) from deployment_logs where deployment_id = '$DEPLOYMENT_ID'"` prints a count greater than `0`. Write the count to `/tmp/goforge-verify/proof/deploy-verdict.txt`.
+- **Build context.** `verify.sh psql "select build_context from projects where name = 'verify-hello'"` prints `app`. Since #28 the pipeline builds from that directory and rejects a context or Dockerfile that is missing or escapes the clone. This repository has no `app/` directory, so the deployment is expected to fail with `build context not found: app`. Record that as `deploy-build-context=pass` only when the failure names the context. For a build that succeeds, create a second project with `build_context=.`.
 - **Proof.** The deployment detail `GET /projects/$PROJECT_ID/deployments/$DEPLOYMENT_ID` returns `200`. Record whether the body contains `No logs available yet` or a log line. Do not save the HTML.
 
 ## Gotchas
 
-- `Service.Log` in `internal/deploy/state.go` writes structured process logs and returns. It does not insert `deployment_logs`. `SSEHandler.DeploymentLogs` sends `event: connected` and then live hub events. It does not replay stored rows. On this tree `deploy-sse-replay` and `deploy-db-rows` fail. Record the count and that the replay file has no earlier log line. Do not treat `event: connected` as replay.
+- Not re-driven live since #28. The expectations below come from the merged source.
+- Pipeline log lines are stored in `deployment_logs`. A reconnect to the log stream sends one `snapshot` event with the stored lines before live `log` events. Do not treat `event: connected` alone as replay.
 - The manual repository field is named `repository_url_manual` until page script renames it. HTTP posts must send `repository_url`.
-- `projects.build_context` is saved from the form. `RunPipeline` passes the clone root as `ContextDir` and does not read `BuildContext`. `deploy-build-context` fails on this tree. Keep the posted value `app`.
 - The log stream is behind `RequireAuth`. A missing session is `401` or a redirect to `/login`, not an empty log.
-- Status broadcasts use the deployment topic. The log pane swaps on SSE event name `log`. A status payload does not append a log line and does not change the badge until reload.
+- A deployment id under a project it does not belong to, or another account's project, returns `404` on the detail page and the log stream.
+- Status events update the badge on the deployment page.
