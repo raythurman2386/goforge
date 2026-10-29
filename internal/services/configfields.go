@@ -10,11 +10,10 @@ import (
 
 // Config field types a template can declare. An empty type is treated as text.
 const (
-	FieldTypeText     = "text"
-	FieldTypePassword = "password"
-	FieldTypeNumber   = "number"
-	FieldTypeBool     = "bool"
-	FieldTypeSelect   = "select"
+	FieldTypeText   = "text"
+	FieldTypeNumber = "number"
+	FieldTypeBool   = "bool"
+	FieldTypeSelect = "select"
 )
 
 // ErrInvalidConfig is wrapped by every error that rejects a user-supplied
