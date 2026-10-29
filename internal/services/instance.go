@@ -75,6 +75,16 @@ func NewInstanceService(
 	}
 }
 
+// publicProtocol is the scheme a browser uses to reach domain. Cloudflare proxy
+// mode still means HTTPS for the visitor: Cloudflare ends TLS and forwards HTTP
+// to Traefik. Only localhost domains and services without a domain use HTTP.
+func publicProtocol(domain string) string {
+	if domain == "" || proxy.IsLocalhostDomain(domain) {
+		return "http"
+	}
+	return "https"
+}
+
 // DeployInstance deploys a new service instance.
 func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName string, config map[string]interface{}) (*models.ServiceInstance, error) {
 	tmpl, err := s.catalog.GetTemplate(tmplName)
@@ -118,10 +128,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 
 	// Prepare interpolation data
 	containerName := fmt.Sprintf("goforge-service-%s", instance.ID)
-	protocol := "https"
-	if domain == "" || s.cloudflareProxyMode || proxy.IsLocalhostDomain(domain) {
-		protocol = "http"
-	}
+	protocol := publicProtocol(domain)
 
 	data := map[string]interface{}{
 		"Config":        config,

@@ -69,6 +69,8 @@ Templates use Go's `text/template` syntax. The following variables are available
 | `{{ .Version }}` | Selected version from the `versions` list |
 | `{{ .Config.<name> }}` | User-provided configuration value by field name |
 | `{{ .ContainerName }}` | Generated Docker container name |
+| `{{ .Domain }}` | Domain entered on the configure form. Empty when none is set |
+| `{{ .Protocol }}` | Scheme a browser uses for `Domain`: `https`, or `http` for an empty or `localhost` / `*.localhost` domain. Cloudflare proxy mode still gives `https` |
 
 ---
 
@@ -141,6 +143,73 @@ REDIS_PASSWORD: "{{ .Config.password }}"
 **Connection string**: `redis://:<password>@<container>:6379`
 
 **Volume**: `data` -> `/data`
+
+---
+
+### SolidCraft
+
+**File**: `templates/solidcraft.yaml`
+
+| Property | Value |
+|----------|-------|
+| Name | `solidcraft` |
+| Category | `cad` |
+| Web | Yes (Domain field, Traefik route) |
+| Versions | latest |
+| Default version | latest |
+| Default resources | 0.25 CPU, 128MB memory |
+| Container port | 8080/tcp |
+
+**Configuration fields**: none. Name and domain come from the configure form.
+
+**Image**: `ghcr.io/tangency-labs/solidcraft-web:{{ .Version }}` (public, no registry login)
+
+**Health check**: `wget --spider -q http://127.0.0.1:8080/`
+
+**Connection**: internal `http://<container>:8080`, external `<protocol>://<domain>`
+
+**Volume**: none. Project files stay in the browser's private storage, which needs HTTPS or `localhost`.
+
+---
+
+### Vaultwarden
+
+**File**: `templates/vaultwarden.yaml`
+
+| Property | Value |
+|----------|-------|
+| Name | `vaultwarden` |
+| Category | `security` |
+| Web | Yes (Domain field, Traefik route) |
+| Versions | latest |
+| Default version | latest |
+| Default resources | 0.25 CPU, 256MB memory |
+| Container port | 80/tcp |
+
+**Configuration fields**:
+
+| Field | Type | Default | Required | Description |
+|-------|------|---------|----------|-------------|
+| `signups_allowed` | text | `true` | Yes | `SIGNUPS_ALLOWED` at first start. Turn signups off later in `/admin` |
+| `admin_token` | password | (generated, 48 chars) | Yes | `ADMIN_TOKEN` for `/admin` |
+
+**Environment variables**:
+
+```yaml
+DOMAIN: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ end }}"
+SIGNUPS_ALLOWED: "{{ .Config.signups_allowed }}"
+ADMIN_TOKEN: "{{ .Config.admin_token }}"
+```
+
+WebSocket notifications are served on the main port by Vaultwarden 1.29 and later, so no `WEBSOCKET_ENABLED` or second port is needed.
+
+**Health check**: `curl -fsS http://localhost:80/alive`
+
+**Connection**: internal `http://<container>:80`, external `<protocol>://<domain>`
+
+**Volume**: `data` -> `/data`
+
+`latest` moves. To pin, add a version such as `1.37.4` (current `latest` on 2026-10-29) to `versions` or use an image digest.
 
 ---
 

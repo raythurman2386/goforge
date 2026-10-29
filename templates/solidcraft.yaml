@@ -1,0 +1,33 @@
+name: solidcraft
+display_name: SolidCraft
+description: Browser-based parametric CAD (SolidCraft web) served by nginx. The browser keeps project files in private storage, which needs HTTPS (or localhost), so give it a public HTTPS domain or a .localhost domain.
+icon: solidcraft
+category: cad
+web: true
+
+versions:
+  - "latest"
+default_version: "latest"
+
+config: []
+
+resources:
+  cpu: "0.25"
+  memory: "128m"
+
+docker:
+  image: "ghcr.io/tangency-labs/solidcraft-web:{{ .Version }}"
+  ports:
+    - container: 8080
+      protocol: tcp
+  environment: {}
+  volumes: []
+  health_check:
+    test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:8080"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:8080{{ end }}"
