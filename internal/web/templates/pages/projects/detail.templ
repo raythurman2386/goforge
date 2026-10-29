@@ -5,12 +5,11 @@ import (
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
-	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, activeTab string, csrfToken string) {
+templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, maskedConn map[string]map[string]string, activeTab string, csrfToken string) {
 	@layouts.AppLayout(project.Name, csrfToken, nil) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
@@ -79,7 +78,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 		} else if activeTab == "deployments" {
 			@Deployments(project, deployments)
 		} else if activeTab == "services" {
-			@Services(project, linkedServices, availableServices, csrfToken)
+			@Services(project, linkedServices, availableServices, maskedConn, csrfToken)
 		} else if activeTab == "settings" {
 			@ProjectSettings(project, currentEnv, csrfToken)
 		}
@@ -344,7 +343,7 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%ds", s)
 }
 
-templ Services(project *models.Project, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, csrfToken string) {
+templ Services(project *models.Project, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, maskedConn map[string]map[string]string, csrfToken string) {
 	<div class="space-y-6">
 		// Linked services
 		<div class="card overflow-hidden !p-0">
@@ -384,7 +383,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 											{ string(svc.Status) }
 										</span>
 									</div>
-									if connInfo := services.MaskedConnectionInfo(nil, svc); len(connInfo) > 0 {
+									if connInfo := maskedConn[svc.ID]; len(connInfo) > 0 {
 										<div class="mt-2 space-y-1">
 											for key, val := range connInfo {
 												<div class="flex items-center space-x-2">

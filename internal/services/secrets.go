@@ -194,8 +194,10 @@ const (
 // argon2idPHC hashes value into an Argon2id PHC string with a random salt, so
 // a template can hand a service the hash while GoForge keeps the plain token.
 // An empty value stays empty so "unset" keeps its meaning for the service.
-func argon2idPHC(value string) (string, error) {
-	if value == "" {
+func argon2idPHC(v interface{}) (string, error) {
+	value, ok := v.(string)
+	if !ok || value == "" {
+		// nil or non-string: soft-empty so template exec does not hard-fail
 		return "", nil
 	}
 	salt := make([]byte, phcSaltLen)

@@ -111,3 +111,12 @@ func TestRedactSecrets(t *testing.T) {
 		t.Error("empty password counted as a secret to redact")
 	}
 }
+
+func TestArgon2idPHCNonString(t *testing.T) {
+	for _, v := range []interface{}{nil, 42} {
+		got, err := argon2idPHC(v)
+		if err != nil || got != "" {
+			t.Fatalf("argon2idPHC(%v) = %q, %v; want empty, nil", v, got, err)
+		}
+	}
+}

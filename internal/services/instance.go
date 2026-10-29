@@ -755,3 +755,15 @@ func (s *InstanceService) UpdateInstance(ctx context.Context, instance *models.S
 func (s *InstanceService) GetContainer(ctx context.Context, instanceID string) (*models.Container, error) {
 	return s.containerRepo.GetByServiceInstanceID(ctx, instanceID)
 }
+
+// Template returns the catalog template for name, or nil if unavailable.
+func (s *InstanceService) Template(name string) *ServiceTemplate {
+	if s == nil || s.catalog == nil {
+		return nil
+	}
+	tmpl, err := s.catalog.GetTemplate(name)
+	if err != nil {
+		return nil
+	}
+	return tmpl
+}
