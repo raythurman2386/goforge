@@ -810,3 +810,23 @@ func TestInstanceService_PruneSystem(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultServiceDomain(t *testing.T) {
+	t.Parallel()
+	if got := DefaultServiceDomain("vaultwarden", false); got != "vaultwarden.localhost" {
+		t.Errorf("standard mode = %q, want vaultwarden.localhost", got)
+	}
+	if got := DefaultServiceDomain("vaultwarden", true); got != "" {
+		t.Errorf("Cloudflare proxy mode = %q, want empty (a .localhost host is unreachable through the tunnel)", got)
+	}
+}
+
+func TestInstanceService_CloudflareProxyMode(t *testing.T) {
+	t.Parallel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	for _, mode := range []bool{false, true} {
+		if got := NewInstanceService(nil, nil, nil, nil, "goforge_net", mode, logger).CloudflareProxyMode(); got != mode {
+			t.Errorf("CloudflareProxyMode() = %v, want %v", got, mode)
+		}
+	}
+}

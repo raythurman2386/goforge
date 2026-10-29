@@ -69,6 +69,15 @@ In the Cloudflare dashboard, configure your tunnel's public hostname:
 
 For each deployed application, add additional public hostnames pointing to `traefik:80`.
 
+## Service Domains
+
+One-click services (Gitea, Vaultwarden, and others) need a public host in the **Domain** field. In proxy mode the configure form leaves Domain empty, because a `<name>.localhost` host cannot be reached through the tunnel.
+
+- Use a first-level host such as `vaultwarden-app.example.com`. Cloudflare Universal SSL covers `*.example.com` but not `*.apps.example.com`, so a second-level name fails the TLS handshake.
+- Before you deploy, create a proxied CNAME for the host that points at `<tunnel-id>.cfargotunnel.com`. A proxied wildcard CNAME on the zone that already points at the tunnel also works.
+
+See [Public HTTPS behind Cloudflare Tunnel](../guides/services.md#public-https-behind-cloudflare-tunnel) for how templates use the domain.
+
 ## Architecture
 
 ```

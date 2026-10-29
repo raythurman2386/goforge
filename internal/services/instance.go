@@ -77,6 +77,22 @@ func NewInstanceService(
 	}
 }
 
+// CloudflareProxyMode reports whether services are routed through a Cloudflare Tunnel.
+func (s *InstanceService) CloudflareProxyMode() bool {
+	return s.cloudflareProxyMode
+}
+
+// DefaultServiceDomain is the Domain prefilled on the configure form. Outside
+// Cloudflare proxy mode it is <name>.localhost so a local deploy works as-is.
+// In proxy mode a .localhost host can never be reached from outside, and there
+// is no configured base domain to build a public host from, so it is empty.
+func DefaultServiceDomain(templateName string, cloudflareProxyMode bool) string {
+	if cloudflareProxyMode {
+		return ""
+	}
+	return templateName + ".localhost"
+}
+
 // publicProtocol is the scheme a browser uses to reach domain. Cloudflare proxy
 // mode still means HTTPS for the visitor: Cloudflare ends TLS and forwards HTTP
 // to Traefik. Only localhost domains and services without a domain use HTTP.

@@ -7,7 +7,18 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 )
 
-templ Configure(tmpl *services.ServiceTemplate, csrfToken string) {
+// cloudflareDomainsDocURL explains first-level hosts and the tunnel CNAME.
+const cloudflareDomainsDocURL = "https://github.com/raythurman2386/goforge/blob/main/docs/configuration/cloudflare.md#service-domains"
+
+// domainPlaceholder hints at a public first-level host in Cloudflare proxy mode.
+func domainPlaceholder(templateName string, cloudflareProxyMode bool) string {
+	if cloudflareProxyMode {
+		return templateName + "-app.example.com"
+	}
+	return templateName + ".localhost"
+}
+
+templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProxyMode bool) {
 	@layouts.AppLayout("Configure " + tmpl.DisplayName, csrfToken, nil) {
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
@@ -26,10 +37,32 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string) {
 				@components.Input("Service Name", "name", "text", tmpl.Name, true)
 
 				if tmpl.Web {
-					@components.Input("Domain", "domain", "text", tmpl.Name+".localhost", true)
-					<div class="mt-[-1rem] mb-4 text-xs text-gray-500">
-						Required. Assign a custom domain (e.g., <code>gitea.localhost</code> or <code>gitea.example.com</code>) to access this service via the browser.
+					<div class="mb-4">
+						<label for="domain" class="block text-sm font-medium text-gray-700 mb-1">
+							Domain
+							<span class="text-red-500">*</span>
+						</label>
+						<input
+							id="domain"
+							name="domain"
+							type="text"
+							value={ services.DefaultServiceDomain(tmpl.Name, cloudflareProxyMode) }
+							placeholder={ domainPlaceholder(tmpl.Name, cloudflareProxyMode) }
+							required
+							class="input"
+						/>
 					</div>
+					if cloudflareProxyMode {
+						<div class="mt-[-1rem] mb-4 text-xs text-gray-500 space-y-1">
+							<p>Required. Cloudflare Tunnel mode: use a public first-level host such as <code>{ tmpl.Name }-app.example.com</code>. Cloudflare Universal SSL covers <code>*.example.com</code> but not <code>*.apps.example.com</code>, so a deeper name fails the TLS handshake.</p>
+							<p>Before you deploy, create a proxied CNAME for the host that points at <code>&lt;tunnel-id&gt;.cfargotunnel.com</code>, unless a proxied wildcard already does. <code>.localhost</code> hosts cannot be reached through the tunnel.</p>
+							<p><a href={ templ.SafeURL(cloudflareDomainsDocURL) } target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline">Cloudflare service domains guide</a></p>
+						</div>
+					} else {
+						<div class="mt-[-1rem] mb-4 text-xs text-gray-500">
+							Required. Assign a custom domain (e.g., <code>gitea.localhost</code> or <code>gitea.example.com</code>) to access this service via the browser.
+						</div>
+					}
 				}
 
 					for _, field := range tmpl.Config {
