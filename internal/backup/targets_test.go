@@ -3,8 +3,10 @@ package backup
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -65,11 +67,21 @@ func TestAppDBTarget_EnvIsolation(t *testing.T) {
 	}
 }
 
+// execRule answers an exec whose script contains match. Rules are checked
+// in order and the first match wins, so overlapping substrings (both
+// vaultwarden and gitea tar scripts contain "tar -C /data") resolve the same
+// way on every run. A map here made the chosen rule depend on Go's
+// randomized map iteration order.
+type execRule struct {
+	match  string
+	stdout string
+	exit   int
+}
+
 type fakeExec struct {
 	running map[string]bool
 	calls   []docker.ExecOptions
-	outputs map[string]string // substring of script -> stdout
-	exit    map[string]int
+	rules   []execRule
 }
 
 func (f *fakeExec) Running(_ context.Context, id string) (bool, error) { return f.running[id], nil }
@@ -77,10 +89,10 @@ func (f *fakeExec) Running(_ context.Context, id string) (bool, error) { return 
 func (f *fakeExec) ExecStream(_ context.Context, _ string, opts docker.ExecOptions, w io.Writer) (docker.ExecStreamResult, error) {
 	f.calls = append(f.calls, opts)
 	script := strings.Join(opts.Cmd, " ")
-	for sub, out := range f.outputs {
-		if strings.Contains(script, sub) {
-			n, err := io.WriteString(w, out)
-			return docker.ExecStreamResult{Bytes: int64(n), ExitCode: f.exit[sub], Stderr: "stderr with postgres://a:b@c"}, err
+	for _, r := range f.rules {
+		if strings.Contains(script, r.match) {
+			n, err := io.WriteString(w, r.stdout)
+			return docker.ExecStreamResult{Bytes: int64(n), ExitCode: r.exit, Stderr: "stderr with postgres://a:b@c"}, err
 		}
 	}
 	return docker.ExecStreamResult{}, nil
@@ -93,8 +105,14 @@ func (f fakeLister) ListAll(context.Context) ([]*models.ServiceInstance, error) 
 func TestInstanceSource(t *testing.T) {
 	ex := &fakeExec{
 		running: map[string]bool{"goforge-service-pg1": true, "goforge-service-gt1": true, "goforge-service-vw1": true},
-		outputs: map[string]string{"SELECT datname": "app\npostgres\nmy db\n", "pg_dump -U": "PGDMP", "tar -C /data": "tgz", "--warning=no-file-changed": "tgz"},
-		exit:    map[string]int{"--warning=no-file-changed": 1},
+		// The vaultwarden tar script maps GNU tar's exit 1 to 0 itself
+		// (TestVaultwardenTarScriptExitCodes), so the exec reports 0.
+		rules: []execRule{
+			{match: "SELECT datname", stdout: "app\npostgres\nmy db\n"},
+			{match: "pg_dump -U", stdout: "PGDMP"},
+			{match: "--warning=no-file-changed", stdout: "tgz"},
+			{match: "tar -C /data", stdout: "tgz"},
+		},
 	}
 	src := &InstanceSource{Docker: ex, Instances: fakeLister{
 		{ID: "pg1", TemplateName: "postgres", Name: "shared-pg"},
@@ -154,8 +172,7 @@ func TestInstanceSource(t *testing.T) {
 func TestInstanceTarget_NonZeroExitIsRedactedError(t *testing.T) {
 	ex := &fakeExec{
 		running: map[string]bool{"goforge-service-gt1": true},
-		outputs: map[string]string{"sqlite3": "partial"},
-		exit:    map[string]int{"sqlite3": 3},
+		rules:   []execRule{{match: "sqlite3", stdout: "partial", exit: 3}},
 	}
 	src := &InstanceSource{Docker: ex, Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git"}}}
 	targets, _, _ := src.Targets(context.Background())
@@ -167,5 +184,45 @@ func TestInstanceTarget_NonZeroExitIsRedactedError(t *testing.T) {
 	var target interface{ Name() string } = targets[0]
 	if !strings.Contains(target.Name(), "gitea:git") {
 		t.Errorf("name = %q", target.Name())
+	}
+}
+
+// Overlapping rules must resolve to the first match every time.
+func TestFakeExec_FirstMatchingRuleWins(t *testing.T) {
+	ex := &fakeExec{rules: []execRule{
+		{match: "--warning=no-file-changed", stdout: "specific", exit: 7},
+		{match: "tar -C /data", stdout: "generic"},
+	}}
+	for range 200 {
+		var buf bytes.Buffer
+		res, err := ex.ExecStream(context.Background(), "c", sh(vaultwardenTar), &buf)
+		if err != nil || buf.String() != "specific" || res.ExitCode != 7 {
+			t.Fatalf("got %q exit=%d err=%v, want first rule", buf.String(), res.ExitCode, err)
+		}
+	}
+}
+
+// The vaultwarden tar script itself turns GNU tar's exit 1 ("file changed as
+// we read it") into success and passes other failures through. Runs the real
+// script under sh with a stub tar on PATH.
+func TestVaultwardenTarScriptExitCodes(t *testing.T) {
+	shPath, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh not available")
+	}
+	for _, tt := range []struct{ tarExit, want int }{{0, 0}, {1, 0}, {2, 2}} {
+		dir := t.TempDir()
+		stub := fmt.Sprintf("#!/bin/sh\nprintf tgz\nexit %d\n", tt.tarExit)
+		//nolint:gosec // G306: the stub tar must be executable
+		if err := os.WriteFile(filepath.Join(dir, "tar"), []byte(stub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.CommandContext(context.Background(), shPath, "-c", vaultwardenTar) //nolint:gosec // G204: fixed script under test
+		cmd.Env = []string{"PATH=" + dir}
+		out, _ := cmd.Output()
+		got := cmd.ProcessState.ExitCode()
+		if got != tt.want || string(out) != "tgz" {
+			t.Errorf("tar exit %d: script exit %d out %q, want exit %d", tt.tarExit, got, out, tt.want)
+		}
 	}
 }
