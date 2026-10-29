@@ -10,6 +10,8 @@ STATE_DIR="$VERIFY_DIR/state"
 ROOT=$(git rev-parse --show-toplevel)
 # Evidence lives outside the repo so proofs are never committed.
 EVIDENCE="${GOFORGE_VERIFY_PROOF:-$VERIFY_DIR/proof}"
+# Canonicalize before the inside-repo check so relative and /tmp/../repo paths cannot bypass it.
+EVIDENCE=$(realpath -m "$EVIDENCE")
 # Compose publishes the app on 127.0.0.1:8080 and Traefik on 80, 443, and 8081.
 # Postgres is not published on the host.
 BUSY_PORTS=(80 443 8080 8081)

@@ -12,7 +12,7 @@ Read [features/README.md](features/README.md) before a drive. Then follow that f
 ## Paths
 
 - State: `/tmp/goforge-verify/state`. Holds `stack.env`, cookie jars, and fixture passwords. Mode `700`. Never copy it into evidence.
-- Evidence: `/tmp/goforge-verify/proof`. Override with `GOFORGE_VERIFY_PROOF`. The helper refuses an evidence path inside the repo. **Never commit proofs.** `artifacts/` is in `.gitignore`.
+- Evidence: `/tmp/goforge-verify/proof`. Override with `GOFORGE_VERIFY_PROOF`. The helper canonicalizes with `realpath -m` and refuses a path inside the repo. **Never commit proofs.** `artifacts/` is in `.gitignore`.
 
 ## Launch
 
