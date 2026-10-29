@@ -220,10 +220,11 @@ func Router(
 					})
 
 					// Containers. Per-container routes live with the SSE mount below.
-					r.Route("/containers", func(r chi.Router) {
-						r.Get("/", containerHandler.List)
-						r.Get("/api", containerHandler.ListAPI)
-					})
+					// Register flat routes, not a /containers subrouter: a mounted
+					// subrouter is a catch-all, and chi ranks catch-alls below the
+					// /containers/{id} param, so /containers/api would hit Detail.
+					r.Get("/containers", containerHandler.List)
+					r.Get("/containers/api", containerHandler.ListAPI)
 				})
 
 				// One mount per pattern. Streaming routes stay outside the write timeout.

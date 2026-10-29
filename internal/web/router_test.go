@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/raythurman2386/goforge/internal/auth"
@@ -310,5 +311,30 @@ func TestRouter_APIv1OutsideCSRFAndSession(t *testing.T) {
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/auth/logout", nil))
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("POST /auth/logout without CSRF token = %d, want 403", rec.Code)
+	}
+}
+
+// TestRouter_ContainersAPINotShadowedByDetail checks that GET /containers/api
+// reaches the list API route, not /containers/{id} with id="api".
+func TestRouter_ContainersAPINotShadowedByDetail(t *testing.T) {
+	cfg := &config.Config{DevMode: true, Port: 8080, LogLevel: "info"}
+	db := setupTestRouterDB(t)
+	defer db.Close()
+
+	routes, ok := setupTestRouter(t, db, cfg).(chi.Routes)
+	if !ok {
+		t.Fatal("Router() does not implement chi.Routes")
+	}
+
+	cases := map[string]string{
+		"/containers":     "/containers",
+		"/containers/api": "/containers/api",
+		"/containers/abc": "/containers/{id}",
+	}
+	for path, want := range cases {
+		got := routes.Find(chi.NewRouteContext(), http.MethodGet, path)
+		if got != want {
+			t.Errorf("GET %s matched %q, want %q", path, got, want)
+		}
 	}
 }
