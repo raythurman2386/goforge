@@ -263,9 +263,6 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 // removed once the new container exists.
 func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, replaced *models.Container, logAttrs []any) {
 	instanceID := spec.instanceID
-	if logAttrs == nil {
-		logAttrs = []any{"instance_id", instanceID, "image", spec.opts.Image}
-	}
 
 	dockerID, err := s.dockerClient.CreateContainer(ctx, spec.opts)
 	if err != nil {
@@ -405,10 +402,10 @@ func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTe
 	}
 
 	domain := ""
-	if d, ok := spec.data["domain"].(string); ok {
+	if d, ok := spec.data["Domain"].(string); ok {
 		domain = d
 	}
-	logAttrs := []any{"instance_id", spec.instanceID, "image", spec.opts.Image, "domain", domain}
+	logAttrs := []any{"instance_id", spec.instanceID, "template", tmpl.Name, "image", spec.opts.Image, "domain", domain}
 	if err := s.ensureServiceImage(ctx, spec.opts.Image, logAttrs); err != nil {
 		s.logger.Error("failed to pull service image", append(logAttrs, "error", err)...)
 		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed)

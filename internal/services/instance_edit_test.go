@@ -390,3 +390,126 @@ func TestVolumeName(t *testing.T) {
 		t.Errorf("VolumeName = %q", got)
 	}
 }
+
+func TestUpdateInstanceConfig_LogsDomainAndTemplate(t *testing.T) {
+	t.Parallel()
+
+	buf := &syncBuffer{}
+	logger := slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	h := &editHarness{done: make(chan struct{}, 4)}
+	catalog := NewCatalog("dummy")
+	catalog.templates["vaultwarden"] = editTestTemplate()
+
+	ir := &mockInstanceRepository{
+		createFunc: func(_ context.Context, s *models.ServiceInstance) error {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			s.ID = "11111111-2222-3333-4444-555555555555"
+			cp := *s
+			h.instance = &cp
+			return nil
+		},
+		getByIDFunc: func(_ context.Context, _ string) (*models.ServiceInstance, error) {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			cp := *h.instance
+			return &cp, nil
+		},
+		updateFunc: func(_ context.Context, s *models.ServiceInstance) error {
+			h.mu.Lock()
+			cp := *s
+			h.instance = &cp
+			h.mu.Unlock()
+			if s.Status == models.ServiceStatusRunning || s.Status == models.ServiceStatusFailed {
+				h.done <- struct{}{}
+			}
+			return nil
+		},
+	}
+	cr := &mockContainerRepository{
+		createFunc: func(_ context.Context, c *models.Container) error {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			cp := *c
+			cp.ID = "row-" + c.DockerID
+			h.container = &cp
+			return nil
+		},
+		getByServiceInstanceIDFunc: func(_ context.Context, _ string) (*models.Container, error) {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			if h.container == nil {
+				return nil, errors.New("not found")
+			}
+			cp := *h.container
+			return &cp, nil
+		},
+		deleteFunc: func(_ context.Context, id string) error {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.deletedRow = append(h.deletedRow, id)
+			return nil
+		},
+	}
+	dc := &mockDockerClient{
+		createContainerFunc: func(_ context.Context, opts docker.ContainerOptions) (string, error) {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.created = append(h.created, opts)
+			return "docker-" + string(rune('0'+len(h.created))), nil
+		},
+		stopContainerFunc: func(_ context.Context, id string) error {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.stopped = append(h.stopped, id)
+			return nil
+		},
+		removeContainerFunc: func(_ context.Context, id string) error {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.removed = append(h.removed, id)
+			return nil
+		},
+	}
+	h.svc = NewInstanceService(ir, cr, dc, catalog, "goforge_net", false, logger)
+
+	inst := h.deploy(t)
+	_, err := h.svc.UpdateInstanceConfig(context.Background(), inst.ID, map[string]interface{}{
+		"name":            "vault",
+		"domain":          "vault.example.com",
+		"signups_allowed": "true",
+		"admin_token":     "",
+	})
+	if err != nil {
+		t.Fatalf("UpdateInstanceConfig: %v", err)
+	}
+	h.wait(t)
+
+	var recreateLines []map[string]any
+	for _, rec := range buf.records(t) {
+		msg, _ := rec["msg"].(string)
+		switch msg {
+		case "service image present locally", "pulling service image", "pulled service image",
+			"service container created and started", "service running":
+			// Only count lines after edit: domain should be the new one when present.
+			if domain, ok := rec["domain"].(string); ok && domain == "vault.example.com" {
+				recreateLines = append(recreateLines, rec)
+			}
+		}
+	}
+	if len(recreateLines) == 0 {
+		t.Fatalf("no recreate log lines with domain=vault.example.com; logs=%v", buf.records(t))
+	}
+	for _, rec := range recreateLines {
+		if rec["domain"] != "vault.example.com" {
+			t.Fatalf("domain=%v want vault.example.com in %#v", rec["domain"], rec)
+		}
+		if rec["template"] != "vaultwarden" {
+			t.Fatalf("template=%v want vaultwarden in %#v", rec["template"], rec)
+		}
+		if rec["instance_id"] != inst.ID {
+			t.Fatalf("instance_id=%v want %s", rec["instance_id"], inst.ID)
+		}
+	}
+}
