@@ -153,7 +153,7 @@ The focus for the next release is hardening the platform and improving the devel
 - [x] **Deployment cancel status:** The `canceled` status matches the database check constraint
 
 ### 2. Enhanced Services
-- [ ] **Database Backups:** Automated nightly backups to S3/MinIO.
+- [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. Backup only; restore is manual. Not yet: other templates, restore tooling, run-now from the API
 - [ ] **More Templates:** MySQL, MongoDB, MinIO, Plausible, PocketBase.
 - [ ] **Service Networking:** Private internal networking between projects and services.
 - [ ] **Lifecycle Management:** Implement actual restart logic and proper container stopping in service instances.

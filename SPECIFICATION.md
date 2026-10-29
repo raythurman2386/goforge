@@ -275,7 +275,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **12.11** Create service configuration wizard
 - [x] **12.12** Implement service instance management in `internal/services/instance.go`
 - [x] **12.13** Add connection string exposure to linked projects
-- [x] **12.14** Create service backup/restore functionality
+- [x] **12.14** Service backups: nightly S3 backup of Postgres, Gitea, and Vaultwarden service instances in `internal/backup` (backup only; restore is the manual runbook in `docs/deployment/backup.md`)
 
 ### Phase 13: Polish & Production Readiness
 
@@ -286,7 +286,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **13.5** Add graceful shutdown handling
 - [x] **13.6** Create systemd service file `deploy/goforge.service`
 - [x] **13.7** Write Docker Compose deployment file `deploy/docker-compose.yml`
-- [x] **13.8** Create backup script for database
+- [x] **13.8** Database backup: nightly `pg_dump -Fc` of the GoForge database to S3-compatible storage inside `goforge serve`, plus `goforge backup run`
 - [x] **13.9** Implement restore functionality
 - [x] **13.10** Add Prometheus metrics endpoint (optional)
 - [x] **13.11** Create readiness endpoint `GET /health/ready`
@@ -938,10 +938,12 @@ connection:
   internal: "postgres://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:5432/{{ .Config.database }}"
   external: "postgres://{{ .Config.username }}:{{ .Config.password }}@{{ .Domain }}:{{ .ExternalPort }}/{{ .Config.database }}"
 
-backup:
-  command: "pg_dump -U {{ .Config.username }} {{ .Config.database }}"
-  extension: "sql"
 ```
+
+No shipped template sets a `backup` block. The loader still parses one, but
+the nightly backup ignores it: which instances are backed up, and how, is
+decided in `internal/backup` by template name (`postgres`, `gitea`,
+`vaultwarden` in v1). See `docs/deployment/backup.md`.
 
 ---
 
@@ -1092,8 +1094,9 @@ labels := map[string]string{
    - Encryption key from environment (not in DB)
 
 2. **Backup Strategy**
-   - PostgreSQL: pg_dump script provided
-   - Service volumes: User responsibility (documented)
+   - Nightly backups to S3-compatible storage when `BACKUP_S3_BUCKET` is set: GoForge database, Postgres service instances (per database plus roles), Gitea and Vaultwarden data
+   - Encryption is the storage provider's at-rest encryption. `ENCRYPTION_KEY` is never in a backup and must be kept separately
+   - Restore is manual (documented). Other service volumes are the operator's responsibility
 
 ### Monitoring
 

@@ -52,3 +52,4 @@ Last driven live on minis after #28: register-admin and login-projects. The othe
 - [One-click service credentials](./service-credentials.md) covers a Postgres service whose stored config and connection info are sealed, while the UI still shows the connection string.
 - [JSON API v1 with scoped tokens](./api-v1.md) covers scoped token creation, bearer-only access, masked reads, dry run by default, `approval_ref` in the audit log, protected-service refusal, and ownership parity. Written from source; not driven live yet.
 - [GoForge MCP tools](./mcp-tools.md) covers the stdio MCP server's tool inventory, a read call, a dry run, and protected refusal. Written from source; not driven live yet.
+- [Nightly S3 backups](./backups.md) covers a run to S3-compatible storage, skips, retention, secret redaction, and the admin-only status on Settings, the API, and MCP. Smoke is the integration test against throwaway MinIO; no verify.sh drive yet.

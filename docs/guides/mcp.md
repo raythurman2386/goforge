@@ -131,7 +131,8 @@ Read tools (always on, read-only):
 `get_service_template`, `list_services`, `get_service` (config masked),
 `list_containers`, `get_container`, `get_container_logs`,
 `get_container_stats`, `list_audit_log`, `list_git_sources`, `list_repos`,
-`list_branches`.
+`list_branches`, `get_backup_status` (admin only; see
+[Backups](../deployment/backup.md)).
 
 Write tools (only with `GOFORGE_MCP_ALLOW_WRITES=true` and a `write` token):
 
