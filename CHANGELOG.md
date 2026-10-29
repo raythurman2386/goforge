@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- One-click SolidCraft (`solidcraft`) and Vaultwarden (`vaultwarden`) service templates
 - First-Time User Experience (FTUX) onboarding flow with a step-by-step dashboard guide
 - Clear empty state warnings when attempting to create a project without a Git Source connected
 - Initial project setup
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-time container resource monitoring (stats) to standard Git Projects
 
 ### Changed
+- Service templates get `Protocol` = `https` for public domains in Cloudflare proxy mode (Cloudflare ends TLS), so `DOMAIN`/`ROOT_URL` style settings match the browser URL
 - Renamed project to GoForge
 - Simplified `doRequest` in Gitea and GitLab clients (removed redundant URL construction)
 - Excluded gosec G115 (integer overflow) globally in `.golangci.yml` instead of per-line nolint directives

@@ -1,0 +1,49 @@
+name: vaultwarden
+display_name: Vaultwarden
+description: Lightweight Bitwarden-compatible password manager server. Bitwarden clients and the web vault need HTTPS, so give it a public HTTPS domain. Turn signups off after creating your account.
+icon: vaultwarden
+category: security
+web: true
+
+versions:
+  - "latest"
+default_version: "latest"
+
+config:
+  - name: signups_allowed
+    label: Allow Signups ("true" or "false")
+    type: text
+    default: "true"
+    required: true
+  - name: admin_token
+    label: Admin Panel Token (/admin)
+    type: password
+    generate: true
+    length: 48
+    required: true
+
+resources:
+  cpu: "0.25"
+  memory: "256m"
+
+docker:
+  image: "vaultwarden/server:{{ .Version }}"
+  ports:
+    - container: 80
+      protocol: tcp
+  environment:
+    DOMAIN: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ end }}"
+    SIGNUPS_ALLOWED: "{{ .Config.signups_allowed }}"
+    ADMIN_TOKEN: "{{ .Config.admin_token }}"
+  volumes:
+    - name: data
+      path: /data
+  health_check:
+    test: ["CMD", "curl", "-fsS", "http://localhost:80/alive"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:80"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:80{{ end }}"
