@@ -544,12 +544,24 @@ func TestGenerateServiceLabels_WithDomain(t *testing.T) {
 }
 
 func TestGenerateServiceLabels_NoDomain(t *testing.T) {
+	for _, cloudflare := range []bool{false, true} {
+		labels := GenerateServiceLabels("inst-abc", "", "traefik", 6379, cloudflare)
+		// A data service with no domain must not get Traefik's default
+		// Host(<container name>) router.
+		assertLabel(t, labels, "traefik.enable", "false")
+		for k := range labels {
+			if strings.HasPrefix(k, "traefik.http.") {
+				t.Errorf("cloudflare=%v: unexpected routing label %s without domain", cloudflare, k)
+			}
+		}
+	}
+
 	labels := GenerateServiceLabels("inst-abc", "", "traefik", 3000, false)
 
 	name := "goforge-svc-inst-abc"
 
-	// Should have base labels
-	assertLabel(t, labels, "traefik.enable", "true")
+	// Should have base labels, with Traefik disabled
+	assertLabel(t, labels, "traefik.enable", "false")
 	assertLabel(t, labels, "traefik.docker.network", "traefik")
 	assertLabel(t, labels, "goforge.managed", "true")
 	assertLabel(t, labels, "goforge.service.instance.id", "inst-abc")
@@ -567,6 +579,8 @@ func TestGenerateServiceLabels_CloudflareMode(t *testing.T) {
 	labels := GenerateServiceLabels("inst-abc", "gitea.example.com", "traefik", 3000, true)
 
 	name := "goforge-svc-inst-abc"
+
+	assertLabel(t, labels, "traefik.enable", "true")
 
 	// Should use HTTP entrypoint
 	assertLabel(t, labels, "traefik.http.routers."+name+".rule", "Host(`gitea.example.com`)")

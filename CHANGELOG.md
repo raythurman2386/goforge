@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Service template ports can be published on the host with `publish`, `host_port` (Go template), and `host_ip` (default `127.0.0.1`, loopback only; `0.0.0.0` and `::` are refused). Published ports are recorded on the container and shown on the service page (#42)
 - Gitea publishes SSH (container port 22) on `127.0.0.1:<ssh_port>`; new fields `ssh_port` (default `2223`) and `ssh_domain` (default `minis`) set `[server] SSH_PORT` and `SSH_DOMAIN` so clone URLs match (#42)
 
+- Service template `docker.command`: a list that replaces the image CMD, rendered like `environment`. Templates must not render secrets into it
 ### Changed
 - Recreating a service container that publishes a host port (config edit, image update) renames the old container aside and removes it only after the new one starts; if the new one cannot start, the old one is restored and started again (#42)
 - A config field missing from an older instance's stored config renders its template `default` instead of an empty string (#42)
@@ -45,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed orphaned `CustomDomain` model and `internal/domain` logic that had no database repository
 
 ### Fixed
+- Redis template did not enforce its password: the official image ignores `REDIS_PASSWORD`, so any client on the network could connect without `AUTH`. The template now starts `redis-server` with `requirepass` from a config file written at start, keeps the password out of the command line, and authenticates its health check. Existing Redis instances get auth on their next recreate (config edit or image update)
+- One-click services without a Domain (Postgres, Redis, any instance with no Domain) were labelled `traefik.enable=true`, so Traefik built a default `Host(<container name>)` router to them on the web entrypoint. They now get `traefik.enable=false` and no router. Instances with a Domain (Gitea, Vaultwarden, SolidCraft) keep the same labels
+- Postgres template health check was the literal `pg_isready -U {{ .Config.username }}` (health checks are not templates), which exits 3 with "too many command-line arguments", so the container never reported healthy. It now uses `$POSTGRES_USER` and `$POSTGRES_DB`
+- MinIO template `command` was a string GoForge ignored; it is now a list and applied (`server /data --console-address :9001`)
+- Docs claimed Redis used "AOF + RDB" and an optional password; it uses RDB only and the password is required
 - Gitea served its public install page until someone submitted it. It now starts with `INSTALL_LOCK=true`, so the installer never appears, and GoForge creates the admin account (#43)
 - A template field missing from an older instance's stored config rendered as `<no value>` in the container environment. It now renders as an empty string (#43)
 - Gitea template set `GITEA__APP_NAME`, which Gitea ignores (no section separator). It now sets `GITEA____APP_NAME`

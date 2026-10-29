@@ -25,8 +25,10 @@ const ManagedLabelFilter = ManagedLabelKey + "=" + ManagedLabelValue
 
 // ContainerOptions represents options for creating a container.
 type ContainerOptions struct {
-	Name   string
-	Image  string
+	Name  string
+	Image string
+	// Cmd replaces the image's CMD. Empty keeps the image default.
+	Cmd    []string
 	Env    []string
 	Labels map[string]string
 	// PortMappings publishes container ports on the host. Each binding names
@@ -102,6 +104,7 @@ func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (st
 
 	config := &container.Config{
 		Image:        opts.Image,
+		Cmd:          opts.Cmd,
 		ExposedPorts: exposed,
 		Env:          opts.Env,
 		Labels:       opts.Labels,

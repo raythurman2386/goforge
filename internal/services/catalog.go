@@ -82,6 +82,12 @@ type DockerConfig struct {
 	Image       string            `yaml:"image" json:"image"`
 	Ports       []PortConfig      `yaml:"ports" json:"ports"`
 	Environment map[string]string `yaml:"environment" json:"environment"`
+	// Command replaces the image's CMD. Each element is a Go template
+	// rendered like Environment. Docker keeps it in the container config and
+	// the host shows it in the process list, so never render a secret into
+	// it: pass secrets through Environment and read them from the command,
+	// as templates/redis.yaml does. Empty keeps the image's CMD.
+	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
 	// OptionalEnvironment is rendered like Environment, but a variable whose
 	// value renders empty is left out of the container instead of set to "".
 	OptionalEnvironment map[string]string `yaml:"optional_environment,omitempty" json:"optional_environment,omitempty"`

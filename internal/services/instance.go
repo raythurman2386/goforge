@@ -271,6 +271,11 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 		}
 	}
 
+	cmd, err := s.renderCommand(tmpl.Docker.Command, data)
+	if err != nil {
+		return nil, err
+	}
+
 	hooks, err := s.renderPostStart(tmpl, data)
 	if err != nil {
 		return nil, err
@@ -289,6 +294,7 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 	opts := docker.ContainerOptions{
 		Name:          containerName,
 		Image:         image,
+		Cmd:           cmd,
 		Env:           envVars,
 		NetworkName:   s.traefikNetwork,
 		RestartPolicy: docker.RestartUnlessStopped,
@@ -303,7 +309,8 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 		servicePort = tmpl.Docker.Ports[0].Container
 	}
 
-	// Always mark the container as managed. Routing labels are added only when a domain is set.
+	// Always mark the container as managed. Traefik is enabled, with a
+	// router, only when a domain is set.
 	labels := proxy.GenerateServiceLabels(instance.ID, domain, s.traefikNetwork, servicePort, s.cloudflareProxyMode)
 	opts.Labels = labels.ToMap()
 
@@ -318,6 +325,23 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 	}
 
 	return &containerSpec{instanceID: instance.ID, opts: opts, data: data, hooks: hooks, secrets: SecretValues(tmpl, config)}, nil
+}
+
+// renderCommand renders each docker.command element. An empty command
+// returns nil, which keeps the image's CMD.
+func (s *InstanceService) renderCommand(command []string, data map[string]interface{}) ([]string, error) {
+	if len(command) == 0 {
+		return nil, nil
+	}
+	cmd := make([]string, 0, len(command))
+	for i, arg := range command {
+		val, err := s.interpolate(arg, data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to interpolate command[%d]: %w", i, err)
+		}
+		cmd = append(cmd, val)
+	}
+	return cmd, nil
 }
 
 // templateData is the data every template string of an instance renders with.

@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	labelTrue = "true"
+	labelTrue  = "true"
+	labelFalse = "false"
 
 	// Traefik entrypoint names.
 	entrypointHTTP  = "web"
@@ -383,7 +384,11 @@ func DefaultSecurityHeaders() *HeadersConfig {
 }
 
 // GenerateServiceLabels generates Traefik labels for a one-click service instance.
-// If domain is empty, only base management labels are returned (no routing).
+// If domain is empty, Traefik is disabled for the container
+// (traefik.enable=false) and no router is added. Traefik's docker provider
+// would otherwise build a default Host(<container name>) router to the first
+// exposed port, which puts a data service such as Redis or Postgres behind
+// the web entrypoint.
 func GenerateServiceLabels(instanceID, domain, network string, port int, cloudflareMode bool) Labels {
 	name := fmt.Sprintf("goforge-svc-%s", instanceID)
 
@@ -394,8 +399,8 @@ func GenerateServiceLabels(instanceID, domain, network string, port int, cloudfl
 		"goforge.service.instance.id": instanceID,
 	}
 
-	// Only add routing labels if domain is set
 	if domain == "" {
+		labels["traefik.enable"] = labelFalse
 		return labels
 	}
 

@@ -25,13 +25,35 @@ docker:
   ports:
     - container: 6379
       protocol: tcp
+  # The official redis image ignores REDIS_PASSWORD, so the command writes
+  # it into a config file and starts redis-server with that file. The
+  # password stays out of the command line (docker inspect, ps on the host);
+  # it is read from the environment inside the container. The file is
+  # mode 600 under /tmp in the container, not in the data volume.
+  # docker-entrypoint.sh still drops to the redis user.
+  command:
+    - sh
+    - -c
+    - |
+      set -eu
+      if [ -z "${REDIS_PASSWORD:-}" ]; then
+        echo "goforge: REDIS_PASSWORD is empty, refusing to start without auth" >&2
+        exit 1
+      fi
+      umask 077
+      conf=/tmp/goforge-redis.conf
+      escaped=$(printf '%s' "$REDIS_PASSWORD" | sed 's/[\\"]/\\&/g')
+      printf 'requirepass "%s"\n' "$escaped" > "$conf"
+      if [ "$(id -u)" = 0 ]; then chown redis "$conf"; fi
+      exec docker-entrypoint.sh redis-server "$conf"
   environment:
     REDIS_PASSWORD: "{{ .Config.password }}"
   volumes:
     - name: data
       path: /data
   health_check:
-    test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+    # redis-cli reads the password from REDISCLI_AUTH, so it is not in argv.
+    test: ["CMD-SHELL", "REDISCLI_AUTH=\"$REDIS_PASSWORD\" redis-cli ping | grep PONG"]
     interval: 10s
     timeout: 5s
     retries: 5
