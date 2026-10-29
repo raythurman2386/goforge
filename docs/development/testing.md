@@ -112,6 +112,35 @@ type mockDockerClient struct {
 
 Service tests in `internal/services/instance_test.go` demonstrate the mock pattern.
 
+## Integration tests
+
+Tests that need a real Docker daemon or external binaries carry the `//go:build integration` tag. `make test` and CI do not build them; pass `-tags integration` to run them.
+
+| Test | Package | Needs |
+|------|---------|-------|
+| `TestGiteaPostStartBootstrap` | `internal/services` | Docker |
+| `TestGiteaSSHPublish` | `internal/services` | Docker, `ss` |
+| `TestDataServices_AuthAndLabels` | `internal/services` | Docker (set `GOFORGE_IT_DOCKER` to change the `docker` command the `pg-tenant.sh` subtest uses) |
+| `TestIntegration_RunAgainstMinIO` | `internal/backup` | Docker, `pg_restore`, `sqlite3`, and a GoForge test database in `DATABASE_URL` |
+
+```bash
+# One-click service templates against the real Docker client
+go test -tags integration -run TestGiteaPostStartBootstrap ./internal/services/ -count=1 -v
+
+# Backups against throwaway MinIO, Postgres, Gitea, and Vaultwarden containers
+DATABASE_URL=postgres://goforge:password@localhost:5432/goforge_test?sslmode=disable \
+  go test -tags integration -run Integration ./internal/backup/ -count=1 -v
+```
+
+Each test skips when Docker or a required binary is missing.
+
+Rules for integration tests:
+
+- **Throwaway resources only.** Each test creates its own network, containers, and volumes under random names (networks such as `goforge-it43-*` and `goforge-itdata-*`, backup containers `gfbk-it-*`) and removes them when it ends. It never touches containers it did not create.
+- **Never against production.** Do not run them on a Docker host or database that serves real workloads, and never point `DATABASE_URL` at a production database. Use a database whose name says it is for tests.
+- **No external services.** Tests use local containers (MinIO instead of a real bucket), never GitHub, Cloudflare, or a cloud provider.
+- If your Docker needs `sudo`, run the whole `go test` under it with your `PATH`, for example `sudo -n env "PATH=$PATH" go test -tags integration ...`.
+
 ## CI Testing
 
 The CI pipeline runs tests with:

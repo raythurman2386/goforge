@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs: shared data services (shared-pg / shared-redis with no Domain and no published port) and a shared-pg nightly `pg_dump` runbook (not installed) (#59)
 
 ### Changed
+- Docs: `CONTRIBUTING.md` rewritten as the one contributor guide (house rules tied to checks, test types, migrations, service templates, PR format); `docs/development/index.md` points to it; `GEMINI.md` points to `AGENTS.md`; PR template gains Tests, Proof, and Deferred sections; README, schema reference (migrations 016 to 019), project structure, Compose backup sections, and testing docs brought up to date with #61 and #62 (t1275u)
 - Router: global middleware is recovery and rate limit only; session and API-token auth wrap the UI routes, and `/api/v1` mounts beside them. `docs/reference/api-routes.md` brought in line with the routes (t1250u)
 - Dependencies: `golang.org/x/crypto`, `x/oauth2`, `x/sync`, `x/time`, `x/tools` minor bumps pulled in by `github.com/modelcontextprotocol/go-sdk` v1.8.0 (t1250u)
 - PostgreSQL template defaults to 17 (16, 15, 14 still offered), admin username `pgadmin` instead of `postgres`, a 32-char generated password, and 1 CPU / 1GiB; `database`, `username`, and `password` are immutable because the image applies them only on first init (#59)
@@ -60,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed orphaned `CustomDomain` model and `internal/domain` logic that had no database repository
 
 ### Fixed
+- `TestInstanceSource` flake in `internal/backup`: fake exec matching is deterministic (#63)
 - Redis template did not enforce its password: the official image ignores `REDIS_PASSWORD`, so any client on the network could connect without `AUTH`. The template now starts `redis-server` with `requirepass` from a config file rewritten on every start (so restarts work), keeps the password out of the command line, and authenticates its health check. Existing Redis instances get auth on their next recreate (config edit or image update) (#58)
 - One-click services without a Domain (Postgres, Redis, any instance with no Domain) were labelled `traefik.enable=true`, so Traefik built a default `Host(<container name>)` router to them on the web entrypoint. They now get `traefik.enable=false` and no router. Instances with a Domain (Gitea, Vaultwarden, SolidCraft) keep the same labels (#58)
 - Postgres template health check was the literal `pg_isready -U {{ .Config.username }}` (health checks are not templates), which exits 3 with "too many command-line arguments", so the container never reported healthy. It now uses `$POSTGRES_USER` and `$POSTGRES_DB` (#58)

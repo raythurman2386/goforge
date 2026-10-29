@@ -110,7 +110,13 @@ Docker Compose creates named volumes for persistent data:
 | `traefik_letsencrypt` | Let's Encrypt certificates |
 | `redis_data` | Redis persistence |
 
-### Backup Volumes
+### Backups
+
+GoForge has built-in nightly backups to S3-compatible storage (R2, B2, MinIO, AWS S3). They cover the GoForge database and running Postgres, Gitea, and Vaultwarden services. Set `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, and the key pair in `.env` and restart GoForge. `docker compose exec goforge ./goforge backup run` runs one backup now. Setup, what is covered, and the restore runbook: [Backup & Restore](../deployment/backup.md).
+
+Back up `.env`, and `ENCRYPTION_KEY` in particular, somewhere off the server. Backups never include it.
+
+For a one-off copy without a bucket:
 
 ```bash
 # Backup PostgreSQL
@@ -122,6 +128,8 @@ docker run --rm -v goforge_postgres_data:/data -v $(pwd):/backup \
 ```
 
 ### Restore from Backup
+
+Restore is manual. For a built-in backup, follow [Backup & Restore](../deployment/backup.md#restore). For a one-off `pg_dump` from above:
 
 ```bash
 # Restore PostgreSQL

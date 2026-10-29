@@ -44,7 +44,7 @@ Before deploying GoForge to production, ensure:
 - [ ] Log aggregation configured (journald, syslog, or Docker logging driver)
 - [ ] Health check endpoint monitored (`/health`)
 - [ ] Disk space monitoring (Docker images can accumulate)
-- [ ] Database backup strategy in place
+- [ ] Nightly backups on (`BACKUP_S3_BUCKET` set, see [Backup & Restore](backup.md)) and `ENCRYPTION_KEY` stored off the server
 
 ## Resource Recommendations
 

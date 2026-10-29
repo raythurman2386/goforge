@@ -287,7 +287,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **13.6** Create systemd service file `deploy/goforge.service`
 - [x] **13.7** Write Docker Compose deployment file `deploy/docker-compose.yml`
 - [x] **13.8** Database backup: nightly `pg_dump -Fc` of the GoForge database to S3-compatible storage inside `goforge serve`, plus `goforge backup run`
-- [x] **13.9** Implement restore functionality
+- [ ] **13.9** Implement restore functionality (not built: restore is the manual runbook in `docs/deployment/backup.md`)
 - [x] **13.10** Add Prometheus metrics endpoint (optional)
 - [x] **13.11** Create readiness endpoint `GET /health/ready`
 - [x] **13.12** Write integration tests for critical paths
