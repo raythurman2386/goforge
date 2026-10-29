@@ -126,6 +126,26 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 | `ENABLE_METRICS` | `true` | Enable Prometheus metrics endpoint |
 | `METRICS_RETENTION` | `168h` | How long to retain container metrics (default: 7 days) |
 
+## Backups
+
+Nightly backups to S3-compatible storage. Off while `BACKUP_S3_BUCKET` is empty. See [Backup & Restore](../deployment/backup.md).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BACKUP_S3_ENDPOINT` | (empty) | Endpoint URL, `http` or `https`, no credentials or path. Required with a bucket. R2: `https://<account id>.r2.cloudflarestorage.com` |
+| `BACKUP_S3_REGION` | `auto` | Region. `auto` works for R2 |
+| `BACKUP_S3_BUCKET` | (empty) | Bucket. Setting it turns backups on |
+| `BACKUP_S3_PREFIX` | `goforge/` | Key prefix inside the bucket. A trailing `/` is added. No `..` or `\` |
+| `BACKUP_S3_ACCESS_KEY_ID` | (empty) | Access key. Required with a bucket |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | (empty) | Secret key. Required with a bucket. Redacted from errors and logs |
+| `BACKUP_S3_FORCE_PATH_STYLE` | `false` | Path-style requests. Set `true` for MinIO |
+| `BACKUP_SCHEDULE` | `02:00 America/Chicago` | Daily time as `HH:MM Zone/Name`, or `off` to run only with `goforge backup run` |
+| `BACKUP_RETENTION_DAILY` | `7` | Complete days kept (1-366) |
+| `BACKUP_TIMEOUT` | `2h` | Upper limit for one run (Go duration) |
+
+!!! danger "ENCRYPTION_KEY is not backed up"
+    The database dump holds secrets encrypted with `ENCRYPTION_KEY`. The key is never written to a backup. Keep a copy of it outside the server.
+
 ## Logging
 
 | Variable | Default | Description |

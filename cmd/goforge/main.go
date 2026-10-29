@@ -3,8 +3,10 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/apiv1"
 	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/database"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
@@ -23,6 +26,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/git"
 	"github.com/raythurman2386/goforge/internal/logger"
+	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/secrets"
@@ -169,9 +173,71 @@ var migrateCreateCmd = &cobra.Command{
 	},
 }
 
+// version is reported in logs, the API, and backup manifests.
+const version = "0.1.0"
+
+var backupCmd = &cobra.Command{
+	Use:   "backup",
+	Short: "Backups to S3-compatible storage",
+}
+
+var backupRunCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Run one backup now (same as the nightly run, trigger=manual)",
+	Long: `Run one backup now and wait for it to finish.
+
+Uses the same BACKUP_* settings and lock as the nightly run inside
+"goforge serve", so the two never overlap. It does not run migrations; the
+backup_runs table comes from "goforge serve" or "goforge migrate up".
+Exits non-zero if the run failed.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runBackupOnce(cmd.Context())
+	},
+}
+
+func runBackupOnce(ctx context.Context) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	log := logger.Setup(cfg.LogLevel, cfg.LogFormat)
+	db, err := database.New(cfg) //nolint:contextcheck // database.New takes no context
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer db.Close()
+	dockerClient, err := docker.NewClient(cfg.DockerHost)
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer dockerClient.Close()
+
+	setup, err := backup.New(cfg, db.DB, dockerClient, logger.WithComponent(log, "backup"), version)
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	run, err := setup.Runner.Run(ctx, models.BackupTriggerManual)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("backup %s: status=%s key=%s%s objects=%d bytes=%d skipped=%d pruned=%d\n",
+		run.ID, run.Status, cfg.Backup.Prefix, run.RunKey, run.Objects, run.Bytes, run.Skipped, run.Pruned)
+	if run.ErrorSummary.Valid {
+		fmt.Printf("note: %s\n", run.ErrorSummary.String)
+	}
+	if run.Status != models.BackupRunSucceeded {
+		return errors.New("backup run failed")
+	}
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(migrateCmd)
+	rootCmd.AddCommand(backupCmd)
+	backupCmd.AddCommand(backupRunCmd)
 	migrateCmd.AddCommand(migrateUpCmd)
 	migrateCmd.AddCommand(migrateDownCmd)
 	migrateCmd.AddCommand(migrateStatusCmd)
@@ -194,7 +260,7 @@ func runServer() error {
 	// Initialize logger
 	log := logger.Setup(cfg.LogLevel, cfg.LogFormat)
 	log.Info("starting GoForge",
-		"version", "0.1.0",
+		"version", version,
 		"env", cfg.DevMode,
 		"addr", cfg.Addr(),
 	)
@@ -256,6 +322,22 @@ func runServer() error {
 	sseHub := sse.NewHub()
 	go sseHub.Run()
 
+	// Nightly backups run inside serve. backgroundCtx is canceled on
+	// shutdown; an in-flight run then records itself as failed.
+	backgroundCtx, cancelBackground := context.WithCancel(context.Background())
+	backupDone := make(chan struct{})
+	defer func() {
+		cancelBackground()
+		select {
+		case <-backupDone:
+		case <-time.After(15 * time.Second):
+			log.Warn("backup goroutine did not stop in time")
+		}
+	}()
+	backupRuns := repositories.NewBackupRunRepository(db.DB)
+	backupStatus := &backup.StatusReader{Config: cfg.Backup, Runs: backupRuns}
+	startBackups(backgroundCtx, backupDone, cfg, db.DB, dockerClient, logger.WithComponent(log, "backup"))
+
 	monitorCollector := monitor.NewCollector(dockerClient, containerRepo, projectRepo, instanceRepo)
 
 	// Initialize services
@@ -306,7 +388,7 @@ func runServer() error {
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments"))
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services"))
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
-	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings"))
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
@@ -339,8 +421,9 @@ func runServer() error {
 		GitSources:  gitSourceRepo,
 		GitBrowser:  gitService,
 		DB:          db,
+		Backups:     backupStatus,
 		Logger:      logger.WithComponent(log, "api_v1"),
-		Version:     "0.1.0",
+		Version:     version,
 		ClientIP: func(r *http.Request) string {
 			return httputil.ClientIP(r.RemoteAddr, r.Header.Get("X-Forwarded-For"), r.Header.Get("X-Real-IP"), trustedProxies)
 		},
@@ -420,4 +503,29 @@ func runServer() error {
 	}
 
 	return nil
+}
+
+// startBackups starts the nightly scheduler when backups are enabled and the
+// schedule is not "off". It closes done when the scheduler stops.
+func startBackups(ctx context.Context, done chan<- struct{}, cfg *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.Logger) {
+	setup, err := backup.New(cfg, db, dockerClient, log, version)
+	switch {
+	case errors.Is(err, backup.ErrDisabled):
+		log.Info("backups disabled (BACKUP_S3_BUCKET unset)")
+		close(done)
+		return
+	case err != nil:
+		// Config.validate already checked these settings, so this is unexpected.
+		log.Error("backups not started", "error", backup.RedactorFor(cfg).Redact(err.Error()))
+		close(done)
+		return
+	case !setup.Scheduled:
+		log.Info("backups enabled, nightly schedule off; use goforge backup run")
+		close(done)
+		return
+	}
+	go func() {
+		defer close(done)
+		setup.Runner.Schedule(ctx, setup.Schedule)
+	}()
 }

@@ -89,6 +89,10 @@ type Config struct {
 	// comma-separated list.
 	ProtectedServices []string
 
+	// Backup configures nightly backups to S3-compatible storage. Disabled
+	// while BACKUP_S3_BUCKET is unset.
+	Backup BackupConfig
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -153,6 +157,9 @@ func Load() (*Config, error) {
 
 		// API v1
 		ProtectedServices: getEnvStringSlice("GOFORGE_PROTECTED_SERVICES"),
+
+		// Backups (disabled while BACKUP_S3_BUCKET is unset)
+		Backup: loadBackupConfig(),
 
 		// Dev mode
 		DevMode: devMode,
@@ -247,6 +254,12 @@ func fillDevSecret(current, stored string, changed bool) (value, persisted strin
 
 // validate checks that required configuration is present.
 func (c *Config) validate() error {
+	// Backup settings are checked in every mode once a bucket is set, so a
+	// typo fails at startup instead of at 02:00.
+	if err := c.Backup.validate(); err != nil {
+		return err
+	}
+
 	// In dev mode, we're more lenient
 	if c.DevMode {
 		return nil

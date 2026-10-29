@@ -32,6 +32,7 @@ const (
 	protDocker  = "dock-prot"
 	otherDocker = "dock-other"
 	dbErrDocker = "dock-dberr" // owned, but its row lookup fails
+	adminID     = "88888888-8888-8888-8888-888888888888"
 )
 
 // ---- fakes: each embeds its interface so unused methods panic ----
@@ -49,7 +50,11 @@ func (f *fakeTokens) UpdateLastUsed(context.Context, string) error { return nil 
 type fakeUsers struct{}
 
 func (fakeUsers) GetByID(_ context.Context, id string) (*models.User, error) {
-	return &models.User{ID: id, Email: id[:4] + "@example.com", Role: models.RoleUser}, nil
+	role := models.RoleUser
+	if id == adminID {
+		role = models.RoleAdmin
+	}
+	return &models.User{ID: id, Email: id[:4] + "@example.com", Role: role}, nil
 }
 
 type fakeProjects struct {
@@ -200,6 +205,7 @@ var tokenScopes = map[string][]string{
 	"tok-write":     {models.ScopeWrite},
 	"tok-protected": {models.ScopeWrite, models.ScopeProtected},
 	"tok-other":     {models.ScopeWrite},
+	"tok-admin":     {models.ScopeRead},
 }
 
 func newHarness(t *testing.T) *harness {
@@ -207,8 +213,11 @@ func newHarness(t *testing.T) *harness {
 	tokens := &fakeTokens{byHash: map[string]*models.APIToken{}}
 	for raw, scopes := range tokenScopes {
 		uid := ownerID
-		if raw == "tok-other" {
+		switch raw {
+		case "tok-other":
 			uid = otherID
+		case "tok-admin":
+			uid = adminID
 		}
 		tokens.byHash[auth.HashAPIToken(raw)] = &models.APIToken{ID: "id-" + raw, UserID: uid, Name: raw, Scopes: scopes}
 	}
@@ -237,6 +246,7 @@ func newHarness(t *testing.T) *harness {
 		Containers:        fakeContainers{},
 		Docker:            h.docker,
 		Audit:             h.audit,
+		Backups:           fakeBackups{},
 		Logger:            slog.New(slog.NewTextHandler(io.Discard, nil)),
 		ProtectedServices: []string{protSvcID},
 	}).Routes()

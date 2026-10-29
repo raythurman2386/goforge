@@ -1,11 +1,11 @@
 # GoForge MCP tools
 
-`goforge-mcp` speaks MCP over stdio and calls `/api/v1` with a scoped token. A client sees 22 read tools, plus 14 write tools when `GOFORGE_MCP_ALLOW_WRITES=true`. Write tools are dry runs by default, need `approval_ref` to run, and refuse protected services for stop, config edit, and image update unless the token has the `protected` scope.
+`goforge-mcp` speaks MCP over stdio and calls `/api/v1` with a scoped token. A client sees 23 read tools, plus 14 write tools when `GOFORGE_MCP_ALLOW_WRITES=true`. Write tools are dry runs by default, need `approval_ref` to run, and refuse protected services for stop, config edit, and image update unless the token has the `protected` scope.
 
 ## Sub-features
 
-- `mcp-read-inventory` lists 22 read-only tools when writes are off.
-- `mcp-write-inventory` lists 36 tools when writes are on, each write tool with `dry_run` and `approval_ref` inputs, and no project, service, or volume delete, no prune, and no secret-reveal tool. `delete_env_var` and `unlink_service` are the only deleting tools, and they are gated writes like the rest.
+- `mcp-read-inventory` lists 23 read-only tools when writes are off.
+- `mcp-write-inventory` lists 37 tools when writes are on, each write tool with `dry_run` and `approval_ref` inputs, and no project, service, or volume delete, no prune, and no secret-reveal tool. `delete_env_var` and `unlink_service` are the only deleting tools, and they are gated writes like the rest.
 - `mcp-read-call` returns the API JSON for `whoami` and `list_services`.
 - `mcp-dry-run` returns a plan for `restart_service` without `dry_run`, and nothing changes.
 - `mcp-protected-refusal` returns an error result for `stop_container` or `update_service_config` on a protected service with a `write` token.
@@ -23,7 +23,7 @@ Preconditions:
 - The [api-v1.md](./api-v1.md) preconditions, with `token-read`, `token-write`, and the protected `verify-pg` service in place.
 - `make build-mcp` has produced `bin/goforge-mcp`.
 
-- **Inventory.** Pipe `initialize`, `notifications/initialized`, and `tools/list` JSON-RPC lines into `GOFORGE_MCP_TOKEN_FILE=/tmp/goforge-verify/state/token-read bin/goforge-mcp`. The list has 22 tools, each with `readOnlyHint` true. With `GOFORGE_MCP_ALLOW_WRITES=true` it has 36, and every write tool's `inputSchema.properties` has `dry_run` and `approval_ref`.
+- **Inventory.** Pipe `initialize`, `notifications/initialized`, and `tools/list` JSON-RPC lines into `GOFORGE_MCP_TOKEN_FILE=/tmp/goforge-verify/state/token-read bin/goforge-mcp`. The list has 23 tools, each with `readOnlyHint` true. With `GOFORGE_MCP_ALLOW_WRITES=true` it has 37, and every write tool's `inputSchema.properties` has `dry_run` and `approval_ref`.
 - **Read call.** `tools/call` `whoami` returns text holding `"scopes":["read"]`.
 - **Dry run.** With `token-write` and writes on, `tools/call` `restart_service` with `{"service_id":"$ID"}` returns `"dry_run": true` and the container's `StartedAt` is unchanged.
 - **Protected.** With `token-write`, `tools/call` `update_service_config` with `{"service_id":"$ID","config":{"name":"verify-pg-renamed"}}` returns `isError` true and text naming `protected`. `stop_container` with `{"container_id":"<verify-pg docker id>"}` does the same.

@@ -70,6 +70,7 @@ func (h *Handler) Routes() http.Handler {
 		r.Get("/containers/{id}/stats", h.getContainerStats)
 
 		r.Get("/audit-log", h.listAuditLog)
+		r.Get("/backups", h.getBackups)
 
 		r.Get("/git-sources", h.listGitSources)
 		r.Get("/git-sources/{id}/repos", h.listRepos)

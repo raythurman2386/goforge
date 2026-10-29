@@ -22,7 +22,7 @@ var readTools = []string{
 	"list_env_vars", "list_deployments", "get_deployment", "get_deployment_logs",
 	"list_service_templates", "get_service_template", "list_services", "get_service",
 	"list_containers", "get_container", "get_container_logs", "get_container_stats",
-	"list_audit_log", "list_git_sources", "list_repos", "list_branches",
+	"list_audit_log", "list_git_sources", "list_repos", "list_branches", "get_backup_status",
 }
 
 var writeTools = []string{
@@ -190,6 +190,17 @@ func TestReadToolCallsAPIWithBearer(t *testing.T) {
 	}
 	if strings.Contains(text, testToken) {
 		t.Error("token in tool output")
+	}
+}
+
+func TestBackupStatusToolIsAGet(t *testing.T) {
+	api := &fakeAPI{}
+	cs := connect(t, &Config{}, api)
+	if res, text := callTool(t, cs, "get_backup_status", map[string]any{}); res.IsError {
+		t.Fatalf("error: %s", text)
+	}
+	if c := api.last(); c.method != http.MethodGet || c.path != "/api/v1/backups" {
+		t.Errorf("call %+v", c)
 	}
 }
 

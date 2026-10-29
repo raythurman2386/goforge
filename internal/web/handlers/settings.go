@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -14,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
@@ -28,6 +30,7 @@ type SettingsHandler struct {
 	instanceService *services.InstanceService
 	userRepo        *repositories.UserRepository
 	apiTokenRepo    *repositories.APITokenRepository
+	backups         BackupStatusReader
 	logger          *slog.Logger
 }
 
@@ -182,6 +185,30 @@ func (h *SettingsHandler) PruneSystem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// BackupStatusReader reads the backup status for the Settings card.
+type BackupStatusReader interface {
+	Status(ctx context.Context) (*backup.Status, error)
+}
+
+// WithBackups enables the admin-only Backups card on the profile page.
+func (h *SettingsHandler) WithBackups(b BackupStatusReader) *SettingsHandler {
+	h.backups = b
+	return h
+}
+
+// backupStatus returns nil (card hidden) for non-admins or on error.
+func (h *SettingsHandler) backupStatus(r *http.Request, user *models.User) *backup.Status {
+	if h.backups == nil || !user.IsAdmin() {
+		return nil
+	}
+	st, err := h.backups.Status(r.Context())
+	if err != nil {
+		h.logger.Error("failed to read backup status", "error", err)
+		return nil
+	}
+	return st
+}
+
 // Profile renders the profile settings page.
 func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
 	val := r.Context().Value(auth.UserContextKey)
@@ -199,7 +226,7 @@ func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := settings.Profile(currentUser, csrfToken)
+	component := settings.Profile(currentUser, csrfToken, h.backupStatus(r, currentUser))
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render profile page")
 	}
