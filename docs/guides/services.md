@@ -205,10 +205,31 @@ Key differences from a flat structure:
 
 To add a new service to the catalog:
 
-1. Create a YAML file in the `templates/` directory (or your configured `TEMPLATES_DIR`)
+1. Create a YAML file (`*.yaml`) in your `TEMPLATES_DIR` (default `./templates`)
 2. Follow the template schema shown above, with `config` for user inputs and `docker` for container settings
-3. Restart GoForge or reload templates
+3. Open **Services** (`/services`). The new template appears there.
 
-The template will appear in the service catalog automatically.
+### How the catalog loads and reloads
+
+- At startup GoForge reads every `*.yaml` file in `TEMPLATES_DIR`. It logs one line with the template count and the absolute directory, for example `msg="loaded service templates" count=5 dir=/app/templates`.
+- The service catalog page and each **Configure** page check the directory again before they render. GoForge reloads the catalog when a `*.yaml` file was added, removed, or changed (by name, size, or modification time), and logs `service catalog reloaded` with the new count. You don't need a restart or an image rebuild.
+- A file that fails to parse is skipped and logged as a warning. Every other template keeps working. The broken template returns once its file is fixed.
+- A reload swaps the whole in-memory catalog at once, so a request never sees a half-loaded catalog. Services that are already deployed are not affected.
+
+### Custom templates with Docker Compose
+
+The image includes the repository's `templates/` directory at `/app/templates` (`TEMPLATES_DIR=./templates`, relative to `/app`). A new file inside the image only appears after a rebuild. Mount a directory from the host instead, so you can edit templates without rebuilding:
+
+```yaml
+# docker-compose.override.yml
+services:
+  goforge:
+    volumes:
+      - ./templates:/app/templates:ro
+```
+
+Recreate the `goforge` container once, for example with `docker compose up -d goforge`, so the mount takes effect. After that, files you add or edit under `./templates` on the host appear the next time you open `/services`.
+
+The mount replaces the bundled templates, so mount a directory that holds a copy of them (the repo's `templates/` checkout does). To keep your templates separate, mount them elsewhere and point `TEMPLATES_DIR` there, for example `- ./my-templates:/app/custom-templates:ro` with `TEMPLATES_DIR=/app/custom-templates` in `.env`.
 
 See [Service Templates Reference](../reference/service-templates.md) for the complete template specification.

@@ -29,8 +29,23 @@ func NewServiceHandler(c *services.Catalog, is *services.InstanceService, logger
 	}
 }
 
+// refreshCatalog picks up templates added, edited, or removed under
+// TEMPLATES_DIR since the last load, so new templates do not need an image
+// rebuild or restart. A directory-read failure keeps the last catalog;
+// a file that fails to parse is skipped (that template drops until fixed).
+func (h *ServiceHandler) refreshCatalog(r *http.Request) {
+	reloaded, err := h.catalog.ReloadIfChanged()
+	if err != nil && h.logger != nil {
+		h.logger.WarnContext(r.Context(), "service catalog reload had errors", "dir", h.catalog.Dir(), "error", err)
+	}
+	if reloaded && h.logger != nil {
+		h.logger.InfoContext(r.Context(), "service catalog reloaded", "dir", h.catalog.Dir(), "count", h.catalog.Count())
+	}
+}
+
 // Catalog renders the service catalog page.
 func (h *ServiceHandler) Catalog(w http.ResponseWriter, r *http.Request) {
+	h.refreshCatalog(r)
 	templates := h.catalog.ListTemplates()
 
 	// Also get running instances
@@ -56,6 +71,7 @@ func (h *ServiceHandler) Catalog(w http.ResponseWriter, r *http.Request) {
 
 // Configure renders the configuration page for a service template.
 func (h *ServiceHandler) Configure(w http.ResponseWriter, r *http.Request) {
+	h.refreshCatalog(r)
 	templateName := chi.URLParam(r, "template")
 	tmpl, err := h.catalog.GetTemplate(templateName)
 	if err != nil {

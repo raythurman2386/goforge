@@ -95,7 +95,7 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TEMPLATES_DIR` | `./templates` | Directory containing service template YAML files |
+| `TEMPLATES_DIR` | `./templates` | Directory containing service template YAML files. Changes are picked up without a restart; bind-mount it to add templates without rebuilding the image (see [Adding Custom Service Templates](../guides/services.md#adding-custom-service-templates)) |
 | `GOFORGE_BUILD_DIR` | System temp dir | Directory for cloning repositories during builds |
 
 ## Webhooks
