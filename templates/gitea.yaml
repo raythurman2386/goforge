@@ -17,14 +17,14 @@ config:
     default: "Gitea: Git with a cup of tea"
     required: true
   - name: disable_registration
-    label: Disable Registration ("true" or "false")
-    type: text
-    default: "true"
+    label: Disable Registration
+    type: bool
+    default: true
     required: true
   - name: require_signin_view
-    label: Require Sign-in to View ("true" or "false")
-    type: text
-    default: "true"
+    label: Require Sign-in to View
+    type: bool
+    default: true
     required: true
 
 resources:

@@ -114,6 +114,10 @@ func (h *ServiceHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.instanceService.DeployInstance(r.Context(), user.ID, templateName, config); err != nil {
+		if errors.Is(err, services.ErrInvalidConfig) {
+			RenderError(w, r, http.StatusBadRequest, err.Error())
+			return
+		}
 		h.logger.Error("failed to deploy service", "template", templateName, "error", err)
 		RenderError(w, r, http.StatusInternalServerError, "failed to deploy service")
 		return
@@ -224,6 +228,10 @@ func (h *ServiceHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if _, err := h.instanceService.UpdateInstanceConfig(r.Context(), id, updates); err != nil {
 		if errors.Is(err, services.ErrInstanceBusy) {
 			RenderError(w, r, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, services.ErrInvalidConfig) {
+			RenderError(w, r, http.StatusBadRequest, err.Error())
 			return
 		}
 		h.logger.Error("failed to update service config", "instance_id", id, "error", err)

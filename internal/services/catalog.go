@@ -32,7 +32,8 @@ type ServiceTemplate struct {
 	Backup         BackupConfig     `yaml:"backup" json:"backup"`
 }
 
-// ConfigField represents a configuration field for a service.
+// ConfigField represents a configuration field for a service. Type is one of
+// text (default), password, number, bool, or select (see FieldType*).
 type ConfigField struct {
 	Name     string      `yaml:"name" json:"name"`
 	Label    string      `yaml:"label" json:"label"`
@@ -43,6 +44,8 @@ type ConfigField struct {
 	Length   int         `yaml:"length,omitempty" json:"length,omitempty"`
 	Min      int         `yaml:"min,omitempty" json:"min,omitempty"`
 	Max      int         `yaml:"max,omitempty" json:"max,omitempty"`
+	// Options lists the allowed values of a select field.
+	Options []string `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 // ResourceConfig defines the resource limits for a service.
@@ -203,6 +206,10 @@ func (c *Catalog) load() error {
 		var tmpl ServiceTemplate
 		if err := yaml.Unmarshal(data, &tmpl); err != nil {
 			errs = append(errs, fmt.Errorf("failed to parse template %s: %w", entry.Name(), err))
+			continue
+		}
+		if err := tmpl.validateFields(); err != nil {
+			errs = append(errs, fmt.Errorf("invalid template %s: %w", entry.Name(), err))
 			continue
 		}
 

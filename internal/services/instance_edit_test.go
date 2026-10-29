@@ -40,7 +40,7 @@ func editTestTemplate() *ServiceTemplate {
 		Web:            true,
 		DefaultVersion: "latest",
 		Config: []ConfigField{
-			{Name: "signups_allowed", Type: "text", Default: "true", Required: true},
+			{Name: "signups_allowed", Label: "Allow Signups", Type: FieldTypeBool, Default: true, Required: true},
 			{Name: "admin_token", Type: "password", Generate: true, Length: 48, Required: true},
 		},
 		Resources: ResourceConfig{CPU: "0.25", Memory: "256m"},
