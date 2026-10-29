@@ -27,7 +27,7 @@ func defaultValue(v interface{}) string {
 }
 
 templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProxyMode bool) {
-	@layouts.AppLayout("Configure " + tmpl.DisplayName, csrfToken, nil) {
+	@layouts.AppLayout("Configure " + tmpl.DisplayName, csrfToken) {
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">

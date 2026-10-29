@@ -76,8 +76,11 @@ Each rule names what enforces it. If a rule has no automatic check, the
 reviewer is the check.
 
 1. **`make check` is green before you push.** It runs `fmt-check`, `vet`,
-   `lint` (golangci-lint via `go tool`), and `test` with the race detector.
-   CI (`.github/workflows/ci.yml`) runs the same steps on every PR.
+   `lint` (golangci-lint via `go tool`, pinned in `go.mod`), and `test` with
+   the race detector. CI (`.github/workflows/ci.yml`) runs the same checks on
+   every PR, but its lint step uses `golangci/golangci-lint-action@v6` with
+   `version: latest`, not the `go.mod` pin, so CI can flag lints a local
+   `make lint` does not.
 2. **Follow the Go style in [AGENTS.md](AGENTS.md).** Wrapped errors,
    `context.Context` first, grouped imports, sentinel errors with
    `errors.Is`. Enforced by golangci-lint and review.

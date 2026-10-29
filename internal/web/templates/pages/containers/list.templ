@@ -7,7 +7,7 @@ import (
 )
 
 templ List(csrfToken string) {
-	@layouts.AppLayout("Containers", csrfToken, nil) {
+	@layouts.AppLayout("Containers", csrfToken) {
 		<div class="px-4 sm:px-6 lg:px-8">
 			<div class="sm:flex sm:items-center">
 				<div class="sm:flex-auto">
@@ -33,10 +33,10 @@ templ List(csrfToken string) {
 										</th>
 									</tr>
 								</thead>
-								<tbody class="divide-y divide-gray-200 bg-white" id="container-list-body">
+								<tbody class="divide-y divide-gray-200 bg-white" id="container-list-body" hx-get="/containers/api" hx-trigger="load, containerStopped from:body, containerRestarted from:body" hx-swap="innerHTML">
 									<tr>
 										<td colspan="5" class="py-8 text-center text-gray-500">
-											<div hx-get="/containers/api" hx-trigger="load" hx-swap="innerHTML">
+											<div>
 												<svg class="animate-spin h-5 w-5 mx-auto text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
