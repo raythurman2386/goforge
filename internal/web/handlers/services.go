@@ -64,7 +64,7 @@ func (h *ServiceHandler) Configure(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages_services.Configure(tmpl, csrfToken)
+	component := pages_services.Configure(tmpl, csrfToken, h.instanceService.CloudflareProxyMode())
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render configuration page")
 	}
