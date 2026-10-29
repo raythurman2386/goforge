@@ -338,3 +338,31 @@ func TestRouter_ContainersAPINotShadowedByDetail(t *testing.T) {
 		}
 	}
 }
+
+// Browsers fetch /favicon.ico on every page, so it must not 404. Static files
+// are served relative to the working directory, as in the container.
+func TestRouter_FaviconAndFont(t *testing.T) {
+	t.Chdir("../..")
+	cfg := &config.Config{
+		DevMode:  true,
+		Port:     8080,
+		LogLevel: "info",
+	}
+	db := setupTestRouterDB(t)
+	defer db.Close()
+
+	server := httptest.NewServer(setupTestRouter(t, db, cfg))
+	defer server.Close()
+
+	for _, path := range []string{"/favicon.ico", "/static/favicon.svg", "/static/fonts/InterVariable.woff2"} {
+		resp, err := http.Get(server.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", path, err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || len(body) == 0 {
+			t.Errorf("GET %s = %d (%d bytes), want 200 with a body", path, resp.StatusCode, len(body))
+		}
+	}
+}

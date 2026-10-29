@@ -5,13 +5,13 @@ import (
 )
 
 templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken string, projectID string) {
-	<div class="bg-white shadow sm:rounded-lg overflow-hidden">
-		<div class="px-4 py-5 sm:px-6 flex justify-between items-center bg-gray-50 border-b">
+	<div class="card !p-0 overflow-hidden">
+		<div class="card-header">
 			<div>
-				<h3 class="text-lg leading-6 font-medium text-gray-900">Environment Variables</h3>
+				<h3 class="card-title">Environment Variables</h3>
 				<p class="mt-1 max-w-2xl text-sm text-gray-500">Variables for this environment.</p>
 			</div>
-			<div class="flex items-center space-x-2">
+			<div class="flex items-center gap-2">
 				if projectID != "" {
 					<button
 						hx-post={ "/projects/" + projectID + "/envs/" + envID + "/variables/sync" }
@@ -19,25 +19,25 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 						hx-headers={ `{"X-CSRF-Token": "` + csrfToken + `"}` }
 						hx-disabled-elt="this"
 						hx-indicator="find .htmx-indicator"
-						class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+						class="btn-secondary btn-sm"
 					>
 						Sync from repo
 						@Spinner()
 					</button>
 				}
-				<button hx-get={ "/envs/" + envID + "/variables/new" } hx-target="body" hx-swap="beforeend" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200">
+				<button type="button" hx-get={ "/envs/" + envID + "/variables/new" } hx-target="body" hx-swap="beforeend" class="btn-primary btn-sm">
 					+ Add Variable
 				</button>
 			</div>
 		</div>
 		
-		<div class="px-4 py-5 sm:p-6">
+		<div class="card-body">
 			if len(variables) == 0 {
-				<p class="text-sm text-gray-500 italic">No variables defined.</p>
+				<p class="text-sm text-gray-500">No variables defined.</p>
 			} else {
-				<div class="space-y-4">
+				<div class="space-y-2">
 					for _, v := range variables {
-						<div class="flex items-center space-x-4 p-3 border rounded-md group hover:bg-gray-50">
+						<div class="flex items-center gap-4 rounded-lg border border-gray-100 p-3 hover:bg-gray-50/60">
 							<div class="flex-1 grid grid-cols-2 gap-4">
 								<div class="text-sm font-mono font-medium text-gray-900">{ v.Key }</div>
 								<div class="text-sm font-mono text-gray-500 truncate">
@@ -54,9 +54,11 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 									hx-confirm="Delete this variable?"
 									hx-swap="none"
 									hx-headers={ `{"X-CSRF-Token": "` + csrfToken + `"}` }
-									class="text-gray-400 hover:text-red-600"
+									class="icon-btn hover:text-red-600 hover:bg-red-50"
+									title="Delete"
+									aria-label={ "Delete " + v.Key }
 								>
-									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
 									</svg>
 								</button>
@@ -84,7 +86,7 @@ templ AddVariableModal(envID string, csrfToken string) {
 			</div>
 
 			<div class="mt-5 flex justify-end space-x-3">
-				<button type="button" onclick="document.getElementById('modal').remove()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+				<button type="button" data-modal-close class="btn-secondary">
 					Cancel
 				</button>
 				@Button("Add Variable", "primary")

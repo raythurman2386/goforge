@@ -22,241 +22,177 @@ type DetailProps struct {
 templ Detail(props DetailProps) {
 	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID)), props.CSRFToken) {
 		<div hx-ext="sse" sse-connect={ fmt.Sprintf("/projects/%s/deployments/%s/logs", props.Project.ID, props.Deployment.ID) }>
-		<!-- Breadcrumb -->
-		<nav class="flex mb-4" aria-label="Breadcrumb">
-			<ol class="flex items-center space-x-2">
-				<li>
-					<a href="/projects" class="text-gray-400 hover:text-gray-500">
-						<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-							<path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
-						</svg>
-					</a>
-				</li>
-				<li>
-					<div class="flex items-center">
-						<svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
-						</svg>
-						<a href={ templ.URL("/projects/" + props.Project.ID) } class="ml-2 text-sm font-medium text-gray-500 hover:text-gray-700">
-							{ props.Project.Name }
-						</a>
-					</div>
-				</li>
-				<li>
-					<div class="flex items-center">
-						<svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
-						</svg>
-						<a href={ templ.URL("/projects/" + props.Project.ID + "/deployments") } class="ml-2 text-sm font-medium text-gray-500 hover:text-gray-700">
-							Deployments
-						</a>
-					</div>
-				</li>
-				<li>
-					<div class="flex items-center">
-						<svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
-						</svg>
-						<span class="ml-2 text-sm font-medium text-gray-700">
-							{ truncateID(props.Deployment.ID) }
-						</span>
-					</div>
-				</li>
-			</ol>
-		</nav>
+		@components.Breadcrumbs([]components.Crumb{
+			{Label: "Projects", Href: "/projects"},
+			{Label: props.Project.Name, Href: "/projects/" + props.Project.ID},
+			{Label: "Deployments", Href: "/projects/" + props.Project.ID + "/deployments"},
+			{Label: truncateID(props.Deployment.ID)},
+		})
 
-		<!-- Header -->
-		<div class="flex items-center justify-between mb-6">
-			<div class="flex items-center space-x-4">
-				<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl">
-					Deployment { truncateID(props.Deployment.ID) }
-				</h2>
-				<span sse-swap="status" hx-swap="innerHTML">
-					@components.DeploymentStatusBadge(props.Deployment.Status)
-				</span>
-			</div>
-			<div class="flex space-x-3">
-				if props.CanRollback && props.Deployment.Status == models.DeploymentStatusRunning {
-					<button
-						hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/rollback", props.Project.ID, props.Deployment.ID) }
-						hx-confirm="Are you sure you want to rollback this deployment?"
-						hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
-						class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
-						<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
-						</svg>
-						Rollback
-					</button>
-				}
-				if !props.Deployment.IsTerminal() {
-					<button
-						hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/cancel", props.Project.ID, props.Deployment.ID) }
-						hx-confirm="Are you sure you want to cancel this deployment?"
-						hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
-						class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-						<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-						</svg>
-						Cancel
-					</button>
-				}
-			</div>
-		</div>
+		@components.PageHeaderWithBadge("Deployment "+truncateID(props.Deployment.ID), "", liveStatus(props.Deployment.Status)) {
+			if props.CanRollback && props.Deployment.Status == models.DeploymentStatusRunning {
+				<button
+					type="button"
+					hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/rollback", props.Project.ID, props.Deployment.ID) }
+					hx-confirm="Are you sure you want to rollback this deployment?"
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
+					hx-disabled-elt="this"
+					hx-indicator="find .htmx-indicator"
+					class="btn-warning"
+				>
+					<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+					</svg>
+					Rollback
+					@components.Spinner()
+				</button>
+			}
+			if !props.Deployment.IsTerminal() {
+				<button
+					type="button"
+					hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/cancel", props.Project.ID, props.Deployment.ID) }
+					hx-confirm="Are you sure you want to cancel this deployment?"
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
+					hx-disabled-elt="this"
+					hx-indicator="find .htmx-indicator"
+					class="btn-secondary"
+				>
+					<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+					</svg>
+					Cancel
+					@components.Spinner()
+				</button>
+			}
+		}
 
 		<!-- Deployment Info Grid -->
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 			<!-- Main Info Card -->
-			<div class="lg:col-span-2 bg-white shadow overflow-hidden sm:rounded-lg">
-				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-lg leading-6 font-medium text-gray-900">Deployment Information</h3>
+			<div class="lg:col-span-2 card !p-0 overflow-hidden">
+				<div class="card-header">
+					<h3 class="card-title">Deployment Information</h3>
 				</div>
-				<div class="border-t border-gray-200">
-					<dl>
-						<div class="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-							<dt class="text-sm font-medium text-gray-500">Status</dt>
-							<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-								<span sse-swap="status" hx-swap="innerHTML">
-									@components.DeploymentStatusBadge(props.Deployment.Status)
-								</span>
-							</dd>
-						</div>
-						<div class="bg-white px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-							<dt class="text-sm font-medium text-gray-500">Trigger</dt>
-							<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-								@components.TriggerTypeBadge(props.Deployment.TriggerType)
-							</dd>
-						</div>
-						if props.Deployment.Branch.Valid {
-							<div class="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-								<dt class="text-sm font-medium text-gray-500">Branch</dt>
-								<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-									<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800">
-										<svg class="-ml-0.5 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-										</svg>
-										{ props.Deployment.Branch.String }
-									</span>
-								</dd>
-							</div>
+				<dl class="divide-y divide-gray-100">
+					@infoRow("Status") {
+						@liveStatus(props.Deployment.Status)
+					}
+					@infoRow("Trigger") {
+						@components.TriggerTypeBadge(props.Deployment.TriggerType)
+					}
+					if props.Deployment.Branch.Valid {
+						@infoRow("Branch") {
+							<span class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700">
+								<svg class="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+								</svg>
+								{ props.Deployment.Branch.String }
+							</span>
 						}
-						if props.Deployment.CommitSHA.Valid {
-							<div class="bg-white px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-								<dt class="text-sm font-medium text-gray-500">Commit</dt>
-								<dd class="mt-1 text-sm sm:mt-0 sm:col-span-2">
-									<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-sm">
-										{ props.Deployment.CommitSHA.String }
-									</code>
-								</dd>
-							</div>
+					}
+					if props.Deployment.CommitSHA.Valid {
+						@infoRow("Commit") {
+							<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-xs">{ props.Deployment.CommitSHA.String }</code>
 						}
-						if props.Deployment.CommitMessage.Valid {
-							<div class="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-								<dt class="text-sm font-medium text-gray-500">Commit Message</dt>
-								<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-									{ props.Deployment.CommitMessage.String }
-								</dd>
-							</div>
+					}
+					if props.Deployment.CommitMessage.Valid {
+						@infoRow("Commit Message") {
+							{ props.Deployment.CommitMessage.String }
 						}
-						if props.Deployment.CommitAuthor.Valid {
-							<div class="bg-white px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-								<dt class="text-sm font-medium text-gray-500">Author</dt>
-								<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-									{ props.Deployment.CommitAuthor.String }
-								</dd>
-							</div>
+					}
+					if props.Deployment.CommitAuthor.Valid {
+						@infoRow("Author") {
+							{ props.Deployment.CommitAuthor.String }
 						}
-						if props.Deployment.ImageTag.Valid {
-							<div class="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-								<dt class="text-sm font-medium text-gray-500">Image Tag</dt>
-								<dd class="mt-1 text-sm sm:mt-0 sm:col-span-2">
-									<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-sm">
-										{ props.Deployment.ImageTag.String }
-									</code>
-								</dd>
-							</div>
+					}
+					if props.Deployment.ImageTag.Valid {
+						@infoRow("Image Tag") {
+							<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-xs break-all">{ props.Deployment.ImageTag.String }</code>
 						}
-						if props.Deployment.ErrorMessage.Valid {
-							<div class="bg-red-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-								<dt class="text-sm font-medium text-red-700">Error</dt>
-								<dd class="mt-1 text-sm text-red-800 sm:mt-0 sm:col-span-2">
-									{ props.Deployment.ErrorMessage.String }
-								</dd>
-							</div>
+					}
+				</dl>
+				if props.Deployment.ErrorMessage.Valid {
+					<div class="card-body border-t border-gray-100">
+						@components.Alert("error") {
+							<p class="font-semibold">Error</p>
+							<p class="mt-1 break-words">{ props.Deployment.ErrorMessage.String }</p>
 						}
-					</dl>
-				</div>
+					</div>
+				}
 			</div>
 
 			<!-- Timeline Card -->
-			<div class="bg-white shadow overflow-hidden sm:rounded-lg">
-				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-lg leading-6 font-medium text-gray-900">Timeline</h3>
+			<div class="card !p-0">
+				<div class="card-header">
+					<h3 class="card-title">Timeline</h3>
 				</div>
-				<div class="border-t border-gray-200 px-4 py-5 sm:px-6">
-					<dl class="space-y-4">
+				<dl class="card-body space-y-4">
+					<div>
+						<dt class="text-sm font-medium text-gray-500">Created</dt>
+						<dd class="mt-1 text-sm text-gray-900">{ formatTimestamp(props.Deployment.CreatedAt) }</dd>
+					</div>
+					if props.Deployment.StartedAt.Valid {
 						<div>
-							<dt class="text-sm font-medium text-gray-500">Created</dt>
-							<dd class="mt-1 text-sm text-gray-900">
-								{ formatTimestamp(props.Deployment.CreatedAt) }
-							</dd>
+							<dt class="text-sm font-medium text-gray-500">Started</dt>
+							<dd class="mt-1 text-sm text-gray-900">{ formatTimestamp(props.Deployment.StartedAt.Time) }</dd>
 						</div>
-						if props.Deployment.StartedAt.Valid {
-							<div>
-								<dt class="text-sm font-medium text-gray-500">Started</dt>
-								<dd class="mt-1 text-sm text-gray-900">
-									{ formatTimestamp(props.Deployment.StartedAt.Time) }
-								</dd>
-							</div>
-						}
-						if props.Deployment.FinishedAt.Valid {
-							<div>
-								<dt class="text-sm font-medium text-gray-500">Finished</dt>
-								<dd class="mt-1 text-sm text-gray-900">
-									{ formatTimestamp(props.Deployment.FinishedAt.Time) }
-								</dd>
-							</div>
-						}
+					}
+					if props.Deployment.FinishedAt.Valid {
 						<div>
-							<dt class="text-sm font-medium text-gray-500">Duration</dt>
-							<dd class="mt-1 text-sm text-gray-900">
-								{ formatDuration(props.Deployment.Duration()) }
-							</dd>
+							<dt class="text-sm font-medium text-gray-500">Finished</dt>
+							<dd class="mt-1 text-sm text-gray-900">{ formatTimestamp(props.Deployment.FinishedAt.Time) }</dd>
 						</div>
-					</dl>
-				</div>
+					}
+					<div>
+						<dt class="text-sm font-medium text-gray-500">Duration</dt>
+						<dd class="mt-1 text-sm text-gray-900">{ formatDuration(props.Deployment.Duration()) }</dd>
+					</div>
+				</dl>
 			</div>
 		</div>
 
 		<!-- Deployment Logs -->
-		<div class="bg-white shadow sm:rounded-lg">
-			<div class="px-4 py-5 sm:px-6 flex justify-between items-center">
-				<h3 class="text-lg leading-6 font-medium text-gray-900">Deployment Logs</h3>
+		<div class="card !p-0 overflow-hidden">
+			<div class="card-header">
+				<h3 class="card-title">Deployment Logs</h3>
 				if !props.Deployment.IsTerminal() {
-					<span class="inline-flex items-center text-sm text-gray-500">
-						<svg class="animate-pulse -ml-0.5 mr-2 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
-							<circle cx="4" cy="4" r="3"></circle>
-						</svg>
+					<span class="inline-flex items-center gap-2 text-sm text-gray-500">
+						<span class="h-2 w-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true"></span>
 						Live
 					</span>
 				}
 			</div>
-			<div class="border-t border-gray-200">
-				<div id="deployment-logs" class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto">
-					<div id="deployment-log-lines" sse-swap="snapshot" hx-swap="innerHTML">
-						if len(props.Logs) == 0 {
-							<p class="text-gray-500 italic">No logs available yet...</p>
-						} else {
-							for _, log := range props.Logs {
-								@LogLine(log)
-							}
+			<div id="deployment-logs" class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto">
+				<div id="deployment-log-lines" sse-swap="snapshot" hx-swap="innerHTML">
+					if len(props.Logs) == 0 {
+						<p class="text-gray-500 italic">No logs available yet...</p>
+					} else {
+						for _, log := range props.Logs {
+							@LogLine(log)
 						}
-					</div>
-					<div sse-swap="log" hx-swap="beforeend" hx-target="#deployment-log-lines"></div>
+					}
 				</div>
+				<div sse-swap="log" hx-swap="beforeend" hx-target="#deployment-log-lines"></div>
 			</div>
 		</div>
 		</div>
 	}
+}
+
+// liveStatus is the status badge wrapped in the SSE "status" swap target.
+templ liveStatus(status models.DeploymentStatus) {
+	<span sse-swap="status" hx-swap="innerHTML">
+		@components.DeploymentStatusBadge(status)
+	</span>
+}
+
+templ infoRow(label string) {
+	<div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+		<dt class="text-sm font-medium text-gray-500">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+			{ children... }
+		</dd>
+	</div>
 }
 
 templ LogLine(log *models.DeploymentLog) {
@@ -264,7 +200,7 @@ templ LogLine(log *models.DeploymentLog) {
 		<span class="text-gray-500">{ formatLogTime(log.Timestamp) }</span>
 		<span class={ logLevelBadgeClass(log.Level) }>{ string(log.Level) }</span>
 		if log.Source.Valid {
-			<span class="text-blue-400">[{ log.Source.String }]</span>
+			<span class="text-primary-300">[{ log.Source.String }]</span>
 		}
 		<span>{ log.Message }</span>
 	</div>

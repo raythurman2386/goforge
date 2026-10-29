@@ -101,22 +101,6 @@ func isActiveDeployment(status models.DeploymentStatus) bool {
 		status == models.DeploymentStatusDeploying
 }
 
-func getStatusColor(status models.DeploymentStatus) string {
-	switch status {
-	case models.DeploymentStatusRunning:
-		return "bg-green-100 text-green-800 border-green-200"
-	case models.DeploymentStatusFailed:
-		return "bg-red-100 text-red-800 border-red-200"
-	case models.DeploymentStatusPending, models.DeploymentStatusCloning, 
-		models.DeploymentStatusBuilding, models.DeploymentStatusDeploying:
-		return "bg-yellow-100 text-yellow-800 border-yellow-200"
-	case models.DeploymentStatusCanceled, models.DeploymentStatusRolledBack:
-		return "bg-gray-100 text-gray-800 border-gray-200"
-	default:
-		return "bg-gray-100 text-gray-800 border-gray-200"
-	}
-}
-
 templ DeploymentStatusBanner(projectID string, deployment *models.Deployment) {
 	<div 
 		id="deployment-status-banner"
@@ -185,9 +169,7 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 					<div class="space-y-4">
 						<div class="flex items-center justify-between">
 							<span class="text-sm text-gray-500">Status</span>
-							<span class={ "px-2.5 py-0.5 rounded-full text-xs font-medium border", getStatusColor(latestDeployment.Status) }>
-								{ string(latestDeployment.Status) }
-							</span>
+							@components.DeploymentStatusBadge(latestDeployment.Status)
 						</div>
 						if latestDeployment.Branch.Valid {
 							<div class="flex items-center justify-between">
@@ -206,12 +188,12 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 							<span class="text-sm text-gray-900">{ formatTime(latestDeployment.CreatedAt) }</span>
 						</div>
 						if latestDeployment.ErrorMessage.Valid && latestDeployment.ErrorMessage.String != "" {
-							<div class="mt-4 p-3 bg-red-50 rounded-md border border-red-100">
-								<p class="text-sm text-red-700">{ latestDeployment.ErrorMessage.String }</p>
+							<div class="mt-4">
+								@components.AlertMessage("error", latestDeployment.ErrorMessage.String)
 							</div>
 						}
 						<div class="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-							<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + latestDeployment.ID) } class="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline">
+							<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + latestDeployment.ID) } class="text-sm text-primary-600 hover:text-primary-800 font-medium hover:underline">
 								View Logs &rarr;
 							</a>
 						</div>
@@ -296,9 +278,7 @@ templ Deployments(project *models.Project, deployments []*models.Deployment) {
 								for _, d := range deployments {
 									<tr>
 										<td class="px-6 py-4 whitespace-nowrap">
-											<span class={ "px-2 inline-flex text-xs leading-5 font-semibold rounded-full border", getStatusColor(d.Status) }>
-												{ string(d.Status) }
-											</span>
+											@components.DeploymentStatusBadge(d.Status)
 										</td>
 										<td class="px-6 py-4 whitespace-nowrap">
 											<div class="text-sm text-gray-900">{ d.Branch.String }</div>
@@ -380,9 +360,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 										<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
 											{ svc.TemplateName }
 										</span>
-										<span class={ "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border", serviceStatusColor(svc.Status) }>
-											{ string(svc.Status) }
-										</span>
+										@components.StatusBadge("service", string(svc.Status))
 									</div>
 									if connInfo := maskedConn[svc.ID]; len(connInfo) > 0 {
 										<div class="mt-2 space-y-1">
@@ -451,19 +429,6 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 			</div>
 		}
 	</div>
-}
-
-func serviceStatusColor(status models.ServiceInstanceStatus) string {
-	switch status {
-	case models.ServiceStatusRunning:
-		return "bg-green-100 text-green-800 border-green-200"
-	case models.ServiceStatusFailed:
-		return "bg-red-100 text-red-800 border-red-200"
-	case models.ServiceStatusPending, models.ServiceStatusStarting:
-		return "bg-yellow-100 text-yellow-800 border-yellow-200"
-	default:
-		return "bg-gray-100 text-gray-800 border-gray-200"
-	}
 }
 
 templ ProjectSettings(project *models.Project, currentEnv *models.Environment, csrfToken string) {
@@ -545,9 +510,12 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 						</div>
 
 						<div class="sm:col-span-6 flex items-center justify-between pt-4">
-							<div class="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+							<p class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
+								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+								</svg>
 								Changes to port require redeployment.
-							</div>
+							</p>
 							<button type="submit" class="btn-primary">
 								Save Changes
 								@components.Spinner()

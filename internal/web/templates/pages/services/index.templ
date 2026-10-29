@@ -3,6 +3,7 @@ package pages_services
 import (
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
@@ -95,13 +96,7 @@ templ InstanceList(instances []*models.ServiceInstance) {
 				<a href={ templ.URL("/services/" + instance.ID) } class="card hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group">
 					<div class="flex items-center justify-between mb-4">
 						<h3 class="text-lg font-bold text-gray-900 tracking-tight">{ instance.Name }</h3>
-						<span class={ "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-							templ.KV("bg-emerald-100 text-emerald-800", instance.Status == models.ServiceStatusRunning),
-							templ.KV("bg-amber-100 text-amber-800", instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting),
-							templ.KV("bg-red-100 text-red-800", instance.Status == models.ServiceStatusFailed),
-							templ.KV("bg-gray-100 text-gray-600", instance.Status == models.ServiceStatusStopped) }>
-							{ string(instance.Status) }
-						</span>
+						@components.StatusBadge("service", string(instance.Status))
 					</div>
 					<div class="flex items-center text-sm text-gray-500">
 						<div class="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold mr-2">
