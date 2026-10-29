@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -55,6 +56,18 @@ func NewClient(host string) (*Client, error) {
 	}
 
 	return &Client{docker: cli}, nil
+}
+
+// ImageExists reports whether imageName is present locally.
+func (c *Client) ImageExists(ctx context.Context, imageName string) (bool, error) {
+	_, _, err := c.docker.ImageInspectWithRaw(ctx, imageName)
+	if err == nil {
+		return true, nil
+	}
+	if errdefs.IsNotFound(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to inspect image %s: %w", imageName, err)
 }
 
 // EnsureImage pulls an image if it doesn't exist locally.

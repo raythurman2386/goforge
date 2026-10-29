@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -269,6 +270,32 @@ func TestClient_Ping(t *testing.T) {
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Ping() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestClient_ImageExists(t *testing.T) {
+	tests := []struct {
+		name       string
+		inspectErr error
+		want       bool
+		wantErr    bool
+	}{
+		{"present", nil, true, false},
+		{"missing", errdefs.NotFound(errors.New("No such image")), false, false},
+		{"daemon error", errors.New("connection refused"), false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{docker: &mockDockerAPI{
+				imageInspectFunc: func(context.Context, string) (types.ImageInspect, []byte, error) {
+					return types.ImageInspect{}, nil, tt.inspectErr
+				},
+			}}
+			got, err := c.ImageExists(context.Background(), "example/web:1.0")
+			if (err != nil) != tt.wantErr || got != tt.want {
+				t.Errorf("ImageExists() = %v, %v; want %v, wantErr %v", got, err, tt.want, tt.wantErr)
 			}
 		})
 	}
