@@ -70,13 +70,18 @@ type logDeployResult struct {
 	pulled  int
 }
 
-func runLoggedDeploy(t *testing.T, imageExists bool, pullErr error) logDeployResult {
+const (
+	logTagImage    = "example/web:{{ .Version }}"
+	logDigestImage = "example/web@sha256:0000000000000000000000000000000000000000000000000000000000000001"
+)
+
+func runLoggedDeploy(t *testing.T, imageTmpl string, imageExists bool, pullErr error) logDeployResult {
 	t.Helper()
 	catalog := NewCatalog("dummy")
 	catalog.templates["web"] = &ServiceTemplate{
 		Name:           "web",
 		DefaultVersion: "1.0",
-		Docker:         DockerConfig{Image: "example/web:{{ .Version }}"},
+		Docker:         DockerConfig{Image: imageTmpl},
 	}
 
 	var mu sync.Mutex
@@ -106,6 +111,12 @@ func runLoggedDeploy(t *testing.T, imageExists bool, pullErr error) logDeployRes
 	dc := &mockDockerClient{
 		imageExistsFunc: func(_ context.Context, _ string) (bool, error) { return imageExists, nil },
 		ensureImageFunc: func(_ context.Context, _ string) error {
+			mu.Lock()
+			res.pulled++
+			mu.Unlock()
+			return pullErr
+		},
+		pullImageFunc: func(_ context.Context, _ string) error {
 			mu.Lock()
 			res.pulled++
 			mu.Unlock()
@@ -155,7 +166,7 @@ func runLoggedDeploy(t *testing.T, imageExists bool, pullErr error) logDeployRes
 
 func TestDeployInstance_LogsHappyPathWithPull(t *testing.T) {
 	t.Parallel()
-	res := runLoggedDeploy(t, false, nil)
+	res := runLoggedDeploy(t, logTagImage, false, nil)
 
 	want := []string{
 		"service deploy requested",
@@ -190,9 +201,9 @@ func TestDeployInstance_LogsHappyPathWithPull(t *testing.T) {
 	}
 }
 
-func TestDeployInstance_LogsSkipPullWhenImagePresent(t *testing.T) {
+func TestDeployInstance_DigestImagePresentSkipsPull(t *testing.T) {
 	t.Parallel()
-	res := runLoggedDeploy(t, true, nil)
+	res := runLoggedDeploy(t, logDigestImage, true, nil)
 
 	want := []string{
 		"service deploy requested",
@@ -205,13 +216,53 @@ func TestDeployInstance_LogsSkipPullWhenImagePresent(t *testing.T) {
 		t.Fatalf("info logs = %q, want %q", got, want)
 	}
 	if res.pulled != 0 {
-		t.Errorf("EnsureImage called %d times for a local image", res.pulled)
+		t.Errorf("pulled %d times for a local digest image, want 0", res.pulled)
+	}
+}
+
+// A tag such as latest can move upstream, so a local copy must not stop the pull (#39).
+func TestDeployInstance_MutableTagPullsEvenWhenImagePresent(t *testing.T) {
+	t.Parallel()
+	res := runLoggedDeploy(t, "example/web:latest", true, nil)
+
+	if res.pulled != 1 {
+		t.Errorf("pulled %d times for a local :latest image, want 1", res.pulled)
+	}
+	want := []string{
+		"service deploy requested",
+		"pulling service image",
+		"pulled service image",
+		"service container created and started",
+		"service running",
+	}
+	if got := messages(res.recs, "INFO"); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("info logs = %q, want %q", got, want)
+	}
+}
+
+func TestDeployInstance_PullFailureFallsBackToLocalImage(t *testing.T) {
+	t.Parallel()
+	res := runLoggedDeploy(t, "example/web:latest", true, errors.New("registry down"))
+
+	if res.status != models.ServiceStatusRunning || res.created != 1 {
+		t.Fatalf("status=%s created=%d, want running on the local image", res.status, res.created)
+	}
+	if warns := messages(res.recs, "WARN"); len(warns) != 1 || warns[0] != "service image pull failed; using local image" {
+		t.Errorf("warn logs = %q", warns)
+	}
+	for _, r := range res.recs {
+		if r["msg"] == "service image pull failed; using local image" && r["error"] != "registry down" {
+			t.Errorf("fallback warn has error=%v, want registry down", r["error"])
+		}
+	}
+	if errs := messages(res.recs, "ERROR"); len(errs) != 0 {
+		t.Errorf("error logs = %q, want none", errs)
 	}
 }
 
 func TestDeployInstance_PullFailureLogsErrorAndFails(t *testing.T) {
 	t.Parallel()
-	res := runLoggedDeploy(t, false, errors.New("registry down"))
+	res := runLoggedDeploy(t, logTagImage, false, errors.New("registry down"))
 
 	if res.status != models.ServiceStatusFailed {
 		t.Errorf("status = %s, want failed", res.status)

@@ -39,6 +39,7 @@ type ContainerRepository interface {
 type DockerClient interface {
 	CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error)
 	EnsureImage(ctx context.Context, image string) error
+	PullImage(ctx context.Context, image string) error
 	ImageExists(ctx context.Context, image string) (bool, error)
 	StartContainer(ctx context.Context, id string) error
 	StopContainer(ctx context.Context, id string) error
@@ -164,7 +165,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
-		if err := s.ensureServiceImage(bgCtx, image, logAttrs); err != nil {
+		if err := s.ensureServiceImage(bgCtx, image, pullPreferRemote, logAttrs); err != nil {
 			s.logger.Error("failed to pull service image", append(logAttrs, "error", err)...)
 			s.setInstanceStatus(bgCtx, instanceID, models.ServiceStatusFailed)
 			return
@@ -373,6 +374,7 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 		return nil, err
 	}
 
+	prevStatus := instance.Status
 	instance.Status = models.ServiceStatusPending
 	if err = s.instanceRepo.Update(ctx, instance); err != nil {
 		return nil, fmt.Errorf("failed to save instance config: %w", err)
@@ -382,15 +384,76 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		s.recreateContainer(bgCtx, tmpl, spec)
+		s.recreateContainer(bgCtx, tmpl, spec, pullPreferRemote, prevStatus)
 	}()
 
 	return instance, nil
 }
 
-// recreateContainer stops and removes the instance's current container (not
-// its named volumes) and starts a new one from spec.
-func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec) {
+// UpdateInstanceImage pulls the instance's image again and recreates its
+// container with the stored config. It is how a service on a moving tag such
+// as latest picks up a newer upstream image. The instance ID does not change,
+// so the new container mounts the same goforge-vol-<instanceID>-<name>
+// volumes. The pull must succeed: if the registry cannot be reached, the
+// running container is left alone instead of being recreated on the old image.
+func (s *InstanceService) UpdateInstanceImage(ctx context.Context, id string) (*models.ServiceInstance, error) {
+	instance, err := s.instanceRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting {
+		return nil, ErrInstanceBusy
+	}
+
+	tmpl, err := s.catalog.GetTemplate(instance.TemplateName)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := instance.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse stored config: %w", err)
+	}
+
+	// Render before touching anything so a bad template leaves the running container alone.
+	spec, err := s.buildContainerSpec(tmpl, instance, config)
+	if err != nil {
+		return nil, err
+	}
+
+	prevStatus := instance.Status
+	instance.Status = models.ServiceStatusPending
+	if err = s.instanceRepo.Update(ctx, instance); err != nil {
+		return nil, fmt.Errorf("failed to save instance status: %w", err)
+	}
+	s.logger.Info("service image update requested", "instance_id", instance.ID, "template", tmpl.Name, "image", spec.opts.Image)
+
+	//nolint:contextcheck // Intentional use of background context for async work
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		s.recreateContainer(bgCtx, tmpl, spec, pullRequired, prevStatus)
+	}()
+
+	return instance, nil
+}
+
+// recreateContainer gets the image for spec, then stops and removes the
+// instance's current container (not its named volumes) and starts a new one
+// from spec. The image comes first so a failed pull leaves the old container
+// running; the instance then goes back to prevStatus.
+func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, policy imagePullPolicy, prevStatus models.ServiceInstanceStatus) {
+	domain := ""
+	if d, ok := spec.data["Domain"].(string); ok {
+		domain = d
+	}
+	logAttrs := []any{"instance_id", spec.instanceID, "template", tmpl.Name, "image", spec.opts.Image, "domain", domain}
+	if err := s.ensureServiceImage(ctx, spec.opts.Image, policy, logAttrs); err != nil {
+		s.logger.Error("failed to pull service image; existing container left in place", append(logAttrs, "error", err)...)
+		s.setInstanceStatus(ctx, spec.instanceID, prevStatus)
+		return
+	}
+
 	old, err := s.containerRepo.GetByServiceInstanceID(ctx, spec.instanceID)
 	if err != nil || old == nil {
 		s.logger.Warn("no container record for instance; creating a new container", "instance_id", spec.instanceID, "error", err)
@@ -408,16 +471,6 @@ func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTe
 		}
 	}
 
-	domain := ""
-	if d, ok := spec.data["Domain"].(string); ok {
-		domain = d
-	}
-	logAttrs := []any{"instance_id", spec.instanceID, "template", tmpl.Name, "image", spec.opts.Image, "domain", domain}
-	if err := s.ensureServiceImage(ctx, spec.opts.Image, logAttrs); err != nil {
-		s.logger.Error("failed to pull service image", append(logAttrs, "error", err)...)
-		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed)
-		return
-	}
 	s.startServiceContainer(ctx, tmpl, spec, old, logAttrs)
 }
 
@@ -453,24 +506,61 @@ func mergeEditedConfig(tmpl *ServiceTemplate, current, updates map[string]interf
 	return merged
 }
 
-// ensureServiceImage pulls image when it is not present locally and logs the
-// outcome so operators can see pull vs cache hit during one-click deploys.
-func (s *InstanceService) ensureServiceImage(ctx context.Context, image string, logAttrs []any) error {
-	exists, err := s.dockerClient.ImageExists(ctx, image)
-	if err != nil {
-		s.logger.Warn("failed to check for service image", append(logAttrs, "error", err)...)
-	}
-	if exists {
-		s.logger.Info("service image present locally", logAttrs...)
+// imagePullPolicy says what a service operation does when it cannot pull its image.
+type imagePullPolicy int
+
+const (
+	// pullPreferRemote pulls tag references and falls back to a local copy
+	// when the registry cannot be reached. Deploys and config edits use it.
+	pullPreferRemote imagePullPolicy = iota
+	// pullRequired pulls tag references and fails when the pull fails. The
+	// Update action uses it so it never quietly recreates on the old image.
+	pullRequired
+)
+
+// ensureServiceImage makes the service image available and logs pull vs
+// cache hit. A tag (including an implied latest) can move upstream, so tag
+// references are pulled every time; an unchanged tag costs only a manifest
+// check. Digest references (name@sha256:...) never change and are pulled
+// only when missing.
+func (s *InstanceService) ensureServiceImage(ctx context.Context, image string, policy imagePullPolicy, logAttrs []any) error {
+	if docker.IsDigestReference(image) {
+		exists, err := s.dockerClient.ImageExists(ctx, image)
+		if err != nil {
+			s.logger.Warn("failed to check for service image", append(logAttrs, "error", err)...)
+		}
+		if exists {
+			s.logger.Info("service image present locally", logAttrs...)
+			return nil
+		}
+		s.logger.Info("pulling service image", logAttrs...)
+		start := time.Now()
+		if err := s.dockerClient.EnsureImage(ctx, image); err != nil {
+			return err
+		}
+		s.logger.Info("pulled service image", append(logAttrs, "duration", time.Since(start).Round(time.Millisecond).String())...)
 		return nil
 	}
 
 	s.logger.Info("pulling service image", logAttrs...)
 	start := time.Now()
-	if err := s.dockerClient.EnsureImage(ctx, image); err != nil {
-		return err
+	pullErr := s.dockerClient.PullImage(ctx, image)
+	if pullErr == nil {
+		s.logger.Info("pulled service image", append(logAttrs, "duration", time.Since(start).Round(time.Millisecond).String())...)
+		return nil
 	}
-	s.logger.Info("pulled service image", append(logAttrs, "duration", time.Since(start).Round(time.Millisecond).String())...)
+	if policy == pullRequired {
+		return pullErr
+	}
+
+	exists, err := s.dockerClient.ImageExists(ctx, image)
+	if err != nil {
+		s.logger.Warn("failed to check for service image", append(logAttrs, "error", err)...)
+	}
+	if !exists {
+		return pullErr
+	}
+	s.logger.Warn("service image pull failed; using local image", append(logAttrs, "error", pullErr)...)
 	return nil
 }
 

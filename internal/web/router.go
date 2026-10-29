@@ -178,6 +178,7 @@ func Router(
 						r.Post("/restart", serviceHandler.Restart)
 						r.Get("/edit", serviceHandler.EditConfig)
 						r.Post("/edit", serviceHandler.UpdateConfig)
+						r.Post("/update", serviceHandler.UpdateImage)
 					})
 				})
 

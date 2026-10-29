@@ -234,6 +234,38 @@ func (h *ServiceHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/services/"+id, http.StatusSeeOther)
 }
 
+// UpdateImage pulls the service's image again and recreates its container
+// with the same config and named volumes. It is the way to pick up a newer
+// upstream image on a moving tag such as latest.
+func (h *ServiceHandler) UpdateImage(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	instance, err := h.instanceService.GetInstance(r.Context(), id)
+	if err != nil {
+		http.Error(w, "service instance not found", http.StatusNotFound)
+		return
+	}
+	val := r.Context().Value(auth.UserContextKey)
+	user, ok := val.(*models.User)
+	if !ok || user.ID != instance.UserID {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+
+	if _, err := h.instanceService.UpdateInstanceImage(r.Context(), id); err != nil {
+		if errors.Is(err, services.ErrInstanceBusy) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		h.logger.Error("failed to update service image", "instance_id", id, "error", err)
+		http.Error(w, "failed to update service", http.StatusInternalServerError)
+		return
+	}
+
+	// Reload the detail page so it shows the pending state and starts polling.
+	w.Header().Set("HX-Redirect", "/services/"+id)
+	w.WriteHeader(http.StatusOK)
+}
+
 // Delete handles service instance deletion.
 func (h *ServiceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

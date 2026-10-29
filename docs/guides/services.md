@@ -61,8 +61,8 @@ Bitwarden clients and the web vault need HTTPS, so give Vaultwarden a public HTT
 
 To close signups after the first account, open `/admin`, sign in with the admin token, turn off **Allow new signups** under General settings, and save. Settings saved in `/admin` are written to `/data/config.json` and override the environment.
 
-!!! warning "Do not redeploy to change settings"
-    GoForge has no edit action for a running service. A new deploy is a new instance with a new, empty `/data` volume, so deleting and redeploying Vaultwarden loses the vault. Change settings in `/admin` instead.
+!!! warning "Do not redeploy to change settings or upgrade"
+    A new deploy is a new instance with a new, empty `/data` volume, so deleting and redeploying Vaultwarden loses the vault. Use **Edit configuration** or **Update image** on the service page instead: both recreate the container on the same volume. Settings saved in `/admin` also stay in `/data`.
 
 ### Gitea
 
@@ -117,8 +117,18 @@ GoForge will:
 
 | Action | Description |
 |--------|-------------|
+| **Edit configuration** | Change name, domain, or template settings and recreate the container on the same volumes |
+| **Update image** | Pull the service's image again and recreate the container with the same config and volumes |
 | **Restart** | Restart the service container |
 | **Delete** | Stop and remove the service and its data |
+
+### Image updates
+
+GoForge pulls the image every time it deploys a service or recreates its container, unless the image is pinned by digest (`name@sha256:...`). A tag such as `latest` can point at a newer image upstream, and the pull picks it up. A pull of an unchanged tag only checks the registry and downloads nothing. If the registry can't be reached during a deploy or a configuration edit, GoForge logs a warning and uses the local copy of the image.
+
+**Update image** pulls first and only then stops the old container, so the service stays up while the image downloads. If the pull fails, the running container is left as it was and the error is in the GoForge logs. The new container keeps the instance ID, so it mounts the same `goforge-vol-<instance-id>-<volume>` volumes.
+
+For predictable upgrades, prefer a pinned version tag (for example `gitea/gitea:1.25.5`) or a digest over `latest`. With a pinned tag, an upgrade is a template change to a new version, not a surprise on the next deploy.
 
 ### Connection Information
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -70,16 +71,20 @@ func (c *Client) ImageExists(ctx context.Context, imageName string) (bool, error
 	return false, fmt.Errorf("failed to inspect image %s: %w", imageName, err)
 }
 
-// EnsureImage pulls an image if it doesn't exist locally.
+// EnsureImage pulls an image if it doesn't exist locally. It never refreshes
+// a local image, so locally built app images (which are not in any registry)
+// are used as-is. Service deploys refresh mutable tags with PullImage instead.
 func (c *Client) EnsureImage(ctx context.Context, imageName string) error {
-	// Check if image exists locally
-	_, _, err := c.docker.ImageInspectWithRaw(ctx, imageName)
-	if err == nil {
-		// Image exists locally
+	if _, _, err := c.docker.ImageInspectWithRaw(ctx, imageName); err == nil {
 		return nil
 	}
+	return c.PullImage(ctx, imageName)
+}
 
-	// Image doesn't exist, pull it
+// PullImage pulls imageName from its registry even when a local copy exists,
+// so a moved tag such as latest resolves to the registry's current image.
+// Pulling an unchanged tag only checks the manifest and downloads nothing.
+func (c *Client) PullImage(ctx context.Context, imageName string) error {
 	reader, err := c.docker.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to pull image %s: %w", imageName, err)
@@ -92,6 +97,13 @@ func (c *Client) EnsureImage(ctx context.Context, imageName string) error {
 	}
 
 	return nil
+}
+
+// IsDigestReference reports whether ref pins an image by content digest
+// (name@sha256:...). A digest always names the same image; any tag, including
+// an implied latest, can be moved upstream.
+func IsDigestReference(ref string) bool {
+	return strings.Contains(ref, "@")
 }
 
 // GetStats returns statistics for a container.

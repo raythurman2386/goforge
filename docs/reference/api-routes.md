@@ -132,6 +132,7 @@ Used by HTMX components for dynamic repository/branch selection.
 | `GET` | `/services/{id}` | `serviceHandler.Show` | View service instance (`{id}` is UUID) |
 | `DELETE` | `/services/{id}` | `serviceHandler.Delete` | Delete a service instance |
 | `POST` | `/services/{id}/restart` | `serviceHandler.Restart` | Restart a service instance |
+| `POST` | `/services/{id}/update` | `serviceHandler.UpdateImage` | Pull the image again and recreate the container (same config and volumes) |
 
 !!! note "Route Disambiguation"
     The `{id}` parameter for service instances uses a UUID regex pattern (`[a-f0-9-]{36}`) to disambiguate from `{template}` string routes.
