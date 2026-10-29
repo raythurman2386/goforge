@@ -17,7 +17,7 @@ func hasPendingInstance(instances []*models.ServiceInstance) bool {
 }
 
 templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceInstance, csrfToken string) {
-	@layouts.AppLayout("Services", csrfToken, nil) {
+	@layouts.AppLayout("Services", csrfToken) {
 		<div class="mb-12">
 			<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">Your Services</h2>
 			<p class="mt-2 text-sm text-gray-500">Currently active and pending instances.</p>

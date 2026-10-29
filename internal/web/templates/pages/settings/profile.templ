@@ -12,7 +12,7 @@ import (
 // Profile renders the profile page. backups is nil for non-admins, which
 // hides the Backups card.
 templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
-	@layouts.AppLayout("Profile Settings", csrfToken, nil) {
+	@layouts.AppLayout("Profile Settings", csrfToken) {
 		<div class="max-w-2xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">
@@ -26,7 +26,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 			<!-- Profile Information -->
 			<div class="card mb-8">
 				<h3 class="text-lg font-medium text-gray-900 mb-4">Account Information</h3>
-				<form hx-put="/settings/profile" hx-swap="none">
+				<form hx-put="/settings/profile" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 					<input type="hidden" name="csrf_token" value={ csrfToken } />
 					
 					<div class="mb-4">
@@ -59,6 +59,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 					<div class="flex justify-end">
 						<button type="submit" class="btn-primary">
 							Save Changes
+							@components.Spinner()
 						</button>
 					</div>
 				</form>
@@ -68,7 +69,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 			if !user.IsGitHubUser() {
 				<div class="card mb-8">
 					<h3 class="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
-					<form hx-put="/settings/password" hx-swap="none">
+					<form hx-put="/settings/password" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 						<input type="hidden" name="csrf_token" value={ csrfToken } />
 						
 						<div class="mb-4">
@@ -89,6 +90,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 						<div class="flex justify-end">
 							<button type="submit" class="btn-primary">
 								Update Password
+								@components.Spinner()
 							</button>
 						</div>
 					</form>
@@ -224,7 +226,7 @@ script copyToken(token string) {
 
 templ AddAPITokenModal(csrfToken string) {
 	@components.Modal("Generate API Token") {
-		<form hx-post="/settings/tokens" hx-target="#modal" hx-swap="outerHTML">
+		<form hx-post="/settings/tokens" hx-target="#modal" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			
 			@components.Input("Token Name", "name", "text", "", true)

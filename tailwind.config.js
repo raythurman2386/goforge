@@ -4,6 +4,7 @@ module.exports = {
     "./internal/web/templates/**/*.templ",
     "./internal/web/templates/**/*_templ.go",
     "./internal/web/handlers/**/*.go",
+    "./static/js/app.js",
   ],
   theme: {
     extend: {

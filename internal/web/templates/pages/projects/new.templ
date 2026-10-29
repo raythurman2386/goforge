@@ -7,7 +7,7 @@ import (
 )
 
 templ New(sources []*models.GitSource, serviceInstances []*models.ServiceInstance, csrfToken string) {
-	@layouts.AppLayout("New Project", csrfToken, nil) {
+	@layouts.AppLayout("New Project", csrfToken) {
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">

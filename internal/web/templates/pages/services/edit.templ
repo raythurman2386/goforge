@@ -20,7 +20,7 @@ func configValue(config map[string]interface{}, key string, fallback interface{}
 }
 
 templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, config map[string]interface{}, csrfToken string) {
-	@layouts.AppLayout("Edit "+instance.Name, csrfToken, nil) {
+	@layouts.AppLayout("Edit "+instance.Name, csrfToken) {
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">

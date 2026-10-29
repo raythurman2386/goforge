@@ -75,7 +75,8 @@
 }
 
 /* HTMX loading indicator */
-.htmx-request .htmx-indicator {
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
   @apply opacity-100;
 }
 

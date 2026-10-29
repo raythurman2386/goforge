@@ -1,23 +1,26 @@
 package components
 
+// Toast renders a notification into the #toast live region in layouts.Base.
+// It swaps with innerHTML so the region itself stays in the page for the next
+// toast; static/js/app.js dismisses each toast after a few seconds.
 templ Toast(message string, level string) {
-	<div id="toast" hx-swap-oob="true" class="fixed bottom-5 right-5 z-50">
-		<div class={ "rounded-md p-4 shadow-lg flex items-center space-x-3 ", 
+	<div id="toast" hx-swap-oob="innerHTML">
+		<div
+			data-toast
+			if level == "error" {
+				role="alert"
+			}
+			class={ "rounded-md p-4 shadow-lg flex items-center space-x-3 ",
 			templ.KV("bg-green-500 text-white", level == "success"),
 			templ.KV("bg-red-500 text-white", level == "error"),
-			templ.KV("bg-blue-500 text-white", level == "info") }>
+			templ.KV("bg-blue-500 text-white", level == "info") }
+		>
 			<span>{ message }</span>
-			<button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<button type="button" aria-label="Dismiss" onclick="this.closest('[data-toast]').remove()" class="text-white hover:text-gray-200">
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
 				</svg>
 			</button>
 		</div>
-		<script>
-			setTimeout(() => {
-				const toast = document.getElementById('toast');
-				if (toast) toast.remove();
-			}, 5000);
-		</script>
 	</div>
 }

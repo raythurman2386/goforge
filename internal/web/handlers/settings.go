@@ -84,7 +84,7 @@ func (h *SettingsHandler) NewGitSourceModal(w http.ResponseWriter, r *http.Reque
 
 	// For direct access, wrap in AppLayout
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	layout := layouts.AppLayout("Add Git Source", csrfToken, nil)
+	layout := layouts.AppLayout("Add Git Source", csrfToken)
 	if err := layout.Render(templ.WithChildren(r.Context(), component), w); err != nil {
 		http.Error(w, "failed to render page", http.StatusInternalServerError)
 	}
@@ -372,7 +372,7 @@ func (h *SettingsHandler) NewAPITokenModal(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	layout := layouts.AppLayout("Generate API Token", csrfToken, nil)
+	layout := layouts.AppLayout("Generate API Token", csrfToken)
 	if err := layout.Render(templ.WithChildren(r.Context(), component), w); err != nil {
 		http.Error(w, "failed to render page", http.StatusInternalServerError)
 	}

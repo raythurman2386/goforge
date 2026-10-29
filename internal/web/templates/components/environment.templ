@@ -43,7 +43,7 @@ templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentE
 
 templ CreateEnvironmentModal(projectID string, csrfToken string) {
 	@Modal("Create New Environment") {
-		<form hx-post={ "/projects/" + projectID + "/envs" } hx-swap="none">
+		<form hx-post={ "/projects/" + projectID + "/envs" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			@Input("Environment Name", "name", "text", "", true)
 			<p class="text-xs text-gray-500 mb-4">Examples: staging, qa, feature-x</p>

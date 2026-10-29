@@ -10,7 +10,7 @@ import (
 )
 
 templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, maskedConn map[string]map[string]string, activeTab string, csrfToken string) {
-	@layouts.AppLayout(project.Name, csrfToken, nil) {
+	@layouts.AppLayout(project.Name, csrfToken) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center space-x-4">
@@ -26,11 +26,12 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 			</div>
 			<div class="mt-4 flex md:mt-0 md:ml-4">
 				if currentEnv != nil {
-					<button hx-post={ "/projects/" + project.ID + "/deployments?env_id=" + currentEnv.ID } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="btn-primary">
+					<button hx-post={ "/projects/" + project.ID + "/deployments?env_id=" + currentEnv.ID } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-disabled-elt="this" hx-indicator="find .htmx-indicator" class="btn-primary">
 						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
 						</svg>
 						Deploy Now
+						@components.Spinner()
 					</button>
 				}
 			</div>
@@ -420,10 +421,10 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 					<p class="mt-1 text-sm text-gray-500">Link a running service instance to this project.</p>
 				</div>
 				<div class="p-6">
-					<form hx-post={ "/projects/" + project.ID + "/services" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="flex items-end space-x-4">
+					<form hx-post={ "/projects/" + project.ID + "/services" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator" class="flex items-end space-x-4">
 						<div class="flex-1">
 							<label for="service_instance_id" class="block text-sm font-medium text-gray-700 mb-1">Service</label>
-							<select name="service_instance_id" id="service_instance_id" class="input-text text-sm" required>
+							<select name="service_instance_id" id="service_instance_id" class="select" required>
 								<option value="">Select a service...</option>
 								for _, svc := range availableServices {
 									<option value={ svc.ID }>{ svc.Name } ({ svc.TemplateName })</option>
@@ -436,6 +437,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101"></path>
 							</svg>
 							Attach
+							@components.Spinner()
 						</button>
 					</form>
 				</div>
@@ -469,7 +471,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 		<div class="card mb-8">
 			<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6">Configuration</h3>
 			
-			<form hx-put={ "/projects/" + project.ID + "/settings" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-swap="none">
+			<form hx-put={ "/projects/" + project.ID + "/settings" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 				<input type="hidden" name="env_id" value={ currentEnv.ID } />
 				
 				<div class="space-y-8 divide-y divide-gray-100">
@@ -485,7 +487,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 							<div class="mt-1">
 								<input type="text" name="custom_domain" id="custom_domain" 
 									value={ project.CustomDomain.String }
-									class="input-text text-sm" 
+									class="input" 
 									placeholder="example.com" />
 							</div>
 						</div>
@@ -508,7 +510,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 							<div class="mt-1">
 								<input type="text" name="domain" id="domain" 
 									value={ currentEnv.Domain.String }
-									class="input-text text-sm" 
+									class="input" 
 									placeholder="env.example.com" />
 							</div>
 							<p class="mt-1 text-xs text-gray-500">
@@ -521,7 +523,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 							<div class="mt-1">
 								<input type="number" name="port" id="port" 
 									value={ getPort(currentEnv) }
-									class="input-text text-sm" 
+									class="input" 
 									placeholder="80" />
 							</div>
 							<p class="mt-1 text-xs text-gray-500">
@@ -534,7 +536,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 							<div class="mt-1">
 								<input type="text" name="branch" id="branch" 
 									value={ currentEnv.Branch.String }
-									class="input-text text-sm" 
+									class="input" 
 									placeholder={ project.DefaultBranch } />
 							</div>
 							<p class="mt-1 text-xs text-gray-500">
@@ -546,7 +548,10 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 							<div class="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
 								Changes to port require redeployment.
 							</div>
-							<button type="submit" class="btn-primary">Save Changes</button>
+							<button type="submit" class="btn-primary">
+								Save Changes
+								@components.Spinner()
+							</button>
 						</div>
 					</div>
 				</div>

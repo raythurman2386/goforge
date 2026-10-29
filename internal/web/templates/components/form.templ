@@ -30,6 +30,7 @@ templ Button(text string, variant string) {
 			templ.KV("btn-danger", variant == "danger") }
 	>
 		{ text }
+		@Spinner()
 	</button>
 }
 

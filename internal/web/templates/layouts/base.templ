@@ -3,7 +3,6 @@ package layouts
 import (
 	"fmt"
 
-	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 )
 
@@ -17,6 +16,7 @@ templ Base(title, csrfToken string) {
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script src="/static/js/htmx.min.js"></script>
 			<script src="/static/js/htmx-sse.js"></script>
+			<script src="/static/js/app.js"></script>
 		</head>
 		<body class="min-h-screen bg-gray-50"
 			if csrfToken != "" {
@@ -24,6 +24,8 @@ templ Base(title, csrfToken string) {
 			}
 		>
 			{ children... }
+			<!-- Toast live region: server toasts swap in via hx-swap-oob, client toasts via app.js -->
+			<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-50 flex flex-col items-end space-y-2"></div>
 		</body>
 	</html>
 }
@@ -38,7 +40,7 @@ templ AuthLayout(title, csrfToken string) {
 	}
 }
 
-templ AppLayout(title, csrfToken string, projects []*models.Project) {
+templ AppLayout(title, csrfToken string) {
 	@Base(title, csrfToken) {
 		<div class="min-h-screen flex flex-col md:flex-row bg-gray-50/50 relative">
 			<!-- Mobile Header -->
@@ -53,7 +55,7 @@ templ AppLayout(title, csrfToken string, projects []*models.Project) {
 			<!-- Overlay -->
 			<div id="sidebar-overlay" aria-hidden="true" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-30 hidden transition-opacity duration-300 opacity-0 md:hidden"></div>
 
-			@components.Sidebar(projects)
+			@components.Sidebar(csrfToken)
 
 			<!-- Main content -->
 			<main class="flex-1 overflow-auto">

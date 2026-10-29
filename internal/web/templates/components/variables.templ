@@ -17,9 +17,12 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 						hx-post={ "/projects/" + projectID + "/envs/" + envID + "/variables/sync" }
 						hx-swap="none"
 						hx-headers={ `{"X-CSRF-Token": "` + csrfToken + `"}` }
+						hx-disabled-elt="this"
+						hx-indicator="find .htmx-indicator"
 						class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
 					>
 						Sync from repo
+						@Spinner()
 					</button>
 				}
 				<button hx-get={ "/envs/" + envID + "/variables/new" } hx-target="body" hx-swap="beforeend" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200">
@@ -68,7 +71,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 
 templ AddVariableModal(envID string, csrfToken string) {
 	@Modal("Add Environment Variable") {
-		<form hx-post={ "/envs/" + envID + "/variables" } hx-swap="none">
+		<form hx-post={ "/envs/" + envID + "/variables" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			@Input("Key", "key", "text", "", true)
 			@Input("Value", "value", "text", "", true)
