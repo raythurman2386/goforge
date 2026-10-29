@@ -26,10 +26,11 @@ default_version: "16"     # Default version if not specified
 config:                   # Configuration fields shown to the user
   - name: string          # Field identifier
     label: string         # Display label
-    type: string          # Field type: "text", "password", "number"
+    type: string          # Field type: "text" (default), "password", "number", "bool", "select"
     default: string       # Default value (optional)
     required: boolean     # Whether field is required
     generate: boolean     # Auto-generate value (for passwords)
+    options: [string]     # Allowed values (select only, required for select)
 
 # Resource Limits
 resources:
@@ -57,6 +58,36 @@ docker:
 connection:
   internal: string        # Internal connection string template
 ```
+
+### Field types
+
+| Type | Form control | Value in `{{ .Config.<name> }}` |
+|------|--------------|----------------------------------|
+| `text` | Text input. Also used when `type` is empty | As entered |
+| `password` | Password input. With `generate: true`, a blank field gets a server-generated password | As entered or generated, stored encrypted |
+| `number` | Number input | As entered |
+| `bool` | Checkbox. `default: true` starts it checked | Always `true` or `false` |
+| `select` | Drop-down of `options`. An optional select also offers a blank choice | One of `options`, or, for an optional field left blank, the field's `default` if one is set (empty only when there is no default) |
+
+Use `bool` for on/off settings instead of a `text` field with a `"true" or "false"` hint, and `select` for a fixed set of values:
+
+```yaml
+config:
+  - name: signups_allowed
+    label: Allow Signups
+    type: bool
+    default: true
+  - name: log_level
+    label: Log Level
+    type: select
+    options: [info, debug, warn]
+    default: info
+    required: true
+```
+
+GoForge checks `bool` and `select` values on the server when you deploy a service and when you save **Edit configuration**, before any container is created or recreated. A `bool` accepts `true`/`false` (also `True`, `TRUE`, `1`/`0`, `t`/`f`) and is stored as `true` or `false`. A `select` value must match one of `options` exactly. Any other value is rejected with a `400` that names the field, for example `Allow Signups must be true or false, got "ture"`. A missing value takes the field's `default` (`false` for a `bool` without one).
+
+A template is skipped at load, with an error in the log, if a `select` field has no `options`, a `select` default is not in `options`, or a `bool` default is not true or false.
 
 ---
 
@@ -190,7 +221,7 @@ REDIS_PASSWORD: "{{ .Config.password }}"
 
 | Field | Type | Default | Required | Description |
 |-------|------|---------|----------|-------------|
-| `signups_allowed` | text | `true` | Yes | `SIGNUPS_ALLOWED` at first start. Turn signups off later in `/admin` |
+| `signups_allowed` | bool | `true` | Yes | `SIGNUPS_ALLOWED` at first start. Turn signups off later in `/admin` |
 | `admin_token` | password | (generated, 48 chars) | Yes | `ADMIN_TOKEN` for `/admin` |
 
 **Environment variables**:
@@ -234,8 +265,8 @@ WebSocket notifications are served on the main port by Vaultwarden 1.29 and late
 | Field | Type | Default | Required | Description |
 |-------|------|---------|----------|-------------|
 | `app_name` | text | `Gitea: Git with a cup of tea` | Yes | `APP_NAME` |
-| `disable_registration` | text | `true` | Yes | `[service] DISABLE_REGISTRATION`, `true` or `false` |
-| `require_signin_view` | text | `true` | Yes | `[service] REQUIRE_SIGNIN_VIEW`, `true` or `false` |
+| `disable_registration` | bool | `true` | Yes | `[service] DISABLE_REGISTRATION` |
+| `require_signin_view` | bool | `true` | Yes | `[service] REQUIRE_SIGNIN_VIEW` |
 
 **Environment variables**:
 

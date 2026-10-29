@@ -11,9 +11,9 @@ default_version: "latest"
 
 config:
   - name: signups_allowed
-    label: Allow Signups ("true" or "false")
-    type: text
-    default: "true"
+    label: Allow Signups
+    type: bool
+    default: true
     required: true
   - name: admin_token
     label: Admin Panel Token (/admin)

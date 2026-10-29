@@ -74,3 +74,58 @@ func TestServiceHandler_Configure_DomainDefaults(t *testing.T) {
 		}
 	})
 }
+
+func TestServiceHandler_Configure_RendersBoolAndSelect(t *testing.T) {
+	dir := t.TempDir()
+	tmpl := `name: gitea
+display_name: Gitea
+config:
+  - name: disable_registration
+    label: Disable Registration
+    type: bool
+    default: true
+  - name: require_signin_view
+    label: Require Sign-in
+    type: bool
+  - name: log_level
+    label: Log Level
+    type: select
+    options: [info, debug]
+    default: debug
+    required: true
+docker:
+  image: gitea/gitea:latest
+`
+	if err := os.WriteFile(filepath.Join(dir, "gitea.yaml"), []byte(tmpl), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	catalog := services.NewCatalog(dir)
+	if err := catalog.LoadTemplates(); err != nil {
+		t.Fatal(err)
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := NewServiceHandler(catalog, services.NewInstanceService(nil, nil, nil, catalog, "goforge_net", false, logger), logger)
+
+	req := httptest.NewRequest(http.MethodGet, "/services/gitea/configure", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("template", "gitea")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rr := httptest.NewRecorder()
+	h.Configure(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	body := rr.Body.String()
+	for _, want := range []string{
+		`id="disable_registration" name="disable_registration" type="checkbox" value="true" checked`,
+		`<input type="hidden" name="disable_registration" value="false">`,
+		`id="require_signin_view" name="require_signin_view" type="checkbox" value="true" class=`,
+		`<select id="log_level" name="log_level" required`,
+		`<option value="debug" selected>debug</option>`,
+		`<option value="info">info</option>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("configure page missing %q", want)
+		}
+	}
+}

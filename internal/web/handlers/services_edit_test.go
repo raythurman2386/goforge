@@ -82,8 +82,13 @@ default_version: "latest"
 config:
   - name: signups_allowed
     label: Allow Signups
-    type: text
-    default: "true"
+    type: bool
+    default: true
+  - name: log_level
+    label: Log Level
+    type: select
+    options: [info, debug]
+    default: info
   - name: admin_token
     label: Admin Token
     type: password
@@ -213,5 +218,121 @@ func TestServiceHandler_UpdateConfig(t *testing.T) {
 				t.Error("csrf_token saved into config")
 			}
 		})
+	}
+}
+
+func TestServiceHandler_EditConfig_RendersBoolAndSelect(t *testing.T) {
+	h, repo := newEditHandler(t, models.ServiceStatusRunning)
+	repo.mu.Lock()
+	cfg, _ := json.Marshal(map[string]interface{}{
+		"name": "vw", "domain": "vw.example.com", "signups_allowed": "false", "log_level": "debug", "admin_token": "keep-me",
+	})
+	repo.inst.Config = cfg
+	repo.mu.Unlock()
+
+	rr := httptest.NewRecorder()
+	h.EditConfig(rr, editRequest(http.MethodGet, "owner", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	body := rr.Body.String()
+	for _, want := range []string{
+		`id="signups_allowed" name="signups_allowed" type="checkbox" value="true" class=`,
+		`<input type="hidden" name="signups_allowed" value="false">`,
+		`<select id="log_level" name="log_level"`,
+		`<option value="debug" selected>debug</option>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("edit page missing %q", want)
+		}
+	}
+	if strings.Contains(body, `type="checkbox" value="true" checked`) {
+		t.Error("stored false rendered as checked")
+	}
+}
+
+func TestServiceHandler_UpdateConfig_CheckboxValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []string
+		wantCode int
+		want     string
+	}{
+		{"checked sends true then hidden false", []string{"true", "false"}, http.StatusSeeOther, "true"},
+		{"unchecked sends hidden false", []string{"false"}, http.StatusSeeOther, "false"},
+		{"typo rejected", []string{"ture"}, http.StatusBadRequest, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, repo := newEditHandler(t, models.ServiceStatusRunning)
+			form := url.Values{
+				"name":            {"vw"},
+				"domain":          {"vw.example.com"},
+				"signups_allowed": tt.values,
+				"log_level":       {"info"},
+			}
+			rr := httptest.NewRecorder()
+			h.UpdateConfig(rr, editRequest(http.MethodPost, "owner", form))
+			if rr.Code != tt.wantCode {
+				t.Fatalf("status = %d, want %d; body=%s", rr.Code, tt.wantCode, rr.Body.String())
+			}
+			repo.mu.Lock()
+			defer repo.mu.Unlock()
+			if tt.want == "" {
+				if len(repo.saw) != 0 {
+					t.Error("invalid edit was saved")
+				}
+				if !strings.Contains(rr.Body.String(), "Allow Signups must be true or false") {
+					t.Error("error page does not explain the bad value")
+				}
+				return
+			}
+			var cfg map[string]interface{}
+			if err := json.Unmarshal(repo.saw[0].Config, &cfg); err != nil {
+				t.Fatal(err)
+			}
+			if cfg["signups_allowed"] != tt.want {
+				t.Errorf("signups_allowed = %v, want %s", cfg["signups_allowed"], tt.want)
+			}
+		})
+	}
+}
+
+func TestServiceHandler_UpdateConfig_RejectsUnknownSelectOption(t *testing.T) {
+	h, repo := newEditHandler(t, models.ServiceStatusRunning)
+	form := url.Values{"name": {"vw"}, "domain": {"vw.example.com"}, "signups_allowed": {"true"}, "log_level": {"trace"}}
+	rr := httptest.NewRecorder()
+	h.UpdateConfig(rr, editRequest(http.MethodPost, "owner", form))
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rr.Code)
+	}
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	if len(repo.saw) != 0 {
+		t.Error("invalid select value was saved")
+	}
+}
+
+func TestServiceHandler_Deploy_RejectsInvalidBool(t *testing.T) {
+	h, repo := newEditHandler(t, models.ServiceStatusRunning)
+	form := url.Values{"name": {"vw2"}, "domain": {"vw2.example.com"}, "signups_allowed": {"yes please"}}
+	req := httptest.NewRequest(http.MethodPost, "/services/vaultwarden", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("template", "vaultwarden")
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	ctx = context.WithValue(ctx, auth.UserContextKey, &models.User{ID: "owner"})
+	rr := httptest.NewRecorder()
+	h.Deploy(rr, req.WithContext(ctx))
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "Allow Signups must be true or false") {
+		t.Error("error page does not explain the bad value")
+	}
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	if len(repo.saw) != 0 {
+		t.Error("instance touched by rejected deploy")
 	}
 }

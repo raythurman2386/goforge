@@ -18,6 +18,14 @@ func domainPlaceholder(templateName string, cloudflareProxyMode bool) string {
 	return templateName + ".localhost"
 }
 
+// defaultValue renders a field default, or "" when there is none.
+func defaultValue(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", v)
+}
+
 templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProxyMode bool) {
 	@layouts.AppLayout("Configure " + tmpl.DisplayName, csrfToken, nil) {
 		<div class="max-w-3xl mx-auto">
@@ -69,6 +77,10 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 						if field.Type == "password" && field.Generate {
 							@components.Input(field.Label, field.Name, "password", "", false)
 							<p class="mt-[-1rem] mb-4 text-xs text-gray-500">Leave blank and GoForge generates a password. It is stored encrypted.</p>
+						} else if field.Type == services.FieldTypeBool {
+							@components.Checkbox(field.Label, field.Name, field.BoolDefault())
+						} else if field.Type == services.FieldTypeSelect {
+							@components.ConfigSelect(field.Label, field.Name, field.Options, defaultValue(field.Default), field.Required)
 						} else if field.Type == "number" {
 							@components.Input(field.Label, field.Name, "number", fmt.Sprintf("%v", field.Default), field.Required)
 						} else {

@@ -116,6 +116,10 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	if genErr := fillGeneratedConfig(tmpl, config); genErr != nil {
 		return nil, genErr
 	}
+	// Reject a bad bool or select value before any record or container exists.
+	if cfgErr := normalizeConfig(tmpl, config); cfgErr != nil {
+		return nil, cfgErr
+	}
 
 	configJSON, err := json.Marshal(config)
 	if err != nil {
@@ -348,6 +352,10 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 	config := mergeEditedConfig(tmpl, current, updates)
 	if genErr := fillGeneratedConfig(tmpl, config); genErr != nil {
 		return nil, genErr
+	}
+	// Reject a bad bool or select value while the running container is untouched.
+	if cfgErr := normalizeConfig(tmpl, config); cfgErr != nil {
+		return nil, cfgErr
 	}
 
 	name, ok := config["name"].(string)

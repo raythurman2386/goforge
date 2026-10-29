@@ -53,6 +53,10 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 						if field.Type == "password" {
 							@components.Input(field.Label, field.Name, "password", "", false)
 							<p class="mt-[-1rem] mb-4 text-xs text-gray-500">Leave blank to keep the current value.</p>
+						} else if field.Type == services.FieldTypeBool {
+							@components.Checkbox(field.Label, field.Name, services.IsTrue(configValue(config, field.Name, field.Default)))
+						} else if field.Type == services.FieldTypeSelect {
+							@components.ConfigSelect(field.Label, field.Name, field.Options, configValue(config, field.Name, field.Default), field.Required)
 						} else if field.Type == "number" {
 							@components.Input(field.Label, field.Name, "number", configValue(config, field.Name, field.Default), field.Required)
 						} else {
