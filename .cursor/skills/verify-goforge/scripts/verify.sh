@@ -5,13 +5,32 @@ umask 077
 
 PROJECT=goforge-verify
 BASE=http://127.0.0.1:8080
-STATE_DIR=/tmp/goforge-verify
+VERIFY_DIR=/tmp/goforge-verify
+STATE_DIR="$VERIFY_DIR/state"
 ROOT=$(git rev-parse --show-toplevel)
-EVIDENCE="$ROOT/artifacts/verify-goforge-proof"
-BUSY_PORTS=(80 443 5432 8080 8081)
+# Evidence lives outside the repo so proofs are never committed.
+EVIDENCE="${GOFORGE_VERIFY_PROOF:-$VERIFY_DIR/proof}"
+# Canonicalize before the inside-repo check so relative and /tmp/../repo paths cannot bypass it.
+EVIDENCE=$(realpath -m "$EVIDENCE")
+# Compose publishes the app on 127.0.0.1:8080 and Traefik on 80, 443, and 8081.
+# Postgres is not published on the host.
+BUSY_PORTS=(80 443 8080 8081)
+# Set GOFORGE_VERIFY_DOCKER="sudo -n docker" when the user is not in the docker group.
+read -r -a DOCKER <<<"${GOFORGE_VERIFY_DOCKER:-docker}"
+ADMIN_EMAIL="${GOFORGE_VERIFY_ADMIN_EMAIL:-verify-admin@example.test}"
+# Registered with different case to prove GOFORGE_ADMIN_EMAIL matching ignores case.
+REGISTER_EMAIL="${GOFORGE_VERIFY_REGISTER_EMAIL:-Verify-Admin@Example.Test}"
+ENABLE_REGISTRATION="${GOFORGE_VERIFY_ENABLE_REGISTRATION:-false}"
+
+case "$EVIDENCE" in
+  "$ROOT"|"$ROOT"/*)
+    echo "refusing: evidence directory $EVIDENCE is inside the repo. Keep proofs under $VERIFY_DIR/proof." >&2
+    exit 1
+    ;;
+esac
 
 usage() {
-  echo "usage: verify.sh launch|doctor|drive-register|psql|check-sealed|cleanup" >&2
+  echo "usage: verify.sh launch|doctor|drive-register|drive-login|psql|check-sealed|cleanup" >&2
   exit 1
 }
 
@@ -23,7 +42,7 @@ need_cmd() {
 }
 
 compose() {
-  docker compose --env-file "$STATE_DIR/stack.env" -p "$PROJECT" "$@"
+  "${DOCKER[@]}" compose -f "$ROOT/docker-compose.yml" --project-directory "$ROOT" --env-file "$STATE_DIR/stack.env" -p "$PROJECT" "$@"
 }
 
 redact_file() {
@@ -34,7 +53,7 @@ import pathlib, re, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text(errors="replace")
 text = re.sub(
-    r"(?i)(encryption_key|session_secret|csrf_secret|postgres_password|database_url)\s*[:=]\s*\S+",
+    r"(?i)(encryption_key|session_secret|csrf_secret|webhook_secret|postgres_password|database_url)\s*[:=]\s*\S+",
     r"\1=[redacted]",
     text,
 )
@@ -122,19 +141,24 @@ port_busy() {
 write_stack_env() {
   install -d -m 700 "$STATE_DIR"
   local env_file="$STATE_DIR/stack.env"
-  cat >"$env_file" <<'EOF'
-GOFORGE_DEV_MODE=true
+  local pg_password
+  pg_password=$(openssl rand -hex 24)
+  cat >"$env_file" <<EOF
+GOFORGE_DEV_MODE=false
 GOFORGE_HOST=0.0.0.0
 GOFORGE_PORT=8080
 GOFORGE_BASE_URL=http://127.0.0.1:8080
 GOFORGE_DOMAIN=localhost
-DATABASE_URL=postgres://goforge:password@db:5432/goforge?sslmode=disable
+DATABASE_URL=postgres://goforge:${pg_password}@db:5432/goforge?sslmode=disable
 POSTGRES_USER=goforge
-POSTGRES_PASSWORD=password
+POSTGRES_PASSWORD=${pg_password}
 POSTGRES_DB=goforge
-ENCRYPTION_KEY=
-SESSION_SECRET=
-CSRF_SECRET=
+ENCRYPTION_KEY=$(openssl rand -base64 32)
+SESSION_SECRET=$(openssl rand -base64 32)
+CSRF_SECRET=$(openssl rand -base64 32)
+WEBHOOK_SECRET=$(openssl rand -base64 32)
+GOFORGE_ENABLE_REGISTRATION=${ENABLE_REGISTRATION}
+GOFORGE_ADMIN_EMAIL=${ADMIN_EMAIL}
 DOCKER_HOST=unix:///var/run/docker.sock
 TRAEFIK_NETWORK=traefik
 ACME_EMAIL=admin@example.com
@@ -161,6 +185,7 @@ cmd_launch() {
   need_cmd python3
   need_cmd curl
   need_cmd ss
+  need_cmd openssl
   install -d -m 755 "$EVIDENCE"
   git -C "$ROOT" rev-parse HEAD >"$EVIDENCE/revision.txt"
   chmod 644 "$EVIDENCE/revision.txt"
@@ -168,13 +193,13 @@ cmd_launch() {
   if [[ -f "$ROOT/.env" ]]; then
     refuse "refusing launch: $ROOT/.env exists. This run does not read or modify it."
   fi
-  if ! docker info >/dev/null 2>&1; then
-    refuse "refusing launch: docker info failed."
+  if ! "${DOCKER[@]}" info >/dev/null 2>&1; then
+    refuse "refusing launch: ${DOCKER[*]} info failed. Set GOFORGE_VERIFY_DOCKER=\"sudo -n docker\" if the socket needs root."
   fi
-  if ! docker compose version >/dev/null 2>&1; then
+  if ! "${DOCKER[@]}" compose version >/dev/null 2>&1; then
     refuse "refusing launch: docker compose is not available."
   fi
-  if docker compose -p "$PROJECT" ps -q 2>/dev/null | grep -q .; then
+  if "${DOCKER[@]}" compose -p "$PROJECT" ps -q 2>/dev/null | grep -q .; then
     refuse "refusing launch: project $PROJECT already has containers."
   fi
   local port
@@ -183,12 +208,13 @@ cmd_launch() {
       refuse "refusing launch: port $port is already listening. This compose file publishes fixed ports, so only one stack can run."
     fi
   done
-  if docker network inspect traefik >/dev/null 2>&1; then
+  if "${DOCKER[@]}" network inspect traefik >/dev/null 2>&1; then
     refuse "refusing launch: docker network traefik already exists."
   fi
 
   write_stack_env
-  if ! compose up -d --build 2>&1 | tee "$EVIDENCE/launch.log"; then
+  rm -f "$EVIDENCE/BLOCKED.txt"
+  if ! (cd "$ROOT" && compose up -d --build) 2>&1 | tee "$EVIDENCE/launch.log"; then
     fail_launch "compose up failed"
   fi
   redact_file "$EVIDENCE/launch.log"
@@ -239,7 +265,7 @@ cmd_doctor() {
   local report="$EVIDENCE/doctor.txt"
   local container="missing" health_code="000" ready_code="000"
   local database="missing" docker_check="missing" app_port="missing" db_port="missing"
-  local drive_auth=no drive_docker=no
+  local app_loopback=no drive_auth=no drive_docker=no
 
   if [[ -f "$STATE_DIR/stack.env" ]]; then
     container=$(compose ps -q goforge || true)
@@ -279,7 +305,14 @@ PY
     redact_file "$EVIDENCE/ready.json"
   fi
 
-  if [[ "$container" == "running" && "$health_code" == "200" && "$database" == "ok" ]]; then
+  case "${app_port:-}" in
+    127.0.0.1:*) app_loopback=yes ;;
+  esac
+  case "${db_port:-}" in
+    ""|":0"|"missing") db_port="unpublished" ;;
+  esac
+
+  if [[ "$container" == "running" && "$health_code" == "200" && "$database" == "ok" && "$app_loopback" == "yes" ]]; then
     drive_auth=yes
   fi
   if [[ "$drive_auth" == "yes" && "$docker_check" == "ok" ]]; then
@@ -294,6 +327,7 @@ ready_code=$ready_code
 database=$database
 docker=$docker_check
 app_port=${app_port:-missing}
+app_loopback=$app_loopback
 db_port=${db_port:-missing}
 drive_auth=$drive_auth
 drive_docker=$drive_docker
@@ -316,8 +350,9 @@ cmd_drive_register() {
   local dash="$STATE_DIR/dashboard.html"
   local again="$STATE_DIR/register-again.html"
   local verdict="$EVIDENCE/register-verdict.txt"
-  local email="verify-admin@example.test"
-  local open=fail submit=fail closed=fail harness=ok
+  local email="$REGISTER_EMAIL"
+  local open=fail submit=fail closed=fail admin=fail closed_post=fail harness=ok
+  local role stored_email post_again_status
   local page_status post_status location dash_status again_status users_count heading again_heading session_cookie
 
   users_count=$(db_psql "select count(*) from users;" | tr -d '[:space:]')
@@ -384,11 +419,35 @@ EOF
     closed=pass
   fi
 
+  # A second account POST from a fresh jar must also be refused.
+  local jar_b="$STATE_DIR/jar-other.txt"
+  curl -sS -c "$jar_b" -o /dev/null "$BASE/login" || true
+  local csrf_b
+  csrf_b=$(csrf_from_jar "$jar_b")
+  post_again_status=$(curl -sS -c "$jar_b" -b "$jar_b" -o /dev/null -w '%{http_code}' \
+    -X POST "$BASE/auth/register" \
+    --data-urlencode "csrf_token=$csrf_b" \
+    --data-urlencode "email=verify-other@example.test" \
+    --data-urlencode "password@$STATE_DIR/register.password" \
+    --data-urlencode "confirm_password@$STATE_DIR/register.password" || true)
+  if [[ "$post_again_status" == "403" ]]; then
+    closed_post=pass
+  fi
+  rm -f "$jar_b"
+
+  stored_email=$(db_psql "select email from users;" | tr -d '[:space:]')
+  role=$(db_psql "select role from users;" | tr -d '[:space:]')
+  if [[ "$role" == "admin" ]]; then
+    admin=pass
+  fi
+
   cat >"$verdict" <<EOF
 harness=$harness
 register-open=$open
 register-submit=$submit
 register-closed=$closed
+register-closed-post=$closed_post
+register-admin-role=$admin
 register-page-status=$page_status
 register-post-status=$post_status
 register-post-location=$location
@@ -398,15 +457,104 @@ dashboard-heading=$heading
 users-count=$users_count
 register-again-status=$again_status
 register-again-heading=$again_heading
+register-other-post-status=$post_again_status
+users-count-after=$(db_psql "select count(*) from users;" | tr -d '[:space:]')
 fixture-email=$email
+admin-email-env=$ADMIN_EMAIL
+stored-email=$stored_email
+stored-role=$role
 EOF
-  if [[ "$closed" != "pass" ]]; then
-    cat >>"$verdict" <<'EOF'
-register-closed-reason=GET /auth/register stayed open after the first user. This tree checks GOFORGE_ENABLE_REGISTRATION, which defaults to true, and does not close registration from the users count.
-EOF
+  if [[ "$closed" != "pass" || "$closed_post" != "pass" ]]; then
+    echo "register-closed-reason=registration stayed open after the first user with GOFORGE_ENABLE_REGISTRATION=$ENABLE_REGISTRATION" >>"$verdict"
   fi
   chmod 644 "$verdict"
   rm -f "$page" "$dash" "$again" "$headers"
+  cat "$verdict"
+  if [[ "$harness" != "ok" ]]; then
+    exit 2
+  fi
+}
+
+cmd_drive_login() {
+  need_cmd curl
+  need_cmd python3
+  install -d -m 755 "$EVIDENCE"
+  if [[ ! -f "$STATE_DIR/register.password" ]]; then
+    echo "missing $STATE_DIR/register.password. Run drive-register first." >&2
+    exit 1
+  fi
+  local jar="$STATE_DIR/jar-login.txt"
+  local headers="$STATE_DIR/login.headers"
+  local page="$STATE_DIR/login.html"
+  local verdict="$EVIDENCE/login-verdict.txt"
+  local email
+  email=$(printf '%s' "$ADMIN_EMAIL" | tr '[:upper:]' '[:lower:]')
+  local login=fail list=fail create=fail listed=fail harness=ok
+  local login_page_status login_status location dash_status list_status list_heading create_status create_location detail_status listed_name
+
+  rm -f "$jar"
+  login_page_status=$(curl -sS -c "$jar" -o "$page" -w '%{http_code}' "$BASE/login" || true)
+  local csrf
+  csrf=$(csrf_from_jar "$jar")
+  login_status=$(curl -sS -c "$jar" -b "$jar" -D "$headers" -o /dev/null -w '%{http_code}' \
+    -X POST "$BASE/auth/login" \
+    --data-urlencode "csrf_token=$csrf" \
+    --data-urlencode "email=$email" \
+    --data-urlencode "password@$STATE_DIR/register.password" || true)
+  location=$(header_value "$headers" "Location")
+  dash_status=$(curl -sS -b "$jar" -c "$jar" -o /dev/null -w '%{http_code}' "$BASE/dashboard" || true)
+  if [[ "$login_status" == "303" && "$location" == */dashboard && "$dash_status" == "200" ]]; then
+    login=pass
+  fi
+
+  list_status=$(curl -sS -b "$jar" -c "$jar" -o "$page" -w '%{http_code}' "$BASE/projects" || true)
+  list_heading=$(body_has "$page" "View and manage your application projects.")
+  if [[ "$list_status" == "200" && "$list_heading" == "yes" ]]; then
+    list=pass
+  fi
+
+  csrf=$(csrf_from_jar "$jar")
+  create_status=$(curl -sS -b "$jar" -c "$jar" -D "$headers" -o /dev/null -w '%{http_code}' \
+    -X POST "$BASE/projects" \
+    --data-urlencode "csrf_token=$csrf" \
+    --data-urlencode "name=verify-smoke" \
+    --data-urlencode "repository_url=https://github.com/raythurman2386/goforge.git" \
+    --data-urlencode "default_branch=main" \
+    --data-urlencode "dockerfile_path=Dockerfile" \
+    --data-urlencode "build_context=." || true)
+  create_location=$(header_value "$headers" "Location")
+  create_location=$(printf '%s' "$create_location" | sed -E 's#^https?://[^/]+##')
+  if [[ "$create_status" == "303" && "$create_location" == /projects/* ]]; then
+    create=pass
+    detail_status=$(curl -sS -b "$jar" -c "$jar" -o /dev/null -w '%{http_code}' "$BASE$create_location" || true)
+  fi
+  curl -sS -b "$jar" -c "$jar" -o "$page" "$BASE/projects" >/dev/null || true
+  listed_name=$(body_has "$page" "verify-smoke")
+  if [[ "$listed_name" == "yes" ]]; then
+    listed=pass
+  fi
+  [[ "$login" == "pass" ]] || harness=fail
+
+  cat >"$verdict" <<EOF
+harness=$harness
+login=$login
+projects-list=$list
+project-create=$create
+project-listed=$listed
+login-page-status=$login_page_status
+login-post-status=$login_status
+login-post-location=$(printf '%s' "$location" | sed -E 's#^https?://[^/]+##')
+dashboard-status=$dash_status
+projects-status=$list_status
+projects-heading=$list_heading
+project-create-status=$create_status
+project-create-location=${create_location:-missing}
+project-detail-status=${detail_status:-missing}
+project-db-row=$(db_psql "select count(*) from projects where name = 'verify-smoke';" | tr -d '[:space:]')
+login-email=$email
+EOF
+  chmod 644 "$verdict"
+  rm -f "$page" "$headers"
   cat "$verdict"
   if [[ "$harness" != "ok" ]]; then
     exit 2
@@ -458,7 +606,7 @@ PY
 }
 
 evidence_list() {
-  find "$EVIDENCE" -type f | sort
+  find "$EVIDENCE" -type f 2>/dev/null | sort
 }
 
 cmd_cleanup() {
@@ -469,14 +617,14 @@ cmd_cleanup() {
   if [[ -f "$STATE_DIR/stack.env" ]]; then
     compose down -v --remove-orphans >"$EVIDENCE/cleanup.log" 2>&1 || true
   else
-    docker compose -p "$PROJECT" down -v --remove-orphans >"$EVIDENCE/cleanup.log" 2>&1 || true
+    "${DOCKER[@]}" compose -p "$PROJECT" down -v --remove-orphans >"$EVIDENCE/cleanup.log" 2>&1 || true
   fi
   redact_file "$EVIDENCE/cleanup.log"
-  if docker network inspect traefik >/dev/null 2>&1; then
+  if "${DOCKER[@]}" network inspect traefik >/dev/null 2>&1; then
     local attached
-    attached=$(docker network inspect traefik -f '{{len .Containers}}' 2>/dev/null || echo 1)
+    attached=$("${DOCKER[@]}" network inspect traefik -f '{{len .Containers}}' 2>/dev/null || echo 1)
     if [[ "$attached" == "0" ]]; then
-      docker network rm traefik >>"$EVIDENCE/cleanup.log" 2>&1 || true
+      "${DOCKER[@]}" network rm traefik >>"$EVIDENCE/cleanup.log" 2>&1 || true
     fi
   fi
   redact_file "$EVIDENCE/cleanup.log"
@@ -501,6 +649,7 @@ main() {
     launch) cmd_launch ;;
     doctor) cmd_doctor ;;
     drive-register) cmd_drive_register ;;
+    drive-login) cmd_drive_login ;;
     psql) shift; cmd_psql "${1:-}" ;;
     check-sealed) shift; cmd_check_sealed "${1:-}" ;;
     cleanup) cmd_cleanup ;;

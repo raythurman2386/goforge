@@ -42,15 +42,24 @@ We take security vulnerabilities seriously. If you find a security issue:
 
 ## Known Security Gaps (As of Current Version)
 
-The following security features are planned but not yet implemented:
+### Partly done
 
-- [ ] Database encryption at rest for sensitive variables
+- [ ] **Database encryption at rest.** `ENCRYPTION_KEY` encrypts these values with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, and one-click service `config` and `connection_info`. Gaps: rows written in plaintext by an older version stay plaintext until they are updated, non-secret project variables are plaintext, and there is no key rotation.
+- [ ] **Role-based access control.** Accounts have a role of `admin` or `user`. Every account is created as `user`, and only the address in `GOFORGE_ADMIN_EMAIL` becomes `admin` (matching ignores case). The admin role gates host operations such as Docker prune. Projects, deployments, and services are scoped to the owning account, and another account's project or deployment returns `404`. Gaps: no teams, invites, or per-project roles.
+- [ ] **Audit logging.** An `audit_logs` table exists and some actions, such as login, are recorded. Coverage is not complete.
+
+### Not started
+
 - [ ] Two-factor authentication (2FA)
-- [ ] Role-based access control (RBAC)
-- [ ] Comprehensive audit logging
 - [ ] API key rotation mechanism
 - [ ] Container escape prevention measures
 - [ ] Resource quota enforcement per project
+
+### Defaults that reduce exposure
+
+- Registration is closed after the first account unless `GOFORGE_ENABLE_REGISTRATION=true`.
+- `GOFORGE_DEV_MODE` defaults to `false`. Outside dev mode GoForge refuses to start without `DATABASE_URL`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET`.
+- Docker Compose publishes the app on `127.0.0.1` only. Traefik on 80 and 443 is the public entrypoint. Postgres is not published on the host.
 
 ## Security Best Practices for Deployment
 
@@ -63,7 +72,7 @@ The following security features are planned but not yet implemented:
 - [ ] Regular security updates and patches
 
 ### Recommended Hardening
-- [ ] Enable audit logging
+- [ ] Review audit log coverage (partial today)
 - [ ] Implement network segmentation
 - [ ] Use secrets management (Vault, AWS Secrets Manager, etc.)
 - [ ] Regular penetration testing
