@@ -30,16 +30,18 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       pages_artifact_id: ${{ steps.pages-artifact.outputs.artifact_id }}
+      deploy_pages: ${{ steps.check-pages.outputs.deploy_pages }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      # deploy-pages hides the Pages API errors array behind "Validation Failed".
-      # Record the site source before the deploy job. A private repository on
-      # GitHub Free is rejected later with HTTP 422 and no errors array.
+      # Private repos on GitHub Free cannot host Pages (#32). When Pages is not
+      # enabled (GET /pages → 404), skip the deploy path successfully so main
+      # pushes stay green instead of failing Check Pages site.
       - name: Check Pages site
+        id: check-pages
         if: github.event_name != 'pull_request'
         uses: actions/github-script@v9
         with:
@@ -47,19 +49,37 @@ jobs:
             const { owner, repo } = context.repo
             const repoInfo = await github.rest.repos.get({ owner, repo })
             core.info(`repository private=${repoInfo.data.private} visibility=${repoInfo.data.visibility}`)
+            const skipPrivatePages = (reason) => {
+              core.notice(
+                `Skipping GitHub Pages deploy: ${reason}. ` +
+                'Private repositories on GitHub Free cannot publish Pages (#32). ' +
+                'MkDocs still builds. Re-enable deploy by making the repo public or upgrading to Pro, then set Settings → Pages → GitHub Actions.'
+              )
+              core.setOutput('deploy_pages', 'false')
+            }
             try {
               const { data } = await github.rest.repos.getPages({ owner, repo })
               core.info(`build_type=${data.build_type} status=${data.status} public=${data.public} url=${data.html_url}`)
               if (data.build_type !== 'workflow') {
+                if (repoInfo.data.private) {
+                  skipPrivatePages(`Pages build_type is "${data.build_type}" (need "workflow")`)
+                  return
+                }
                 core.setFailed(
                   `GitHub Pages build type is "${data.build_type}". ` +
                   'actions/deploy-pages only works when Settings → Pages → Build and deployment is "GitHub Actions" (build_type "workflow").'
                 )
+                return
               }
+              core.setOutput('deploy_pages', 'true')
             } catch (error) {
               const status = error.status || error.response?.status || 'unknown'
               const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
               if (status === 404) {
+                if (repoInfo.data.private) {
+                  skipPrivatePages(`Pages is not enabled (GET /pages → 404: ${body})`)
+                  return
+                }
                 core.setFailed(`GitHub Pages is not enabled for this repository (${body}). In Settings → Pages, set Build and deployment to GitHub Actions.`)
                 return
               }
@@ -67,7 +87,7 @@ jobs:
             }
 
       - name: Setup Pages
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.check-pages.outputs.deploy_pages == 'true'
         uses: actions/configure-pages@v6
 
       - name: Setup Python
@@ -86,13 +106,13 @@ jobs:
 
       - name: Upload artifact
         id: pages-artifact
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.check-pages.outputs.deploy_pages == 'true'
         uses: actions/upload-pages-artifact@v5
         with:
           path: ./site
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && needs.build.outputs.deploy_pages == 'true'
     needs: build
     runs-on: ubuntu-latest
     permissions:
