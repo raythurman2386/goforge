@@ -83,7 +83,10 @@ Pair an immutable field with `optional_environment` when an empty value must not
 
 - The instance turns `running` only when every hook exits 0. If the container turns unhealthy or stops first, or a hook exits non-zero, GoForge stops there and marks the instance `failed`. The container and its volumes are left in place.
 - GoForge logs each hook's name, exit code, and duration. It never logs `env`. For a failed hook it logs the end of the output with every secret config value and every hook `env` value masked.
-- Pass secrets in `env`, not in `command`. Hooks run again on every recreate, so make each one idempotent: check whether the work is already done and exit 0.
+- Pass secrets and user-entered values in `env`, not in `command`, and reference them as quoted variables (`"$ADMIN_PASSWORD"`) inside the script. GoForge masks `env` values in logs, but a value templated into `command` is part of the exec request itself.
+- The exec `env` is not in the container's own environment. A program the hook runs, though, is an ordinary process: if the script passes a secret to it as an argument, as `gitea admin user create --password` requires, that argument is in the process's command line for as long as the program runs. Container processes show up in the host's process table, so on a host where `/proc` is not mounted with `hidepid`, any local user can read it there while the command runs. Prefer tools that read secrets from the environment, a file, or stdin, and keep any command that takes one as an argument short.
+- Hooks run again on every recreate, so make each one idempotent: check whether the work is already done and exit 0.
+- A hook that never exits is stopped when the deploy, edit, or update deadline (10 minutes) passes, and the instance turns `failed`.
 - A template is skipped at load if a hook has no `command`. Templates without `post_start` behave exactly as before: no health wait and no exec.
 
 ```yaml

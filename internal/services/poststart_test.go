@@ -283,6 +283,50 @@ func TestPostStart_FailedHookMarksInstanceFailed(t *testing.T) {
 	}
 }
 
+// TestPostStart_HungHookTimesOutAndMarksFailed checks that a hook that never
+// returns is cut off at the background deadline and the instance still turns
+// failed, even though the repos refuse an expired context.
+func TestPostStart_HungHookTimesOutAndMarksFailed(t *testing.T) {
+	t.Parallel()
+	h := newHookHarness(t)
+	h.svc.bgTimeout = 100 * time.Millisecond
+	ir, ok := h.svc.instanceRepo.(*mockInstanceRepository)
+	if !ok {
+		t.Fatal("instance repo is not the mock")
+	}
+	getByID, update := ir.getByIDFunc, ir.updateFunc
+	ir.getByIDFunc = func(ctx context.Context, id string) (*models.ServiceInstance, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return getByID(ctx, id)
+	}
+	ir.updateFunc = func(ctx context.Context, s *models.ServiceInstance) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return update(ctx, s)
+	}
+	dc, ok := h.svc.dockerClient.(*mockDockerClient)
+	if !ok {
+		t.Fatal("docker client is not the mock")
+	}
+	dc.execFunc = func(ctx context.Context, _ string, _ docker.ExecOptions) (docker.ExecResult, error) {
+		<-ctx.Done()
+		return docker.ExecResult{}, ctx.Err()
+	}
+
+	if _, err := h.svc.DeployInstance(context.Background(), "u1", "gitea", giteaConfig("")); err != nil {
+		t.Fatal(err)
+	}
+	if st := h.wait(t); st != models.ServiceStatusFailed {
+		t.Fatalf("status = %s, want failed", st)
+	}
+	if !h.logs.contains("post_start hook could not run") {
+		t.Error("logs lack the hook failure")
+	}
+}
+
 func TestPostStart_UnhealthyContainerSkipsHooksAndFails(t *testing.T) {
 	t.Parallel()
 	h := newHookHarness(t)

@@ -101,6 +101,8 @@ docker:
 # Create the first admin once Gitea is healthy. Runs on every container
 # create (deploy, config edit, image update) and does nothing when any admin
 # account already exists, so it never touches an existing instance's users.
+# Gitea's CLI only takes the password as --password, so it is in that
+# command's argv (readable from the host's /proc without hidepid) while it runs.
 post_start:
   - name: create-admin
     user: git

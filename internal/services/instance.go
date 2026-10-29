@@ -57,6 +57,14 @@ type DockerClient interface {
 // healthPollInterval is how often a post_start wait checks container health.
 const healthPollInterval = 2 * time.Second
 
+// backgroundWorkTimeout bounds a background deploy, config edit, or image
+// update, including every post_start hook.
+const backgroundWorkTimeout = 10 * time.Minute
+
+// statusWriteTimeout bounds the final status write after background work,
+// which gets a fresh deadline because the work may have used up its own.
+const statusWriteTimeout = 10 * time.Second
+
 // InstanceService handles service instance management.
 type InstanceService struct {
 	instanceRepo        InstanceRepository
@@ -67,6 +75,7 @@ type InstanceService struct {
 	cloudflareProxyMode bool
 	logger              *slog.Logger
 	healthPoll          time.Duration
+	bgTimeout           time.Duration
 }
 
 // NewInstanceService creates a new instance service.
@@ -88,6 +97,7 @@ func NewInstanceService(
 		cloudflareProxyMode: cloudflareProxyMode,
 		logger:              logger,
 		healthPoll:          healthPollInterval,
+		bgTimeout:           backgroundWorkTimeout,
 	}
 }
 
@@ -177,7 +187,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	// will be canceled when the HTTP handler returns.
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 
 		if err := s.ensureServiceImage(bgCtx, image, pullPreferRemote, logAttrs); err != nil {
@@ -466,8 +476,13 @@ func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *Servi
 		}
 	}
 
+	// A hung hook runs until ctx ends. Record the outcome with a fresh
+	// deadline so the instance never stays pending.
+	statusCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), statusWriteTimeout)
+	defer cancel()
+
 	// Fetch a fresh copy to avoid racing with the returned pointer
-	inst, err := s.instanceRepo.GetByID(ctx, instanceID)
+	inst, err := s.instanceRepo.GetByID(statusCtx, instanceID)
 	if err != nil {
 		s.logger.Error("failed to fetch instance for status update", "error", err, "instance_id", instanceID)
 		return
@@ -480,7 +495,7 @@ func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *Servi
 		inst.ConnectionInfo = connJSON
 	}
 
-	if err = s.instanceRepo.Update(ctx, inst); err != nil {
+	if err = s.instanceRepo.Update(statusCtx, inst); err != nil {
 		s.logger.Error("failed to update instance status", "error", err, "instance_id", instanceID, "status", status)
 		return
 	}
@@ -559,7 +574,7 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 		s.recreateContainer(bgCtx, tmpl, spec, pullPreferRemote, prevStatus)
 	}()
@@ -607,7 +622,7 @@ func (s *InstanceService) UpdateInstanceImage(ctx context.Context, id string) (*
 
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 		s.recreateContainer(bgCtx, tmpl, spec, pullRequired, prevStatus)
 	}()

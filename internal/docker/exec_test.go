@@ -97,6 +97,39 @@ func TestClient_Exec_Errors(t *testing.T) {
 	}
 }
 
+// TestClient_Exec_ContextEndsWhileStreaming checks that a command whose output
+// stream never closes does not block Exec past ctx.
+func TestClient_Exec_ContextEndsWhileStreaming(t *testing.T) {
+	t.Parallel()
+	c := &Client{docker: &mockDockerAPI{
+		execCreateFunc: func(context.Context, string, container.ExecOptions) (types.IDResponse, error) {
+			return types.IDResponse{ID: "exec-1"}, nil
+		},
+		execAttachFunc: func(context.Context, string, container.ExecAttachOptions) (types.HijackedResponse, error) {
+			// The server end stays open and silent, like a hung hook.
+			client, server := net.Pipe()
+			t.Cleanup(func() { _ = server.Close() })
+			return types.HijackedResponse{Conn: client, Reader: bufio.NewReader(client)}, nil
+		},
+	}}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.Exec(ctx, "ctr", ExecOptions{Cmd: []string{"sleep", "infinity"}})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Exec error = %v, want deadline exceeded", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Exec still blocked 3s after its context expired")
+	}
+}
+
 func TestCappedBuffer(t *testing.T) {
 	t.Parallel()
 	b := &cappedBuffer{limit: 4}

@@ -59,9 +59,16 @@ func (c *Client) Exec(ctx context.Context, id string, opts ExecOptions) (ExecRes
 	if err != nil {
 		return ExecResult{}, fmt.Errorf("failed to attach exec: %w", err)
 	}
+	// StdCopy does not watch ctx, so a command that never exits would block it
+	// forever. Closing the attach connection when ctx ends unblocks the read.
+	stopClose := context.AfterFunc(ctx, resp.Close)
 	out := &cappedBuffer{limit: maxExecOutput}
 	_, copyErr := stdcopy.StdCopy(out, out, resp.Reader)
+	stopClose()
 	resp.Close()
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ExecResult{}, ctxErr
+	}
 	if copyErr != nil {
 		return ExecResult{}, fmt.Errorf("failed to read exec output: %w", copyErr)
 	}
