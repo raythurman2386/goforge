@@ -30,6 +30,8 @@ config:                   # Configuration fields shown to the user
     default: string       # Default value (optional)
     required: boolean     # Whether field is required
     generate: boolean     # Auto-generate value (for passwords)
+    length: integer       # Generated length (minimum 16, default 24)
+    immutable: boolean    # Set once at deploy, never changed by Edit configuration
     options: [string]     # Allowed values (select only, required for select)
 
 # Resource Limits
@@ -45,6 +47,8 @@ docker:
       protocol: string    # Protocol (tcp/udp)
   environment:            # Environment variables (Go templates)
     KEY: "{{ .Config.fieldname }}"
+  optional_environment:   # Like environment, but left out when the value renders empty
+    KEY: "{{ .Config.fieldname }}"
   volumes:                # Persistent volumes
     - name: string        # Volume name suffix
       path: string        # Mount path in container
@@ -54,9 +58,43 @@ docker:
     timeout: duration     # Check timeout
     retries: integer      # Retry count
 
+# Post-start hooks (optional)
+post_start:               # Commands run with docker exec once the container is healthy
+  - name: string          # Hook name, used in logs
+    user: string          # User to run as (optional)
+    command: [string]     # Command and arguments (Go templates)
+    env:                  # Extra environment for the command only (Go templates)
+      KEY: "{{ .Config.fieldname }}"
+
 # Connection Info
 connection:
   internal: string        # Internal connection string template
+```
+
+### Immutable fields
+
+A field with `immutable: true` gets its value at deploy (generated there when `generate: true` and left blank) and keeps it. **Edit configuration** does not show it and ignores it if a form sends it, and an edit never generates it. An instance deployed before the field was added to the template stays without it. Use it for values a service writes into its own data on first start and that must not change later, such as an encryption key or the first admin password.
+
+Pair an immutable field with `optional_environment` when an empty value must not reach the container. GoForge leaves a variable in `optional_environment` out when it renders to an empty string, so an older instance without the field keeps whatever the service already stored. A field that the template declares but the stored config lacks renders as an empty string, never as `<no value>`.
+
+### Post-start hooks
+
+`post_start` runs one-time setup that needs the service up, such as creating the first admin account. After GoForge creates and starts the container (on deploy, **Edit configuration**, and **Update image**), it waits until the health check reports healthy, or until the container runs when there is no health check. Then it runs each hook in order with `docker exec`, as `user` when set. `command` and `env` values are Go templates with the same variables as `environment`. The command also sees the container's own environment.
+
+- The instance turns `running` only when every hook exits 0. If the container turns unhealthy or stops first, or a hook exits non-zero, GoForge stops there and marks the instance `failed`. The container and its volumes are left in place.
+- GoForge logs each hook's name, exit code, and duration. It never logs `env`. For a failed hook it logs the end of the output with every secret config value and every hook `env` value masked.
+- Pass secrets in `env`, not in `command`. Hooks run again on every recreate, so make each one idempotent: check whether the work is already done and exit 0.
+- A template is skipped at load if a hook has no `command`. Templates without `post_start` behave exactly as before: no health wait and no exec.
+
+```yaml
+post_start:
+  - name: create-admin
+    user: git
+    command: ["sh", "-c", "gitea admin user list --admin | tail -n +2 | grep -q . || gitea admin user create --admin --username \"$ADMIN_USER\" --email \"$ADMIN_EMAIL\" --password \"$ADMIN_PASSWORD\""]
+    env:
+      ADMIN_USER: "{{ .Config.admin_username }}"
+      ADMIN_EMAIL: "admin@{{ .Domain }}"
+      ADMIN_PASSWORD: "{{ .Config.admin_password }}"
 ```
 
 ### Field types
@@ -267,6 +305,10 @@ WebSocket notifications are served on the main port by Vaultwarden 1.29 and late
 | `app_name` | text | `Gitea: Git with a cup of tea` | Yes | `APP_NAME` |
 | `disable_registration` | bool | `true` | Yes | `[service] DISABLE_REGISTRATION` |
 | `require_signin_view` | bool | `true` | Yes | `[service] REQUIRE_SIGNIN_VIEW` |
+| `admin_username` | text | `gitea-admin` | Yes | First admin account (`admin` is reserved by Gitea) |
+| `admin_email` | text | blank | No | First admin email. Blank uses `admin@<Domain>`, or `admin@<container name>` without a Domain |
+| `admin_password` | password, immutable | (generated, 32 chars) | Yes | First admin password, masked on the service page |
+| `secret_key` | password, immutable | (generated, 64 chars) | Yes | `[security] SECRET_KEY` |
 
 **Environment variables**:
 
@@ -281,6 +323,9 @@ GITEA__SERVER__DOMAIN: "{{ if .Domain }}{{ .Domain }}{{ else }}{{ .ContainerName
 GITEA__SERVER__ROOT_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}/{{ else }}http://{{ .ContainerName }}:3000/{{ end }}"
 GITEA__SERVICE__DISABLE_REGISTRATION: "{{ .Config.disable_registration }}"
 GITEA__SERVICE__REQUIRE_SIGNIN_VIEW: "{{ .Config.require_signin_view }}"
+GITEA__security__INSTALL_LOCK: "true"
+# optional_environment: left out when empty (instances deployed before secret_key existed)
+GITEA__security__SECRET_KEY: "{{ .Config.secret_key }}"
 ```
 
 Gitea maps `GITEA__<SECTION>__<KEY>` to `app.ini` on every start. The section name is case-insensitive. Keys in the root section need an empty section, so `APP_NAME` is `GITEA____APP_NAME` (four underscores). `GITEA__APP_NAME` has no key part and Gitea ignores it.
@@ -293,7 +338,7 @@ Gitea maps `GITEA__<SECTION>__<KEY>` to `app.ini` on every start. The section na
 
 **Volume**: `data` -> `/data`
 
-The first visit opens Gitea's install page. Create the admin account there. See [One-Click Services](../guides/services.md#gitea).
+**Post-start**: `create-admin` runs as `git` once the health check passes. It exits 0 without changes when any admin exists, and otherwise runs `gitea admin user create --admin` with the username, email, and password passed in the exec environment. `INSTALL_LOCK=true` from the first start means the install page is never served. See [One-Click Services](../guides/services.md#gitea).
 
 ---
 

@@ -12,7 +12,7 @@ func TestFillGeneratedConfig(t *testing.T) {
 	}}
 
 	blank := map[string]interface{}{"password": "", "username": "appuser"}
-	if err := fillGeneratedConfig(tmpl, blank); err != nil {
+	if err := fillGeneratedConfig(tmpl, blank, true); err != nil {
 		t.Fatal(err)
 	}
 	password, _ := blank["password"].(string)
@@ -28,7 +28,7 @@ func TestFillGeneratedConfig(t *testing.T) {
 	}
 
 	kept := map[string]interface{}{"password": "keep-me"}
-	if err := fillGeneratedConfig(tmpl, kept); err != nil {
+	if err := fillGeneratedConfig(tmpl, kept, true); err != nil {
 		t.Fatal(err)
 	}
 	if kept["password"] != "keep-me" {

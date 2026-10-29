@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -71,6 +72,12 @@ func (fakeDocker) CleanupSystem(context.Context) error               { return ni
 func (fakeDocker) EnsureImage(context.Context, string) error         { return nil }
 func (fakeDocker) PullImage(context.Context, string) error           { return nil }
 func (fakeDocker) ImageExists(context.Context, string) (bool, error) { return true, nil }
+func (fakeDocker) WaitHealthy(context.Context, string, time.Duration) error {
+	return nil
+}
+func (fakeDocker) Exec(context.Context, string, docker.ExecOptions) (docker.ExecResult, error) {
+	return docker.ExecResult{}, nil
+}
 
 func newEditHandler(t *testing.T, status models.ServiceInstanceStatus) (*ServiceHandler, *fakeInstanceRepo) {
 	t.Helper()

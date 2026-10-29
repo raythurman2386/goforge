@@ -76,18 +76,26 @@ A self-hosted Git service.
 | Application Name | `Gitea: Git with a cup of tea` | `APP_NAME` shown in the page title |
 | Disable Registration | `true` | `[service] DISABLE_REGISTRATION`. Only admins can create accounts |
 | Require Sign-in to View | `true` | `[service] REQUIRE_SIGNIN_VIEW`. Anonymous visitors see only the sign-in page |
+| Admin Username | `gitea-admin` | First admin account, created by GoForge. `admin` is reserved by Gitea |
+| Admin Email | blank | Email of the first admin. Blank uses `admin@<Domain>`, or `admin@<container name>` when no Domain is set |
+| Admin Password | Generated (32 chars) when left blank | Password of the first admin, stored encrypted and masked on the service page behind **Show** and **Copy** |
+| Secret Key | Generated (64 chars) when left blank | `[security] SECRET_KEY`, which Gitea uses to encrypt stored secrets. Set once at deploy |
 | Storage | Docker volume | `/data` (SQLite database, repositories, `app.ini`) |
 
 Gitea always listens on plain HTTP (`PROTOCOL=http`). Traefik, and Cloudflare in proxy mode, end TLS in front of it. Only `ROOT_URL` carries the browser URL: `https://<domain>/` for a public host, `http://<domain>/` for a `.localhost` host. Do not set Gitea's `PROTOCOL` to `https`. Gitea then expects TLS on port 3000 and the Traefik route returns errors.
 
 When you enter a Domain, GoForge adds the Traefik labels itself: a ``Host(`<domain>`)`` router on the `web` entrypoint in Cloudflare proxy mode or for a `.localhost` host (otherwise `websecure` with a Let's Encrypt certificate and an HTTP to HTTPS redirect) and a load balancer on port 3000, the first port in the template. For a public host, create the proxied Cloudflare CNAME first (see [Public HTTPS behind Cloudflare Tunnel](#public-https-behind-cloudflare-tunnel)).
 
-**First start.** Gitea opens its install page at `ROOT_URL` until someone submits it. The page is public, so finish it right after the deploy turns `running`. Keep SQLite, check that **Server Domain** and **Gitea Base URL** match your Domain, and fill in **Administrator Account Settings**. With registration disabled, the install page is the only way to create the first account from the browser. GoForge has no shell into the container.
+**First start.** There is no install page. GoForge starts Gitea with `[security] INSTALL_LOCK=true`, so the installer is never served, not even for the seconds before the first account exists. Gitea uses SQLite in `/data`. Once the container's health check passes, GoForge runs the template's `post_start` hook inside the container as user `git`. The hook creates the admin account from **Admin Username**, **Admin Email**, and **Admin Password** with `gitea admin user create --admin`, and only when Gitea has no admin yet. The deploy turns `running` after the hook succeeds. Sign in at your Domain with the admin username and the password from the service page (**Show** or **Copy**). If the container never becomes healthy or the hook exits non-zero, the instance turns `failed` and the GoForge log has the hook name, exit code, and duration. The container and its `/data` volume are left in place.
+
+**Admin account after the first start.** GoForge creates the admin once and never changes it. Change the password, email, or name in Gitea (**Site Administration** or your user settings). The value on the service page is the password GoForge created the account with. **Admin Password** and **Secret Key** are set once at deploy, so **Edit configuration** does not show them. Editing the other admin fields later has no effect once an admin exists.
+
+**Secret key.** Gitea encrypts stored secrets, such as two-factor keys and mirror credentials, with `SECRET_KEY`. GoForge generates one at deploy and passes it as `GITEA__security__SECRET_KEY` on every start, so it stays the same across **Edit configuration** and **Update image**. It must never change, which is why it cannot be edited. A Gitea instance deployed before this field existed has no stored key. GoForge then leaves the variable out, and Gitea keeps the `SECRET_KEY` already in its `app.ini`. The admin hook still runs on every recreate of such an instance and does nothing because an admin exists.
 
 **SSH.** GoForge does not publish container ports on the host, and Traefik routes only HTTP. Port 22 is not reachable from outside the Docker network, so clone and push over HTTPS with a personal access token. SSH clone URLs that Gitea shows do not work.
 
-!!! warning "Do not redeploy to change settings"
-    As with Vaultwarden, a new deploy is a new instance with a new, empty `/data` volume, so repositories and users are lost. Change settings in **Site Administration** instead. Fields set from the environment (domain, URLs, registration) are rewritten into `app.ini` on every container start.
+!!! warning "Do not redeploy to change settings or upgrade"
+    As with Vaultwarden, a new deploy is a new instance with a new, empty `/data` volume, so repositories and users are lost. Use **Edit configuration** or **Update image** on the service page instead: both recreate the container on the same volume and keep the secret key. Settings that come from the environment (domain, URLs, registration, install lock, secret key) are rewritten into `app.ini` on every container start, so change those in GoForge. Change everything else in **Site Administration**.
 
 ### Public HTTPS behind Cloudflare Tunnel
 

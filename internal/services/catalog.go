@@ -30,6 +30,24 @@ type ServiceTemplate struct {
 	Docker         DockerConfig     `yaml:"docker" json:"docker"`
 	Connection     ConnectionConfig `yaml:"connection" json:"connection"`
 	Backup         BackupConfig     `yaml:"backup" json:"backup"`
+	// PostStart lists commands GoForge runs inside the container after every
+	// create (deploy, config edit, image update), once it is healthy.
+	PostStart []PostStartHook `yaml:"post_start,omitempty" json:"post_start,omitempty"`
+}
+
+// PostStartHook is a command run with docker exec inside a service container
+// once its health check passes. Command and Env values are Go templates
+// rendered with the same data as docker.environment. Pass secrets through Env,
+// never in Command: GoForge logs the hook name, exit code, and duration, and
+// never logs Env. A hook runs again on every recreate, so it must be
+// idempotent. A non-zero exit marks the instance failed; the container and its
+// volumes are left in place.
+type PostStartHook struct {
+	// Name identifies the hook in logs.
+	Name    string            `yaml:"name" json:"name"`
+	Command []string          `yaml:"command" json:"command"`
+	User    string            `yaml:"user,omitempty" json:"user,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
 }
 
 // ConfigField represents a configuration field for a service. Type is one of
@@ -41,9 +59,14 @@ type ConfigField struct {
 	Default  interface{} `yaml:"default,omitempty" json:"default,omitempty"`
 	Required bool        `yaml:"required" json:"required"`
 	Generate bool        `yaml:"generate,omitempty" json:"generate,omitempty"`
-	Length   int         `yaml:"length,omitempty" json:"length,omitempty"`
-	Min      int         `yaml:"min,omitempty" json:"min,omitempty"`
-	Max      int         `yaml:"max,omitempty" json:"max,omitempty"`
+	// Immutable fields are set once at deploy (generated there when Generate
+	// is set) and never changed by a config edit. An edit of an instance that
+	// predates the field leaves it unset. Use it for values the service writes
+	// into its own data on first start, such as an encryption key.
+	Immutable bool `yaml:"immutable,omitempty" json:"immutable,omitempty"`
+	Length    int  `yaml:"length,omitempty" json:"length,omitempty"`
+	Min       int  `yaml:"min,omitempty" json:"min,omitempty"`
+	Max       int  `yaml:"max,omitempty" json:"max,omitempty"`
 	// Options lists the allowed values of a select field.
 	Options []string `yaml:"options,omitempty" json:"options,omitempty"`
 }
@@ -59,8 +82,11 @@ type DockerConfig struct {
 	Image       string            `yaml:"image" json:"image"`
 	Ports       []PortConfig      `yaml:"ports" json:"ports"`
 	Environment map[string]string `yaml:"environment" json:"environment"`
-	Volumes     []VolumeConfig    `yaml:"volumes" json:"volumes"`
-	HealthCheck HealthCheckConfig `yaml:"health_check" json:"health_check"`
+	// OptionalEnvironment is rendered like Environment, but a variable whose
+	// value renders empty is left out of the container instead of set to "".
+	OptionalEnvironment map[string]string `yaml:"optional_environment,omitempty" json:"optional_environment,omitempty"`
+	Volumes             []VolumeConfig    `yaml:"volumes" json:"volumes"`
+	HealthCheck         HealthCheckConfig `yaml:"health_check" json:"health_check"`
 }
 
 // PortConfig defines a port mapping.
