@@ -104,7 +104,8 @@ make test-coverage # Generate HTML coverage report
 
 # Code Generation
 make templ         # Generate templ templates
-make css           # Compile TailwindCSS
+make css           # Compile TailwindCSS (v3.4.17)
+make css-check     # make css, then fail on undefined class tokens (CI css job)
 
 # Database
 make migrate       # Run migrations up

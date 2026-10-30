@@ -25,6 +25,7 @@ make fmt-check                      # Check formatting (CI mode, exits non-zero 
 make vet                            # Run go vet
 make lint                           # Run golangci-lint (30+ linters configured)
 make check                          # Run all checks: fmt-check, vet, lint, test
+make ci                             # deps, templ, css-check, then the make check steps
 
 # Testing
 make test                           # Run all tests with race detector and coverage
@@ -49,7 +50,11 @@ mkdocs build --strict
 
 # Code generation
 make templ                          # Generate templ templates (*_templ.go files)
-make css                            # Compile TailwindCSS
+make css                            # Compile TailwindCSS (v3.4.17; v4 does not work)
+make css-check                      # make css, then scripts/class_check.py: fails on literal
+                                    # class="..." tokens in .templ and handler files that are
+                                    # missing from output.css (CI css job). Without the CLI:
+                                    # make css-check TAILWIND="npx --yes tailwindcss@3.4.17"
 
 # Database
 make migrate                        # Run migrations up

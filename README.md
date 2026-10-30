@@ -136,7 +136,7 @@ GoForge follows a clean architecture with:
    - GoForge is designed to work with **Cloudflare Tunnel** (recommended)
    - Compose publishes the app on `127.0.0.1` only. Traefik on 80 and 443 is the entrypoint for direct installs (Let's Encrypt). With Cloudflare Tunnel, bind 80 and 443 to `127.0.0.1` in a `docker-compose.override.yml`
    - No inbound ports needed - tunnel connects outbound to Cloudflare
-   - Restrict access to the Docker socket
+   - Restrict access to the Docker socket: the `goforge` container's read-write socket, Traefik's socket, and `docker` group membership are root-equivalent on the host (see the Docker socket trust model in [SECURITY.md](SECURITY.md))
    - Use TLS/SSL for all external connections (handled by Cloudflare)
    - Configure firewall to allow only outbound connections to Cloudflare IPs
 
@@ -150,7 +150,7 @@ GoForge follows a clean architecture with:
    - Registration is closed after the first account by default (`GOFORGE_ENABLE_REGISTRATION=false`)
    - Two roles exist: `admin` and `user`. Only `GOFORGE_ADMIN_EMAIL` grants `admin`. There are no teams or per-project roles yet
    - A project or deployment owned by another account returns `404`
-   - Use strong passwords for local accounts
+   - Use strong passwords for local accounts. Failed logins lock the client IP or the account for 15 minutes after 10 tries in 15 minutes; set `TRUSTED_PROXIES` (and `CLOUDFLARE_PROXY_MODE=true` behind Cloudflare Tunnel) so the lockout and rate limiter see the real client IP
    - Review OAuth permissions requested by GitHub integration
    - Consider implementing 2FA (not yet implemented)
    - Audit logs are partially implemented - complete before production use

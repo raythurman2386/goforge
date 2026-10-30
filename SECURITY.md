@@ -54,6 +54,9 @@ We take security vulnerabilities seriously. If you find a security issue:
 - [ ] API key rotation mechanism
 - [ ] Container escape prevention measures
 - [ ] Resource quota enforcement per project
+- [ ] `/health/ready` is unauthenticated and its JSON includes database and Docker error text
+- [ ] `BACKUP_S3_*` credentials are plain environment variables in the `goforge` container, so anyone who can run `docker inspect` (the `docker` group) can read them
+- [ ] The main `goforge` image runs as root (the `mcp` image runs as uid 10001)
 
 ### Defaults that reduce exposure
 

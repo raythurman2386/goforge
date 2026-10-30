@@ -47,14 +47,14 @@ Docker builds an image from the project's Dockerfile. `build_context` is the dir
 
 ```dockerfile
 # Example Dockerfile for a Go application
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o main .
 
-FROM alpine:latest
+FROM alpine:3.24
 RUN apk --no-cache add ca-certificates
 COPY --from=builder /app/main /main
 EXPOSE 8080

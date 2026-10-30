@@ -58,7 +58,8 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          # Same version as the go.mod tool pin, so CI and `make lint` agree.
+          version: v1.64.8
           args: --timeout=5m
           install-mode: "goinstall"
         env:

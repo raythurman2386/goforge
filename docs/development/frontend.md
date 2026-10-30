@@ -131,7 +131,12 @@ make css
 
 # Watch for changes
 make css-watch
+
+# Build, then fail on class tokens missing from output.css (same as the CI css job)
+make css-check
 ```
+
+`make css` expects the Tailwind v3.4.17 standalone CLI (the Dockerfile and CI pin that version) and warns when a different version is on `PATH`. Without it, run `make css-check TAILWIND="npx --yes tailwindcss@3.4.17"`. `scripts/class_check.py` only sees literal `class="..."` attributes in `.templ` files and handlers; classes built at runtime are not checked.
 
 ### Configuration
 

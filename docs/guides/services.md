@@ -63,6 +63,8 @@ Bitwarden clients and the web vault need HTTPS, so give Vaultwarden a public HTT
 
 To close signups after the first account, open `/admin`, sign in with the admin token, turn off **Allow new signups** under General settings, and save. Settings saved in `/admin` are written to `/data/config.json` and override the environment.
 
+After that, `/admin` is the place to check or change signups. The **Allow Signups** field on the GoForge service page only sets `SIGNUPS_ALLOWED`, which `/data/config.json` overrides, so it no longer shows the live setting. The public `GET /api/config` field `disableUserRegistration` does not tell you either: Vaultwarden reports `true` only when invitations are also off or SMTP is configured.
+
 !!! warning "Do not redeploy to change settings or upgrade"
     A new deploy is a new instance with a new, empty `/data` volume, so deleting and redeploying Vaultwarden loses the vault. Use **Edit configuration** or **Update image** on the service page instead: both recreate the container on the same volume. Settings saved in `/admin` also stay in `/data`.
 
