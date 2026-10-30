@@ -22,10 +22,13 @@ var AllAPITokenScopes = []string{ScopeFull, ScopeRead, ScopeWrite, ScopeProtecte
 
 // APIToken represents a personal access token.
 type APIToken struct {
-	ID         string
-	UserID     string
-	Name       string
-	TokenHash  string
+	ID        string
+	UserID    string
+	Name      string
+	TokenHash string
+	// TokenHint is a non-secret label such as "gf_…a1b2" (prefix and last
+	// four characters). Empty for tokens created before migration 021.
+	TokenHint  string
 	Scopes     []string
 	LastUsedAt sql.NullTime
 	ExpiresAt  sql.NullTime
@@ -43,6 +46,12 @@ func (t *APIToken) IsExpired() bool {
 // IsActive returns true if the token is active (not expired).
 func (t *APIToken) IsActive() bool {
 	return !t.IsExpired()
+}
+
+// IsMCPCapable reports whether the token may connect to /mcp: it must carry
+// explicit scopes (not the legacy full scope) and grant at least read.
+func (t *APIToken) IsMCPCapable() bool {
+	return !t.IsFull() && t.HasScope(ScopeRead)
 }
 
 // IsFull reports whether the token carries the legacy full scope. A token

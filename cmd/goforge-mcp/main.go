@@ -1,6 +1,8 @@
-// Command goforge-mcp is the GoForge MCP server. It speaks MCP over stdio
-// (run it over ssh) and calls the GoForge /api/v1 JSON API with a scoped
-// bearer token. See docs/guides/mcp.md.
+// Command goforge-mcp is the stdio fallback for the GoForge MCP tools. The
+// server itself serves the same tools at /mcp (internal/mcphttp); use this
+// binary only for a client that cannot speak streamable HTTP. It speaks MCP
+// over stdio and calls the GoForge /api/v1 JSON API (GOFORGE_MCP_URL, the
+// public HTTPS URL) with a scoped bearer token. See docs/guides/mcp.md.
 package main
 
 import (

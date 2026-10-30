@@ -93,6 +93,11 @@ type Config struct {
 	// comma-separated list.
 	ProtectedServices []string
 
+	// MCPHTTP serves the MCP tools at /mcp for Profile API tokens. On by
+	// default; GOFORGE_MCP_HTTP=false turns the endpoint off (404) and
+	// leaves /api/v1 and the stdio binary as they are.
+	MCPHTTP bool
+
 	// Backup configures nightly backups to S3-compatible storage. Disabled
 	// while BACKUP_S3_BUCKET is unset.
 	Backup BackupConfig
@@ -167,6 +172,9 @@ func Load() (*Config, error) {
 
 		// API v1
 		ProtectedServices: getEnvStringSlice("GOFORGE_PROTECTED_SERVICES"),
+
+		// MCP over HTTP at /mcp (kill switch: GOFORGE_MCP_HTTP=false)
+		MCPHTTP: getEnvBool("GOFORGE_MCP_HTTP", true),
 
 		// Backups (disabled while BACKUP_S3_BUCKET is unset)
 		Backup: loadBackupConfig(),

@@ -37,16 +37,44 @@ func New(cfg *Config, hc *http.Client) *Server {
 		}),
 	}
 	s.registerReads()
-	if cfg.AllowWrites {
+	switch {
+	case cfg.AllowWrites:
 		s.registerWrites()
+	case cfg.WriteRefusal != "":
+		s.mcp.AddReceivingMiddleware(refuseWrites(cfg.WriteRefusal))
 	}
 	return s
 }
 
+// refuseWrites answers tools/call for an unregistered mutation tool with a
+// tool error carrying msg, so a read-only client learns why instead of
+// seeing "unknown tool".
+func refuseWrites(msg string) mcp.Middleware {
+	writes := make(map[string]bool, len(writeToolNames))
+	for _, n := range writeToolNames {
+		writes[n] = true
+	}
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if method == "tools/call" {
+				if ctr, ok := req.(*mcp.CallToolRequest); ok && ctr.Params != nil && writes[ctr.Params.Name] {
+					return errorResult(msg), nil
+				}
+			}
+			return next(ctx, method, req)
+		}
+	}
+}
+
+// WriteToolNames lists the mutation tools in registration order.
+func WriteToolNames() []string { return append([]string(nil), writeToolNames...) }
+
 // MCP returns the underlying MCP server.
 func (s *Server) MCP() *mcp.Server { return s.mcp }
 
-// Run serves MCP over stdin and stdout until the client disconnects.
+// Run serves MCP over stdin and stdout until the client disconnects. The
+// HTTP transport does not call Run; it hands MCP() to the SDK's streamable
+// HTTP handler.
 func (s *Server) Run(ctx context.Context) error {
 	return s.mcp.Run(ctx, &mcp.StdioTransport{})
 }

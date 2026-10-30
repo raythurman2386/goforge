@@ -36,6 +36,7 @@ func Router(
 	healthHandler *handlers.HealthHandler,
 	containerHandler *handlers.ContainerHandler,
 	apiV1 http.Handler,
+	mcpHTTP http.Handler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -54,8 +55,8 @@ func Router(
 	// Session middleware just populates context. API token middleware
 	// authenticates Authorization: Bearer headers with legacy full-scope
 	// tokens; it runs after the session middleware so session auth wins.
-	// Neither runs on /api/v1, which authenticates bearer tokens itself and
-	// ignores cookies.
+	// Neither runs on /api/v1 or /mcp, which authenticate bearer tokens
+	// themselves and ignore cookies.
 	sessionAuth := func(next http.Handler) http.Handler {
 		return auth.Middleware(sessionManager)(auth.APITokenMiddleware(apiTokenRepo, userRepo)(next))
 	}
@@ -73,6 +74,16 @@ func Router(
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(writeTimeout))
 			r.Mount("/api/v1", apiV1)
+		})
+	}
+
+	// MCP over streamable HTTP: the same bearer tokens and gates as
+	// /api/v1, outside the session and CSRF groups. nil when
+	// GOFORGE_MCP_HTTP=false.
+	if mcpHTTP != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(writeTimeout))
+			r.Handle("/mcp", mcpHTTP)
 		})
 	}
 
@@ -213,6 +224,7 @@ func Router(
 							r.Get("/", settingsHandler.ListAPITokens)
 							r.Get("/new", settingsHandler.NewAPITokenModal)
 							r.Post("/", settingsHandler.CreateAPIToken)
+							r.Post("/{id}/rotate", settingsHandler.RotateAPIToken)
 							r.Delete("/{id}", settingsHandler.DeleteAPIToken)
 						})
 						r.Route("/git", func(r chi.Router) {

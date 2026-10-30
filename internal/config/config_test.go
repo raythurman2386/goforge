@@ -250,3 +250,31 @@ func TestGenerateRandomKey(t *testing.T) {
 		t.Errorf("expected key length >= 32, got %d", len(key1))
 	}
 }
+
+func TestLoad_MCPHTTPKillSwitch(t *testing.T) {
+	for _, tc := range []struct {
+		env  string
+		set  bool
+		want bool
+	}{
+		{"", false, true},
+		{"true", true, true},
+		{"false", true, false},
+		{"0", true, false},
+	} {
+		os.Clearenv()
+		os.Setenv("GOFORGE_DEV_MODE", "true")
+		os.Setenv("GOFORGE_DEV_SECRETS_FILE", filepath.Join(t.TempDir(), "dev-secrets.json"))
+		if tc.set {
+			os.Setenv("GOFORGE_MCP_HTTP", tc.env)
+		}
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.MCPHTTP != tc.want {
+			t.Errorf("GOFORGE_MCP_HTTP=%q (set=%v): MCPHTTP = %v, want %v", tc.env, tc.set, cfg.MCPHTTP, tc.want)
+		}
+	}
+	os.Clearenv()
+}

@@ -5,6 +5,15 @@ import (
 	"net/http"
 )
 
+// writeToolNames is every tool registerWrites adds. TestWriteToolNames keeps
+// it in sync.
+var writeToolNames = []string{
+	"trigger_deployment", "cancel_deployment", "rollback_deployment", "set_env_var",
+	"delete_env_var", "sync_env_vars", "link_service", "unlink_service", "deploy_service",
+	"restart_service", "update_service_image", "update_service_config", "restart_container",
+	"stop_container",
+}
+
 // Gate is part of every mutation input.
 type Gate struct {
 	DryRun      *bool  `json:"dry_run,omitempty" jsonschema:"default true: only return the plan. Set false to run the change."`

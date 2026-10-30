@@ -1,6 +1,10 @@
-// Package mcpserver is the GoForge MCP server. It speaks MCP over stdio and
-// calls the GoForge JSON API (/api/v1) with a scoped bearer token. It holds
+// Package mcpserver holds the GoForge MCP tools. Every tool is one call to
+// the GoForge JSON API (/api/v1) with a scoped bearer token; the package holds
 // no Docker socket and no database connection.
+//
+// Two transports use it: cmd/goforge-mcp serves it over stdio (the fallback
+// for clients that only spawn a process), and internal/mcphttp serves it at
+// /mcp on goforge serve with an in-process HTTP client.
 package mcpserver
 
 import (
@@ -30,6 +34,11 @@ type Config struct {
 	Token string
 	// AllowWrites registers the mutation tools. Off by default.
 	AllowWrites bool
+	// WriteRefusal, when set and AllowWrites is false, answers a call to any
+	// mutation tool with this text as a tool error instead of "unknown
+	// tool". The HTTP transport sets it to an insufficient_scope message for
+	// read-only tokens. Stdio leaves it empty.
+	WriteRefusal string
 	// Protected lists service instance IDs the MCP refuses to stop,
 	// reconfigure, or re-image unless the token has the protected scope.
 	// The server enforces its own list; this one is checked first.

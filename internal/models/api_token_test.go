@@ -38,3 +38,21 @@ func TestNormalizeScopes(t *testing.T) {
 		t.Error("unknown scope accepted")
 	}
 }
+
+func TestIsMCPCapable(t *testing.T) {
+	for _, tc := range []struct {
+		scopes []string
+		want   bool
+	}{
+		{nil, false},
+		{[]string{ScopeFull}, false},
+		{[]string{ScopeProtected}, false},
+		{[]string{ScopeWrite}, true}, // write implies read
+		{[]string{ScopeRead}, true},
+		{[]string{ScopeRead, ScopeWrite, ScopeProtected}, true},
+	} {
+		if got := (&APIToken{Scopes: tc.scopes}).IsMCPCapable(); got != tc.want {
+			t.Errorf("IsMCPCapable(%v) = %v, want %v", tc.scopes, got, tc.want)
+		}
+	}
+}

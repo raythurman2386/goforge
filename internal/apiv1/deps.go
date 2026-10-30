@@ -1,6 +1,7 @@
 // Package apiv1 serves the bearer-token JSON API under /api/v1.
 //
-// The API is the backend for the GoForge MCP server (cmd/goforge-mcp). It is
+// The API is the backend for the GoForge MCP tools (/mcp via internal/mcphttp,
+// and the cmd/goforge-mcp stdio fallback). It is
 // bearer-only: session cookies are ignored, so it sits outside the CSRF group.
 // Every route needs a token scope (read, write, or protected), and every
 // mutation is gated: dry_run defaults to true, and a real run needs a
