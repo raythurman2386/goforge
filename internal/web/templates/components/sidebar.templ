@@ -3,8 +3,12 @@ package components
 // Sidebar renders the app navigation. app.js marks the link whose data-nav
 // prefix best matches the current path with aria-current="page"; the
 // aria-[current=page] variants below style it.
+//
+// On md+ the aside is sticky and viewport-tall (md:h-screen) instead of
+// stretching with <main>, so the settings footer (Log out) stays on screen
+// however tall the page grows; the middle nav scrolls if the viewport is short.
 templ Sidebar(csrfToken string) {
-	<aside id="sidebar" aria-label="Sidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-white/95 backdrop-blur-xl border-r border-gray-200/50 shadow-2xl md:shadow-none transform -translate-x-full transition-all duration-300 ease-in-out md:translate-x-0 md:static md:inset-0 h-full md:h-auto flex flex-col dark:bg-gray-900/95 dark:border-gray-800/50">
+	<aside id="sidebar" aria-label="Sidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-white/95 backdrop-blur-xl border-r border-gray-200/50 shadow-2xl md:shadow-none transform -translate-x-full transition-all duration-300 ease-in-out md:translate-x-0 md:sticky md:inset-0 h-full md:h-screen md:flex-shrink-0 flex flex-col dark:bg-gray-900/95 dark:border-gray-800/50">
 		<div class="flex-1 flex flex-col min-h-0">
 			<!-- Logo -->
 			<div class="flex-shrink-0 flex items-center h-16 px-6 border-b border-gray-100 dark:border-gray-800">
