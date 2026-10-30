@@ -1,6 +1,7 @@
 package projects
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
@@ -9,12 +10,19 @@ import (
 templ List(projects []*models.Project, csrfToken string) {
 	@layouts.AppLayout("Projects", csrfToken) {
 		@components.PageHeader("Projects", "View and manage your application projects.") {
-				<button hx-get="/projects/new" hx-target="body" hx-push-url="true" class="btn-primary">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonPrimary,
+					Attrs: templ.Attributes{
+						"hx-get": "/projects/new",
+						"hx-target": "body",
+						"hx-push-url": "true",
+					},
+				}) {
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 					</svg>
 					New Project
-				</button>
+				}
 		}
 
 		if len(projects) == 0 {
@@ -28,7 +36,10 @@ templ List(projects []*models.Project, csrfToken string) {
 		} else {
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				for _, p := range projects {
-					<a href={ templ.URL("/projects/" + p.ID) } class="card hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group">
+					@ui.Card(ui.CardProps{
+						Href: templ.URL("/projects/" + p.ID),
+						Class: "hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group",
+					}) {
 						<div class="flex items-center justify-between mb-4">
 							<div class="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-colors dark:bg-primary-900/30 dark:text-primary-400">
 								<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,7 +65,7 @@ templ List(projects []*models.Project, csrfToken string) {
 								</svg>
 							</div>
 						</div>
-					</a>
+					}
 				}
 			</div>
 		}

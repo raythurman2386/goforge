@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"time"
 
@@ -20,8 +21,16 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 			@components.PageHeader("Profile Settings", "Manage your account information and security.")
 
 			<!-- Profile Information -->
-			<div class="card mb-8">
-				<h3 class="card-title mb-4">Account Information</h3>
+			@ui.Card(ui.CardProps{Class: "mb-8"}) {
+				<div class="mb-4 flex items-center gap-4">
+					@ui.Avatar(ui.AvatarProps{Name: components.UserDisplayName(user), Size: ui.AvatarLG})
+					<div class="min-w-0">
+						@ui.CardTitle(3, nil) {
+							Account Information
+						}
+						<p class="truncate text-sm text-muted-foreground">{ components.UserDisplayName(user) }</p>
+					</div>
+				</div>
 				<form hx-put="/settings/profile" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 					<input type="hidden" name="csrf_token" value={ csrfToken } />
 					
@@ -34,37 +43,39 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 						<p class="label">Account Type</p>
 						<div class="mt-1">
 							if user.IsGitHubUser() {
-								<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-900 text-white dark:bg-gray-700">
-									<svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 24 24">
+								@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSolid, Size: ui.BadgeMD}) {
+									<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 										<path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
 									</svg>
 									GitHub Account
-								</span>
+								}
 								<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
 							} else {
-								<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-900/30 dark:text-primary-300">
-									<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Size: ui.BadgeMD}) {
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
 									</svg>
 									Local Account
-								</span>
+								}
 							}
 						</div>
 					</div>
 
 					<div class="flex justify-end">
-						<button type="submit" class="btn-primary">
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
 							Save Changes
 							@components.Spinner()
-						</button>
+						}
 					</div>
 				</form>
-			</div>
+			}
 
 			<!-- Change Password (Local accounts only) -->
 			if !user.IsGitHubUser() {
-				<div class="card mb-8">
-					<h3 class="card-title mb-4">Change Password</h3>
+				@ui.Card(ui.CardProps{Class: "mb-8"}) {
+					@ui.CardTitle(3, templ.Attributes{"class": "mb-4"}) {
+						Change Password
+					}
 					<form hx-put="/settings/password" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 						<input type="hidden" name="csrf_token" value={ csrfToken } />
 						
@@ -84,13 +95,13 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 						</div>
 
 						<div class="flex justify-end">
-							<button type="submit" class="btn-primary">
+							@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
 								Update Password
 								@components.Spinner()
-							</button>
+							}
 						</div>
 					</form>
-				</div>
+				}
 			}
 
 			if backups != nil {
@@ -102,26 +113,36 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 			}
 
 			<!-- API Tokens -->
-			<div class="card">
+			@ui.Card(ui.CardProps{}) {
 				<div class="flex items-center justify-between mb-4">
-					<h3 class="card-title">API Tokens</h3>
-					<button hx-get="/settings/tokens/new" hx-target="body" hx-swap="beforeend" class="btn-secondary btn-sm">
+					@ui.CardTitle(3, nil) {
+						API Tokens
+					}
+					@ui.Button(ui.ButtonProps{
+						Variant: ui.ButtonSecondary,
+						Size: ui.ButtonSM,
+						Attrs: templ.Attributes{
+							"hx-get": "/settings/tokens/new",
+							"hx-target": "body",
+							"hx-swap": "beforeend",
+						},
+					}) {
 						<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 						</svg>
 						Generate Token
-					</button>
+					}
 				</div>
 				<p class="text-sm text-gray-500 mb-4 dark:text-gray-400">API tokens allow programmatic access to your account. Keep them secure!</p>
 				
 				<div class="mb-4">
-					@components.AlertMessage("info", "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1 and on the MCP endpoint at /mcp. Full tokens also work on the web routes and are refused on /mcp.")
+					@ui.AlertMessage(ui.AlertInfo, "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1 and on the MCP endpoint at /mcp. Full tokens also work on the web routes and are refused on /mcp.")
 				</div>
 
 				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-gray-100 animate-fade-in dark:divide-gray-800">
 					@components.LoadingState("Loading tokens...")
 				</div>
-			</div>
+			}
 		</div>
 	}
 }
@@ -129,12 +150,22 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 // MCPCardView shows the /mcp endpoint, a copy-ready mcp.json, and the MCP
 // token preset.
 templ MCPCardView(mcp *MCPCard) {
-	<div class="card mb-8" id="mcp-card">
+	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "mcp-card"}}) {
 		<div class="flex items-center justify-between mb-4">
-			<h3 class="card-title">MCP</h3>
-			<button hx-get="/settings/tokens/new?preset=mcp" hx-target="body" hx-swap="beforeend" class="btn-primary btn-sm">
+			@ui.CardTitle(3, nil) {
+				MCP
+			}
+			@ui.Button(ui.ButtonProps{
+				Variant: ui.ButtonPrimary,
+				Size: ui.ButtonSM,
+				Attrs: templ.Attributes{
+					"hx-get": "/settings/tokens/new?preset=mcp",
+					"hx-target": "body",
+					"hx-swap": "beforeend",
+				},
+			}) {
 				Generate MCP token
-			</button>
+			}
 		</div>
 		<p class="text-sm text-gray-500 mb-4 dark:text-gray-400">
 			Point an MCP client (Cursor, Claude, or any streamable HTTP client) at this endpoint with an MCP token. A read token gets { fmt.Sprint(MCPReadTools) } read-only tools; a token with write gets all { fmt.Sprint(MCPWriteTools) }, and every change is a dry run until you pass an approval_ref. Full tokens are refused.
@@ -145,9 +176,11 @@ templ MCPCardView(mcp *MCPCard) {
 		<pre id="mcp-snippet" class="mb-2 w-full overflow-x-auto rounded-lg bg-gray-100 p-3 text-xs font-mono border border-gray-200 dark:bg-gray-800 dark:border-gray-800">{ mcp.Snippet }</pre>
 		<p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Set <code>{ MCPTokenEnv }</code> in the client's environment to the token. The token is not stored in the file.</p>
 		<div class="flex justify-end">
-			<button type="button" onclick={ copyText(mcp.Snippet, "Copy mcp.json") } class="btn-secondary btn-sm">Copy mcp.json</button>
+			// onclick takes a templ script, which templ.Attributes cannot carry,
+			// so this keeps a native button styled by ui.ButtonClass.
+			<button type="button" onclick={ copyText(mcp.Snippet, "Copy mcp.json") } class={ ui.ButtonClass(ui.ButtonSecondary, ui.ButtonSM) }>Copy mcp.json</button>
 		</div>
-	</div>
+	}
 }
 
 templ APITokenRow(token *models.APIToken) {
@@ -170,29 +203,37 @@ templ APITokenRow(token *models.APIToken) {
 			</p>
 			<p class="mt-1 flex flex-wrap gap-1">
 				for _, scope := range tokenScopes(token) {
-					<span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{ scope }</span>
+					@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-gray-700 dark:text-gray-300"}) {
+						{ scope }
+					}
 				}
 			</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<button
-				hx-post={ "/settings/tokens/" + token.ID + "/rotate" }
-				hx-target="body"
-				hx-swap="beforeend"
-				hx-confirm="Rotate this token? The current secret stops working immediately."
-				class="btn-secondary btn-sm"
-			>
+			@ui.Button(ui.ButtonProps{
+				Variant: ui.ButtonSecondary,
+				Size: ui.ButtonSM,
+				Attrs: templ.Attributes{
+					"hx-post": "/settings/tokens/" + token.ID + "/rotate",
+					"hx-target": "body",
+					"hx-swap": "beforeend",
+					"hx-confirm": "Rotate this token? The current secret stops working immediately.",
+				},
+			}) {
 				Rotate
-			</button>
-			<button
-				hx-delete={ "/settings/tokens/" + token.ID }
-				hx-target="#tokens-list"
-				hx-swap="innerHTML"
-				hx-confirm="Revoke this token? Anything using it stops working immediately."
-				class="btn-danger btn-sm"
-			>
+			}
+			@ui.Button(ui.ButtonProps{
+				Variant: ui.ButtonDanger,
+				Size: ui.ButtonSM,
+				Attrs: templ.Attributes{
+					"hx-delete": "/settings/tokens/" + token.ID,
+					"hx-target": "#tokens-list",
+					"hx-swap": "innerHTML",
+					"hx-confirm": "Revoke this token? Anything using it stops working immediately.",
+				},
+			}) {
 				Revoke
-			</button>
+			}
 		</div>
 	</div>
 }
@@ -224,10 +265,10 @@ templ TokenCreatedModal(title, rawToken string, mcp bool) {
 			</div>
 		</div>
 		<div class="flex justify-end gap-3">
-			<button type="button" data-modal-close class="btn-secondary">
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: templ.Attributes{"data-modal-close": true}}) {
 				Close
-			</button>
-			<button type="button" onclick={ copyText(rawToken, "Copy to Clipboard") } class="btn-primary">
+			}
+			<button type="button" onclick={ copyText(rawToken, "Copy to Clipboard") } class={ ui.ButtonClass(ui.ButtonPrimary, ui.ButtonMD) }>
 				Copy to Clipboard
 			</button>
 		</div>
@@ -291,10 +332,18 @@ templ AddAPITokenModal(csrfToken string, mcp bool) {
 			</fieldset>
 
 			<div class="mt-8 flex justify-end space-x-3">
-				<button type="button" data-modal-close class="btn-secondary">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonSecondary,
+					Attrs: templ.Attributes{
+						"data-modal-close": true,
+					},
+				}) {
 					Cancel
-				</button>
-				@components.Button("Generate Token", "primary")
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+					Generate Token
+					@components.Spinner()
+				}
 			</div>
 		</form>
 	}
@@ -324,8 +373,10 @@ func formatDate(t time.Time) string {
 // access key; it only says whether one is stored. There is no run-now
 // button; use `goforge backup run`.
 templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string) {
-	<div class="card mb-8" id="backup-status">
-		<h3 class="card-title mb-2">Backups</h3>
+	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "backup-status"}}) {
+		@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
+			Backups
+		}
 		if !st.Enabled {
 			<p class={ "text-sm", backupOffClass(form) } data-testid="backup-off">
 				{ backupOffLine(st, form) }
@@ -355,7 +406,7 @@ templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string)
 		if form != nil {
 			@backupSettingsForm(form, csrfToken)
 		}
-	</div>
+	}
 }
 
 // BackupRestorePoints is the read-only Restore points list, loaded into the
@@ -475,13 +526,28 @@ templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
 			</div>
 		</div>
 		<div class="mt-4 flex justify-end gap-2">
-			<button type="button" class="btn-secondary" data-testid="backup-test" hx-post="/settings/backups/test" hx-include="closest form" hx-swap="none" hx-target="this">
+			@ui.Button(ui.ButtonProps{
+				Variant: ui.ButtonSecondary,
+				Attrs: templ.Attributes{
+					"data-testid": "backup-test",
+					"hx-post": "/settings/backups/test",
+					"hx-include": "closest form",
+					"hx-swap": "none",
+					"hx-target": "this",
+				},
+			}) {
 				Test connection
-			</button>
-			<button type="submit" class="btn-primary" data-testid="backup-save">
+			}
+			@ui.Button(ui.ButtonProps{
+				Variant: ui.ButtonPrimary,
+				Type: "submit",
+				Attrs: templ.Attributes{
+					"data-testid": "backup-save",
+				},
+			}) {
 				Save backup settings
 				@components.Spinner()
-			</button>
+			}
 		</div>
 	</form>
 }

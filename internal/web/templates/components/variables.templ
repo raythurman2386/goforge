@@ -1,37 +1,51 @@
 package components
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
 templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken string, projectID string) {
-	<div class="card !p-0 overflow-hidden">
-		<div class="card-header">
+	@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
+		@ui.CardHeader(nil) {
 			<div>
-				<h3 class="card-title">Environment Variables</h3>
+				@ui.CardTitle(3, nil) {
+					Environment Variables
+				}
 				<p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Variables for this environment.</p>
 			</div>
 			<div class="flex items-center gap-2">
 				if projectID != "" {
-					<button
-						hx-post={ "/projects/" + projectID + "/envs/" + envID + "/variables/sync" }
-						hx-swap="none"
-						hx-headers={ `{"X-CSRF-Token": "` + csrfToken + `"}` }
-						hx-disabled-elt="this"
-						hx-indicator="find .htmx-indicator"
-						class="btn-secondary btn-sm"
-					>
+					@ui.Button(ui.ButtonProps{
+						Variant: ui.ButtonSecondary,
+						Size: ui.ButtonSM,
+						Attrs: templ.Attributes{
+							"hx-post": "/projects/" + projectID + "/envs/" + envID + "/variables/sync",
+							"hx-swap": "none",
+							"hx-headers": `{"X-CSRF-Token": "` + csrfToken + `"}`,
+							"hx-disabled-elt": "this",
+							"hx-indicator": "find .htmx-indicator",
+						},
+					}) {
 						Sync from repo
 						@Spinner()
-					</button>
+					}
 				}
-				<button type="button" hx-get={ "/envs/" + envID + "/variables/new" } hx-target="body" hx-swap="beforeend" class="btn-primary btn-sm">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonPrimary,
+					Size: ui.ButtonSM,
+					Attrs: templ.Attributes{
+						"hx-get": "/envs/" + envID + "/variables/new",
+						"hx-target": "body",
+						"hx-swap": "beforeend",
+					},
+				}) {
 					+ Add Variable
-				</button>
+				}
 			</div>
-		</div>
+		}
 		
-		<div class="card-body">
+		@ui.CardContent(nil) {
 			if len(variables) == 0 {
 				<p class="text-sm text-gray-500 dark:text-gray-400">No variables defined.</p>
 			} else {
@@ -49,26 +63,29 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 								</div>
 							</div>
 							<div class="flex items-center space-x-2">
-								<button
-									hx-delete={ "/envs/" + envID + "/variables/" + v.ID }
-									hx-confirm="Delete this variable?"
-									hx-swap="none"
-									hx-headers={ `{"X-CSRF-Token": "` + csrfToken + `"}` }
-									class="icon-btn hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/40"
-									title="Delete"
-									aria-label={ "Delete " + v.Key }
-								>
+								@ui.Button(ui.ButtonProps{
+									Variant: ui.ButtonGhostDanger,
+									Size: ui.ButtonIcon,
+									Label: "Delete " + v.Key,
+									Attrs: templ.Attributes{
+										"hx-delete": "/envs/" + envID + "/variables/" + v.ID,
+										"hx-confirm": "Delete this variable?",
+										"hx-swap": "none",
+										"hx-headers": `{"X-CSRF-Token": "` + csrfToken + `"}`,
+										"title": "Delete",
+									},
+								}) {
 									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
 									</svg>
-								</button>
+								}
 							</div>
 						</div>
 					}
 				</div>
 			}
-		</div>
-	</div>
+		}
+	}
 }
 
 templ AddVariableModal(envID string, csrfToken string) {
@@ -86,10 +103,18 @@ templ AddVariableModal(envID string, csrfToken string) {
 			</div>
 
 			<div class="mt-5 flex justify-end space-x-3">
-				<button type="button" data-modal-close class="btn-secondary">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonSecondary,
+					Attrs: templ.Attributes{
+						"data-modal-close": true,
+					},
+				}) {
 					Cancel
-				</button>
-				@Button("Add Variable", "primary")
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+					Add Variable
+					@Spinner()
+				}
 			</div>
 		</form>
 	}

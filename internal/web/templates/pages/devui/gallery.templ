@@ -1,11 +1,12 @@
 // Package devui is the UI kit gallery, served at /dev/ui only when
 // GOFORGE_DEV_MODE=true (see web.Router). It shows the design tokens, the
-// legacy component classes restated on them, and each components/ui
+// legacy form and table classes restated on them, and each components/ui
 // primitive with its variants. verify.sh drive-ui-a11y scans it with axe in
 // light and dark.
 package devui
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
@@ -17,6 +18,22 @@ var colorTokens = []string{
 	"field-placeholder", "secondary", "secondary-foreground", "secondary-hover",
 	"secondary-border", "ring", "ring-offset",
 }
+
+var buttonVariants = []struct {
+	variant ui.ButtonVariant
+	label   string
+}{
+	{ui.ButtonPrimary, "Primary"},
+	{ui.ButtonSecondary, "Secondary"},
+	{ui.ButtonDanger, "Danger"},
+	{ui.ButtonWarning, "Warning"},
+	{ui.ButtonGhost, "Ghost"},
+	{ui.ButtonLink, "Link"},
+}
+
+var badgeTones = []ui.BadgeTone{ui.BadgeNeutral, ui.BadgePrimary, ui.BadgeSuccess, ui.BadgeWarning, ui.BadgeDanger, ui.BadgeInfo}
+
+var badgeVariants = []ui.BadgeVariant{ui.BadgeSoft, ui.BadgeSubtle, ui.BadgeSolid, ui.BadgeOutline}
 
 var primarySteps = []string{"50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"}
 
@@ -54,20 +71,98 @@ templ Gallery(csrfToken string) {
 					<div class="flex h-16 w-24 items-center justify-center rounded-ui-lg border border-border bg-card text-xs">rounded-ui-lg</div>
 				</div>
 			}
-			@section("buttons", "Buttons (legacy classes on tokens)") {
+			@section("buttons", "Button") {
 				<div class="flex flex-wrap items-center gap-3">
-					<button type="button" class="btn-primary">Primary</button>
-					<button type="button" class="btn-secondary">Secondary</button>
-					<button type="button" class="btn-danger">Danger</button>
-					<button type="button" class="btn-warning">Warning</button>
-					<button type="button" class="btn-primary btn-sm">Small</button>
-					<button type="button" class="btn-secondary" disabled>Disabled</button>
-					<a href="#buttons" class="btn-secondary">Link as button</a>
-					<button type="button" class="icon-btn hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300" aria-label="Refresh">
-						<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-					</button>
+					for _, v := range buttonVariants {
+						@ui.Button(ui.ButtonProps{Variant: v.variant}) {
+							{ v.label }
+						}
+					}
 				</div>
-				<p class="mt-3 text-sm text-muted-foreground">Rings show on keyboard focus only (focus-visible). Press Tab to see them.</p>
+				<div class="mt-4 flex flex-wrap items-center gap-3">
+					@ui.Button(ui.ButtonProps{Size: ui.ButtonSM}) {
+						Small
+					}
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Disabled: true}) {
+						Disabled
+					}
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Href: "#buttons"}) {
+						Link as button
+					}
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Href: "#buttons", Disabled: true}) {
+						Disabled link
+					}
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonIcon, Label: "Refresh"}) {
+						<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+					}
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhostDanger, Size: ui.ButtonIcon, Label: "Delete example"}) {
+						<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+					}
+				</div>
+				<p class="mt-3 text-sm text-muted-foreground">Rings show on keyboard focus only (focus-visible). Press Tab to see them. Icon buttons are 44px on touch widths and 32px from md up.</p>
+			}
+			@section("badges", "Badge") {
+				for _, v := range badgeVariants {
+					<div class="flex flex-wrap items-center gap-2">
+						<span class="w-16 text-xs text-muted-foreground">{ string(v) }</span>
+						for _, t := range badgeTones {
+							@ui.Badge(ui.BadgeProps{Tone: t, Variant: v}) {
+								{ string(t) }
+							}
+						}
+					</div>
+				}
+				<div class="flex flex-wrap items-center gap-2">
+					@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Variant: ui.BadgeSubtle, Square: true}) {
+						Square
+					}
+					@ui.Badge(ui.BadgeProps{Tone: ui.BadgeSuccess, Size: ui.BadgeMD}) {
+						Medium
+					}
+					@components.StatusBadge("deployment", "running")
+					@components.StatusBadge("deployment", "building")
+					@components.StatusBadge("deployment", "failed")
+				</div>
+			}
+			@section("alerts", "Alert") {
+				<div class="space-y-3">
+					@ui.Alert(ui.AlertProps{Tone: ui.AlertInfo, Title: "Info"}) {
+						<p>Polite: role="status".</p>
+					}
+					@ui.Alert(ui.AlertProps{Tone: ui.AlertSuccess}) {
+						<p>Saved. No title, one line.</p>
+					}
+					@ui.Alert(ui.AlertProps{Tone: ui.AlertWarning, Title: "Warning", Dismissible: true}) {
+						<p>Dismissible: the close button removes the alert (static/js/ui.js).</p>
+					}
+					@ui.AlertMessage(ui.AlertError, "Errors interrupt: role=\"alert\".")
+				</div>
+			}
+			@section("skeletons", "Skeleton") {
+				<div role="status" aria-label="Loading example" aria-busy="true" class="flex items-center gap-4">
+					@ui.Skeleton(ui.SkeletonCircle, "")
+					<div class="flex-1 space-y-2">
+						@ui.Skeleton(ui.SkeletonLine, "w-1/2")
+						@ui.Skeleton(ui.SkeletonLine, "")
+					</div>
+				</div>
+				@ui.Skeleton(ui.SkeletonBlock, "mt-4")
+				<p class="mt-3 text-sm text-muted-foreground">Pulses only with motion allowed (motion-safe). Shapes are aria-hidden; the region carries role="status" and aria-busy.</p>
+			}
+			@section("avatars", "Avatar") {
+				<div class="flex items-center gap-3">
+					@ui.Avatar(ui.AvatarProps{Name: "Ada Lovelace", Size: ui.AvatarSM})
+					@ui.Avatar(ui.AvatarProps{Name: "grace@example.com", Size: ui.AvatarMD})
+					@ui.Avatar(ui.AvatarProps{Name: "Linus", Size: ui.AvatarLG, Label: "Linus"})
+				</div>
+				<p class="mt-3 text-sm text-muted-foreground">Initials only, no remote images. Decorative (aria-hidden) unless Label is set.</p>
+			}
+			@section("breadcrumbs", "Breadcrumb") {
+				@ui.Breadcrumb([]ui.Crumb{
+					{Label: "Projects", Href: "#breadcrumbs"},
+					{Label: "my-app", Href: "#breadcrumbs"},
+					{Label: "Deployments"},
+				})
 			}
 			@section("forms", "Form controls (legacy classes on tokens)") {
 				<form class="grid gap-4 sm:grid-cols-2" action="#">
@@ -91,13 +186,22 @@ templ Gallery(csrfToken string) {
 					</div>
 				</form>
 			}
-			@section("cards", "Card and table (legacy classes on tokens)") {
-				<div class="card !p-0">
-					<div class="card-header">
-						<h3 class="card-title">Card header</h3>
-						<button type="button" class="btn-secondary btn-sm">Action</button>
-					</div>
-					<div class="card-body">
+			@section("cards", "Card (table on legacy classes)") {
+				@ui.Card(ui.CardProps{Flush: true}) {
+					@ui.CardHeader(nil) {
+						<div>
+							@ui.CardTitle(3, nil) {
+								Card header
+							}
+							@ui.CardDescription(nil) {
+								A flush card with a header, content, and footer.
+							}
+						</div>
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM}) {
+							Action
+						}
+					}
+					@ui.CardContent(nil) {
 						<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Example table">
 							<table class="min-w-full">
 								<caption class="sr-only">Example deployments</caption>
@@ -119,15 +223,23 @@ templ Gallery(csrfToken string) {
 								</tbody>
 							</table>
 						</div>
-					</div>
-				</div>
-				<div class="card mt-4">
+					}
+					@ui.CardFooter(nil) {
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary}) {
+							Save
+						}
+					}
+				}
+				@ui.Card(ui.CardProps{Class: "mt-4"}) {
 					<p class="text-sm">A padded card. Focus ring helper: <a href="#cards" class="ui-focus-ring rounded-ui font-medium text-primary-700 underline dark:text-primary-300">a link with ui-focus-ring</a>.</p>
-				</div>
+				}
+				@ui.Card(ui.CardProps{Href: "#cards", Class: "mt-4 block"}) {
+					<p class="text-sm font-medium">A link card (Href set).</p>
+				}
 			}
 			@section("components", "Components") {
 				<p class="text-sm text-muted-foreground">
-					Foundation only. Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb, form fields, Dialog, Dropdown, Popover, Tooltip, Tabs, Table, and Sheet land here with their variants as their PRs merge.
+					Static primitives above: Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb. Form fields, Dialog, Dropdown, Popover, Tooltip, Tabs, Table, and Sheet land here with their variants as their PRs merge.
 				</p>
 			}
 		</main>
@@ -137,8 +249,8 @@ templ Gallery(csrfToken string) {
 templ section(id, title string) {
 	<section id={ id } aria-labelledby={ id + "-title" } class="space-y-4">
 		<h2 id={ id + "-title" } class="text-lg font-semibold text-foreground">{ title }</h2>
-		<div class="card">
+		@ui.Card(ui.CardProps{}) {
 			{ children... }
-		</div>
+		}
 	</section>
 }

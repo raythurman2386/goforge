@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
@@ -9,12 +10,19 @@ import (
 templ GitSources(sources []*models.GitSource, csrfToken string) {
 	@layouts.AppLayout("Git Sources", csrfToken) {
 		@components.PageHeader("Git Sources", "Manage your git provider integrations and access tokens.") {
-				<button hx-get="/settings/git/new" hx-target="body" hx-swap="beforeend" class="btn-primary">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonPrimary,
+					Attrs: templ.Attributes{
+						"hx-get": "/settings/git/new",
+						"hx-target": "body",
+						"hx-swap": "beforeend",
+					},
+				}) {
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 					</svg>
 					Add Source
-				</button>
+				}
 		}
 
 		if len(sources) == 0 {
@@ -26,7 +34,7 @@ templ GitSources(sources []*models.GitSource, csrfToken string) {
 				Icon:        "code",
 			})
 		} else {
-			<div class="card overflow-hidden !p-0">
+			@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
 				<ul role="list" class="divide-y divide-gray-100 dark:divide-gray-800">
 					for _, s := range sources {
 						<li class="hover:bg-gray-50 transition-colors dark:hover:bg-gray-800/50">
@@ -45,17 +53,22 @@ templ GitSources(sources []*models.GitSource, csrfToken string) {
 									</div>
 								</div>
 								<div class="flex space-x-2">
-									<button hx-delete={ "/settings/git/" + s.ID } hx-confirm="Remove this source?" class="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-200 dark:hover:text-red-400 dark:hover:bg-red-950/40">
-										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									@ui.Button(ui.ButtonProps{
+										Variant: ui.ButtonGhostDanger,
+										Size:    ui.ButtonIcon,
+										Label:   "Remove " + s.Name,
+										Attrs:   templ.Attributes{"hx-delete": "/settings/git/" + s.ID, "hx-confirm": "Remove this source?"},
+									}) {
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
 										</svg>
-									</button>
+									}
 								</div>
 							</div>
 						</li>
 					}
 				</ul>
-			</div>
+			}
 		}
 	}
 }
@@ -95,10 +108,18 @@ templ AddGitSourceModal(csrfToken string) {
 			@components.Input("Access Token", "access_token", "password", "", true)
 
 			<div class="mt-8 flex justify-end space-x-3">
-				<button type="button" data-modal-close class="btn-secondary">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonSecondary,
+					Attrs: templ.Attributes{
+						"data-modal-close": true,
+					},
+				}) {
 					Cancel
-				</button>
-				@components.Button("Add Source", "primary")
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+					Add Source
+					@components.Spinner()
+				}
 			</div>
 		</form>
 	}

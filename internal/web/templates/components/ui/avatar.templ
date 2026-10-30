@@ -1,0 +1,6 @@
+package ui
+
+// Avatar is a round initials badge for a user (no remote images).
+templ Avatar(p AvatarProps) {
+	<span { avatarAttrs(p)... }>{ Initials(p.Name) }</span>
+}

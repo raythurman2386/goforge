@@ -1,6 +1,7 @@
 package components
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"strconv"
 
@@ -24,32 +25,39 @@ templ Pagination(p *pagination.Pagination) {
 			</div>
 			<div class="flex flex-1 justify-between sm:justify-end">
 				if p.HasPrevious() {
-					<a
-						href={ templ.URL(p.PreviousURL()) }
-						class="btn-secondary btn-sm"
-						hx-get={ p.PreviousURL() }
-						hx-target="#content"
-						hx-push-url="true"
-					>
+					@ui.Button(ui.ButtonProps{
+						Variant: ui.ButtonSecondary,
+						Size: ui.ButtonSM,
+						Href: templ.URL(p.PreviousURL()),
+						Attrs: templ.Attributes{
+							"hx-get": p.PreviousURL(),
+							"hx-target": "#content",
+							"hx-push-url": "true",
+						},
+					}) {
 						Previous
-					</a>
+					}
 				} else {
-					<span class="btn-secondary btn-sm opacity-50 cursor-not-allowed" aria-disabled="true">
+					<span class={ ui.ButtonClass(ui.ButtonSecondary, ui.ButtonSM) } aria-disabled="true">
 						Previous
 					</span>
 				}
 				if p.HasNext() {
-					<a
-						href={ templ.URL(p.NextURL()) }
-						class="btn-secondary btn-sm ml-3"
-						hx-get={ p.NextURL() }
-						hx-target="#content"
-						hx-push-url="true"
-					>
+					@ui.Button(ui.ButtonProps{
+						Variant: ui.ButtonSecondary,
+						Size: ui.ButtonSM,
+						Href: templ.URL(p.NextURL()),
+						Class: "ml-3",
+						Attrs: templ.Attributes{
+							"hx-get": p.NextURL(),
+							"hx-target": "#content",
+							"hx-push-url": "true",
+						},
+					}) {
 						Next
-					</a>
+					}
 				} else {
-					<span class="btn-secondary btn-sm ml-3 opacity-50 cursor-not-allowed" aria-disabled="true">
+					<span class={ ui.Class(ui.ButtonClass(ui.ButtonSecondary, ui.ButtonSM), "ml-3") } aria-disabled="true">
 						Next
 					</span>
 				}
@@ -77,86 +85,102 @@ templ PaginationFull(p *pagination.Pagination) {
 				<div class="flex items-center space-x-1">
 					// First page button
 					if p.Page > 2 {
-						<a
-							href={ templ.URL(p.FirstURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
-							hx-get={ p.FirstURL() }
-							hx-target="#content"
-							hx-push-url="true"
-							title="First page"
-						>
+						@ui.Button(ui.ButtonProps{
+							Variant: ui.ButtonSecondary,
+							Size: ui.ButtonSM,
+							Href: templ.URL(p.FirstURL()),
+							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Attrs: templ.Attributes{
+								"hx-get": p.FirstURL(),
+								"hx-target": "#content",
+								"hx-push-url": "true",
+								"title": "First page",
+							},
+						}) {
 							<span class="sr-only">First</span>
 							<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 								<path fill-rule="evenodd" d="M15.79 14.77a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L11.832 10l3.938 3.71a.75.75 0 01.02 1.06zm-6 0a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L5.832 10l3.938 3.71a.75.75 0 01.02 1.06z" clip-rule="evenodd"></path>
 							</svg>
-						</a>
+						}
 					}
 					// Previous button
 					if p.HasPrevious() {
-						<a
-							href={ templ.URL(p.PreviousURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
-							hx-get={ p.PreviousURL() }
-							hx-target="#content"
-							hx-push-url="true"
-						>
+						@ui.Button(ui.ButtonProps{
+							Variant: ui.ButtonSecondary,
+							Size: ui.ButtonSM,
+							Href: templ.URL(p.PreviousURL()),
+							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Attrs: templ.Attributes{
+								"hx-get": p.PreviousURL(),
+								"hx-target": "#content",
+								"hx-push-url": "true",
+							},
+						}) {
 							<span class="sr-only">Previous</span>
 							<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 								<path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd"></path>
 							</svg>
-						</a>
+						}
 					}
 					// Page numbers
 					for _, pageNum := range p.PageRange(5) {
 						if pageNum == p.Page {
-							<span
-								class="btn-primary btn-sm"
-								aria-current="page"
-							>
+							<span class={ ui.ButtonClass(ui.ButtonPrimary, ui.ButtonSM) } aria-current="page">
 								{ strconv.Itoa(pageNum) }
 							</span>
 						} else {
-							<a
-								href={ templ.URL(p.PageURL(pageNum)) }
-								class="btn-secondary btn-sm"
-								hx-get={ p.PageURL(pageNum) }
-								hx-target="#content"
-								hx-push-url="true"
-							>
+							@ui.Button(ui.ButtonProps{
+								Variant: ui.ButtonSecondary,
+								Size: ui.ButtonSM,
+								Href: templ.URL(p.PageURL(pageNum)),
+								Attrs: templ.Attributes{
+									"hx-get": p.PageURL(pageNum),
+									"hx-target": "#content",
+									"hx-push-url": "true",
+								},
+							}) {
 								{ strconv.Itoa(pageNum) }
-							</a>
+							}
 						}
 					}
 					// Next button
 					if p.HasNext() {
-						<a
-							href={ templ.URL(p.NextURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
-							hx-get={ p.NextURL() }
-							hx-target="#content"
-							hx-push-url="true"
-						>
+						@ui.Button(ui.ButtonProps{
+							Variant: ui.ButtonSecondary,
+							Size: ui.ButtonSM,
+							Href: templ.URL(p.NextURL()),
+							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Attrs: templ.Attributes{
+								"hx-get": p.NextURL(),
+								"hx-target": "#content",
+								"hx-push-url": "true",
+							},
+						}) {
 							<span class="sr-only">Next</span>
 							<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 								<path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"></path>
 							</svg>
-						</a>
+						}
 					}
 					// Last page button
 					if p.Page < p.TotalPages-1 {
-						<a
-							href={ templ.URL(p.LastURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
-							hx-get={ p.LastURL() }
-							hx-target="#content"
-							hx-push-url="true"
-							title="Last page"
-						>
+						@ui.Button(ui.ButtonProps{
+							Variant: ui.ButtonSecondary,
+							Size: ui.ButtonSM,
+							Href: templ.URL(p.LastURL()),
+							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Attrs: templ.Attributes{
+								"hx-get": p.LastURL(),
+								"hx-target": "#content",
+								"hx-push-url": "true",
+								"title": "Last page",
+							},
+						}) {
 							<span class="sr-only">Last</span>
 							<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 								<path fill-rule="evenodd" d="M4.21 5.23a.75.75 0 011.06-.02l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 11-1.04-1.08L8.168 10 4.23 6.29a.75.75 0 01-.02-1.06zm6 0a.75.75 0 011.06-.02l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 11-1.04-1.08L14.168 10l-3.938-3.71a.75.75 0 01-.02-1.06z" clip-rule="evenodd"></path>
 							</svg>
-						</a>
+						}
 					}
 				</div>
 			</div>

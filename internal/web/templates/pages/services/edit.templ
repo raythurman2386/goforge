@@ -1,6 +1,7 @@
 package pages_services
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
@@ -31,7 +32,7 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 				</div>
 			</div>
 			<div class="mb-6">
-			@components.Alert("warning") {
+			@ui.Alert(ui.AlertProps{Tone: ui.AlertWarning}) {
 				<p class="font-semibold">Saving recreates the container.</p>
 				<p class="mt-1">The service restarts with the new settings. Its data volumes are kept and mounted again:</p>
 				if len(tmpl.Docker.Volumes) > 0 {
@@ -44,7 +45,7 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 				<p class="mt-2">Some images read credentials only on first start. Changing a database password here does not change it inside existing data.</p>
 			}
 			</div>
-			<div class="card">
+			@ui.Card(ui.CardProps{}) {
 				<form class="space-y-8" action={ templ.SafeURL("/services/" + instance.ID + "/edit") } method="POST">
 					<input type="hidden" name="csrf_token" value={ csrfToken }/>
 					@components.Input("Service Name", "name", "text", configValue(config, "name", instance.Name), true)
@@ -68,13 +69,19 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 						}
 					}
 					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3 dark:border-gray-800">
-						<a href={ templ.SafeURL("/services/" + instance.ID) } class="btn-secondary">
+						@ui.Button(ui.ButtonProps{
+							Variant: ui.ButtonSecondary,
+							Href: templ.SafeURL("/services/" + instance.ID),
+						}) {
 							Cancel
-						</a>
-						@components.Button("Save and Recreate", "primary")
+						}
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+							Save and Recreate
+							@components.Spinner()
+						}
 					</div>
 				</form>
-			</div>
+			}
 		</div>
 	}
 }

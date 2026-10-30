@@ -1,14 +1,14 @@
 package pages
 
 import (
-	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
 templ Register(csrfToken, errorMessage string) {
 	@layouts.AuthLayout("Register", csrfToken) {
 		@authHeader("Create your account", "Start deploying in minutes")
-		<div class="card">
+		@ui.Card(ui.CardProps{}) {
 			<form class="space-y-5" action="/auth/register" method="POST">
 				<input type="hidden" name="csrf_token" value={ csrfToken }/>
 				<div>
@@ -24,11 +24,13 @@ templ Register(csrfToken, errorMessage string) {
 					<input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" required class="input"/>
 				</div>
 				if errorMessage != "" {
-					@components.AlertMessage("error", errorMessage)
+					@ui.AlertMessage(ui.AlertError, errorMessage)
 				}
-				<button type="submit" class="btn-primary w-full">Register</button>
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit", Class: "w-full"}) {
+					Register
+				}
 			</form>
-		</div>
+		}
 
 		<p class="text-center text-sm text-gray-600 dark:text-gray-400">
 			Already have an account?

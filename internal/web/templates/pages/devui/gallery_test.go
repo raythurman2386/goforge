@@ -20,6 +20,12 @@ func TestGalleryRenders(t *testing.T) {
 		`aria-describedby="gallery-name-help"`, `class="sr-only"`,
 		`<th scope="col" class="table-th">`,
 		`src="/static/js/ui.js"`,
+		`aria-labelledby="badges-title"`, `aria-labelledby="alerts-title"`,
+		`aria-labelledby="skeletons-title"`, `aria-labelledby="avatars-title"`,
+		`aria-labelledby="breadcrumbs-title"`, `aria-label="Breadcrumb"`,
+		`aria-current="page"`, `data-ui="alert"`, `aria-label="Dismiss"`,
+		`role="alert"`, `aria-busy="true"`, `aria-disabled="true"`,
+		`motion-safe:animate-pulse`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("gallery missing %q", want)

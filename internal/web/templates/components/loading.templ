@@ -14,12 +14,6 @@ templ LoadingState(label string) {
 	</div>
 }
 
-// Skeleton is a pulsing placeholder bar. class sets its size, for example
-// "h-8 w-24".
-templ Skeleton(class string) {
-	<div class={ "animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700", class } aria-hidden="true"></div>
-}
-
 // Spinner is a small inline request indicator. It uses the .htmx-indicator
 // class from input.css, so it is hidden until the element named by
 // hx-indicator (or an ancestor) carries htmx-request.

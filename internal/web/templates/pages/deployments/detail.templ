@@ -1,6 +1,7 @@
 package deployments
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"time"
 
@@ -22,7 +23,7 @@ type DetailProps struct {
 templ Detail(props DetailProps) {
 	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID)), props.CSRFToken) {
 		<div hx-ext="sse" sse-connect={ fmt.Sprintf("/projects/%s/deployments/%s/logs", props.Project.ID, props.Deployment.ID) }>
-		@components.Breadcrumbs([]components.Crumb{
+		@ui.Breadcrumb([]ui.Crumb{
 			{Label: "Projects", Href: "/projects"},
 			{Label: props.Project.Name, Href: "/projects/" + props.Project.ID},
 			{Label: "Deployments", Href: "/projects/" + props.Project.ID + "/deployments"},
@@ -31,48 +32,52 @@ templ Detail(props DetailProps) {
 
 		@components.PageHeaderWithBadge("Deployment "+truncateID(props.Deployment.ID), "", liveStatus(props.Deployment.Status)) {
 			if props.CanRollback && props.Deployment.Status == models.DeploymentStatusRunning {
-				<button
-					type="button"
-					hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/rollback", props.Project.ID, props.Deployment.ID) }
-					hx-confirm="Are you sure you want to rollback this deployment?"
-					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
-					hx-disabled-elt="this"
-					hx-indicator="find .htmx-indicator"
-					class="btn-warning"
-				>
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonWarning,
+					Attrs: templ.Attributes{
+						"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/rollback", props.Project.ID, props.Deployment.ID),
+						"hx-confirm": "Are you sure you want to rollback this deployment?",
+						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
+						"hx-disabled-elt": "this",
+						"hx-indicator": "find .htmx-indicator",
+					},
+				}) {
 					<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
 					</svg>
 					Rollback
 					@components.Spinner()
-				</button>
+				}
 			}
 			if !props.Deployment.IsTerminal() {
-				<button
-					type="button"
-					hx-post={ fmt.Sprintf("/projects/%s/deployments/%s/cancel", props.Project.ID, props.Deployment.ID) }
-					hx-confirm="Are you sure you want to cancel this deployment?"
-					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken) }
-					hx-disabled-elt="this"
-					hx-indicator="find .htmx-indicator"
-					class="btn-secondary"
-				>
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonSecondary,
+					Attrs: templ.Attributes{
+						"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/cancel", props.Project.ID, props.Deployment.ID),
+						"hx-confirm": "Are you sure you want to cancel this deployment?",
+						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
+						"hx-disabled-elt": "this",
+						"hx-indicator": "find .htmx-indicator",
+					},
+				}) {
 					<svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
 					</svg>
 					Cancel
 					@components.Spinner()
-				</button>
+				}
 			}
 		}
 
 		<!-- Deployment Info Grid -->
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 			<!-- Main Info Card -->
-			<div class="lg:col-span-2 card !p-0 overflow-hidden">
-				<div class="card-header">
-					<h3 class="card-title">Deployment Information</h3>
-				</div>
+			@ui.Card(ui.CardProps{Flush: true, Class: "lg:col-span-2 overflow-hidden"}) {
+				@ui.CardHeader(nil) {
+					@ui.CardTitle(3, nil) {
+						Deployment Information
+					}
+				}
 				<dl class="divide-y divide-gray-100 dark:divide-gray-800">
 					@infoRow("Status") {
 						@liveStatus(props.Deployment.Status)
@@ -82,12 +87,12 @@ templ Detail(props DetailProps) {
 					}
 					if props.Deployment.Branch.Valid {
 						@infoRow("Branch") {
-							<span class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+							@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 font-mono text-gray-700 dark:text-gray-300"}) {
 								<svg class="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
 								</svg>
 								{ props.Deployment.Branch.String }
-							</span>
+							}
 						}
 					}
 					if props.Deployment.CommitSHA.Valid {
@@ -112,20 +117,22 @@ templ Detail(props DetailProps) {
 					}
 				</dl>
 				if props.Deployment.ErrorMessage.Valid {
-					<div class="card-body border-t border-gray-100 dark:border-gray-800">
-						@components.Alert("error") {
+					@ui.CardContent(templ.Attributes{"class": "border-t border-gray-100 dark:border-gray-800"}) {
+						@ui.Alert(ui.AlertProps{Tone: ui.AlertError}) {
 							<p class="font-semibold">Error</p>
 							<p class="mt-1 break-words">{ props.Deployment.ErrorMessage.String }</p>
 						}
-					</div>
+					}
 				}
-			</div>
+			}
 
 			<!-- Timeline Card -->
-			<div class="card !p-0">
-				<div class="card-header">
-					<h3 class="card-title">Timeline</h3>
-				</div>
+			@ui.Card(ui.CardProps{Flush: true}) {
+				@ui.CardHeader(nil) {
+					@ui.CardTitle(3, nil) {
+						Timeline
+					}
+				}
 				<dl class="card-body space-y-4">
 					<div>
 						<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
@@ -148,20 +155,22 @@ templ Detail(props DetailProps) {
 						<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatDuration(props.Deployment.Duration()) }</dd>
 					</div>
 				</dl>
-			</div>
+			}
 		</div>
 
 		<!-- Deployment Logs -->
-		<div class="card !p-0 overflow-hidden">
-			<div class="card-header">
-				<h3 class="card-title">Deployment Logs</h3>
+		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
+			@ui.CardHeader(nil) {
+				@ui.CardTitle(3, nil) {
+					Deployment Logs
+				}
 				if !props.Deployment.IsTerminal() {
 					<span class="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
 						<span class="h-2 w-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true"></span>
 						Live
 					</span>
 				}
-			</div>
+			}
 			<div id="deployment-logs" class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto dark:bg-gray-950">
 				<div id="deployment-log-lines" sse-swap="snapshot" hx-swap="innerHTML">
 					if len(props.Logs) == 0 {
@@ -174,7 +183,7 @@ templ Detail(props DetailProps) {
 				</div>
 				<div sse-swap="log" hx-swap="beforeend" hx-target="#deployment-log-lines"></div>
 			</div>
-		</div>
+		}
 		</div>
 	}
 }

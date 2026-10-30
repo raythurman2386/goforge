@@ -1,0 +1,31 @@
+package ui
+
+// Crumb is one Breadcrumb entry. The last entry is the current page and
+// ignores Href.
+type Crumb struct {
+	Label string
+	Href  string
+}
+
+// Breadcrumb is the trail above a detail page title. The last item is the
+// current page (aria-current="page"); separators are aria-hidden.
+templ Breadcrumb(items []Crumb) {
+	<nav class="mb-4" aria-label="Breadcrumb">
+		<ol class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+			for i, c := range items {
+				<li class="flex min-w-0 items-center gap-1.5">
+					if i > 0 {
+						<svg class="h-4 w-4 shrink-0 text-muted-foreground/60" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+						</svg>
+					}
+					if i == len(items)-1 {
+						<span class="truncate font-medium text-foreground" aria-current="page">{ c.Label }</span>
+					} else {
+						<a href={ templ.SafeURL(c.Href) } class="truncate rounded-ui font-medium transition-colors hover:text-foreground ui-focus-ring">{ c.Label }</a>
+					}
+				</li>
+			}
+		</ol>
+	</nav>
+}

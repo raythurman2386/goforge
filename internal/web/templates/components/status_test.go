@@ -41,17 +41,3 @@ func TestStatusBadge(t *testing.T) {
 		})
 	}
 }
-
-func TestRenderedAlertEscapesMessage(t *testing.T) {
-	var buf bytes.Buffer
-	if err := AlertMessage("error", `<img src=x>`).Render(context.Background(), &buf); err != nil {
-		t.Fatal(err)
-	}
-	got := buf.String()
-	if strings.Contains(got, "<img") || !strings.Contains(got, "&lt;img") {
-		t.Fatalf("alert did not escape message: %s", got)
-	}
-	if !strings.Contains(got, `role="alert"`) {
-		t.Fatalf("error alert missing role=alert: %s", got)
-	}
-}

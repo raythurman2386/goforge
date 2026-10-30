@@ -1,0 +1,24 @@
+package ui
+
+// Button is the one button: <button>, or <a> when Href is set. Children are
+// the content (text, an icon svg with aria-hidden, a Spinner). Without Type
+// it renders type="button", so pass Type: "submit" in forms.
+//
+//	@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+//		Save
+//	}
+templ Button(p ButtonProps) {
+	if p.Href != "" && !p.Disabled {
+		<a href={ p.Href } { buttonAttrs(p)... }>
+			{ children... }
+		</a>
+	} else if p.Href != "" {
+		<span aria-disabled="true" { buttonAttrs(p)... }>
+			{ children... }
+		</span>
+	} else {
+		<button type={ buttonType(p.Type) } disabled?={ p.Disabled } { buttonAttrs(p)... }>
+			{ children... }
+		</button>
+	}
+}

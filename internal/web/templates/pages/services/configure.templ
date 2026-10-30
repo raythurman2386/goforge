@@ -1,6 +1,7 @@
 package pages_services
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
@@ -38,7 +39,7 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 				</div>
 			</div>
 
-			<div class="card">
+			@ui.Card(ui.CardProps{}) {
 				<form class="space-y-8" action={ templ.SafeURL("/services/" + tmpl.Name) } method="POST">
 				<input type="hidden" name="csrf_token" value={ csrfToken } />
 					
@@ -89,13 +90,16 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 					}
 
 					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3 dark:border-gray-800">
-						<a href="/services" class="btn-secondary">
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Href: "/services"}) {
 							Cancel
-						</a>
-						@components.Button("Deploy Service", "primary")
+						}
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+							Deploy Service
+							@components.Spinner()
+						}
 					</div>
 				</form>
-			</div>
+			}
 		</div>
 	}
 }
