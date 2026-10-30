@@ -107,11 +107,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 					@ui.Button(ui.ButtonProps{
 						Variant: ui.ButtonSecondary,
 						Size: ui.ButtonSM,
-						Attrs: templ.Attributes{
-							"hx-get": "/settings/tokens/new",
-							"hx-target": "body",
-							"hx-swap": "beforeend",
-						},
+						Attrs: ui.OpenDialogAttrs("/settings/tokens/new"),
 					}) {
 						<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -144,11 +140,7 @@ templ MCPCardView(mcp *MCPCard) {
 			@ui.Button(ui.ButtonProps{
 				Variant: ui.ButtonPrimary,
 				Size: ui.ButtonSM,
-				Attrs: templ.Attributes{
-					"hx-get": "/settings/tokens/new?preset=mcp",
-					"hx-target": "body",
-					"hx-swap": "beforeend",
-				},
+				Attrs: ui.OpenDialogAttrs("/settings/tokens/new?preset=mcp"),
 			}) {
 				Generate MCP token
 			}
@@ -203,7 +195,9 @@ templ APITokenRow(token *models.APIToken) {
 					"hx-post": "/settings/tokens/" + token.ID + "/rotate",
 					"hx-target": "body",
 					"hx-swap": "beforeend",
+					"aria-haspopup": "dialog",
 					"hx-confirm": "Rotate this token? The current secret stops working immediately.",
+					"data-ui-confirm-label": "Rotate",
 				},
 			}) {
 				Rotate
@@ -216,6 +210,8 @@ templ APITokenRow(token *models.APIToken) {
 					"hx-target": "#tokens-list",
 					"hx-swap": "innerHTML",
 					"hx-confirm": "Revoke this token? Anything using it stops working immediately.",
+					"data-ui-confirm-tone": "danger",
+					"data-ui-confirm-label": "Revoke",
 				},
 			}) {
 				Revoke
@@ -235,7 +231,7 @@ templ EmptyTokenList() {
 // TokenCreatedModal shows a new or rotated token once. mcp adds the
 // GOFORGE_MCP_TOKEN hint for tokens /mcp accepts.
 templ TokenCreatedModal(title, rawToken string, mcp bool) {
-	@components.Modal(title) {
+	@ui.Dialog(ui.DialogProps{Title: title, NonDismissible: true}) {
 		<div class="flex items-start gap-3 mb-6">
 			<div class="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center dark:bg-primary-900/50">
 				<svg class="h-6 w-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
@@ -251,7 +247,7 @@ templ TokenCreatedModal(title, rawToken string, mcp bool) {
 			</div>
 		</div>
 		<div class="flex justify-end gap-3">
-			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: templ.Attributes{"data-modal-close": true}}) {
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
 				Close
 			}
 			<button type="button" onclick={ copyText(rawToken, "Copy to Clipboard") } class={ ui.ButtonClass(ui.ButtonPrimary, ui.ButtonMD) }>
@@ -273,8 +269,8 @@ script copyText(text string, label string) {
 // write checked, 90 days by default, no never-expiring option, and the
 // server refuses full.
 templ AddAPITokenModal(csrfToken string, mcp bool) {
-	@components.Modal(addTokenTitle(mcp)) {
-		<form hx-post="/settings/tokens" hx-target="#modal" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
+	@ui.Dialog(ui.DialogProps{Title: addTokenTitle(mcp)}) {
+		<form hx-post="/settings/tokens" hx-target="closest dialog" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			if mcp {
 				<input type="hidden" name="preset" value="mcp" />
@@ -296,7 +292,7 @@ templ AddAPITokenModal(csrfToken string, mcp bool) {
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonSecondary,
 					Attrs: templ.Attributes{
-						"data-modal-close": true,
+						"data-ui-dialog-close": true,
 					},
 				}) {
 					Cancel

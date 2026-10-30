@@ -12,11 +12,7 @@ templ GitSources(sources []*models.GitSource, csrfToken string) {
 		@components.PageHeader("Git Sources", "Manage your git provider integrations and access tokens.") {
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonPrimary,
-					Attrs: templ.Attributes{
-						"hx-get": "/settings/git/new",
-						"hx-target": "body",
-						"hx-swap": "beforeend",
-					},
+					Attrs: ui.OpenDialogAttrs("/settings/git/new"),
 				}) {
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -57,7 +53,7 @@ templ GitSources(sources []*models.GitSource, csrfToken string) {
 										Variant: ui.ButtonGhostDanger,
 										Size:    ui.ButtonIcon,
 										Label:   "Remove " + s.Name,
-										Attrs:   templ.Attributes{"hx-delete": "/settings/git/" + s.ID, "hx-confirm": "Remove this source?"},
+										Attrs:   templ.Attributes{"hx-delete": "/settings/git/" + s.ID, "hx-confirm": "Remove this source?", "data-ui-confirm-tone": "danger", "data-ui-confirm-label": "Remove"},
 									}) {
 										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -74,7 +70,7 @@ templ GitSources(sources []*models.GitSource, csrfToken string) {
 }
 
 templ AddGitSourceModal(csrfToken string) {
-	@components.Modal("Add Git Source") {
+	@ui.Dialog(ui.DialogProps{Title: "Add Git Source"}) {
 		<form hx-post="/settings/git" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			
@@ -111,7 +107,7 @@ templ AddGitSourceModal(csrfToken string) {
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonSecondary,
 					Attrs: templ.Attributes{
-						"data-modal-close": true,
+						"data-ui-dialog-close": true,
 					},
 				}) {
 					Cancel

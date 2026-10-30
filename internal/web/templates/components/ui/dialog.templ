@@ -1,0 +1,73 @@
+package ui
+
+// Dialog is the one modal shell, on native <dialog>. showModal() (from
+// static/js/ui.js) gives the real focus trap, the inert page behind it, and
+// Escape. Server fragments render it at the top level and are appended to
+// <body> (OpenDialogAttrs), so a poll or SSE swap never destroys it.
+//
+// The htmx contract, from ui.js: a successful request from inside the
+// dialog closes it, and a failed one shows its text in the dialog's own
+// error node. On close, focus returns to the element that opened it.
+// Buttons with data-ui-dialog-close close it.
+//
+//	@ui.Dialog(ui.DialogProps{Title: "Add Git Source"}) {
+//		<form hx-post="/settings/git" hx-swap="none">...</form>
+//	}
+templ Dialog(p DialogProps) {
+	@dialog(resolveDialog(p)) {
+		{ children... }
+	}
+}
+
+templ dialog(p DialogProps) {
+	<dialog { dialogAttrs(p)... }>
+		<div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+			<div class="min-w-0">
+				<h2 id={ DialogTitleID(p.ID) } class="text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{ p.Title }</h2>
+				if p.Description != "" {
+					<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-muted-foreground">{ p.Description }</p>
+				}
+			</div>
+			@Button(ButtonProps{Variant: ButtonGhost, Size: ButtonIcon, Label: "Close dialog", Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
+				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+				</svg>
+			}
+		</div>
+		<div id={ DialogErrorID(p.ID) } data-ui-dialog-error role="alert" class="mx-6 mt-4 hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"></div>
+		<div class="px-6 py-6">
+			{ children... }
+		</div>
+	</dialog>
+}
+
+// ConfirmDialog is the kit's one confirm dialog. layouts.Base renders it at
+// the end of <body>. ui.js opens it for every hx-confirm trigger instead of
+// window.confirm(), fills in the question, the button text
+// (data-ui-confirm-label), and the tone (data-ui-confirm-tone), and runs the
+// request only when Confirm is pressed. Cancel, Escape, and a backdrop
+// click send nothing. Focus starts on Cancel.
+templ ConfirmDialog() {
+	<dialog
+		id={ ConfirmDialogID }
+		data-ui-dialog="static"
+		data-ui-confirm
+		role="alertdialog"
+		aria-labelledby={ DialogTitleID(ConfirmDialogID) }
+		aria-describedby={ DialogDescriptionID(ConfirmDialogID) }
+		class={ confirmDialogClass() }
+	>
+		<div class="px-6 pt-6">
+			<h2 id={ DialogTitleID(ConfirmDialogID) } class="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100">Please confirm</h2>
+			<p id={ DialogDescriptionID(ConfirmDialogID) } data-ui-confirm-message class="mt-2 text-sm text-muted-foreground"></p>
+		</div>
+		<div class="flex justify-end gap-3 px-6 pb-6 pt-6">
+			@Button(ButtonProps{Variant: ButtonSecondary, Attrs: templ.Attributes{"data-ui-confirm-cancel": true, "autofocus": true}}) {
+				Cancel
+			}
+			@Button(ButtonProps{Variant: ButtonPrimary, Attrs: templ.Attributes{"data-ui-confirm-accept": true}}) {
+				Confirm
+			}
+		</div>
+	</dialog>
+}

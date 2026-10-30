@@ -135,7 +135,9 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 									Type: "submit",
 									Class: "text-sm",
 									Attrs: templ.Attributes{
-										"onclick": "return confirm('This will remove all stopped containers and unused images. Continue?')",
+										"hx-confirm": "This will remove all stopped containers and unused images. Continue?",
+										"data-ui-confirm-tone": "danger",
+										"data-ui-confirm-label": "Prune",
 									},
 								}) {
 									Prune System
