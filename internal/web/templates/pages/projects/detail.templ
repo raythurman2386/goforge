@@ -389,6 +389,8 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 								Attrs: templ.Attributes{
 									"hx-delete":  "/projects/" + project.ID + "/services/" + svc.ID,
 									"hx-confirm": "Detach this service? The connection string will no longer be injected on next deploy.",
+									"data-ui-confirm-tone": "danger",
+									"data-ui-confirm-label": "Detach",
 									"hx-headers": `{"X-CSRF-Token":"` + csrfToken + `"}`,
 								},
 							}) {
@@ -502,6 +504,8 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 					Attrs: templ.Attributes{
 						"hx-delete": "/projects/" + project.ID,
 						"hx-confirm": "Are you sure you want to delete this project?",
+						"data-ui-confirm-tone": "danger",
+						"data-ui-confirm-label": "Delete project",
 						"hx-headers": `{"X-CSRF-Token":"` + csrfToken + `"}`,
 					},
 				}) {

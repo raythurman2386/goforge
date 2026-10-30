@@ -431,3 +431,30 @@ func TestRouter_DevUIGalleryOnlyInDevMode(t *testing.T) {
 		}
 	}
 }
+
+func TestRouter_DevUIDialogDemoOnlyInDevMode(t *testing.T) {
+	for _, tt := range []struct {
+		devMode bool
+		query   string
+		want    int
+		body    string
+	}{
+		{true, "?depth=1", http.StatusOK, `data-ui-dialog="ephemeral"`},
+		{true, "?ok=1", http.StatusNoContent, ""},
+		{true, "?fail=1", http.StatusUnprocessableEntity, "Demo error"},
+		{false, "?depth=1", http.StatusNotFound, ""},
+	} {
+		cfg := &config.Config{DevMode: tt.devMode, Port: 8080, LogLevel: "info", CSRFSecret: "test-csrf-secret"}
+		db := setupTestRouterDB(t)
+		router := setupTestRouter(t, db, cfg)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/dev/ui/dialog"+tt.query, nil))
+		db.Close()
+		if rec.Code != tt.want {
+			t.Errorf("DevMode=%v %s: code %d, want %d", tt.devMode, tt.query, rec.Code, tt.want)
+		}
+		if tt.body != "" && !strings.Contains(rec.Body.String(), tt.body) {
+			t.Errorf("DevMode=%v %s: body missing %q", tt.devMode, tt.query, tt.body)
+		}
+	}
+}

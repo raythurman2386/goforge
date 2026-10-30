@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 )
 
 templ Base(title, csrfToken string) {
@@ -33,6 +34,8 @@ templ Base(title, csrfToken string) {
 			{ children... }
 			<!-- Toast live region: server toasts swap in via hx-swap-oob, client toasts via app.js -->
 			<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-50 flex flex-col items-end space-y-2"></div>
+			<!-- The kit confirm dialog for every hx-confirm (static/js/ui.js). Outside every polled region. -->
+			@ui.ConfirmDialog()
 		</body>
 	</html>
 }

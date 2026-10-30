@@ -27,6 +27,11 @@ func TestGalleryRenders(t *testing.T) {
 		`aria-current="page"`, `data-ui="alert"`, `aria-label="Dismiss"`,
 		`role="alert"`, `aria-busy="true"`, `aria-disabled="true"`,
 		`motion-safe:animate-pulse`,
+		`aria-labelledby="dialogs-title"`, `id="gallery-dialog-open"`, `aria-haspopup="dialog"`,
+		`hx-get="/dev/ui/dialog?depth=1"`, `data-ui-dialog-open="gallery-static-dialog"`,
+		`id="gallery-static-dialog"`, `data-ui-dialog="static"`,
+		`<dialog `, `id="ui-confirm"`, `role="alertdialog"`,
+		`id="gallery-confirm"`, `data-ui-confirm-tone="danger"`, `id="gallery-confirm-form"`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("gallery missing %q", want)
@@ -43,6 +48,23 @@ func TestSwatchClassCoversEveryToken(t *testing.T) {
 	for _, step := range primarySteps {
 		if primarySwatchClass(step) == "" {
 			t.Errorf("primarySwatchClass(%q) is empty", step)
+		}
+	}
+}
+
+func TestDemoDialog(t *testing.T) {
+	var buf bytes.Buffer
+	if err := DemoDialog(2, true).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	for _, want := range []string{
+		`data-ui-dialog="ephemeral"`, `data-ui-dialog-nondismissible`, `data-depth="2"`,
+		`id="demo-dialog-name-2"`, `<label`, `data-testid="demo-stack"`, `data-testid="demo-fail"`,
+		`data-testid="demo-save"`, `data-ui-dialog-close`, `role="alert"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("demo dialog missing %q", want)
 		}
 	}
 }

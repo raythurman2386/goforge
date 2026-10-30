@@ -49,11 +49,7 @@ templ emptyStateBody(p EmptyStateProps) {
 			if p.HxGet != "" {
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonPrimary,
-					Attrs: templ.Attributes{
-						"hx-get": p.HxGet,
-						"hx-target": "body",
-						"hx-swap": "beforeend",
-					},
+					Attrs: ui.OpenDialogAttrs(p.HxGet),
 				}) {
 					@plusIcon()
 					{ p.ButtonText }

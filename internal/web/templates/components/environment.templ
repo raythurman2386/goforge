@@ -43,7 +43,7 @@ templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentE
 					</a>
 				}
 				<div class="my-1.5 border-t border-gray-100 dark:border-gray-800"></div>
-				<button hx-get={ "/projects/" + projectID + "/envs/new" } hx-target="body" hx-swap="beforeend" class="text-primary-600 block w-full text-left px-3 py-2 text-sm font-bold hover:bg-primary-600 hover:text-white rounded-lg transition-colors dark:text-primary-400" role="menuitem" tabindex="-1">
+				<button hx-get={ "/projects/" + projectID + "/envs/new" } hx-target="body" hx-swap="beforeend" aria-haspopup="dialog" class="text-primary-600 block w-full text-left px-3 py-2 text-sm font-bold hover:bg-primary-600 hover:text-white rounded-lg transition-colors dark:text-primary-400" role="menuitem" tabindex="-1">
 					<span class="mr-1">+</span> New Environment
 				</button>
 			</div>
@@ -52,7 +52,7 @@ templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentE
 }
 
 templ CreateEnvironmentModal(projectID string, csrfToken string) {
-	@Modal("Create New Environment") {
+	@ui.Dialog(ui.DialogProps{Title: "Create New Environment"}) {
 		<form hx-post={ "/projects/" + projectID + "/envs" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			@ui.Input(ui.InputProps{ID: "environment-name", Name: "name", Label: "Environment Name", Autocomplete: "off", Required: true, Class: "mb-4"})
@@ -62,7 +62,7 @@ templ CreateEnvironmentModal(projectID string, csrfToken string) {
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonSecondary,
 					Attrs: templ.Attributes{
-						"data-modal-close": true,
+						"data-ui-dialog-close": true,
 					},
 				}) {
 					Cancel

@@ -1,0 +1,95 @@
+package devui
+
+import (
+	"strconv"
+
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// DemoDialogPath is the dev-only fragment route behind the gallery's
+// dialog examples (handlers.UIGalleryDialog).
+const DemoDialogPath = "/dev/ui/dialog"
+
+func demoDialogURL(depth int) string {
+	return DemoDialogPath + "?depth=" + strconv.Itoa(depth)
+}
+
+func demoDialogTitle(depth int) string {
+	if depth <= 1 {
+		return "Demo dialog"
+	}
+	return "Demo dialog " + strconv.Itoa(depth)
+}
+
+// DemoDialog is an ephemeral ui.Dialog for the gallery and the ui-a11y
+// keyboard drive: a field to focus, a button that stacks another dialog,
+// a request that fails (error text lands in this dialog's own error
+// node), and a submit that succeeds (the dialog closes).
+templ DemoDialog(depth int, nonDismissible bool) {
+	@ui.Dialog(ui.DialogProps{
+		Title:          demoDialogTitle(depth),
+		Description:    "Tab and Shift+Tab stay inside. Escape closes. Focus returns to the button that opened it.",
+		NonDismissible: nonDismissible,
+		Attrs:          templ.Attributes{"data-testid": "demo-dialog", "data-depth": strconv.Itoa(depth)},
+	}) {
+		<form hx-get={ DemoDialogPath + "?ok=1" } hx-swap="none" class="space-y-4">
+			@ui.Input(ui.InputProps{ID: "demo-dialog-name-" + strconv.Itoa(depth), Name: "demo_name", Label: "Name", Autocomplete: "off"})
+			<div class="flex flex-wrap justify-end gap-3">
+				@ui.Button(ui.ButtonProps{Attrs: ui.Attrs(ui.OpenDialogAttrs(demoDialogURL(depth+1)), templ.Attributes{"data-testid": "demo-stack"})}) {
+					Open another dialog
+				}
+				@ui.Button(ui.ButtonProps{Attrs: templ.Attributes{"hx-get": DemoDialogPath + "?fail=1", "hx-swap": "none", "data-testid": "demo-fail"}}) {
+					Fail request
+				}
+				@ui.Button(ui.ButtonProps{Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
+					Cancel
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit", Attrs: templ.Attributes{"data-testid": "demo-save"}}) {
+					Save
+				}
+			</div>
+		</form>
+	}
+}
+
+templ dialogSection() {
+	<div class="flex flex-wrap gap-3">
+		@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Attrs: ui.Attrs(ui.OpenDialogAttrs(demoDialogURL(1)), templ.Attributes{"id": "gallery-dialog-open"})}) {
+			Open dialog
+		}
+		@ui.Button(ui.ButtonProps{Attrs: ui.Attrs(ui.OpenDialogAttrs(demoDialogURL(1)+"&nondismissible=1"), templ.Attributes{"id": "gallery-dialog-nondismissible"})}) {
+			Open non-dismissible dialog
+		}
+		@ui.Button(ui.ButtonProps{Attrs: templ.Attributes{"id": "gallery-static-open", "data-ui-dialog-open": "gallery-static-dialog", "aria-haspopup": "dialog"}}) {
+			Open static dialog
+		}
+	</div>
+	<p class="mt-3 text-sm text-muted-foreground">
+		Fragments come from { DemoDialogPath } and are appended to body. A backdrop click closes the first two kinds unless the dialog is non-dismissible. The static dialog lives in the page and is reused.
+	</p>
+	@ui.Dialog(ui.DialogProps{ID: "gallery-static-dialog", Static: true, Title: "Static dialog", Description: "Rendered in the page; ui.js does not remove it on close."}) {
+		<div class="flex justify-end">
+			@ui.Button(ui.ButtonProps{Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
+				Close
+			}
+		</div>
+	}
+	<h3 class="mt-6 text-sm font-semibold text-foreground">Confirm (hx-confirm)</h3>
+	<div class="mt-3 flex flex-wrap gap-3">
+		@ui.Button(ui.ButtonProps{Attrs: ui.Attrs(templ.Attributes{"id": "gallery-confirm", "hx-get": DemoDialogPath + "?ok=1", "hx-swap": "none"}, ui.ConfirmAttrs("Send the demo request?", ui.ConfirmPrimary, "Send"))}) {
+			Confirm a request
+		}
+		@ui.Button(ui.ButtonProps{Variant: ui.ButtonDanger, Attrs: ui.Attrs(templ.Attributes{"id": "gallery-confirm-danger", "hx-get": DemoDialogPath + "?ok=1", "hx-swap": "none"}, ui.ConfirmAttrs("Delete the demo thing? This cannot be undone.", ui.ConfirmDanger, "Delete"))}) {
+			Danger confirm
+		}
+		<form method="get" action="/dev/ui" class="inline">
+			<input type="hidden" name="confirmed" value="1"/>
+			@ui.Button(ui.ButtonProps{Type: "submit", Attrs: ui.Attrs(templ.Attributes{"id": "gallery-confirm-form"}, ui.ConfirmAttrs("Submit the plain form?", ui.ConfirmPrimary, ""))}) {
+				Confirm a plain form
+			}
+		</form>
+	</div>
+	<p class="mt-3 text-sm text-muted-foreground">
+		hx-confirm opens the kit confirm dialog instead of the browser prompt. Cancel, Escape, and the backdrop send nothing; Confirm sends one request. A plain form submit with hx-confirm is gated the same way.
+	</p>
+}

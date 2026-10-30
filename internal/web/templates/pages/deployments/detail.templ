@@ -37,6 +37,7 @@ templ Detail(props DetailProps) {
 					Attrs: templ.Attributes{
 						"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/rollback", props.Project.ID, props.Deployment.ID),
 						"hx-confirm": "Are you sure you want to rollback this deployment?",
+						"data-ui-confirm-label": "Roll back",
 						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
 						"hx-disabled-elt": "this",
 						"hx-indicator": "find .htmx-indicator",
@@ -55,6 +56,8 @@ templ Detail(props DetailProps) {
 					Attrs: templ.Attributes{
 						"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/cancel", props.Project.ID, props.Deployment.ID),
 						"hx-confirm": "Are you sure you want to cancel this deployment?",
+						"data-ui-confirm-tone": "danger",
+						"data-ui-confirm-label": "Cancel deployment",
 						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
 						"hx-disabled-elt": "this",
 						"hx-indicator": "find .htmx-indicator",

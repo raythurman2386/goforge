@@ -21,7 +21,7 @@ internal/web/templates/
     ├── sidebar.templ      # Navigation sidebar
     ├── nav.templ          # Top navigation bar
     ├── form.templ         # Reusable form elements
-    ├── modal.templ        # Modal dialogs
+    ├── ui/dialog.templ    # ui.Dialog and the hx-confirm dialog (native <dialog>)
     ├── toast.templ        # Toast notifications
     └── ...
 ```

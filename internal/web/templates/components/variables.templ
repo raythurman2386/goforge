@@ -34,11 +34,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonPrimary,
 					Size: ui.ButtonSM,
-					Attrs: templ.Attributes{
-						"hx-get": "/envs/" + envID + "/variables/new",
-						"hx-target": "body",
-						"hx-swap": "beforeend",
-					},
+					Attrs: ui.OpenDialogAttrs("/envs/" + envID + "/variables/new"),
 				}) {
 					+ Add Variable
 				}
@@ -70,6 +66,8 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 									Attrs: templ.Attributes{
 										"hx-delete": "/envs/" + envID + "/variables/" + v.ID,
 										"hx-confirm": "Delete this variable?",
+										"data-ui-confirm-tone": "danger",
+										"data-ui-confirm-label": "Delete",
 										"hx-swap": "none",
 										"hx-headers": `{"X-CSRF-Token": "` + csrfToken + `"}`,
 										"title": "Delete",
@@ -89,7 +87,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 }
 
 templ AddVariableModal(envID string, csrfToken string) {
-	@Modal("Add Environment Variable") {
+	@ui.Dialog(ui.DialogProps{Title: "Add Environment Variable"}) {
 		<form hx-post={ "/envs/" + envID + "/variables" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			@ui.Input(ui.InputProps{ID: "variable-key", Name: "key", Label: "Key", Autocomplete: "off", Required: true, Class: "mb-4", Attrs: templ.Attributes{"spellcheck": "false"}})
@@ -100,7 +98,7 @@ templ AddVariableModal(envID string, csrfToken string) {
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonSecondary,
 					Attrs: templ.Attributes{
-						"data-modal-close": true,
+						"data-ui-dialog-close": true,
 					},
 				}) {
 					Cancel

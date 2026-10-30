@@ -103,3 +103,29 @@ func TestTokenCreatedModal(t *testing.T) {
 		t.Error("non-MCP token shows the MCP hint")
 	}
 }
+
+// PR4: the token dialogs are ui.Dialogs. The form swaps its own dialog
+// (no fixed #modal id), and the shown-once token is not dismissed by a
+// stray backdrop click.
+func TestTokenDialogs_KitContract(t *testing.T) {
+	add := renderMCP(t, AddAPITokenModal("csrf", false))
+	for _, want := range []string{` id="dialog-`, `data-ui-dialog="ephemeral"`, `hx-target="closest dialog"`, `hx-swap="outerHTML"`, `data-ui-dialog-close`} {
+		if !strings.Contains(add, want) {
+			t.Errorf("AddAPITokenModal missing %q", want)
+		}
+	}
+	if strings.Contains(add, `id="modal"`) || strings.Contains(add, "data-ui-dialog-nondismissible") {
+		t.Error("AddAPITokenModal: legacy id or non-dismissible")
+	}
+	created := renderMCP(t, TokenCreatedModal("API Token Created", "gf_x", false))
+	if !strings.Contains(created, "data-ui-dialog-nondismissible") || !strings.Contains(created, ">API Token Created</h2>") {
+		t.Errorf("TokenCreatedModal = %s", created)
+	}
+	tok := &models.APIToken{ID: "tid", Name: "agent", CreatedAt: time.Now()}
+	row := renderMCP(t, APITokenRow(tok))
+	for _, want := range []string{`aria-haspopup="dialog"`, `data-ui-confirm-label="Rotate"`, `data-ui-confirm-tone="danger"`, `data-ui-confirm-label="Revoke"`} {
+		if !strings.Contains(row, want) {
+			t.Errorf("token row missing %q", want)
+		}
+	}
+}

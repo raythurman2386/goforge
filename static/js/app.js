@@ -1,5 +1,5 @@
-// GoForge shell behavior: sidebar active link, toasts, HTMX error toasts, and
-// the components.Modal dialog.
+// GoForge shell behavior: sidebar active link, toasts, and HTMX error toasts.
+// Dialogs and the hx-confirm prompt live in static/js/ui.js (components/ui).
 // Loaded from layouts.Base after htmx. No build step; plain ES2017.
 (function () {
 	"use strict";
@@ -90,11 +90,12 @@
 		return text;
 	}
 
-	// Requests from inside the modal show errors in the modal (components.Modal).
-	// Polling requests would toast every few seconds, so they stay quiet.
+	// Requests from inside a dialog show errors in that dialog's own error
+	// node (ui.Dialog, handled by ui.js). Polling requests would toast every
+	// few seconds, so they stay quiet.
 	function shouldToast(elt) {
 		if (!elt || !elt.closest) return true;
-		if (elt.closest("#modal")) return false;
+		if (elt.closest("dialog[data-ui-dialog]")) return false;
 		var trigger = elt.getAttribute("hx-trigger") || "";
 		return !/\bevery\b/.test(trigger);
 	}
@@ -110,75 +111,6 @@
 	document.addEventListener("htmx:sendError", function (evt) {
 		if (!shouldToast(evt.detail.elt)) return;
 		showToast("Could not reach GoForge. Check your connection and try again.", "error");
-	});
-
-	// --- Modal ----------------------------------------------------------------
-
-	// components.Modal renders <div id="modal" data-modal> around a
-	// role="dialog" panel. Only one is open at a time; take the last one.
-	function openModal() {
-		var all = document.querySelectorAll("[data-modal]");
-		return all.length ? all[all.length - 1] : null;
-	}
-
-	function closeModal(modal) {
-		if (!modal) return;
-		var back = modal._returnFocus;
-		modal.remove();
-		if (back && document.contains(back) && back.focus) back.focus();
-	}
-
-	function focusModal(modal) {
-		if (!modal || modal.dataset.modalReady) return;
-		modal.dataset.modalReady = "1";
-		modal._returnFocus = document.activeElement;
-		var target = modal.querySelector(
-			"[autofocus], input:not([type=hidden]):not([disabled]), select, textarea, button:not([data-modal-close])"
-		);
-		(target || modal.querySelector("[role=dialog]") || modal).focus();
-	}
-
-	document.addEventListener("click", function (evt) {
-		var closer = evt.target.closest && evt.target.closest("[data-modal-close]");
-		if (closer) {
-			closeModal(closer.closest("[data-modal]"));
-			return;
-		}
-		// A click on the backdrop itself (not the panel) closes the dialog.
-		if (evt.target.hasAttribute && evt.target.hasAttribute("data-modal")) {
-			closeModal(evt.target);
-		}
-	});
-
-	document.addEventListener("keydown", function (evt) {
-		if (evt.key === "Escape") {
-			var modal = openModal();
-			if (modal) {
-				evt.preventDefault();
-				closeModal(modal);
-			}
-		}
-	});
-
-	document.addEventListener("htmx:afterSettle", function () {
-		focusModal(openModal());
-	});
-
-	// A request from inside the dialog closes it on success and shows the
-	// error text in #modal-error on failure.
-	document.addEventListener("htmx:afterRequest", function (evt) {
-		var elt = evt.detail.elt;
-		var dialog = elt && elt.closest && elt.closest("[data-modal] [role=dialog]");
-		if (!dialog) return;
-		if (evt.detail.successful) {
-			closeModal(dialog.closest("[data-modal]"));
-			return;
-		}
-		var errDiv = dialog.querySelector("#modal-error");
-		if (errDiv) {
-			errDiv.textContent = errorMessage(evt.detail.xhr);
-			errDiv.classList.remove("hidden");
-		}
 	});
 
 	// --- Sidebar active link ------------------------------------------------
@@ -203,7 +135,6 @@
 	function init() {
 		markActiveNav();
 		watchToastRegion();
-		focusModal(openModal());
 	}
 
 	if (document.readyState === "loading") {
@@ -214,4 +145,5 @@
 
 	window.GoForge = window.GoForge || {};
 	window.GoForge.toast = showToast;
+	window.GoForge.errorMessage = errorMessage;
 })();

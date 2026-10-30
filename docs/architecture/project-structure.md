@@ -268,7 +268,7 @@ templates/
     ├── sidebar.templ      # Navigation sidebar
     ├── nav.templ          # Top navigation
     ├── form.templ         # Reusable form components
-    ├── modal.templ        # Modal dialogs
+    ├── ui/dialog.templ    # ui.Dialog and the hx-confirm dialog (native <dialog>)
     ├── toast.templ        # Toast notifications
     ├── table.templ        # Data tables
     ├── pagination.templ   # Pagination controls

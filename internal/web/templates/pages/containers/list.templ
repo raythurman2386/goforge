@@ -91,6 +91,8 @@ templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 						Attrs: templ.Attributes{
 							"hx-post": "/containers/" + dc.ID + "/stop",
 							"hx-confirm": "Are you sure you want to stop this container?",
+							"data-ui-confirm-tone": "danger",
+							"data-ui-confirm-label": "Stop",
 							"hx-disabled-elt": "this",
 							"title": "Stop",
 						},
@@ -106,6 +108,7 @@ templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 						Attrs: templ.Attributes{
 							"hx-post": "/containers/" + dc.ID + "/restart",
 							"hx-confirm": "Are you sure you want to restart this container?",
+							"data-ui-confirm-label": "Restart",
 							"hx-disabled-elt": "this",
 							"title": "Restart",
 						},

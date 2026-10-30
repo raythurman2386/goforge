@@ -307,6 +307,61 @@
 }
 
 /*
+ * Dialog (components/ui Dialog and ConfirmDialog, opened by static/js/ui.js
+ * with showModal()). The backdrop and the enter and exit transitions are
+ * plain CSS because Tailwind 3.4 has no utilities for ::backdrop,
+ * @starting-style, or transition-behavior. Evergreen browsers only; an
+ * older browser skips the transition and still opens the dialog.
+ */
+dialog[data-ui-dialog] {
+  opacity: 0;
+  transform: translateY(0.5rem) scale(0.98);
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out,
+    overlay 150ms ease-out allow-discrete,
+    display 150ms ease-out allow-discrete;
+}
+
+dialog[data-ui-dialog][open] {
+  opacity: 1;
+  transform: none;
+}
+
+@starting-style {
+  dialog[data-ui-dialog][open] {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+}
+
+dialog[data-ui-dialog]::backdrop {
+  background-color: rgb(17 24 39 / 0.4);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition:
+    opacity 150ms ease-out,
+    overlay 150ms ease-out allow-discrete,
+    display 150ms ease-out allow-discrete;
+}
+
+dialog[data-ui-dialog][open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  dialog[data-ui-dialog][open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  dialog[data-ui-dialog]::backdrop {
+    background-color: rgb(0 0 0 / 0.6);
+  }
+}
+
+/*
  * Reduced motion: drop transitions, smooth scrolling, and decorative
  * animations. Spinners keep turning (animate-spin) because they carry the
  * loading state; everything else ends on its final frame.
@@ -322,6 +377,11 @@
     transition-duration: 0.01ms !important;
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
+  }
+
+  dialog[data-ui-dialog],
+  dialog[data-ui-dialog]::backdrop {
+    transition: none !important;
   }
 
   *:not(.animate-spin),
