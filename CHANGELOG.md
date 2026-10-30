@@ -80,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSS spacing inconsistency (`mt-6` inside grid with `gap-6`) on resource usage card
 
 ### Security
+- Client IP for the rate limiter, audit log, and API: from a `TRUSTED_PROXIES` peer, GoForge now uses `CF-Connecting-IP`, then the rightmost `X-Forwarded-For` hop that is not a trusted proxy, then `X-Real-IP`. The leftmost `X-Forwarded-For` entry is client-written and is no longer trusted, so rotating it no longer gets a fresh rate-limit bucket. `TRUSTED_PROXIES` is documented in `.env.example` (XFF-SPOOF)
+- Login lockout: 10 failed password logins per client IP, or per account from any IP, within 15 minutes lock that key for 15 minutes; `POST /auth/login` answers `429` with `Retry-After` before checking the password
+- Security headers on every response: `Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Strict-Transport-Security: max-age=31536000` on HTTPS (NO-SEC-HEADERS)
+- CSRF tokens are HMAC-SHA256 keyed by `CSRF_SECRET` (previously required but unused): session-bound when signed in, signed nonce when signed out. A planted `goforge_csrf` cookie no longer passes. Pages open across the upgrade need one reload (CSRF-SECRET-UNUSED)
+- `goforge serve` deletes expired session rows at startup and hourly (SESSION-PURGE)
 - Dependency and toolchain bump to clear every reachable `govulncheck` finding: builder image `golang:1.26.10` and `go 1.26.0` in `go.mod` (CI `GO_VERSION` 1.26); go-git v5.19.3, go-billy v5.9.2, golang.org/x/crypto v0.58.0, golang.org/x/net v0.62.0, OpenTelemetry v1.47.0, cloudflare/circl v1.6.5, go-chi/chi v5.3.0. The Docker SDK moves from `github.com/docker/docker` v27.3.1 (GO-2026-4887, GO-2026-4883: no fixed version of that module) to `github.com/moby/moby/client` v0.6.2 and `github.com/moby/moby/api` v1.56.1
 - Added trusted proxy validation for `X-Forwarded-For` / `X-Real-IP` headers (configurable via `TRUSTED_PROXIES` env var)
 

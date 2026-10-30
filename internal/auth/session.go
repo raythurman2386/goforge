@@ -118,6 +118,44 @@ func (s *SessionManager) DestroySession(ctx context.Context, token string) error
 	return s.sessionRepo.Delete(ctx, session.ID)
 }
 
+// SessionPurgeInterval is how often RunExpiredSessionPurge deletes expired rows.
+const SessionPurgeInterval = time.Hour
+
+// PurgeExpired deletes every expired session row and returns how many were removed.
+func (s *SessionManager) PurgeExpired(ctx context.Context) (int64, error) {
+	n, err := s.sessionRepo.DeleteExpired(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete expired sessions: %w", err)
+	}
+	return n, nil
+}
+
+// RunExpiredSessionPurge purges expired sessions once immediately and then
+// every interval until ctx is canceled. It blocks; run it in a goroutine.
+// Errors are logged and retried on the next tick.
+func (s *SessionManager) RunExpiredSessionPurge(ctx context.Context, interval time.Duration) {
+	purge := func() {
+		n, err := s.PurgeExpired(ctx)
+		switch {
+		case err != nil && ctx.Err() == nil:
+			s.logger.Warn("expired session purge failed", "error", err)
+		case n > 0:
+			s.logger.Info("purged expired sessions", "count", n)
+		}
+	}
+	purge()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			purge()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 // generateRandomToken generates a random base64-encoded token.
 func generateRandomToken(length int) (string, error) {
 	bytes := make([]byte, length)

@@ -50,6 +50,9 @@ func Router(
 
 	// Middleware stack
 	r.Use(chi_middleware.Recoverer)
+	// Browser hardening headers (CSP frame-ancestors, XFO, nosniff,
+	// Referrer-Policy, HSTS on HTTPS) on every response.
+	r.Use(middleware.SecurityHeaders)
 	// Rate limiting
 	r.Use(rateLimiter.Middleware)
 
@@ -90,7 +93,7 @@ func Router(
 
 		// UI Routes (Require CSRF protection)
 		r.Group(func(r chi.Router) {
-			r.Use(auth.CSRFMiddleware)
+			r.Use(auth.NewCSRF(cfg.CSRFSecret).Middleware)
 
 			// Serve static files (no timeout — static file server manages its own I/O)
 			fileServer := http.FileServer(http.Dir("static"))

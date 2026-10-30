@@ -25,7 +25,7 @@ var trustedProxies []*net.IPNet
 const htmxTrue = "true"
 
 // SetTrustedProxies configures which proxy CIDRs are trusted for
-// X-Forwarded-For / X-Real-IP header extraction. If proxies is nil,
+// CF-Connecting-IP / X-Forwarded-For / X-Real-IP header extraction. If proxies is nil,
 // DefaultTrustedProxies (private/loopback networks) are used.
 func SetTrustedProxies(proxies []*net.IPNet) {
 	if proxies != nil {
@@ -38,12 +38,7 @@ func SetTrustedProxies(proxies []*net.IPNet) {
 // getClientIP extracts the real client IP address from a request,
 // only trusting proxy headers when the direct peer is a trusted proxy.
 func getClientIP(r *http.Request) string {
-	return httputil.ClientIP(
-		r.RemoteAddr,
-		r.Header.Get("X-Forwarded-For"),
-		r.Header.Get("X-Real-IP"),
-		trustedProxies,
-	)
+	return httputil.ClientIP(r, trustedProxies)
 }
 
 // RenderError renders an error page or an HTMX-compatible error fragment.

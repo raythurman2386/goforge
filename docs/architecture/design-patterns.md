@@ -116,13 +116,13 @@ type clientInfo struct {
 
 Clients subscribe to topics (e.g., `deployment:abc123`, `container:stats`), and messages are broadcast only to subscribers of matching topics. This powers live deployment logs, container stats, and build output in the UI.
 
-## Double-Submit Cookie (CSRF)
+## HMAC CSRF Tokens
 
-CSRF protection uses the double-submit cookie pattern, adapted for HTMX:
+CSRF protection uses HMAC tokens keyed by `CSRF_SECRET`, adapted for HTMX:
 
-1. Server generates a random token and stores it in a cookie (`HttpOnly: false` so JavaScript can read it)
-2. HTMX reads the cookie and sends it in the `X-CSRF-Token` header on every request
-3. Server middleware compares the header value to the cookie value
+1. Signed in, the token is derived from the session (`HMAC(secret, SHA-256(session token))`); signed out, it is a random nonce plus its HMAC, stored in the `goforge_csrf` cookie
+2. Templates render the token into `hx-headers` (`X-CSRF-Token`) and forms (`csrf_token`)
+3. Server middleware recomputes the expected token and compares in constant time; an unsigned cookie value never verifies
 
 ## Middleware Chain
 
@@ -131,7 +131,8 @@ The HTTP middleware chain follows a layered security model:
 ```
 Request
   -> Recovery (panic handler)
-    -> Rate Limiting
+   -> Security headers
+    -> Rate Limiting (client IP)
       -> Session Loading (optional auth)
         -> CSRF Validation (state-changing methods)
           -> Handler

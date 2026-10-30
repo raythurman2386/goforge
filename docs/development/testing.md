@@ -158,7 +158,6 @@ make check
 
 Current coverage varies by package. Critical gaps include:
 
-- `internal/auth/csrf.go` -- No tests for CSRF middleware
 - `internal/auth/auth.go` -- No tests for local authentication
 - `internal/auth/github.go` -- No tests for OAuth provider
 - `internal/deploy/` -- Limited pipeline testing

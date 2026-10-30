@@ -27,8 +27,8 @@ type RateLimiter struct {
 }
 
 // NewRateLimiter creates a new IP-based rate limiter.
-// trustedProxies controls which peers' X-Forwarded-For headers are trusted
-// for extracting the real client IP. Pass nil to only use RemoteAddr.
+// trustedProxies controls which peers' CF-Connecting-IP / X-Forwarded-For
+// headers are trusted for extracting the real client IP (httputil.ClientIP). Pass nil to only use RemoteAddr.
 // Call Stop() during graceful shutdown to release the cleanup goroutine.
 func NewRateLimiter(rps float64, burst int, trustedProxies []*net.IPNet) *RateLimiter {
 	rl := &RateLimiter{
@@ -75,12 +75,7 @@ func (rl *RateLimiter) Stop() {
 // Middleware returns the chi-compatible middleware handler.
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := httputil.ClientIP(
-			r.RemoteAddr,
-			r.Header.Get("X-Forwarded-For"),
-			r.Header.Get("X-Real-IP"),
-			rl.trustedProxies,
-		)
+		ip := httputil.ClientIP(r, rl.trustedProxies)
 
 		var c *client
 		if v, ok := rl.clients.Load(ip); ok {

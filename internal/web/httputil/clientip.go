@@ -3,33 +3,112 @@ package httputil
 
 import (
 	"net"
+	"net/http"
 	"strings"
 )
 
-// ClientIP extracts the real client IP address from a request's RemoteAddr,
-// taking into account trusted proxy headers (X-Forwarded-For, X-Real-IP).
-//
-// Proxy headers are only trusted when the direct connection (RemoteAddr) comes
-// from a network listed in trustedProxies. If trustedProxies is empty, only
-// RemoteAddr (with port stripped) is returned -- proxy headers are ignored.
-func ClientIP(remoteAddr, xForwardedFor, xRealIP string, trustedProxies []*net.IPNet) string {
-	host := stripPort(remoteAddr)
+// Header names consulted by ClientIP. They are only read when the direct
+// peer (RemoteAddr) is a trusted proxy.
+const (
+	headerCFConnectingIP = "CF-Connecting-IP"
+	headerXForwardedFor  = "X-Forwarded-For"
+	headerXRealIP        = "X-Real-IP"
+)
 
-	// Only trust proxy headers if the direct peer is a trusted proxy
-	if len(trustedProxies) > 0 && isTrustedProxy(host, trustedProxies) {
-		if xff := xForwardedFor; xff != "" {
-			// X-Forwarded-For can contain "client, proxy1, proxy2"
-			// The leftmost entry is the original client IP
-			if ip := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); ip != "" {
-				return ip
-			}
-		}
-		if xRealIP != "" {
-			return xRealIP
-		}
+// ClientIP returns the client IP for r. See ClientIPFromHeaders.
+func ClientIP(r *http.Request, trustedProxies []*net.IPNet) string {
+	return ClientIPFromHeaders(r.RemoteAddr, r.Header, trustedProxies)
+}
+
+// ClientIPFromHeaders extracts the real client IP address.
+//
+// Proxy headers are only read when the direct peer (remoteAddr) is inside
+// trustedProxies. Otherwise, or when trustedProxies is empty, the peer address
+// (port stripped) is returned and every proxy header is ignored.
+//
+// From a trusted peer the order is:
+//
+//  1. CF-Connecting-IP, when it holds a valid IP. Cloudflare's edge overwrites
+//     this header, so a client cannot choose it when traffic arrives through
+//     Cloudflare (Tunnel or proxy).
+//  2. X-Forwarded-For, walked right to left: the first hop that is not a
+//     trusted proxy is the client. Every proxy appends the address it saw, so
+//     only the rightmost untrusted entry is known to be real; anything left of
+//     it was written by the client and can be spoofed. If a hop does not parse
+//     as an IP, the walk stops and the last trusted hop is returned. If every
+//     hop is trusted, the leftmost hop is returned.
+//  3. X-Real-IP, when it holds a valid IP.
+//  4. The peer address.
+func ClientIPFromHeaders(remoteAddr string, h http.Header, trustedProxies []*net.IPNet) string {
+	peer := stripPort(remoteAddr)
+	if len(trustedProxies) == 0 || !isTrustedProxy(peer, trustedProxies) {
+		return peer
 	}
 
-	return host
+	if ip := parseIP(h.Get(headerCFConnectingIP)); ip != "" {
+		return ip
+	}
+
+	if ip, ok := rightmostUntrusted(h.Values(headerXForwardedFor), peer, trustedProxies); ok {
+		return ip
+	}
+
+	if ip := parseIP(h.Get(headerXRealIP)); ip != "" {
+		return ip
+	}
+
+	return peer
+}
+
+// rightmostUntrusted walks every X-Forwarded-For hop (all header lines, in
+// order) from the right and returns the first hop that is not a trusted proxy.
+// ok is false when the header is absent or has no hops.
+func rightmostUntrusted(values []string, peer string, trusted []*net.IPNet) (string, bool) {
+	var hops []string
+	for _, v := range values {
+		for _, part := range strings.Split(v, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				hops = append(hops, part)
+			}
+		}
+	}
+	if len(hops) == 0 {
+		return "", false
+	}
+
+	last := peer // closest hop known to be real
+	for i := len(hops) - 1; i >= 0; i-- {
+		ip := parseIP(hops[i])
+		if ip == "" {
+			// Garbage left of a trusted hop came from the client. Do not
+			// let it become a rate-limit key; fall back to the last real hop.
+			return last, true
+		}
+		if !isTrustedProxy(ip, trusted) {
+			return ip, true
+		}
+		last = ip
+	}
+	// Every hop is a trusted proxy (internal traffic); the leftmost is the origin.
+	return last, true
+}
+
+// parseIP returns the canonical form of s if it is an IP address, or "".
+// A bracketed or port-suffixed value ("[::1]:80", "1.2.3.4:80") is accepted.
+func parseIP(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if ip := net.ParseIP(s); ip != nil {
+		return ip.String()
+	}
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		if ip := net.ParseIP(host); ip != nil {
+			return ip.String()
+		}
+	}
+	return ""
 }
 
 // ParseTrustedProxies parses a slice of CIDR strings into net.IPNet values.
