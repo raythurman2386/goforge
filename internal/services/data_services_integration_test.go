@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -31,9 +32,13 @@ import (
 // Redis must refuse an unauthenticated PING and accept the password from
 // connection_info; both must report healthy and carry traefik.enable=false.
 // Redis must run with AOF, maxmemory 256mb and noeviction, and keep auth and
-// its data across two restarts. Postgres must be 17 with the pgadmin admin,
+// its data across two restarts. Its default user's password lives in
+// /data/users.acl (no requirepass), and scripts/shared-data/redis-tenant.sh
+// must create per-app users confined to <app>:* that, like the default
+// user, survive two restarts. Postgres must be 17 with the pgadmin admin,
 // and scripts/shared-data/pg-tenant.sh must provision throwaway tenants
-// idempotently (it shells out to docker; set GOFORGE_IT_DOCKER to override).
+// idempotently. Both tenant scripts shell out to docker; set
+// GOFORGE_IT_DOCKER to override (for example "sudo -n docker").
 // Run it with:
 //
 //	sudo -n env "PATH=$PATH" mise x go@1.26.6 -- go test -tags integration \
@@ -152,6 +157,18 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 		return strings.TrimSpace(res.Output), res.ExitCode
 	}
 	const rcli = `REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning `
+	dockerCmd := os.Getenv("GOFORGE_IT_DOCKER")
+	if dockerCmd == "" {
+		dockerCmd = "docker"
+	}
+	// tenantScript runs scripts/shared-data/<script> with args and stdin.
+	tenantScript := func(script, stdin string, args ...string) (string, error) {
+		cmd := exec.CommandContext(ctx, "sh", append([]string{"../../scripts/shared-data/" + script}, args...)...)
+		cmd.Env = append(os.Environ(), "DOCKER="+dockerCmd)
+		cmd.Stdin = strings.NewReader(stdin)
+		b, cErr := cmd.CombinedOutput()
+		return string(b), cErr
+	}
 
 	// Generated passwords are alphanumeric; the second case proves the
 	// config-file escaping for a user-chosen password.
@@ -210,7 +227,7 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 			if strings.Contains(strings.Join(info.Config.Cmd, " "), password) || strings.Contains(strings.Join(info.Config.Healthcheck.Test, " "), password) {
 				t.Error("password appears in container Cmd or health check")
 			}
-			res, eErr := dc.Exec(ctx, dockerID, docker.ExecOptions{Cmd: []string{"sh", "-c", `tr '\0' ' ' </proc/1/cmdline; echo; awk '/^Uid:/{print $2}' /proc/1/status; stat -c '%a %U' /tmp/goforge-redis.conf`}})
+			res, eErr := dc.Exec(ctx, dockerID, docker.ExecOptions{Cmd: []string{"sh", "-c", `tr '\0' ' ' </proc/1/cmdline; echo; awk '/^Uid:/{print $2}' /proc/1/status; stat -c '%a %U' /tmp/goforge-redis.conf /data/users.acl`}})
 			if eErr != nil {
 				t.Fatal(eErr)
 			}
@@ -218,10 +235,38 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 				t.Error("password appears in PID 1 argv")
 			}
 			lines := strings.Split(strings.TrimSpace(res.Output), "\n")
-			if len(lines) != 3 || !strings.HasPrefix(lines[0], "redis-server") || lines[1] == "0" || lines[2] != "600 redis" {
-				t.Errorf("pid1 argv / uid / conf mode = %q, want redis-server, non-root, 600 redis", lines)
+			if len(lines) != 4 || !strings.HasPrefix(lines[0], "redis-server") || lines[1] == "0" || lines[2] != "600 redis" || lines[3] != "600 redis" {
+				t.Errorf("pid1 argv / uid / conf mode / acl mode = %q, want redis-server, non-root, 600 redis, 600 redis", lines)
 			} else {
-				t.Logf("pid1 %q uid %s conf %s", lines[0], lines[1], lines[2])
+				t.Logf("pid1 %q uid %s conf %s users.acl %s", lines[0], lines[1], lines[2], lines[3])
+			}
+
+			// The default user's password is the SHA-256 in /data/users.acl,
+			// not requirepass, and the plain password is in neither file.
+			// ACL SAVE writes the same user back with "sanitize-payload".
+			wantDefault := "user default on #" + sha256Hex(password) + " ~* &* +@all"
+			savedDefault := "user default on sanitize-payload #" + sha256Hex(password) + " ~* &* +@all"
+			checkFiles := func(t *testing.T, label string, afterSave bool) {
+				t.Helper()
+				out, _ := sh(t, dockerID, "cat /tmp/goforge-redis.conf /data/users.acl", nil, false)
+				if strings.Contains(out, password) {
+					t.Errorf("%s: plain password in the conf or ACL file", label)
+				}
+				conf, _ := sh(t, dockerID, "cat /tmp/goforge-redis.conf", nil, false)
+				if strings.Contains(conf, "requirepass") || !strings.Contains(conf, "aclfile /data/users.acl") {
+					t.Errorf("%s: conf = %q, want aclfile /data/users.acl and no requirepass", label, conf)
+				}
+				acl, _ := sh(t, dockerID, "cat /data/users.acl", nil, false)
+				if first := strings.SplitN(acl, "\n", 2)[0]; first != wantDefault && !(afterSave && first == savedDefault) {
+					t.Errorf("%s: users.acl first line = %q, want %q", label, first, wantDefault)
+				}
+				if n := strings.Count(acl, "user default "); n != 1 {
+					t.Errorf("%s: users.acl has %d default user lines, want 1", label, n)
+				}
+			}
+			checkFiles(t, "start", false)
+			if out, _ := sh(t, dockerID, rcli+"config get requirepass", nil, false); out != "requirepass" {
+				t.Errorf("CONFIG GET requirepass = %q, want empty (password in the ACL file)", out)
 			}
 
 			// Sessions/queues settings from the conf file.
@@ -245,10 +290,96 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 			}
 			t.Log("appendonly yes, maxmemory 256mb, noeviction refuses writes with OOM and keeps keys")
 
+			// Per-app users from redis-tenant.sh: each one only reaches its
+			// own <app>:* keys and channels.
+			const tenantA, tenantB, tenantC = "it_tenant_a", "it_tenant_b", "it_tenant_c"
+			pwA, pwB := `p'w\x"y $z`, "tenant-b-pass"
+			// isolation checks that each tenant reaches only its own keys
+			// and channels on addr, and the default user reaches all.
+			isolation := func(t *testing.T, addr string) {
+				t.Helper()
+				// want holds one prefix per reply.
+				checks := []struct {
+					cmds [][]string
+					want []string
+				}{
+					{[][]string{{"AUTH", tenantA, pwA}, {"SET", tenantA + ":k", "a"}, {"GET", tenantA + ":k"}}, []string{"+OK", "+OK", "$1"}},
+					{[][]string{{"AUTH", tenantB, pwB}, {"SET", tenantB + ":k", "b"}}, []string{"+OK", "+OK"}},
+					{[][]string{{"AUTH", tenantA, pwA}, {"GET", tenantB + ":k"}, {"SET", tenantB + ":k", "x"}, {"DEL", tenantB + ":k"}, {"GET", "it:keep"}}, []string{"+OK", "-NOPERM", "-NOPERM", "-NOPERM", "-NOPERM"}},
+					{[][]string{{"AUTH", tenantB, pwB}, {"GET", tenantA + ":k"}, {"PUBLISH", tenantA + ":ch", "x"}, {"EVAL", "return redis.call('get', KEYS[1])", "1", tenantA + ":k"}, {"EVAL", "return redis.call('get', ARGV[1])", "0", tenantA + ":k"}}, []string{"+OK", "-NOPERM", "-NOPERM", "-NOPERM", "-ERR ACL failure in script"}},
+					{[][]string{{"AUTH", tenantA, pwA}, {"FLUSHALL"}, {"KEYS", "*"}, {"SCAN", "0"}, {"CONFIG", "GET", "maxmemory"}, {"ACL", "LIST"}}, []string{"+OK", "-NOPERM", "-NOPERM", "-NOPERM", "-NOPERM", "-NOPERM"}},
+					{[][]string{{"AUTH", tenantA, "wrong"}}, []string{"-WRONGPASS"}},
+					{[][]string{{"AUTH", tenantC, "tenant-c-pass"}}, []string{"-WRONGPASS"}},
+				}
+				for _, c := range checks {
+					got := respReplies(t, addr, c.cmds...)
+					ok := len(got) == len(c.want)
+					for i := 0; ok && i < len(got); i++ {
+						ok = strings.HasPrefix(got[i], c.want[i])
+					}
+					if !ok {
+						t.Errorf("%v = %q, want prefixes %q", c.cmds[1:], got, c.want)
+					}
+				}
+				// The default user still reaches every key.
+				if got := respCmds(t, addr, []string{"AUTH", authPass}, []string{"GET", tenantA + ":k"}, []string{"GET", tenantB + ":k"}); got != "+OK|$1|$1" {
+					t.Errorf("default user GET tenant keys = %q, want +OK|$1|$1", got)
+				}
+			}
+			t.Run("redis-tenant", func(t *testing.T) {
+				for _, p := range []struct{ app, pw string }{{tenantA, pwA}, {tenantA, pwA}, {tenantB, pwB}, {tenantC, "tenant-c-pass"}} {
+					if out, tErr := tenantScript("redis-tenant.sh", p.pw, spec.opts.Name, p.app); tErr != nil {
+						t.Fatalf("redis-tenant.sh %s: %v: %s", p.app, tErr, out)
+					}
+				}
+				if got := respCmds(t, addr, []string{"AUTH", tenantC, "tenant-c-pass"}, []string{"SET", tenantC + ":k", "c"}); got != "+OK|+OK" {
+					t.Errorf("tenant c before revoke = %q, want +OK|+OK", got)
+				}
+				for i := 0; i < 2; i++ { // revoke is idempotent
+					if out, tErr := tenantScript("redis-tenant.sh", "", "--revoke", spec.opts.Name, tenantC); tErr != nil {
+						t.Fatalf("redis-tenant.sh --revoke %s: %v: %s", tenantC, tErr, out)
+					}
+				}
+				isolation(t, addr)
+
+				// Rotation: the old password stops working.
+				if out, tErr := tenantScript("redis-tenant.sh", "rotated", spec.opts.Name, tenantB); tErr != nil {
+					t.Fatalf("rotate: %v: %s", tErr, out)
+				}
+				if got := respCmds(t, addr, []string{"AUTH", tenantB, pwB}); !strings.HasPrefix(got, "-WRONGPASS") {
+					t.Errorf("old tenant b password after rotation = %q, want -WRONGPASS", got)
+				}
+				if out, tErr := tenantScript("redis-tenant.sh", pwB, spec.opts.Name, tenantB); tErr != nil {
+					t.Fatalf("rotate back: %v: %s", tErr, out)
+				}
+
+				// Refusals change nothing.
+				for _, bad := range []struct{ stdin, app string }{{"x", "default"}, {"x", "Bad"}, {"x", "a:b"}, {"x", "a*"}, {"", "it_empty"}} {
+					if out, tErr := tenantScript("redis-tenant.sh", bad.stdin, spec.opts.Name, bad.app); tErr == nil {
+						t.Errorf("redis-tenant.sh %q succeeded: %s", bad.app, out)
+					}
+				}
+				acl, _ := sh(t, dockerID, "cat /data/users.acl", nil, false)
+				for _, want := range []string{"user " + tenantA + " on ", "~" + tenantA + ":* ", "&" + tenantA + ":* ", "user " + tenantB + " on "} {
+					if !strings.Contains(acl, want) {
+						t.Errorf("users.acl missing %q after ACL SAVE", want)
+					}
+				}
+				if strings.Contains(acl, tenantC) || strings.Contains(acl, pwA) || strings.Contains(acl, "it_empty") {
+					t.Error("users.acl has the revoked or refused user, or a plain tenant password")
+				}
+				checkFiles(t, "after tenants", true)
+				t.Log("redis-tenant.sh: idempotent, quoted password, <app>:* keys and channels only, FLUSHALL/KEYS/SCAN/CONFIG/ACL denied, rotation and revoke work, bad names refused")
+			})
+
 			// The conf file is recreated on every start. Without rm -f, a
 			// second start fails: sticky /tmp plus fs.protected_regular=1
 			// denies root writing the redis-owned file (exit 2).
+			// Every start rewrites the default user from REDIS_PASSWORD and
+			// keeps the tenant lines. A planted nopass default line must not
+			// survive the first restart.
 			t.Run("restart", func(t *testing.T) {
+				sh(t, dockerID, `sed -i 's/^user default .*/user default on nopass ~* \&* +@all/' /data/users.acl && grep -q '^user default on nopass' /data/users.acl`, nil, false)
 				for n := 1; n <= 2; n++ {
 					if _, rErr := api.ContainerRestart(ctx, dockerID, client.ContainerRestartOptions{}); rErr != nil {
 						t.Fatalf("restart %d: %v", n, rErr)
@@ -284,7 +415,12 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 					if out, _ := sh(t, dockerID, rcli+"config get appendonly", nil, false); !strings.HasSuffix(out, "yes") {
 						t.Errorf("restart %d: appendonly = %q, want yes", n, out)
 					}
-					t.Logf("restart %d: running, -NOAUTH, +OK|+PONG, conf 600 redis, key kept, appendonly yes", n)
+					if got := resp(t, raddr, "AUTH", password, "PING"); got != "+OK|+PONG" {
+						t.Errorf("restart %d: AUTH <REDIS_PASSWORD>; PING = %q, want +OK|+PONG", n, got)
+					}
+					checkFiles(t, fmt.Sprintf("restart %d", n), false)
+					isolation(t, raddr)
+					t.Logf("restart %d: running, -NOAUTH, +OK|+PONG, conf 600 redis, key kept, appendonly yes, default user from users.acl, tenants isolated, revoked tenant still gone", n)
 				}
 			})
 		})
@@ -306,10 +442,6 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 		}
 
 		t.Run("pg-tenant", func(t *testing.T) {
-			dockerCmd := os.Getenv("GOFORGE_IT_DOCKER")
-			if dockerCmd == "" {
-				dockerCmd = "docker"
-			}
 			provision := func(t *testing.T, app, password string) {
 				t.Helper()
 				cmd := exec.CommandContext(ctx, "sh", "../../scripts/shared-data/pg-tenant.sh", spec.opts.Name, app)
@@ -377,18 +509,18 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 	})
 }
 
+// sha256Hex is the lowercase hex SHA-256 of s, the form of a Redis ACL
+// "#<hash>" password.
+func sha256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
 // resp sends cmds to the Redis server at addr as one RESP pipeline, then
-// returns the first line of each reply joined by "|". A command with spaces
-// is split into arguments, except for AUTH whose second word is kept whole.
+// returns the first line of each reply joined by "|". Each command is one
+// argument, except AUTH whose next element is its password argument.
 func resp(t *testing.T, addr string, cmds ...string) string {
 	t.Helper()
-	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
-
 	var commands [][]string
 	for i := 0; i < len(cmds); i++ {
 		if cmds[i] == "AUTH" && i+1 < len(cmds) {
@@ -398,6 +530,27 @@ func resp(t *testing.T, addr string, cmds ...string) string {
 		}
 		commands = append(commands, []string{cmds[i]})
 	}
+	return respCmds(t, addr, commands...)
+}
+
+// respCmds is respReplies joined by "|".
+func respCmds(t *testing.T, addr string, commands ...[]string) string {
+	t.Helper()
+	return strings.Join(respReplies(t, addr, commands...), "|")
+}
+
+// respReplies sends commands (each a list of arguments) to the Redis server
+// at addr as one RESP pipeline on a fresh connection, then returns the first
+// line of each reply.
+func respReplies(t *testing.T, addr string, commands ...[]string) []string {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+
 	var b strings.Builder
 	for _, args := range commands {
 		fmt.Fprintf(&b, "*%d\r\n", len(args))
@@ -411,11 +564,38 @@ func resp(t *testing.T, addr string, cmds ...string) string {
 	r := bufio.NewReader(conn)
 	replies := make([]string, 0, len(commands))
 	for range commands {
-		line, rErr := r.ReadString('\n')
+		line, rErr := readReply(r)
 		if rErr != nil {
 			t.Fatalf("read reply: %v", rErr)
 		}
-		replies = append(replies, strings.TrimRight(line, "\r\n"))
+		replies = append(replies, line)
 	}
-	return strings.Join(replies, "|")
+	return replies
+}
+
+// readReply reads one whole RESP2 reply from r, including the payload of a
+// bulk string and the elements of an array, and returns its first line.
+func readReply(r *bufio.Reader) (string, error) {
+	line, err := r.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	line = strings.TrimRight(line, "\r\n")
+	if len(line) < 2 {
+		return line, nil
+	}
+	n := 0
+	switch line[0] {
+	case '$':
+		if _, err = fmt.Sscan(line[1:], &n); err == nil && n >= 0 {
+			_, err = io.ReadFull(r, make([]byte, n+2))
+		}
+	case '*':
+		if _, err = fmt.Sscan(line[1:], &n); err == nil {
+			for i := 0; i < n && err == nil; i++ {
+				_, err = readReply(r)
+			}
+		}
+	}
+	return line, err
 }

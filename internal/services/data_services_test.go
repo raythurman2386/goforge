@@ -77,8 +77,10 @@ func TestTraefikLabels_DataServicesDisabled(t *testing.T) {
 }
 
 // TestRedisTemplate_EnforcesAuth: the redis template sets a command that
-// starts redis-server with requirepass, keeps the password out of the
-// command and health check argv, and authenticates its health check.
+// starts redis-server with an ACL file whose default user carries the
+// SHA-256 of REDIS_PASSWORD (not requirepass, which an ACL file resets),
+// refuses an empty password, keeps the password out of the command and
+// health check argv, and authenticates its health check.
 func TestRedisTemplate_EnforcesAuth(t *testing.T) {
 	t.Parallel()
 	spec := renderRepoSpec(t, templateNameRedis, "")
@@ -89,9 +91,23 @@ func TestRedisTemplate_EnforcesAuth(t *testing.T) {
 		t.Fatalf("Cmd = %q, want [sh -c <script>]", cmd)
 	}
 	script := cmd[2]
-	for _, want := range []string{"requirepass", "$REDIS_PASSWORD", "exec docker-entrypoint.sh redis-server"} {
+	for _, want := range []string{
+		`if [ -z "${REDIS_PASSWORD:-}" ]; then`,
+		`printf '%s' "$REDIS_PASSWORD" | sha256sum`,
+		`printf 'user default on #%s ~* &* +@all\n' "$hash"`,
+		`acl=/data/users.acl`,
+		`"aclfile $acl"`,
+		`grep -v '^user default ' "$acl"`,
+		`mv -f "$next" "$acl"`,
+		"exec docker-entrypoint.sh redis-server",
+	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("command script missing %q:\n%s", want, script)
+		}
+	}
+	for _, bad := range []string{"requirepass", "nopass", ">$REDIS_PASSWORD", "/tmp/users.acl"} {
+		if strings.Contains(script, bad) {
+			t.Errorf("command script contains %q:\n%s", bad, script)
 		}
 	}
 	if strings.Contains(strings.Join(cmd, " "), password) {
@@ -155,8 +171,8 @@ func TestMinioTemplate_Command(t *testing.T) {
 
 // TestRedisTemplate_SessionsAndQueues: Redis is for sessions and queues, so
 // the conf turns AOF on, caps memory below the container limit, and refuses
-// writes when full instead of evicting. It never loads an ACL file, which
-// would reset the default user to nopass.
+// writes when full instead of evicting. Every setting, including the ACL
+// file under /data, is written into the per-start conf file.
 func TestRedisTemplate_SessionsAndQueues(t *testing.T) {
 	t.Parallel()
 	spec := renderRepoSpec(t, templateNameRedis, "")
@@ -168,9 +184,6 @@ func TestRedisTemplate_SessionsAndQueues(t *testing.T) {
 		if !strings.Contains(script, want) {
 			t.Errorf("command script missing %s:\n%s", want, script)
 		}
-	}
-	if strings.Contains(script, "aclfile") {
-		t.Error("command script loads an aclfile, which resets requirepass")
 	}
 	const maxmemory = 256 << 20
 	if spec.opts.Memory < 2*maxmemory {

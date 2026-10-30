@@ -242,9 +242,9 @@ POSTGRES_PASSWORD: "{{ .Config.password }}"
 REDIS_PASSWORD: "{{ .Config.password }}"
 ```
 
-**Command**: the official `redis` image ignores `REDIS_PASSWORD`, so the template's `command` writes `requirepass` into `/tmp/goforge-redis.conf` (mode 600, inside the container, not in the volume) and runs `docker-entrypoint.sh redis-server /tmp/goforge-redis.conf`. The password is read from the environment, so it is not in the container command or the host process list. A client that does not `AUTH` gets `NOAUTH`.
+**Command**: the official `redis` image ignores `REDIS_PASSWORD`, so the template's `command` writes the password into the ACL file `/data/users.acl` as the `default` user's SHA-256 hash (`user default on #<sha256> ~* &* +@all`), writes `/tmp/goforge-redis.conf` (mode 600, inside the container, not in the volume) with `aclfile /data/users.acl`, and runs `docker-entrypoint.sh redis-server /tmp/goforge-redis.conf`. There is no `requirepass`: on 7.4, loading an ACL file resets the `default` user to `nopass`, so `requirepass` next to `aclfile` turns auth off; the ACL file has to own the password. The password is read from the environment, so it is not in the container command, the host process list, or either file. An empty `REDIS_PASSWORD` stops the container before Redis starts. A client that does not `AUTH` gets `NOAUTH`.
 
-The conf file is rewritten on every container start (restart, stop/start, daemon reboot). Keep the `rm -f` before the write: `/tmp` is sticky and `fs.protected_regular=1` makes root's `>` into the old redis-owned file fail with `Permission denied`, so a second start would exit 2 (Gatekeeper P8). Do not add `aclfile` next to `requirepass`: loading an ACL file resets the `default` user to `nopass`, which turns auth off (checked on 7.4).
+Both files are rewritten on every container start (restart, stop/start, daemon reboot). The `default` line is always regenerated from `REDIS_PASSWORD`, so an edited or stale default user cannot outlive a restart; every other line of `users.acl` (per-app users saved by `scripts/shared-data/redis-tenant.sh`) is kept. `users.acl` is built as `/data/.users.acl.next` (mode 600, owned by `redis`) and renamed into place. Keep the `rm -f` before writing the conf file: `/tmp` is sticky and `fs.protected_regular=1` makes root's `>` into the old redis-owned file fail with `Permission denied`, so a second start would exit 2 (Gatekeeper P8).
 
 **Persistence and memory**: Redis is set up for sessions and queues, not as a cache. The conf sets `dir /data`, `appendonly yes`, `appendfsync everysec` (AOF files in `/data/appendonlydir`, alongside RDB snapshots), `maxmemory 256mb`, and `maxmemory-policy noeviction`: a full instance answers writes with `OOM` instead of dropping keys. The 512MiB container limit leaves room for client buffers and the fork of an AOF rewrite.
 
@@ -252,7 +252,9 @@ The conf file is rewritten on every container start (restart, stop/start, daemon
 
 **Connection string**: `redis://:<password>@<container>:6379`
 
-**Volume**: `data` -> `/data`
+**Volume**: `data` -> `/data` (data, AOF files, and `users.acl`)
+
+**App users**: `scripts/shared-data/redis-tenant.sh <container> <app>` creates or updates one app's ACL user, confined to keys and Pub/Sub channels matching `<app>:*`, reading the password from stdin; `--revoke` deletes it. Changes are saved with `ACL SAVE`, so they survive restarts. See [Shared data services](../guides/services.md#shared-data-services).
 
 ---
 

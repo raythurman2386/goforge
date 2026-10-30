@@ -260,6 +260,7 @@ Before tagging V1.0, the following **must** be completed:
 
 - [x] **#58** Redis template enforces `requirepass`; services without a Domain get `traefik.enable=false`; Postgres health check and MinIO `command` fixed
 - [x] **#59** A1 shared data services: Postgres 17 (`pgadmin`), Redis 7.4 (AOF, `noeviction`), `scripts/shared-data/pg-tenant.sh`
+- [x] **#60** Redis per-app ACL users: default password in `/data/users.acl` (no `requirepass`), `scripts/shared-data/redis-tenant.sh` (`~<app>:*`); no live tenants provisioned
 - [x] **#61** Scoped JSON API `/api/v1` and the `goforge-mcp` stdio server
 - [x] **#62** Nightly S3-compatible backups (default 02:00 America/Chicago, 7 daily kept); backup only
 - [x] **#63** `TestInstanceSource` flake fixed
@@ -277,7 +278,6 @@ Before tagging V1.0, the following **must** be completed:
 
 Parked items need Raymond's OK before anyone starts them.
 
-- [ ] **#60 Redis ACL** (parked): per-app Redis users on shared-redis
 - [ ] **#48 Service edit CAS** (parked): compare-and-swap on service config edits
 - [ ] **Backup restore** (parked): restore tooling or a run-now path; restore is manual today (`docs/deployment/backup.md`)
 - [ ] **Aesthetics Goal 3 nits** (parked): `class_check.py` only sees literal `class="..."` strings; no repo-local Tailwind pin (the CLI comes from `PATH`, `make css` only warns on a version mismatch); unused sidebar dark tokens; `select` chevron in dark mode

@@ -29,7 +29,7 @@ An in-memory data store for caching, sessions, and message queues.
 |---------|---------|-------------|
 | Version | 7.4 | Redis version |
 | Port | 6379 | Container port |
-| Password | Generated on the server when the field is left blank | Required for every client (`requirepass`), stored encrypted. Never in the container command or health check argv |
+| Password | Generated on the server when the field is left blank | Password of the `default` user, required for every client, stored encrypted. Written to `/data/users.acl` as a SHA-256 hash on every start (no `requirepass`). Never in the container command or health check argv |
 | Persistence | AOF (`appendonly yes`, `everysec`) plus RDB snapshots | Files in the `data` volume (`/data`) |
 | Memory | `maxmemory 256mb`, `noeviction`; container limit 512MiB | A full instance refuses writes with `OOM` instead of evicting keys (sessions and queues) |
 
@@ -146,7 +146,18 @@ One PostgreSQL and one Redis instance can serve several apps on the host ("share
 
     The script is idempotent (run it again to rotate the password), gives the role `LOGIN` only, makes it the owner of its database, and revokes `CONNECT` from `PUBLIC` so other apps cannot open it.
 
-Redis apps share the `default` user for now. Per-app Redis ACL users (`~<app>:*` key patterns) are planned; they need the default user's password moved from `requirepass` into the ACL file, because loading an ACL file resets `requirepass`.
+5. Give each app its own Redis user, never the `default` user:
+
+    ```bash
+    printf '%s' "$APP_REDIS_PASSWORD" | scripts/shared-data/redis-tenant.sh goforge-service-<shared-redis id> <app>
+    # app connects as redis://<app>:<password>@goforge-service-<id>:6379
+    # and must prefix every key and channel with <app>:
+    scripts/shared-data/redis-tenant.sh --revoke goforge-service-<shared-redis id> <app>
+    ```
+
+    The user can only touch keys and Pub/Sub channels matching `<app>:*`; anything else answers `NOPERM`, including inside Lua scripts. It gets `+@all -@admin -@dangerous +info -scan`, so `FLUSHALL`, `FLUSHDB`, `KEYS`, `SCAN`, `CONFIG`, and `ACL` are denied (`SCAN` and `KEYS` would list other apps' key names). The script is idempotent (run it again to rotate the password; connections already open stay logged in until they reconnect). `--revoke` deletes the user and leaves its keys. Changes are written to `/data/users.acl` with `ACL SAVE` and survive restarts. Point the app's client at a key prefix (for example ioredis `keyPrefix`, BullMQ `prefix`) of `<app>:`.
+
+    The script needs an instance started by a template with the ACL file (#60). A Redis instance deployed before that gets it on its next recreate (**Edit configuration** or **Update image**); until then `ACL SAVE` fails and the script exits non-zero without saving anything.
 
 ## Deploying a Service
 
