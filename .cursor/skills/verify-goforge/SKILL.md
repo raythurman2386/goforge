@@ -93,7 +93,7 @@ Authorization status codes after #28:
 - Another account's project id, or a deployment id under a project it does not belong to (get, cancel, rollback, status, log stream, trigger with another project's `env_id`), is `404`. Do not expect `403` there.
 - Another account's container (detail, logs, stats, stop, restart) is still `403` `access denied`.
 
-Scripted journeys: `verify.sh drive-register` then `verify.sh drive-login`, then `drive-backup-settings` or `drive-mcp-http`. The other feature files give the curl and SQL for their journey. Rate limit is 30 requests per second with burst 60.
+Scripted journeys: `verify.sh drive-register` then `verify.sh drive-login`, then `drive-backup-settings`, `drive-mcp-http`, or `drive-ui-a11y`. The other feature files give the curl and SQL for their journey. Rate limit is 30 requests per second with burst 60.
 
 ## Evidence
 
@@ -132,12 +132,13 @@ The helper is `.cursor/skills/verify-goforge/scripts/verify.sh`.
 .cursor/skills/verify-goforge/scripts/verify.sh drive-login
 .cursor/skills/verify-goforge/scripts/verify.sh drive-backup-settings
 .cursor/skills/verify-goforge/scripts/verify.sh drive-mcp-http
+.cursor/skills/verify-goforge/scripts/verify.sh drive-ui-a11y
 .cursor/skills/verify-goforge/scripts/verify.sh psql "select count(*) from users"
 .cursor/skills/verify-goforge/scripts/verify.sh check-sealed verify-pg
 .cursor/skills/verify-goforge/scripts/verify.sh cleanup
 ```
 
-Environment overrides: `GOFORGE_VERIFY_DOCKER`, `GOFORGE_VERIFY_PROOF`, `GOFORGE_VERIFY_BASE`, `GOFORGE_VERIFY_PSQL`, `GOFORGE_VERIFY_APP_LOGS`, `GOFORGE_VERIFY_ADMIN_EMAIL`, `GOFORGE_VERIFY_REGISTER_EMAIL`, `GOFORGE_VERIFY_ENABLE_REGISTRATION`.
+Environment overrides: `GOFORGE_VERIFY_DOCKER`, `GOFORGE_VERIFY_PROOF`, `GOFORGE_VERIFY_BASE`, `GOFORGE_VERIFY_PSQL`, `GOFORGE_VERIFY_APP_LOGS`, `GOFORGE_VERIFY_ADMIN_EMAIL`, `GOFORGE_VERIFY_REGISTER_EMAIL`, `GOFORGE_VERIFY_ENABLE_REGISTRATION`, `GOFORGE_VERIFY_CHROMIUM`, `GOFORGE_UI_SCHEMES`, `GOFORGE_UI_ROUTES`.
 
 `psql` rejects SQL that mentions `password`, `secret`, `token`, `connection_info`, or `config`. `check-sealed` is the only command that reads those columns. It prints two booleans and deletes the row dump.
 
@@ -146,6 +147,8 @@ Environment overrides: `GOFORGE_VERIFY_DOCKER`, `GOFORGE_VERIFY_PROOF`, `GOFORGE
 `drive-login` needs the password `drive-register` stored in the state directory. It logs in with the lowercase admin email, opens `/projects`, creates project `verify-smoke`, and checks that the list shows it. It writes `login-verdict.txt` and exits `2` only when login fails.
 
 `drive-mcp-http` needs `drive-register` and `drive-login` first, and `GOFORGE_PROTECTED_SERVICES` set to one UUID on the stack. It mints tokens through the Profile form into mode `600` files in the state directory, sends them with `curl -H @file`, and deletes them before it exits. It writes `mcp-http-verdict.txt` and exits `2` when the harness could not run or a token value appears in the verdict. A failed sub-feature is a `fail` line, not an exit code.
+
+`drive-ui-a11y` runs on minis only and is not part of CI. It needs `GOFORGE_VERIFY_BASE` or a launched stack, and it refuses otherwise. `GOFORGE_DEV_MODE=true` on the target enables the `/dev/ui` checks. It installs the pinned `axe-core` and `playwright-core` with `npm ci` into `/tmp/goforge-verify/ui-a11y-node`. It writes `ui-a11y-verdict.txt`, `ui-a11y-report.json`, and screenshots. It exits `2` only when the harness could not run. See [features/ui-a11y.md](features/ui-a11y.md).
 
 ## Maintenance
 

@@ -12,6 +12,75 @@
 }
 
 /*
+ * Design tokens. Each color is space-separated RGB channels so Tailwind can
+ * apply opacity: tailwind.config.js maps them as rgb(var(--gf-x) / <alpha-value>).
+ * Light values first, dark values under prefers-color-scheme (dark mode stays
+ * OS-only). The values reproduce the pre-token look: emerald primary, gray
+ * neutrals. See docs/development/frontend.md (UI kit, Path A).
+ */
+@layer base {
+  :root {
+    /* Emerald (Tailwind emerald-50 .. emerald-950). Same in light and dark. */
+    --gf-primary-50: 236 253 245;
+    --gf-primary-100: 209 250 229;
+    --gf-primary-200: 167 243 208;
+    --gf-primary-300: 110 231 183;
+    --gf-primary-400: 52 211 153;
+    --gf-primary-500: 16 185 129;
+    --gf-primary-600: 5 150 105;
+    --gf-primary-700: 4 120 87;
+    --gf-primary-800: 6 95 70;
+    --gf-primary-900: 6 78 59;
+    --gf-primary-950: 2 44 34;
+
+    --gf-background: 249 250 251;          /* gray-50 */
+    --gf-foreground: 17 24 39;             /* gray-900 */
+    --gf-card: 255 255 255;                /* white */
+    --gf-card-border: 239 241 243;         /* gray-200/60 over white */
+    --gf-border: 229 231 235;              /* gray-200 */
+    --gf-divider: 243 244 246;             /* gray-100 */
+    --gf-muted: 243 244 246;               /* gray-100 */
+    --gf-muted-foreground: 107 114 128;    /* gray-500 */
+    --gf-label: 55 65 81;                  /* gray-700 */
+    --gf-field: 255 255 255;               /* white */
+    --gf-field-border: 229 231 235;        /* gray-200 */
+    --gf-field-placeholder: 156 163 175;   /* gray-400 */
+    --gf-secondary: 255 255 255;           /* white */
+    --gf-secondary-foreground: 55 65 81;   /* gray-700 */
+    --gf-secondary-hover: 249 250 251;     /* gray-50 */
+    --gf-secondary-border: 229 231 235;    /* gray-200 */
+    --gf-ring: 16 185 129;                 /* primary-500 */
+    --gf-ring-offset: 255 255 255;         /* white */
+
+    --gf-radius: 0.5rem;                   /* rounded-lg */
+    --gf-radius-lg: 0.75rem;               /* rounded-xl */
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --gf-background: 3 7 18;             /* gray-950 */
+      --gf-foreground: 243 244 246;        /* gray-100 */
+      --gf-card: 17 24 39;                 /* gray-900 */
+      --gf-card-border: 31 41 55;          /* gray-800 */
+      --gf-border: 31 41 55;               /* gray-800 */
+      --gf-divider: 31 41 55;              /* gray-800 */
+      --gf-muted: 31 41 55;                /* gray-800 */
+      --gf-muted-foreground: 156 163 175;  /* gray-400 */
+      --gf-label: 209 213 219;             /* gray-300 */
+      --gf-field: 17 24 39;                /* gray-900 */
+      --gf-field-border: 55 65 81;         /* gray-700 */
+      --gf-field-placeholder: 107 114 128; /* gray-500 */
+      --gf-secondary: 31 41 55;            /* gray-800 */
+      --gf-secondary-foreground: 229 231 235; /* gray-200 */
+      --gf-secondary-hover: 55 65 81;      /* gray-700 */
+      --gf-secondary-border: 55 65 81;     /* gray-700 */
+      --gf-ring: 52 211 153;               /* primary-400 */
+      --gf-ring-offset: 3 7 18;            /* gray-950 */
+    }
+  }
+}
+
+/*
  * Dark mode follows the OS setting only (tailwind.config.js darkMode: 'media').
  * There is deliberately no theme toggle and no stored preference: every dark:
  * variant compiles to @media (prefers-color-scheme: dark).
@@ -23,34 +92,50 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 selection:bg-primary-100 selection:text-primary-900;
-    @apply dark:bg-gray-950 dark:text-gray-100 dark:selection:bg-primary-900 dark:selection:text-primary-100;
+    @apply bg-background text-foreground selection:bg-primary-100 selection:text-primary-900;
+    @apply dark:selection:bg-primary-900 dark:selection:text-primary-100;
+  }
+
+  /*
+   * Keyboard focus for links, summaries, and custom tabindex targets that set
+   * no focus style of their own. :where() keeps specificity at zero, so any
+   * focus:outline-none or focus-visible:ring utility still wins.
+   */
+  :where(a, summary, [tabindex]):focus-visible {
+    outline: 2px solid rgb(var(--gf-ring));
+    outline-offset: 2px;
   }
 }
 
 @layer components {
+  /*
+   * Shared keyboard focus ring for components/ui: visible only for keyboard
+   * focus (focus-visible), offset from the control on the page background.
+   */
+  .ui-focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset;
+  }
+
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
-    @apply dark:focus:ring-offset-gray-950;
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 shadow-sm hover:shadow-primary-200/50 hover:shadow-lg;
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-500 shadow-sm hover:shadow-primary-200/50 hover:shadow-lg;
     @apply dark:bg-primary-600 dark:hover:bg-primary-500 dark:hover:shadow-primary-900/40;
   }
 
   .btn-secondary {
-    @apply btn bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 focus:ring-gray-500 shadow-sm;
-    @apply dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700;
+    @apply btn bg-secondary text-secondary-foreground border border-secondary-border hover:bg-secondary-hover focus-visible:ring-gray-500 shadow-sm;
   }
 
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm hover:shadow-red-200/50 hover:shadow-lg;
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 shadow-sm hover:shadow-red-200/50 hover:shadow-lg;
     @apply dark:hover:bg-red-500 dark:hover:shadow-red-900/40;
   }
 
   .btn-warning {
-    @apply btn bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500 shadow-sm;
+    @apply btn bg-amber-500 text-white hover:bg-amber-600 focus-visible:ring-amber-500 shadow-sm;
     @apply dark:bg-amber-600 dark:hover:bg-amber-500;
   }
 
@@ -61,13 +146,13 @@
 
   /* Square icon-only button for table rows and toolbars. Needs an aria-label. */
   .icon-btn {
-    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/40 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-ui text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:opacity-50 disabled:pointer-events-none;
     @apply dark:text-gray-500;
   }
 
   .input {
-    @apply block w-full px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm placeholder-gray-400 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 sm:text-sm;
-    @apply dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:focus:ring-primary-400/30 dark:focus:border-primary-400;
+    @apply block w-full px-3 py-2 bg-field border border-field-border rounded-ui shadow-sm placeholder-field-placeholder transition-all focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring sm:text-sm;
+    @apply dark:focus:ring-ring/30;
   }
 
   .select {
@@ -86,19 +171,17 @@
   }
 
   .label {
-    @apply block text-sm font-semibold text-gray-700 mb-1.5;
-    @apply dark:text-gray-300;
+    @apply block text-sm font-semibold text-label mb-1.5;
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200/60 p-6;
-    @apply dark:bg-gray-900 dark:border-gray-800 dark:shadow-none;
+    @apply bg-card rounded-ui-lg shadow-sm border border-card-border p-6;
+    @apply dark:shadow-none;
   }
 
   /* Header row of a padding-free card (class="card !p-0"). */
   .card-header {
-    @apply flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-6 py-4;
-    @apply dark:border-gray-800;
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-divider px-6 py-4;
   }
 
   .card-body {
@@ -106,13 +189,11 @@
   }
 
   .card-title {
-    @apply text-base font-semibold leading-6 text-gray-900;
-    @apply dark:text-gray-100;
+    @apply text-base font-semibold leading-6 text-foreground;
   }
 
   .table-th {
-    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500;
-    @apply dark:text-gray-400;
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground;
   }
 
   .table-td {
@@ -128,4 +209,30 @@
 
 .htmx-indicator {
   @apply opacity-0 pointer-events-none transition-opacity duration-200;
+}
+
+/*
+ * Reduced motion: drop transitions, smooth scrolling, and decorative
+ * animations. Spinners keep turning (animate-spin) because they carry the
+ * loading state; everything else ends on its final frame.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
