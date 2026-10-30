@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/raythurman2386/goforge/internal/models"
@@ -77,5 +78,38 @@ func TestAuthenticateBearer(t *testing.T) {
 	u, tok, err := AuthenticateBearer(req, tokens, stubUsers{})
 	if err != nil || u.ID != "u1" || tok.ID != "t1" {
 		t.Errorf("ok token: %v %v %v", u, tok, err)
+	}
+}
+
+func TestGenerateAPIToken(t *testing.T) {
+	raw, hash, hint, err := GenerateAPIToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(raw, APITokenPrefix) || len(raw) != len(APITokenPrefix)+64 {
+		t.Fatalf("raw token has the wrong shape (len %d)", len(raw))
+	}
+	if hash != HashAPIToken(raw) {
+		t.Fatal("hash does not match HashAPIToken")
+	}
+	if hint != APITokenPrefix+"\u2026"+raw[len(raw)-4:] {
+		t.Fatalf("hint = %q", hint)
+	}
+	raw2, _, _, _ := GenerateAPIToken()
+	if raw2 == raw {
+		t.Fatal("two tokens are equal")
+	}
+}
+
+func TestAPITokenHint(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                    "",
+		"short":               "",
+		"0123456789abcdef":    "\u2026cdef",
+		"gf_0123456789abcdef": "gf_\u2026cdef",
+	} {
+		if got := APITokenHint(in); got != want {
+			t.Errorf("APITokenHint(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

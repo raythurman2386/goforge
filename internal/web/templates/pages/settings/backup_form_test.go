@@ -51,7 +51,7 @@ func TestBackupCard_ShortKeyIDNotShown(t *testing.T) {
 
 func TestProfile_NonAdminHasNoBackupCard(t *testing.T) {
 	var b bytes.Buffer
-	if err := Profile(&models.User{Email: "u@x", Role: models.RoleUser}, "tok", nil, nil).Render(context.Background(), &b); err != nil {
+	if err := Profile(&models.User{Email: "u@x", Role: models.RoleUser}, "tok", nil, nil, nil).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	got := b.String()

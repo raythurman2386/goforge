@@ -33,7 +33,7 @@ case "$EVIDENCE" in
 esac
 
 usage() {
-  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-backup-settings|check-backup-sealed|psql|check-sealed|cleanup" >&2
+  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-backup-settings|drive-mcp-http|check-backup-sealed|psql|check-sealed|cleanup" >&2
   exit 1
 }
 
@@ -969,6 +969,333 @@ EOF
   fi
 }
 
+# --- drive-mcp-http (features/mcp-http.md) ---
+# Tokens live only in $STATE_DIR as mode 600 files: the raw token and a curl
+# header file ("Authorization: Bearer ...") passed with -H @file, so no token
+# is ever on argv, in a verdict, or on stdout.
+
+# mcp_save_token HTML NAME extracts the once-shown token from the created
+# modal into $STATE_DIR/mcp-NAME.token and mcp-NAME.hdr. Prints yes or no.
+mcp_save_token() {
+  python3 - "$1" "$STATE_DIR/mcp-$2.token" "$STATE_DIR/mcp-$2.hdr" <<'PY'
+import os, pathlib, re, sys
+html = pathlib.Path(sys.argv[1]).read_text(errors="replace") if pathlib.Path(sys.argv[1]).exists() else ""
+m = re.search(r'id="created-token"[^>]*>([^<]+)<', html)
+if not m:
+    print("no"); sys.exit(0)
+tok = m.group(1).strip()
+for path, text in ((sys.argv[2], tok), (sys.argv[3], "Authorization: Bearer " + tok)):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.write(fd, (text + "\n").encode()); os.close(fd)
+print("yes" if tok.startswith("gf_") else "no")
+PY
+  rm -f "$1"
+}
+
+# mcp_post NAME OUT HDR JSON [curl args...] posts one JSON-RPC message to /mcp
+# with token NAME ("none" sends no Authorization) and prints the status.
+mcp_post() {
+  local name="$1" out="$2" hdr="$3" body="$4"
+  shift 4
+  local -a auth=()
+  [[ "$name" == "none" ]] || auth=(-H "@$STATE_DIR/mcp-$name.hdr")
+  curl -sS -o "$out" -D "$hdr" -w '%{http_code}' -X POST "$BASE/mcp" "${auth[@]}" \
+    -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+    --data-binary "$body" "$@" || true
+}
+
+# mcp_call NAME OUT TOOL ARGS_JSON [curl args...] sends tools/call.
+mcp_call() {
+  local name="$1" out="$2" tool="$3" args="$4"
+  shift 4
+  mcp_post "$name" "$out" /dev/null \
+    "$(jq -cn --arg t "$tool" --argjson a "$args" '{jsonrpc:"2.0",id:1,method:"tools/call",params:{name:$t,arguments:$a}}')" "$@"
+}
+
+# mcp_text OUT prints the first text content of a tools/call result.
+mcp_text() {
+  jq -r '.result.content[0].text // ""' "$1" 2>/dev/null || true
+}
+
+mcp_is_error() {
+  jq -r '.result.isError // false' "$1" 2>/dev/null || echo parse-error
+}
+
+# mcp_leaks FILE prints yes when FILE holds any token this drive minted.
+mcp_leaks() {
+  python3 - "$1" "$STATE_DIR" <<'PY'
+import pathlib, sys
+f = pathlib.Path(sys.argv[1])
+text = f.read_text(errors="replace") if f.exists() else ""
+toks = [p.read_text().strip() for p in pathlib.Path(sys.argv[2]).glob("mcp-*.token")]
+print("yes" if any(t and t in text for t in toks) else "no")
+PY
+}
+
+cmd_drive_mcp_http() {
+  need_cmd curl
+  need_cmd python3
+  need_cmd jq
+  need_cmd openssl
+  install -d -m 755 "$EVIDENCE"
+  install -d -m 700 "$STATE_DIR"
+  if [[ ! -f "$STATE_DIR/register.password" ]]; then
+    echo "missing $STATE_DIR/register.password. Run drive-register and drive-login first." >&2
+    exit 1
+  fi
+  local verdict="$EVIDENCE/mcp-http-verdict.txt"
+  local jar="$STATE_DIR/jar-mcp.txt" page="$STATE_DIR/mcp-page.html" out="$STATE_DIR/mcp-out.json" hdr="$STATE_DIR/mcp.headers"
+  local admin_email harness=ok
+  admin_email=$(printf '%s' "$ADMIN_EMAIL" | tr '[:upper:]' '[:lower:]')
+  rm -f "$STATE_DIR"/mcp-*.token "$STATE_DIR"/mcp-*.hdr
+  declare -A R=()
+
+  local login_status
+  login_status=$(bk_login "$jar" "$admin_email" "$STATE_DIR/register.password")
+  [[ "$login_status" == "303" ]] || harness=fail
+  local project_id env_id user_id
+  project_id=$(db_psql "select id from projects where name = 'verify-smoke' order by created_at limit 1;" | tr -d '[:space:]')
+  env_id=$(db_psql "select id from environments where project_id = '${project_id:-00000000-0000-0000-0000-000000000000}' order by created_at limit 1;" | tr -d '[:space:]')
+  user_id=$(db_psql "select id from users where lower(email) = '$admin_email';" | tr -d '[:space:]')
+  [[ -n "$project_id" && -n "$env_id" ]] || harness=fail
+
+  # mcp-profile-card: the card shows the endpoint and the env-var snippet.
+  local profile_status
+  profile_status=$(curl -sS -b "$jar" -c "$jar" -o "$page" -w '%{http_code}' "$BASE/settings/profile" || true)
+  R[profile-status]=$profile_status
+  R[card-present]=$(body_has "$page" 'id="mcp-card"')
+  R[card-endpoint]=$(body_has "$page" "$BASE/mcp")
+  R[card-env-snippet]=$(body_has "$page" '${env:GOFORGE_MCP_TOKEN}')
+  R[mcp-profile-card]=fail
+  [[ "$profile_status" == "200" && "${R[card-present]}${R[card-endpoint]}${R[card-env-snippet]}" == "yesyesyes" ]] && R[mcp-profile-card]=pass
+
+  # token-mcp-preset: the preset form is read+write, 90 days, no Never.
+  local modal_status
+  modal_status=$(bk_send GET "/settings/tokens/new?preset=mcp" "$jar" "$page")
+  R[preset-modal-status]=$modal_status
+  R[preset-hidden]=$(body_has "$page" 'name="preset" value="mcp"')
+  R[preset-never]=$(body_has "$page" '>Never<')
+  local create_write create_read create_full create_prot
+  create_write=$(bk_send POST /settings/tokens "$jar" "$page" --data-urlencode "name=verify-mcp-write" \
+    --data-urlencode "preset=mcp" --data-urlencode "expires_in=90")
+  R[token-write-saved]=$(mcp_save_token "$page" write)
+  create_read=$(bk_send POST /settings/tokens "$jar" "$page" --data-urlencode "name=verify-mcp-read" \
+    --data-urlencode "preset=mcp" --data-urlencode "scopes=read" --data-urlencode "expires_in=30")
+  R[token-read-saved]=$(mcp_save_token "$page" read)
+  create_full=$(bk_send POST /settings/tokens "$jar" "$page" --data-urlencode "name=verify-legacy-full" \
+    --data-urlencode "expires_in=30")
+  R[token-full-saved]=$(mcp_save_token "$page" full)
+  create_prot=$(bk_send POST /settings/tokens "$jar" "$page" --data-urlencode "name=verify-mcp-protonly" \
+    --data-urlencode "preset=mcp" --data-urlencode "scopes=protected" --data-urlencode "expires_in=30")
+  R[create-statuses]="write=$create_write read=$create_read full=$create_full preset-protected-only=$create_prot"
+  R[write-scopes]=$(db_psql "select array_to_string(scopes, ',') from api_tokens where name = 'verify-mcp-write';" | tr -d '[:space:]')
+  R[full-scopes]=$(db_psql "select array_to_string(scopes, ',') from api_tokens where name = 'verify-legacy-full';" | tr -d '[:space:]')
+  R[write-expiry-days]=$(db_psql "select round(extract(epoch from expires_at - created_at) / 86400) from api_tokens where name = 'verify-mcp-write';" | tr -d '[:space:]')
+  R[token-mcp-preset]=fail
+  if [[ "$modal_status" == "200" && "${R[preset-hidden]}" == "yes" && "${R[preset-never]}" == "no" && "$create_write" == "201" \
+    && "${R[token-write-saved]}" == "yes" && "${R[write-scopes]}" == "read,write" && "${R[write-expiry-days]}" == "90" \
+    && "$create_prot" == "400" ]]; then
+    R[token-mcp-preset]=pass
+  fi
+  [[ "${R[token-write-saved]}${R[token-read-saved]}${R[token-full-saved]}" == "yesyesyes" ]] || harness=fail
+
+  # token-hint: the row shows gf_…last4, never the token. The list loads
+  # into Profile with hx-get /settings/tokens.
+  bk_send GET /settings/tokens "$jar" "$page" >/dev/null
+  local write_hint
+  write_hint="gf_…$(tail -c 5 "$STATE_DIR/mcp-write.token" | tr -d '\n')"
+  R[hint-shown]=$(body_has "$page" "$write_hint")
+  R[hint-page-leaks-token]=$(mcp_leaks "$page")
+  R[hint-db-matches]=$([[ "$(db_psql "select token_hint from api_tokens where name = 'verify-mcp-write';" | tr -d '[:space:]')" == "$write_hint" ]] && echo yes || echo no)
+  R[token-hint]=fail
+  [[ "${R[hint-shown]}${R[hint-page-leaks-token]}${R[hint-db-matches]}" == "yesnoyes" ]] && R[token-hint]=pass
+
+  local init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"verify-goforge","version":"1"}}}'
+  local list='{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+
+  # mcp-no-bearer-401 / mcp-cookie-only-401 / mcp-bad-bearer-401 / mcp-full-refused.
+  local s www
+  s=$(mcp_post none "$out" "$hdr" "$init"); www=$(header_value "$hdr" "WWW-Authenticate")
+  R[no-bearer-status]=$s; R[no-bearer-www-authenticate]=$www
+  R[mcp-no-bearer-401]=$([[ "$s" == "401" && "$www" == 'Bearer realm="goforge-mcp"'* ]] && echo pass || echo fail)
+  s=$(mcp_post none "$out" "$hdr" "$init" -b "$jar")
+  R[cookie-only-status]=$s
+  R[mcp-cookie-only-401]=$([[ "$s" == "401" ]] && echo pass || echo fail)
+  printf 'Authorization: Bearer gf_%s\n' "$(openssl rand -hex 24)" >"$STATE_DIR/mcp-bogus.hdr"
+  s=$(mcp_post bogus "$out" "$hdr" "$init"); www=$(header_value "$hdr" "WWW-Authenticate")
+  R[bad-bearer-status]=$s; R[bad-bearer-invalid-token]=$([[ "$www" == *'error="invalid_token"'* ]] && echo yes || echo no)
+  R[mcp-bad-bearer-401]=$([[ "$s" == "401" && "${R[bad-bearer-invalid-token]}" == "yes" ]] && echo pass || echo fail)
+  s=$(mcp_post full "$out" "$hdr" "$init"); www=$(header_value "$hdr" "WWW-Authenticate")
+  R[full-status]=$s; R[full-error]=$(jq -r '.error.code // ""' "$out" 2>/dev/null || true)
+  R[mcp-full-refused]=$([[ "$s" == "403" && "${R[full-error]}" == "insufficient_scope" && "$www" == *'error="insufficient_scope"'* ]] && echo pass || echo fail)
+
+  # mcp-get-405: the stateless endpoint has no server-sent stream.
+  s=$(curl -sS -o /dev/null -w '%{http_code}' -H "@$STATE_DIR/mcp-write.hdr" -H "Accept: text/event-stream" "$BASE/mcp" || true)
+  R[get-status]=$s
+  R[mcp-get-405]=$([[ "$s" == "405" ]] && echo pass || echo fail)
+
+  # mcp-initialize: JSON response, no session id needed.
+  s=$(mcp_post write "$out" "$hdr" "$init")
+  R[initialize-status]=$s
+  R[initialize-content-type]=$(header_value "$hdr" "Content-Type")
+  R[initialize-server]=$(jq -r '.result.serverInfo.name // ""' "$out" 2>/dev/null || true)
+  R[initialize-protocol]=$(jq -r '.result.protocolVersion // ""' "$out" 2>/dev/null || true)
+  R[mcp-initialize]=$([[ "$s" == "200" && -n "${R[initialize-server]}" && "${R[initialize-content-type]}" == application/json* ]] && echo pass || echo fail)
+
+  # mcp-read-inventory / mcp-write-inventory.
+  s=$(mcp_post read "$out" /dev/null "$list")
+  R[read-list-status]=$s
+  R[read-tool-count]=$(jq -r '.result.tools | length' "$out" 2>/dev/null || echo 0)
+  R[read-all-readonly]=$(jq -r '[.result.tools[] | .annotations.readOnlyHint == true] | all' "$out" 2>/dev/null || echo false)
+  s=$(mcp_post write "$out" /dev/null "$list")
+  R[write-list-status]=$s
+  R[write-tool-count]=$(jq -r '.result.tools | length' "$out" 2>/dev/null || echo 0)
+  R[write-tools-gated]=$(jq -r '[.result.tools[] | select(.annotations.readOnlyHint != true) | (.inputSchema.properties | has("dry_run") and has("approval_ref"))] | (length == 14 and all)' "$out" 2>/dev/null || echo false)
+  R[mcp-read-inventory]=$([[ "${R[read-tool-count]}" == "23" && "${R[read-all-readonly]}" == "true" ]] && echo pass || echo fail)
+  R[mcp-write-inventory]=$([[ "${R[write-tool-count]}" == "37" && "${R[write-tools-gated]}" == "true" ]] && echo pass || echo fail)
+
+  # mcp-read-call: whoami answers as the caller's token.
+  s=$(mcp_call read "$out" whoami '{}')
+  R[whoami-read-scopes]=$(mcp_text "$out" | jq -r '.token.scopes | join(",")' 2>/dev/null || true)
+  s=$(mcp_call write "$out" whoami '{}')
+  R[whoami-write-scopes]=$(mcp_text "$out" | jq -r '.token.scopes | join(",")' 2>/dev/null || true)
+  R[mcp-read-call]=$([[ "${R[whoami-read-scopes]}" == "read" && "${R[whoami-write-scopes]}" == "read,write" ]] && echo pass || echo fail)
+
+  local env_args
+  env_args=$(jq -cn --arg p "$project_id" --arg e "$env_id" '{project_id:$p,environment_id:$e,key:"VERIFY_MCP_KEY",value:"verify-value"}')
+
+  # mcp-read-token-write-refused: a read token gets a tool error, not a call.
+  mcp_call read "$out" set_env_var "$env_args" >/dev/null
+  R[read-write-is-error]=$(mcp_is_error "$out")
+  R[read-write-insufficient-scope]=$([[ "$(mcp_text "$out")" == insufficient_scope* ]] && echo yes || echo no)
+  R[mcp-read-token-write-refused]=$([[ "${R[read-write-is-error]}" == "true" && "${R[read-write-insufficient-scope]}" == "yes" ]] && echo pass || echo fail)
+
+  # mcp-dry-run: no dry_run means a plan; nothing is written.
+  mcp_call write "$out" set_env_var "$env_args" >/dev/null
+  R[dry-is-error]=$(mcp_is_error "$out")
+  R[dry-flag]=$(mcp_text "$out" | jq -r '.dry_run' 2>/dev/null || true)
+  R[dry-rows-after]=$(db_psql "select count(*) from env_variables where environment_id = '$env_id' and key = 'VERIFY_MCP_KEY';" | tr -d '[:space:]')
+  R[mcp-dry-run]=$([[ "${R[dry-is-error]}" == "false" && "${R[dry-flag]}" == "true" && "${R[dry-rows-after]}" == "0" ]] && echo pass || echo fail)
+
+  # mcp-approval-audit: approved run writes the row; the audit row carries
+  # approval_ref, the outer client IP (X-Forwarded-For from a loopback peer),
+  # and the MCP user agent.
+  local ref approved_args
+  ref="verify-mcp-$(openssl rand -hex 4)"
+  approved_args=$(jq -c --arg r "$ref" '. + {dry_run:false, approval_ref:$r}' <<<"$env_args")
+  mcp_call write "$out" set_env_var "$approved_args" -H "X-Forwarded-For: 203.0.113.7" >/dev/null
+  R[approved-is-error]=$(mcp_is_error "$out")
+  R[approved-rows-after]=$(db_psql "select count(*) from env_variables where environment_id = '$env_id' and key = 'VERIFY_MCP_KEY';" | tr -d '[:space:]')
+  R[audit-row]=$(db_psql "select action || '|' || coalesce(host(ip_address), '') || '|' || split_part(coalesce(user_agent, ''), ' ', 1) from audit_logs where details->>'approval_ref' = '$ref' order by created_at limit 1;" | tr -d '[:space:]')
+  R[mcp-approval-audit]=$([[ "${R[approved-is-error]}" == "false" && "${R[approved-rows-after]}" == "1" && "${R[audit-row]}" == "api_v1.set_env_var|203.0.113.7|goforge-mcp-http" ]] && echo pass || echo fail)
+  R[approval-ref]=$ref
+
+  # mcp-protected-refusal: a service row whose id is in GOFORGE_PROTECTED_SERVICES.
+  local prot_id
+  prot_id=$(mcp_call write "$out" whoami '{}' >/dev/null; mcp_text "$out" | jq -r '.protected_services[0] // ""' 2>/dev/null || true)
+  R[protected-listed-in-whoami]=$([[ -n "$prot_id" ]] && echo yes || echo no)
+  R[admin-user-found]=$([[ -n "$user_id" ]] && echo yes || echo no)
+  if [[ -n "$prot_id" && -n "$user_id" ]]; then
+    db_psql "insert into service_instances (id, user_id, template_name, name, status) values ('$prot_id', '$user_id', 'postgres', 'verify-protected', 'stopped') on conflict (id) do nothing;" >/dev/null
+    mcp_call write "$out" update_service_config "$(jq -cn --arg s "$prot_id" '{service_id:$s,config:{name:"verify-renamed"},dry_run:false,approval_ref:"verify-protected"}')" >/dev/null
+    R[protected-config-is-error]=$(mcp_is_error "$out")
+    R[protected-config-names-protected]=$([[ "$(mcp_text "$out")" == *protected* ]] && echo yes || echo no)
+    mcp_call write "$out" update_service_image "$(jq -cn --arg s "$prot_id" '{service_id:$s,dry_run:false,approval_ref:"verify-protected"}')" >/dev/null
+    R[protected-image-is-error]=$(mcp_is_error "$out")
+    mcp_call write "$out" restart_service "$(jq -cn --arg s "$prot_id" '{service_id:$s}')" >/dev/null
+    R[protected-restart-dry-is-error]=$(mcp_is_error "$out")
+    R[protected-restart-dry-flag]=$(mcp_text "$out" | jq -r '.dry_run' 2>/dev/null || true)
+    # Second layer: the API refuses the same change for a write token.
+    R[protected-api-status]=$(curl -sS -o /dev/null -w '%{http_code}' -X PATCH "$BASE/api/v1/services/$prot_id/config" \
+      -H "@$STATE_DIR/mcp-write.hdr" -H "Content-Type: application/json" \
+      --data-binary '{"config":{"name":"verify-renamed"},"dry_run":false,"approval_ref":"verify-protected"}' || true)
+    R[protected-name-after]=$(db_psql "select name from service_instances where id = '$prot_id';" | tr -d '[:space:]')
+  fi
+  R[mcp-protected-refusal]=fail
+  if [[ "${R[protected-config-is-error]:-}" == "true" && "${R[protected-config-names-protected]:-}" == "yes" \
+    && "${R[protected-image-is-error]:-}" == "true" && "${R[protected-api-status]:-}" == "403" \
+    && "${R[protected-name-after]:-}" == "verify-protected" ]]; then
+    R[mcp-protected-refusal]=pass
+  fi
+  R[mcp-protected-restart-allowed]=$([[ "${R[protected-restart-dry-is-error]:-}" == "false" && "${R[protected-restart-dry-flag]:-}" == "true" ]] && echo pass || echo fail)
+
+  # mcp-cross-origin-403: a browser request from another site is refused
+  # before auth or tool code runs.
+  s=$(mcp_post write "$out" /dev/null "$list" -H "Origin: https://evil.example.test" -H "Sec-Fetch-Site: cross-site")
+  R[cross-origin-status]=$s
+  R[mcp-cross-origin-403]=$([[ "$s" == "403" ]] && echo pass || echo fail)
+
+  # token-rotate: new secret on the same row; the old one stops working at once.
+  local write_id rotate_status old_status new_status new_whoami
+  write_id=$(db_psql "select id from api_tokens where name = 'verify-mcp-write';" | tr -d '[:space:]')
+  cp -p "$STATE_DIR/mcp-write.hdr" "$STATE_DIR/mcp-old.hdr"
+  cp -p "$STATE_DIR/mcp-write.token" "$STATE_DIR/mcp-old.token"
+  rotate_status=$(bk_send POST "/settings/tokens/$write_id/rotate" "$jar" "$page")
+  R[rotate-status]=$rotate_status
+  R[rotate-trigger]=$(body_has "$page" 'API Token Rotated')
+  R[rotated-saved]=$(mcp_save_token "$page" rotated)
+  old_status=$(mcp_post old "$out" /dev/null "$init")
+  new_status=$(mcp_post rotated "$out" /dev/null "$init")
+  mcp_call rotated "$out" whoami '{}' >/dev/null
+  new_whoami=$(mcp_text "$out" | jq -r '.token.scopes | join(",")' 2>/dev/null || true)
+  R[rotate-old-status]=$old_status; R[rotate-new-status]=$new_status; R[rotate-new-scopes]=$new_whoami
+  R[rotate-same-row]=$(db_psql "select count(*) from api_tokens where name = 'verify-mcp-write' and id = '$write_id';" | tr -d '[:space:]')
+  R[rotate-hint-changed]=$([[ "$(db_psql "select token_hint from api_tokens where id = '$write_id';" | tr -d '[:space:]')" == "gf_…$(tail -c 5 "$STATE_DIR/mcp-rotated.token" | tr -d '\n')" ]] && echo yes || echo no)
+  R[token-rotate]=$([[ "$rotate_status" == "200" && "${R[rotated-saved]}" == "yes" && "$old_status" == "401" && "$new_status" == "200" \
+    && "$new_whoami" == "read,write" && "${R[rotate-same-row]}" == "1" && "${R[rotate-hint-changed]}" == "yes" ]] && echo pass || echo fail)
+
+  # token-revoke: the rotated token is refused after revoke.
+  R[revoke-status]=$(bk_send DELETE "/settings/tokens/$write_id" "$jar" "$page")
+  R[revoke-after-status]=$(mcp_post rotated "$out" /dev/null "$init")
+  R[token-revoke]=$([[ "${R[revoke-status]}" == "200" && "${R[revoke-after-status]}" == "401" ]] && echo pass || echo fail)
+
+  # token-audit: create, rotate, revoke rows with no token values in details.
+  sleep 1
+  R[audit-create-rows]=$(db_psql "select count(*) from audit_logs where action = 'api_token.create' and details->>'name' in ('verify-mcp-write','verify-mcp-read','verify-legacy-full');" | tr -d '[:space:]')
+  R[audit-rotate-rows]=$(db_psql "select count(*) from audit_logs where action = 'api_token.rotate' and resource_id = '$write_id';" | tr -d '[:space:]')
+  R[audit-revoke-rows]=$(db_psql "select count(*) from audit_logs where action = 'api_token.revoke' and resource_id = '$write_id';" | tr -d '[:space:]')
+  local audit_dump
+  audit_dump=$(mktemp "$STATE_DIR/mcp-audit.XXXXXX")
+  db_psql "select details::text from audit_logs where action like 'api\_token.%' or details->>'approval_ref' = '$ref';" >"$audit_dump"
+  R[audit-details-leak-token]=$(mcp_leaks "$audit_dump")
+  rm -f "$audit_dump"
+  R[token-audit]=$([[ "${R[audit-create-rows]}" == "3" && "${R[audit-rotate-rows]}" == "1" && "${R[audit-revoke-rows]}" == "1" && "${R[audit-details-leak-token]}" == "no" ]] && echo pass || echo fail)
+
+  # No token in the app log.
+  local logfile
+  logfile=$(mktemp "$STATE_DIR/mcp-log.XXXXXX")
+  app_logs >"$logfile" 2>/dev/null || true
+  R[app-log-lines]=$(wc -l <"$logfile" | tr -d '[:space:]')
+  R[app-log-leaks-token]=$(mcp_leaks "$logfile")
+  rm -f "$logfile"
+
+  {
+    echo "harness=$harness"
+    local k
+    for k in mcp-profile-card token-mcp-preset token-hint mcp-no-bearer-401 mcp-cookie-only-401 mcp-bad-bearer-401 \
+      mcp-full-refused mcp-get-405 mcp-initialize mcp-read-inventory mcp-write-inventory mcp-read-call \
+      mcp-read-token-write-refused mcp-dry-run mcp-approval-audit mcp-protected-refusal mcp-protected-restart-allowed \
+      mcp-cross-origin-403 token-rotate token-revoke token-audit; do
+      echo "$k=${R[$k]:-fail}"
+    done
+    echo "---"
+    for k in $(printf '%s\n' "${!R[@]}" | sort); do
+      case "$k" in mcp-*|token-mcp-preset|token-hint|token-rotate|token-revoke|token-audit) continue ;; esac
+      echo "$k=${R[$k]}"
+    done
+  } >"$verdict"
+  chmod 644 "$verdict"
+  redact_file "$verdict"
+  local leak
+  leak=$(mcp_leaks "$verdict")
+  echo "verdict-leaks-token=$leak" >>"$verdict"
+  rm -f "$page" "$out" "$hdr" "$jar" "$STATE_DIR"/mcp-*.token "$STATE_DIR"/mcp-*.hdr
+  cat "$verdict"
+  if [[ "$harness" != "ok" || "$leak" != "no" ]]; then
+    exit 2
+  fi
+}
+
 
 evidence_list() {
   find "$EVIDENCE" -type f 2>/dev/null | sort
@@ -1020,6 +1347,7 @@ main() {
     check-sealed) shift; cmd_check_sealed "${1:-}" ;;
     check-backup-sealed) cmd_check_backup_sealed ;;
     drive-backup-settings) cmd_drive_backup_settings ;;
+    drive-mcp-http) cmd_drive_mcp_http ;;
     cleanup) cmd_cleanup ;;
     *) usage ;;
   esac

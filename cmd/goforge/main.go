@@ -25,6 +25,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/git"
 	"github.com/raythurman2386/goforge/internal/logger"
+	"github.com/raythurman2386/goforge/internal/mcphttp"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/project"
@@ -422,7 +423,7 @@ func runServer() error {
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments"))
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services"))
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
-	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService)
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithAudit(auditService).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
@@ -462,6 +463,17 @@ func runServer() error {
 		ProtectedServices: cfg.ProtectedServices,
 	}).Routes()
 
+	// The same tools as cmd/goforge-mcp, over streamable HTTP at /mcp.
+	var mcpHTTP http.Handler
+	if cfg.MCPHTTP {
+		mcpHTTP = mcphttp.New(mcphttp.Deps{
+			API:    apiV1,
+			Tokens: apiTokenRepo,
+			Users:  userRepo,
+			Logger: logger.WithComponent(log, "mcp_http"),
+		})
+	}
+
 	// Create router
 	router := web.Router(
 		cfg,
@@ -482,6 +494,7 @@ func runServer() error {
 		healthHandler,
 		containerHandler,
 		apiV1,
+		mcpHTTP,
 	)
 
 	// Configure server

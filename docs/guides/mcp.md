@@ -1,32 +1,100 @@
 # MCP Server
 
-`goforge-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
-server for GoForge. An agent uses it to read projects, deployments, services,
-containers, logs, and the audit log, and, when allowed, to run gated changes.
+GoForge serves its [Model Context Protocol](https://modelcontextprotocol.io)
+tools at **`/mcp`** on the GoForge server itself. An agent uses them to read
+projects, deployments, services, containers, logs, and the audit log, and,
+when its token allows, to run gated changes.
 
-- It speaks MCP over **stdio** only. There is no MCP HTTP listener; reach it
-  over SSH.
-- It calls the [API v1](../reference/api-v1.md) with a scoped bearer token.
-  It has no Docker socket and no database connection, so every check (scope,
-  ownership, protected services, approval, audit) runs in GoForge.
+- **Transport:** streamable HTTP, stateless, JSON responses. `POST /mcp`
+  only; `GET` and `DELETE` answer `405` (there is no session and no server
+  push).
+- **Auth:** a Profile API token in `Authorization: Bearer <token>`. Session
+  cookies are ignored. Full-scope tokens are refused.
+- **Same checks as the API:** each tool call is one request to the
+  [API v1](../reference/api-v1.md) handler, in process, with your token, so
+  scope, ownership, protected services, `dry_run`, `approval_ref`, and the
+  audit-before-act rule are the ones `/api/v1` enforces.
 - There is no tool that reveals a secret.
 
-## 1. Create a token
+`cmd/goforge-mcp` is the same tool set as a stdio binary for clients that
+cannot speak HTTP; it calls `/api/v1` over HTTPS (see
+[stdio fallback](#stdio-fallback)).
 
-Sign in as the admin user and open **Settings → Profile → API Tokens →
-Generate Token**.
+## 1. Create an MCP token
 
-| For | Check |
-|-----|-------|
-| Read-only agent | `read` |
-| Agent that may deploy, restart, and edit variables | `write` |
-| Agent that may also stop, reconfigure, or re-image protected services | `write` and `protected` |
+Sign in and open **Settings → Profile → MCP → Generate MCP token**. The
+preset checks `read` and `write` and expires in 90 days (30, 90, or 365; an
+MCP token always expires).
 
-Copy the token when it is shown; it is shown once. Keep it in a file readable
-only by the user that runs the MCP server, for example
-`~/.config/goforge-mcp/token` with mode `0600`.
+| For | Scopes | Tools |
+|-----|--------|-------|
+| Read-only agent | `read` | 23 read tools |
+| Agent that may deploy, restart, and edit variables | `read`, `write` | 23 read + 14 gated write tools (37) |
+| Agent that may also stop, reconfigure, or re-image protected services | `read`, `write`, `protected` | 37 |
 
-## 2. Protect the shared services
+The token is shown once and starts with `gf_`. The token list shows a
+non-secret hint (`gf_…a1b2`) so you can tell tokens apart.
+
+- **Rotate** gives the same row (name, scopes, expiry) a new secret. The old
+  secret stops working at once. The new one is shown once.
+- **Revoke** deletes the token.
+- Create, rotate, and revoke are written to the audit log (`api_token.create`,
+  `api_token.rotate`, `api_token.revoke`) with the name, scopes, and expiry,
+  never the token or its hint.
+
+Tokens without scopes (legacy **full** tokens) keep working on the web
+routes and `/api/v1`, but `/mcp` answers `403 insufficient_scope`. Create a
+scoped MCP token instead.
+
+## 2. Connect a client
+
+The Profile **MCP** card shows the endpoint (`GOFORGE_BASE_URL` + `/mcp`)
+and a copy-ready `mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "goforge": {
+      "url": "https://goforge.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:GOFORGE_MCP_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Set `GOFORGE_MCP_TOKEN` in the environment the client runs in. The token is
+never written into `mcp.json`. Clients that do not expand `${env:…}` need
+the value some other way; do not commit it.
+
+A raw request, for checking a token:
+
+```bash
+curl -sS https://goforge.example.com/mcp \
+  -H "Authorization: Bearer $GOFORGE_MCP_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+### Answers
+
+| Request | Answer |
+|---------|--------|
+| No `Authorization: Bearer` (cookie only, Basic, none) | `401`, `WWW-Authenticate: Bearer realm="goforge-mcp"` |
+| Unknown, expired, revoked, or rotated-away token | `401`, `WWW-Authenticate: Bearer realm="goforge-mcp", error="invalid_token"` |
+| Full token, or a token with only `protected` | `403 insufficient_scope` |
+| Browser request from another origin (`Origin` / `Sec-Fetch-Site`) | `403` |
+| Write tool with a token that lacks `write` | tool error `insufficient_scope`; nothing runs |
+
+`/mcp` sits beside `/api/v1`: outside the session and CSRF middleware, with
+the same 15 s write timeout and the same per-IP rate limiter (one hit per
+`/mcp` request; the in-process API calls are not counted again). The audit
+log records the `/mcp` caller's IP (proxy headers count only from
+`TRUSTED_PROXIES`, as on `/api/v1`) and a `goforge-mcp-http` user agent.
+
+## 3. Protect the shared services
 
 Set the server-side list on the GoForge container (comma-separated service
 instance IDs, see [Configuration](../configuration/index.md#api-v1-and-mcp)):
@@ -35,91 +103,52 @@ instance IDs, see [Configuration](../configuration/index.md#api-v1-and-mcp)):
 GOFORGE_PROTECTED_SERVICES=<shared-pg-id>,<shared-redis-id>,<gitea-id>,<vaultwarden-id>,<solidcraft-id>
 ```
 
-It takes effect when the GoForge container next starts. Until then the
-server list is empty and only the MCP's own list (below) protects them.
+It takes effect when the GoForge container next starts.
 
-## 3. Build
+## 4. Turn it off
+
+`/mcp` is on by default. `GOFORGE_MCP_HTTP=false` on the GoForge container
+removes the route (it answers `404`) and hides the Profile MCP card.
+`/api/v1` and the stdio binary are not affected.
+
+## stdio fallback
+
+`cmd/goforge-mcp` speaks MCP over stdio and calls `/api/v1` with the same
+kind of scoped token. Use it only for a client that cannot reach an HTTP MCP
+server. Point it at the public HTTPS URL:
 
 ```bash
 make build-mcp            # bin/goforge-mcp
 make docker-build-mcp     # image goforge-mcp:latest (Dockerfile target "mcp")
 ```
 
-## 4. Configure
-
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `GOFORGE_MCP_URL` | `http://127.0.0.1:8080` (image: `http://goforge:8080`) | GoForge base URL, without `/api/v1` |
+| `GOFORGE_MCP_URL` | `http://127.0.0.1:8080` (image: `http://goforge:8080`) | GoForge base URL, without `/api/v1`, for example `https://goforge.example.com` |
 | `GOFORGE_MCP_TOKEN` | | API token |
 | `GOFORGE_MCP_TOKEN_FILE` | | File holding the token, used when `GOFORGE_MCP_TOKEN` is empty |
 | `GOFORGE_MCP_ALLOW_WRITES` | off | `true` registers the write tools. Off: read tools only |
 | `GOFORGE_MCP_PROTECTED` | empty | Extra protected service instance IDs, merged with the server's list |
 
-## 5. Connect over SSH
-
-The client starts the server with `ssh -T` and talks over its stdin and
-stdout. `-T` keeps a terminal from mangling the stream.
-
-Host binary (GoForge publishes `127.0.0.1:8080` on the host):
-
 ```json
 {
   "mcpServers": {
     "goforge": {
-      "command": "ssh",
-      "args": ["-T", "minis",
-               "GOFORGE_MCP_TOKEN_FILE=$HOME/.config/goforge-mcp/token",
-               "GOFORGE_MCP_ALLOW_WRITES=true",
-               "$HOME/bin/goforge-mcp"]
+      "command": "goforge-mcp",
+      "env": {
+        "GOFORGE_MCP_URL": "https://goforge.example.com",
+        "GOFORGE_MCP_TOKEN_FILE": "/home/you/.config/goforge-mcp/token",
+        "GOFORGE_MCP_ALLOW_WRITES": "true"
+      }
     }
   }
 }
 ```
 
-Container on the GoForge network (with project name `goforge` the compose
-network is `goforge_goforge_net`):
-
-```json
-{
-  "mcpServers": {
-    "goforge": {
-      "command": "ssh",
-      "args": ["-T", "minis",
-               "docker", "run", "--rm", "-i",
-               "--network", "goforge_goforge_net",
-               "--env-file", "$HOME/.config/goforge-mcp/env",
-               "goforge-mcp:latest"]
-    }
-  }
-}
-```
-
-The env file holds `GOFORGE_MCP_TOKEN=…` and, if wanted,
-`GOFORGE_MCP_ALLOW_WRITES=true`. Keep it mode `0600`. Do not pass the token
-on the command line, where `ps` shows it.
-
-### Compose snippet
-
-For a long-lived definition next to GoForge, add this to an override file.
-It is behind a profile, so `docker compose up` does not start it; MCP clients
-start it with `docker compose run --rm -T goforge-mcp`.
-
-```yaml
-services:
-  goforge-mcp:
-    build:
-      context: .
-      target: mcp
-    image: goforge-mcp:latest
-    profiles: ["mcp"]
-    stdin_open: true
-    env_file: ${HOME}/.config/goforge-mcp/env
-    environment:
-      - GOFORGE_MCP_URL=http://goforge:8080
-    networks:
-      - goforge_net
-    # No Docker socket, no database, no published ports.
-```
+Keep the token file mode `0600`. Do not pass the token on the command line,
+where `ps` shows it. Unlike `/mcp`, the stdio binary needs
+`GOFORGE_MCP_ALLOW_WRITES=true` for the write tools, and lists only the tools
+it registered.
 
 ## Tools
 
@@ -134,7 +163,8 @@ Read tools (always on, read-only):
 `list_branches`, `get_backup_status` (admin only; see
 [Backups](../deployment/backup.md)).
 
-Write tools (only with `GOFORGE_MCP_ALLOW_WRITES=true` and a `write` token):
+Write tools (on `/mcp`: listed when the token has `write`; stdio: only with
+`GOFORGE_MCP_ALLOW_WRITES=true` and a `write` token):
 
 `trigger_deployment`, `cancel_deployment`, `rollback_deployment`,
 `set_env_var`, `delete_env_var`, `sync_env_vars`, `link_service`,
@@ -151,13 +181,14 @@ Every write tool takes `dry_run` (default `true`) and `approval_ref`:
 
 `stop_container`, `update_service_config`, and `update_service_image` on a
 protected service are refused unless the token has the `protected` scope. The
-MCP checks its list first; GoForge checks again and answers
+MCP tools check the protected list first; the API checks again and answers
 `403 protected_resource` before any Docker call. `restart_service` and
 `restart_container` are allowed on protected services.
 
 ## Not covered yet
 
-Later versions may let the MCP own Postgres tenants on the shared Postgres,
+No OAuth (Profile tokens only), no per-token rate limit, and no Cloudflare
+Access integration. Later versions may let the MCP own Postgres tenants on the shared Postgres,
 Redis ACL users on the shared Redis (today: `scripts/shared-data/pg-tenant.sh`
 and `redis-tenant.sh` on the host), and backups. v1 has none of these. It
 also has no project, service, or volume delete, no prune, and no secret-reveal

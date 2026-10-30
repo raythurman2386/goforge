@@ -31,8 +31,8 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 	}
 
 	query := `
-		INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at, scopes)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at, scopes, token_hint)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -43,6 +43,7 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 		token.ExpiresAt,
 		token.CreatedAt,
 		pq.Array(token.Scopes),
+		token.TokenHint,
 	)
 	return err
 }
@@ -50,7 +51,7 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 // GetByID retrieves an API token by ID.
 func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint
 		FROM api_tokens
 		WHERE id = $1
 	`
@@ -65,6 +66,7 @@ func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.AP
 		&token.ExpiresAt,
 		&token.CreatedAt,
 		pq.Array(&token.Scopes),
+		&token.TokenHint,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -78,7 +80,7 @@ func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.AP
 // GetByTokenHash retrieves an API token by its hash (for authentication).
 func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint
 		FROM api_tokens
 		WHERE token_hash = $1
 	`
@@ -93,6 +95,7 @@ func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*
 		&token.ExpiresAt,
 		&token.CreatedAt,
 		pq.Array(&token.Scopes),
+		&token.TokenHint,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -106,7 +109,7 @@ func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*
 // ListByUserID retrieves all API tokens for a user.
 func (r *APITokenRepository) ListByUserID(ctx context.Context, userID string) ([]*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint
 		FROM api_tokens
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -130,6 +133,7 @@ func (r *APITokenRepository) ListByUserID(ctx context.Context, userID string) ([
 			&token.ExpiresAt,
 			&token.CreatedAt,
 			pq.Array(&token.Scopes),
+			&token.TokenHint,
 		)
 		if err != nil {
 			return nil, err
@@ -144,6 +148,26 @@ func (r *APITokenRepository) UpdateLastUsed(ctx context.Context, id string) erro
 	query := `UPDATE api_tokens SET last_used_at = $1 WHERE id = $2`
 	_, err := r.db.ExecContext(ctx, query, time.Now(), id)
 	return err
+}
+
+// Rotate replaces the secret of the user's token in place: the row keeps its
+// id, name, scopes, and expiry, and the old secret stops matching at once.
+// last_used_at is cleared because it described the old secret. It returns
+// ErrNotFound when the token does not exist or belongs to another user.
+func (r *APITokenRepository) Rotate(ctx context.Context, id, userID, tokenHash, tokenHint string) error {
+	query := `UPDATE api_tokens SET token_hash = $1, token_hint = $2, last_used_at = NULL WHERE id = $3 AND user_id = $4`
+	res, err := r.db.ExecContext(ctx, query, tokenHash, tokenHint, id, userID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Delete deletes an API token.

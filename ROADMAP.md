@@ -171,6 +171,7 @@ The focus for the next release is hardening the platform and improving the devel
 - [ ] **CLI Tool:** `goforge` CLI for deploying from terminal.
 - [x] **API Tokens:** Personal Access Tokens for external integrations, with `read` / `write` / `protected` scopes for `/api/v1` (#61).
 - [x] **JSON API and MCP:** `/api/v1` (bearer only, dry-run by default, audited mutations) and the `goforge-mcp` stdio server (#61).
+- [x] **MCP over HTTP:** `/mcp` on `goforge serve` with scoped Profile tokens (`gf_` prefix, hint, rotate, audited), a Profile MCP card with `mcp.json`, and the stdio binary kept as a fallback pointed at HTTPS. *(Not yet: OAuth, per-token rate limits, MCP ownership of Postgres tenants, Redis ACL users, and backups.)*
 - [ ] **Build Caching:** S3/Local cache for faster Docker builds.
 - [x] **UX Polish:** Finalize login template rendering.
 - [ ] **Rollback feedback:** Show the rollback result in the UI. `RollbackDeployment` discards it today because `HX-Redirect` reloads the page and would drop a toast (`internal/web/handlers/deployments.go`).

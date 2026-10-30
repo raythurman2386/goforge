@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -53,6 +55,37 @@ func BearerToken(r *http.Request) string {
 func HashAPIToken(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
+}
+
+// APITokenPrefix starts every API token created since migration 021, so
+// secret scanners can recognize a leaked GoForge token. Older tokens have no
+// prefix and keep working.
+const APITokenPrefix = "gf_"
+
+// GenerateAPIToken returns a new raw token (APITokenPrefix plus 32 random
+// bytes in hex), its storage hash, and a non-secret hint such as "gf_…a1b2".
+// The raw value is shown to the user once and never stored.
+func GenerateAPIToken() (raw, hash, hint string, err error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", "", "", fmt.Errorf("generate api token: %w", err)
+	}
+	raw = APITokenPrefix + hex.EncodeToString(buf)
+	return raw, HashAPIToken(raw), APITokenHint(raw), nil
+}
+
+// APITokenHint is the label stored next to a token: the gf_ prefix when
+// present, an ellipsis, and the last four characters. Four hex characters of
+// a 256-bit token reveal nothing useful.
+func APITokenHint(raw string) string {
+	if len(raw) < 12 {
+		return ""
+	}
+	prefix := ""
+	if strings.HasPrefix(raw, APITokenPrefix) {
+		prefix = APITokenPrefix
+	}
+	return prefix + "\u2026" + raw[len(raw)-4:]
 }
 
 // AuthenticateBearer resolves the request's bearer token to its active token

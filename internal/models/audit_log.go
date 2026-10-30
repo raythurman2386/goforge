@@ -42,6 +42,12 @@ const (
 	// AuditActionBackupSettingsUpdate records a save of the admin Backups
 	// form. Details hold {"changed": [field names]}, never values.
 	AuditActionBackupSettingsUpdate = "backup.settings.update"
+	// AuditActionAPITokenCreate, AuditActionAPITokenRotate, and
+	// AuditActionAPITokenRevoke record Profile API token changes. Details
+	// carry the name, scopes, and expiry, never the token or its hint.
+	AuditActionAPITokenCreate = "api_token.create"
+	AuditActionAPITokenRotate = "api_token.rotate"
+	AuditActionAPITokenRevoke = "api_token.revoke"
 )
 
 // Common resource types
@@ -53,4 +59,5 @@ const (
 	ResourceTypeServiceInstance = "service_instance"
 	ResourceTypeGitSource       = "git_source"
 	ResourceTypeBackupSettings  = "backup_settings"
+	ResourceTypeAPIToken        = "api_token"
 )

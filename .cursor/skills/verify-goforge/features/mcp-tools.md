@@ -1,6 +1,6 @@
-# GoForge MCP tools
+# GoForge MCP tools (stdio fallback)
 
-`goforge-mcp` speaks MCP over stdio and calls `/api/v1` with a scoped token. A client sees 23 read tools, plus 14 write tools when `GOFORGE_MCP_ALLOW_WRITES=true`. Write tools are dry runs by default, need `approval_ref` to run, and refuse protected services for stop, config edit, and image update unless the token has the `protected` scope.
+The main MCP endpoint is `/mcp` on serve; see [mcp-http.md](./mcp-http.md). This file covers the fallback: `goforge-mcp` speaks MCP over stdio and calls `/api/v1` with a scoped token. A client sees 23 read tools, plus 14 write tools when `GOFORGE_MCP_ALLOW_WRITES=true`. Write tools are dry runs by default, need `approval_ref` to run, and refuse protected services for stop, config edit, and image update unless the token has the `protected` scope.
 
 ## Sub-features
 

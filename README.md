@@ -20,7 +20,7 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 - **Monitoring:** Real-time container resource monitoring (CPU, Memory).
 - **Real-time Updates:** SSE-powered deployment logs and status updates.
 - **One-click Services:** PostgreSQL, Redis, Gitea, Vaultwarden, MinIO, and more from YAML templates in `templates/`, including shared Postgres and Redis for several apps. See [Services](docs/guides/services.md).
-- **API v1 and MCP:** a bearer-token JSON API at `/api/v1` with scoped tokens and gated, audited writes, and `goforge-mcp`, an MCP server over stdio that calls it. See [API v1](docs/reference/api-v1.md) and [MCP server](docs/guides/mcp.md).
+- **API v1 and MCP:** a bearer-token JSON API at `/api/v1` with scoped tokens and gated, audited writes, and the same MCP tools at `/mcp` (streamable HTTP, scoped Profile tokens, set up from Settings → Profile → MCP), with `goforge-mcp` as a stdio fallback. See [API v1](docs/reference/api-v1.md) and [MCP server](docs/guides/mcp.md).
 - **Nightly Backups:** the GoForge database and Postgres, Gitea, and Vaultwarden services uploaded to S3-compatible storage (R2, B2, MinIO) every night, plus `goforge backup run` on demand. Restore is a manual runbook. See [Backup & Restore](docs/deployment/backup.md).
 
 ## Getting Started

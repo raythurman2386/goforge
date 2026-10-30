@@ -58,6 +58,7 @@ Dev mode writes any secrets it generates to `GOFORGE_DEV_SECRETS_FILE` (mode `06
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GOFORGE_PROTECTED_SERVICES` | empty | Comma-separated service instance IDs. Through `/api/v1` (and so the MCP server), stopping, reconfiguring, or re-imaging one of them needs a token with the `protected` scope; without it the API answers `403 protected_resource` before any Docker call. Restart is still allowed with `write`. The UI is not affected |
+| `GOFORGE_MCP_HTTP` | `true` | Serves the MCP tools at `/mcp` for scoped Profile API tokens. `false` removes the route (`404`) and hides the Profile MCP card; `/api/v1` and `cmd/goforge-mcp` are not affected |
 
 See [API v1](../reference/api-v1.md) and [MCP server](../guides/mcp.md).
 

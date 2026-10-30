@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -39,6 +40,11 @@ func setupTestRouter(t *testing.T, db *sql.DB, cfg *config.Config) http.Handler 
 }
 
 func setupTestRouterWithAPI(t *testing.T, db *sql.DB, cfg *config.Config, apiV1 http.Handler) http.Handler {
+	t.Helper()
+	return setupTestRouterWithMCP(t, db, cfg, apiV1, nil)
+}
+
+func setupTestRouterWithMCP(t *testing.T, db *sql.DB, cfg *config.Config, apiV1, mcpHTTP http.Handler) http.Handler {
 	t.Helper()
 
 	// Repos
@@ -82,7 +88,7 @@ func setupTestRouterWithAPI(t *testing.T, db *sql.DB, cfg *config.Config, apiV1 
 	ch := handlers.NewContainerHandler(nil, nil, nil, logger) // Container handler with nil dependencies for testing
 	rl := middleware.NewRateLimiter(100, 200, httputil.ProxyTrust{})
 	t.Cleanup(rl.Stop)
-	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch, apiV1)
+	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch, apiV1, mcpHTTP)
 }
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{
@@ -312,6 +318,41 @@ func TestRouter_APIv1OutsideCSRFAndSession(t *testing.T) {
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/auth/logout", nil))
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("POST /auth/logout without CSRF token = %d, want 403", rec.Code)
+	}
+}
+
+// TestRouter_MCPOutsideCSRFAndSession checks that /mcp is mounted beside
+// /api/v1 (no CSRF, no session middleware) and is absent when the kill
+// switch leaves the handler nil.
+func TestRouter_MCPOutsideCSRFAndSession(t *testing.T) {
+	cfg := &config.Config{DevMode: true, Port: 8080, LogLevel: "info"}
+	db := setupTestRouterDB(t)
+	defer db.Close()
+
+	var reached, sawUser bool
+	stub := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		sawUser = r.Context().Value(auth.UserContextKey) != nil
+		w.WriteHeader(http.StatusTeapot)
+	})
+	router := setupTestRouterWithMCP(t, db, cfg, nil, stub)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer some-token")
+	req.AddCookie(&http.Cookie{Name: "session", Value: "anything"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if !reached || rec.Code != http.StatusTeapot {
+		t.Fatalf("POST /mcp without CSRF token: reached=%v status=%d, want the MCP handler", reached, rec.Code)
+	}
+	if sawUser {
+		t.Error("session middleware ran on /mcp")
+	}
+
+	off := setupTestRouterWithMCP(t, db, cfg, nil, nil)
+	rec = httptest.NewRecorder()
+	off.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/mcp", nil))
+	if rec.Code == http.StatusTeapot || rec.Code < 400 {
+		t.Fatalf("POST /mcp with GOFORGE_MCP_HTTP=false = %d, want an error", rec.Code)
 	}
 }
 

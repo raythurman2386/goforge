@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -295,5 +296,50 @@ func TestLoadConfig(t *testing.T) {
 	cfg, err = LoadConfig(env(map[string]string{EnvTokenFile: path, EnvURL: "http://goforge:8080/"}))
 	if err != nil || cfg.Token != "from-file" || cfg.BaseURL != "http://goforge:8080" || cfg.AllowWrites {
 		t.Errorf("file cfg %+v %v", cfg, err)
+	}
+}
+
+func TestWriteToolNames(t *testing.T) {
+	rw := toolNames(t, connect(t, &Config{AllowWrites: true}, &fakeAPI{}))
+	got := map[string]bool{}
+	for _, n := range WriteToolNames() {
+		got[n] = true
+		if rw[n] == nil {
+			t.Errorf("WriteToolNames lists %s but it is not registered", n)
+		}
+	}
+	for n := range rw {
+		if !slices.Contains(readTools, n) && !got[n] {
+			t.Errorf("registered write tool %s is missing from WriteToolNames", n)
+		}
+	}
+	if len(got) != len(writeTools) {
+		t.Errorf("WriteToolNames has %d names, want %d", len(got), len(writeTools))
+	}
+}
+
+func TestWriteRefusal(t *testing.T) {
+	const msg = "insufficient_scope: token lacks the write scope"
+	api := &fakeAPI{}
+	cs := connect(t, &Config{WriteRefusal: msg}, api)
+	if n := len(toolNames(t, cs)); n != len(readTools) {
+		t.Fatalf("refusing server lists %d tools, want %d", n, len(readTools))
+	}
+	res, text := callTool(t, cs, "set_env_var", map[string]any{"project_id": "p", "environment_id": "e", "key": "K", "value": "v"})
+	if !res.IsError || text != msg {
+		t.Fatalf("set_env_var with refusal = %v %q, want tool error %q", res.IsError, text, msg)
+	}
+	if len(api.paths()) != 0 {
+		t.Fatalf("refused write reached the API: %v", api.paths())
+	}
+	// Reads are untouched.
+	if res, _ := callTool(t, cs, "health", nil); res.IsError {
+		t.Fatal("health failed with a write refusal configured")
+	}
+
+	// Without WriteRefusal (stdio), an unregistered write stays unknown.
+	plain := connect(t, &Config{}, &fakeAPI{})
+	if _, err := plain.CallTool(context.Background(), &mcp.CallToolParams{Name: "set_env_var", Arguments: map[string]any{}}); err == nil {
+		t.Fatal("stdio read-only server answered an unregistered write tool")
 	}
 }

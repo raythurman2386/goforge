@@ -10,9 +10,11 @@ All routes pass through the following middleware (in order):
 2. **SecurityHeaders** - CSP `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, and HSTS on HTTPS (see [Security](../security.md#security-headers))
 3. **RateLimit** - 30 requests/second, burst of 60, per client IP (rightmost untrusted `X-Forwarded-For` hop from a `TRUSTED_PROXIES` peer, or `CF-Connecting-IP` first when `CLOUDFLARE_PROXY_MODE=true`)
 
-The JSON API under `/api/v1` stops here. It authenticates bearer tokens itself,
-ignores session cookies, checks token scopes, and is outside the CSRF group. See
-[API v1](api-v1.md).
+The JSON API under `/api/v1` and the MCP endpoint `/mcp` stop here (plus the
+15 s timeout). Both authenticate bearer tokens themselves, ignore session
+cookies, check token scopes, and are outside the CSRF group. `/mcp` also
+refuses cross-origin browser requests (`http.CrossOriginProtection`). See
+[API v1](api-v1.md) and [MCP server](../guides/mcp.md).
 
 Every other route (webhooks, UI, and the 404/405 handlers) also uses:
 
@@ -181,8 +183,10 @@ Used by HTMX components for dynamic repository/branch selection.
 | `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password |
 | `GET` | `/settings/tokens` | `settingsHandler.ListAPITokens` | List API tokens (HTMX partial) |
 | `GET` | `/settings/tokens/new` | `settingsHandler.NewAPITokenModal` | New token modal (HTMX) |
-| `POST` | `/settings/tokens` | `settingsHandler.CreateAPIToken` | Create API token (optional `scopes`: `read`, `write`, `protected`; none means `full`) |
-| `DELETE` | `/settings/tokens/{id}` | `settingsHandler.DeleteAPIToken` | Revoke API token |
+| `GET` | `/settings/tokens/new?preset=mcp` | `settingsHandler.NewAPITokenModal` | MCP token modal: `read` + `write` checked, 90 days, no never-expiring option |
+| `POST` | `/settings/tokens` | `settingsHandler.CreateAPIToken` | Create API token (optional `scopes`: `read`, `write`, `protected`; none means `full`; `expires_in` 30, 90, 365, or 0 for never). With `preset=mcp`: none means `read` + `write`, `full` and `protected`-only are refused, `expires_in` 30/90/365 (default 90). New tokens start with `gf_`. Audited as `api_token.create` |
+| `POST` | `/settings/tokens/{id}/rotate` | `settingsHandler.RotateAPIToken` | New secret on the same row (id, name, scopes, expiry kept); the old secret stops working. Shows the new token once. `404` for another user's token, `400` if expired. Audited as `api_token.rotate` |
+| `DELETE` | `/settings/tokens/{id}` | `settingsHandler.DeleteAPIToken` | Revoke API token (`404` for another user's token). Audited as `api_token.revoke` |
 | `POST` | `/settings/prune` | `settingsHandler.PruneSystem` | Prune Docker system resources |
 | `GET` | `/settings/git` | `settingsHandler.GitSources` | List configured git sources |
 | `POST` | `/settings/git` | `settingsHandler.CreateGitSource` | Add a git source |
@@ -195,8 +199,17 @@ Used by HTMX components for dynamic repository/branch selection.
 
 ## JSON API v1
 
-`/api/v1/*` is the bearer-token JSON API used by the GoForge MCP server. It is
+`/api/v1/*` is the bearer-token JSON API used by the GoForge MCP tools. It is
 documented in [API v1](api-v1.md).
+
+## MCP
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| `POST` | `/mcp` | `mcphttp.New` | MCP streamable HTTP (stateless, JSON responses). Bearer only; `full` tokens `403`. Off with `GOFORGE_MCP_HTTP=false` (`404`) |
+| `GET`, `DELETE` | `/mcp` | `mcphttp.New` | `405` (no session, no server push) |
+
+See [MCP server](../guides/mcp.md).
 
 ---
 
@@ -237,13 +250,14 @@ Signed in, the token is `HMAC(CSRF_SECRET, SHA-256(session token))`; signed out,
 
 `POST /auth/login` also answers `429` with `Retry-After` while the client IP or the account is locked out after repeated failures.
 
-Webhook routes (`/webhooks/*`) and the JSON API (`/api/v1/*`) are excluded from
-CSRF protection. `/api/v1` accepts only `Authorization: Bearer` and ignores
-cookies, so a browser cannot be tricked into calling it with a session.
+Webhook routes (`/webhooks/*`), the JSON API (`/api/v1/*`), and `/mcp` are
+excluded from CSRF protection. `/api/v1` and `/mcp` accept only
+`Authorization: Bearer` and ignore cookies, so a browser cannot be tricked
+into calling them with a session.
 
 ---
 
 ## Source
 
 Route definitions: `internal/web/router.go` (UI, webhooks) and
-`internal/apiv1/handler.go` (`/api/v1`)
+`internal/apiv1/handler.go` (`/api/v1`), and `internal/mcphttp` (`/mcp`)

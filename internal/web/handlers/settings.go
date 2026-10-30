@@ -2,13 +2,12 @@ package handlers
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
-	"fmt"
+	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
+	"strconv"
 	"time"
 
 	"github.com/a-h/templ"
@@ -29,7 +28,8 @@ type SettingsHandler struct {
 	gitSourceRepo   *repositories.GitSourceRepository
 	instanceService *services.InstanceService
 	userRepo        *repositories.UserRepository
-	apiTokenRepo    *repositories.APITokenRepository
+	apiTokenRepo    APITokenStore
+	mcp             *settings.MCPCard
 	backups         BackupStatusReader
 	backupSettings  BackupSettings
 	audit           AuditRecorder
@@ -41,13 +41,48 @@ func NewSettingsHandler(gsr *repositories.GitSourceRepository, is *services.Inst
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &SettingsHandler{
+	h := &SettingsHandler{
 		gitSourceRepo:   gsr,
 		instanceService: is,
 		userRepo:        ur,
-		apiTokenRepo:    atr,
 		logger:          logger,
 	}
+	if atr != nil {
+		h.apiTokenRepo = atr
+	}
+	return h
+}
+
+// APITokenStore is the API token storage the Profile token routes use
+// (repositories.APITokenRepository).
+type APITokenStore interface {
+	Create(ctx context.Context, token *models.APIToken) error
+	GetByID(ctx context.Context, id string) (*models.APIToken, error)
+	ListByUserID(ctx context.Context, userID string) ([]*models.APIToken, error)
+	Rotate(ctx context.Context, id, userID, tokenHash, tokenHint string) error
+	Delete(ctx context.Context, id string) error
+}
+
+// WithAPITokens replaces the token store (tests).
+func (h *SettingsHandler) WithAPITokens(s APITokenStore) *SettingsHandler {
+	h.apiTokenRepo = s
+	return h
+}
+
+// WithAudit records API token create, rotate, and revoke in the audit log.
+func (h *SettingsHandler) WithAudit(a AuditRecorder) *SettingsHandler {
+	h.audit = a
+	return h
+}
+
+// WithMCP shows the MCP card on the Profile page when /mcp is served.
+// baseURL is GOFORGE_BASE_URL; the endpoint is baseURL + "/mcp".
+func (h *SettingsHandler) WithMCP(baseURL string, enabled bool) *SettingsHandler {
+	h.mcp = nil
+	if enabled {
+		h.mcp = settings.NewMCPCard(baseURL)
+	}
+	return h
 }
 
 // GitSources renders the git sources settings page.
@@ -235,7 +270,7 @@ func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
 	}
 	// The page carries backup settings for admins; never cache it.
 	w.Header().Set("Cache-Control", "no-store")
-	component := settings.Profile(currentUser, csrfToken, st, form)
+	component := settings.Profile(currentUser, csrfToken, st, form, h.mcp)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render profile page")
 	}
@@ -369,9 +404,11 @@ func (h *SettingsHandler) ListAPITokens(w http.ResponseWriter, r *http.Request) 
 }
 
 // NewAPITokenModal renders the modal to create a new API token.
+// ?preset=mcp opens the MCP preset: read and write checked, 90 days, no
+// full or never-expiring option.
 func (h *SettingsHandler) NewAPITokenModal(w http.ResponseWriter, r *http.Request) {
 	csrfToken := auth.GetCSRFToken(r)
-	component := settings.AddAPITokenModal(csrfToken)
+	component := settings.AddAPITokenModal(csrfToken, r.URL.Query().Get("preset") == mcpPreset)
 
 	if r.Header.Get("HX-Request") == htmxTrue {
 		if err := component.Render(r.Context(), w); err != nil {
@@ -387,6 +424,18 @@ func (h *SettingsHandler) NewAPITokenModal(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+const (
+	mcpPreset = "mcp"
+	// mcpDefaultDays is the MCP preset's default lifetime.
+	mcpDefaultDays = 90
+	// defaultTokenDays is the lifetime when expires_in is missing.
+	defaultTokenDays = 365
+)
+
+// tokenLifetimes are the expires_in choices, in days. 0 is never (not
+// offered by the MCP preset).
+var tokenLifetimes = []int{30, 90, 365}
+
 // CreateAPIToken handles creating a new API token.
 func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request) {
 	val := r.Context().Value(auth.UserContextKey)
@@ -396,9 +445,11 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	name := r.FormValue("name")
-	expiresIn := r.FormValue("expires_in")
-
+	if err := r.ParseForm(); err != nil {
+		RenderError(w, r, http.StatusBadRequest, "invalid form data")
+		return
+	}
+	name := r.PostFormValue("name")
 	if name == "" {
 		RenderError(w, r, http.StatusBadRequest, "Token name is required")
 		return
@@ -407,42 +458,56 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 		RenderError(w, r, http.StatusBadRequest, "Token name must be under 100 characters")
 		return
 	}
-
-	if err := r.ParseForm(); err != nil {
-		RenderError(w, r, http.StatusBadRequest, "invalid form data")
-		return
-	}
 	scopes, ok := models.NormalizeScopes(r.PostForm["scopes"])
 	if !ok {
 		RenderError(w, r, http.StatusBadRequest, "Unknown token scope")
 		return
 	}
 
-	// Generate random token
-	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
+	preset := r.PostFormValue("preset") == mcpPreset
+	days := defaultTokenDays
+	if preset {
+		days = mcpDefaultDays
+		if !slices.ContainsFunc(r.PostForm["scopes"], func(v string) bool { return v != "" }) {
+			scopes = []string{models.ScopeRead, models.ScopeWrite}
+		}
+		if !(&models.APIToken{Scopes: scopes}).IsMCPCapable() {
+			RenderError(w, r, http.StatusBadRequest, "An MCP token needs read or write and cannot be full")
+			return
+		}
+	}
+	if v := r.PostFormValue("expires_in"); v != "" {
+		n, err := strconv.Atoi(v)
+		switch {
+		case err == nil && n == 0 && !preset:
+			days = 0
+		case err == nil && slices.Contains(tokenLifetimes, n):
+			days = n
+		case preset && n == 0:
+			RenderError(w, r, http.StatusBadRequest, "An MCP token must expire")
+			return
+		default:
+			RenderError(w, r, http.StatusBadRequest, "Unknown expiry")
+			return
+		}
+	}
+	var expiresAt sql.NullTime
+	if days > 0 {
+		expiresAt = sql.NullTime{Time: time.Now().AddDate(0, 0, days), Valid: true}
+	}
+
+	rawToken, tokenHash, hint, err := auth.GenerateAPIToken()
+	if err != nil {
 		h.logger.Error("failed to generate token", "error", err)
 		RenderError(w, r, http.StatusInternalServerError, "Failed to generate token")
 		return
-	}
-	rawToken := hex.EncodeToString(tokenBytes)
-
-	// Hash the token for storage
-	tokenHash := hashToken(rawToken)
-
-	// Calculate expiration
-	var expiresAt sql.NullTime
-	if expiresIn != "0" {
-		days := 365
-		if _, err := fmt.Sscanf(expiresIn, "%d", &days); err == nil {
-			expiresAt = sql.NullTime{Time: time.Now().AddDate(0, 0, days), Valid: true}
-		}
 	}
 
 	token := &models.APIToken{
 		UserID:    user.ID,
 		Name:      name,
 		TokenHash: tokenHash,
+		TokenHint: hint,
 		Scopes:    scopes,
 		ExpiresAt: expiresAt,
 		CreatedAt: time.Now(),
@@ -453,55 +518,110 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 		RenderError(w, r, http.StatusInternalServerError, "Failed to create token")
 		return
 	}
+	details := tokenAuditDetails(token)
+	details["mcp_preset"] = preset
+	h.recordToken(r, user.ID, models.AuditActionAPITokenCreate, token.ID, details)
 
 	// Trigger a token list refresh on the client
 	w.Header().Set("HX-Trigger", "tokenCreated")
+	w.Header().Set("Cache-Control", "no-store")
 
 	// Return the raw token to the user (only shown once)
 	w.WriteHeader(http.StatusCreated)
-	if err := settings.TokenCreatedModal(rawToken).Render(r.Context(), w); err != nil {
+	if err := settings.TokenCreatedModal("API Token Created", rawToken, token.IsMCPCapable()).Render(r.Context(), w); err != nil {
 		h.logger.Error("failed to render token created modal", "error", err)
 	}
 }
 
-// DeleteAPIToken handles deleting an API token.
-func (h *SettingsHandler) DeleteAPIToken(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(auth.UserContextKey)
-	user, ok := val.(*models.User)
+// ownedToken loads the {id} token if it belongs to the session user. Any
+// other token answers 404, so ids of other users' tokens are not confirmed.
+func (h *SettingsHandler) ownedToken(w http.ResponseWriter, r *http.Request) (*models.User, *models.APIToken, bool) {
+	user, ok := r.Context().Value(auth.UserContextKey).(*models.User)
 	if !ok {
 		RenderError(w, r, http.StatusUnauthorized, "User not found")
-		return
+		return nil, nil, false
 	}
-
-	id := chi.URLParam(r, "id")
-
-	// Verify token belongs to user
-	token, err := h.apiTokenRepo.GetByID(r.Context(), id)
-	if err != nil {
+	token, err := h.apiTokenRepo.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil || token == nil || token.UserID != user.ID {
 		RenderError(w, r, http.StatusNotFound, "Token not found")
+		return nil, nil, false
+	}
+	return user, token, true
+}
+
+// RotateAPIToken replaces a token's secret on the same row: the id, name,
+// scopes, and expiry stay; the old secret stops working at once. The new
+// token is shown once.
+func (h *SettingsHandler) RotateAPIToken(w http.ResponseWriter, r *http.Request) {
+	user, token, ok := h.ownedToken(w, r)
+	if !ok {
 		return
 	}
-
-	if token.UserID != user.ID {
-		RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
+	if token.ExpiresAt.Valid && !token.IsActive() {
+		RenderError(w, r, http.StatusBadRequest, "This token has expired; generate a new one instead")
 		return
 	}
+	rawToken, tokenHash, hint, err := auth.GenerateAPIToken()
+	if err != nil {
+		h.logger.Error("failed to generate token", "error", err)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to generate token")
+		return
+	}
+	if err := h.apiTokenRepo.Rotate(r.Context(), token.ID, user.ID, tokenHash, hint); err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			RenderError(w, r, http.StatusNotFound, "Token not found")
+			return
+		}
+		h.logger.Error("failed to rotate API token", "error", err, "token_id", token.ID)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to rotate token")
+		return
+	}
+	h.recordToken(r, user.ID, models.AuditActionAPITokenRotate, token.ID, tokenAuditDetails(token))
 
-	if err := h.apiTokenRepo.Delete(r.Context(), id); err != nil {
-		h.logger.Error("failed to delete API token", "error", err, "token_id", id)
+	w.Header().Set("HX-Trigger", "tokenCreated")
+	w.Header().Set("Cache-Control", "no-store")
+	if err := settings.TokenCreatedModal("API Token Rotated", rawToken, token.IsMCPCapable()).Render(r.Context(), w); err != nil {
+		h.logger.Error("failed to render token rotated modal", "error", err)
+	}
+}
+
+// DeleteAPIToken revokes (deletes) an API token.
+func (h *SettingsHandler) DeleteAPIToken(w http.ResponseWriter, r *http.Request) {
+	user, token, ok := h.ownedToken(w, r)
+	if !ok {
+		return
+	}
+	if err := h.apiTokenRepo.Delete(r.Context(), token.ID); err != nil {
+		h.logger.Error("failed to delete API token", "error", err, "token_id", token.ID)
 		RenderError(w, r, http.StatusInternalServerError, "Failed to delete token")
 		return
 	}
+	h.recordToken(r, user.ID, models.AuditActionAPITokenRevoke, token.ID, tokenAuditDetails(token))
 
 	// Re-render the full token list after deletion
 	h.ListAPITokens(w, r)
 }
 
-// hashToken creates a SHA-256 hash of an API token for storage.
-// SHA-256 is appropriate here because API tokens are high-entropy,
-// cryptographically random values (32 bytes / 256 bits) that are not
-// susceptible to dictionary attacks.
-func hashToken(token string) string {
-	hash := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(hash[:])
+// tokenAuditDetails is what an audit row says about a token: never the
+// token, its hash, or its hint.
+func tokenAuditDetails(t *models.APIToken) map[string]interface{} {
+	d := map[string]interface{}{"name": t.Name, "scopes": tokenScopeList(t)}
+	if t.ExpiresAt.Valid {
+		d["expires_at"] = t.ExpiresAt.Time.UTC().Format(time.RFC3339)
+	}
+	return d
+}
+
+func tokenScopeList(t *models.APIToken) []string {
+	if t.IsFull() {
+		return []string{models.ScopeFull}
+	}
+	return append([]string(nil), t.Scopes...)
+}
+
+func (h *SettingsHandler) recordToken(r *http.Request, userID, action, tokenID string, details map[string]interface{}) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.Record(r.Context(), userID, action, models.ResourceTypeAPIToken, tokenID, details, getClientIP(r), r.UserAgent())
 }

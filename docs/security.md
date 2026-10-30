@@ -57,7 +57,7 @@ State-changing requests (`POST`, `PUT`, `DELETE`, `PATCH`) in the UI group must 
 
 The `goforge_csrf` cookie is not HttpOnly, is `SameSite=Lax`, and is `Secure` on HTTPS requests. Rotating `CSRF_SECRET` invalidates tokens in open pages; reload to get a new one.
 
-**Exemptions**: Webhook routes (`/webhooks/*`) and `/api/v1/*` (bearer only, cookies ignored) are outside the CSRF group.
+**Exemptions**: Webhook routes (`/webhooks/*`), `/api/v1/*`, and `/mcp` (bearer only, cookies ignored) are outside the CSRF group. `/mcp` also runs `http.CrossOriginProtection`, so a browser on another origin gets `403` even with a token.
 
 ---
 
@@ -84,6 +84,15 @@ The CSP does not restrict scripts or styles because the templates use inline scr
 - Resource ownership is validated at the repository layer via `user_id` filtering
 
 Accounts have a `role` of `admin` or `user`. Registration creates users, including the first account. `GOFORGE_ADMIN_EMAIL` promotes that address on process start and when the account is created. The match is case-insensitive, and account emails are stored in lowercase. Host actions such as Docker prune require the admin role and return 403 for anyone else. Project and service ownership is still checked separately, so a user only sees their own resources. Deployment get, rollback, cancel, and status also require the deployment's environment to belong to the project in the path; a cross-project id is not found.
+
+### API tokens and MCP
+
+- Profile API tokens are 32 random bytes. Tokens created since migration `021_api_token_hint` are `gf_` plus 64 hex characters, so secret scanners can spot a leaked one. Only the SHA-256 hash is stored, plus a non-secret hint (`gf_…` and the last 4 characters) for the token list.
+- **Rotate** replaces the hash and hint on the same row; the old secret stops working on its next request. **Revoke** deletes the row. Create, rotate, and revoke are audited (`api_token.create`, `api_token.rotate`, `api_token.revoke`) with name, scopes, and expiry only.
+- `/mcp` (streamable HTTP MCP) accepts only `Authorization: Bearer` with a scoped token that grants `read`. Legacy `full` tokens and `protected`-only tokens get `403 insufficient_scope`; missing, unknown, expired, or rotated tokens get `401` with `WWW-Authenticate: Bearer realm="goforge-mcp"`. MCP tokens from the Profile preset always expire (30, 90, or 365 days).
+- Each MCP tool call is served by the `/api/v1` handler in the same process, with the caller's token, so `/mcp` cannot do anything `/api/v1` would refuse that token: scope, ownership, protected services, `dry_run`, `approval_ref`, and audit-before-act are the same code. Write tools need `write`; a read token gets an `insufficient_scope` tool error and nothing runs. The token is never sent to another service.
+- The go-sdk handler also refuses (`403`) a request that arrives on a loopback listener with a non-loopback `Host` (DNS rebinding protection, left on). Traefik reaches GoForge on the Docker network, so routed traffic is not affected; a proxy on the host that forwards to `127.0.0.1:8080` while keeping the public `Host` would be refused.
+- `GOFORGE_MCP_HTTP=false` removes `/mcp` entirely.
 
 ---
 
