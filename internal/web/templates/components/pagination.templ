@@ -208,26 +208,30 @@ templ PaginationInfo(p *pagination.Pagination) {
 // PerPageSelector renders a dropdown to select items per page.
 templ PerPageSelector(p *pagination.Pagination, options []int) {
 	<div class="flex items-center space-x-2">
-		<label for="per_page" class="text-sm text-gray-700 dark:text-gray-300">Show</label>
-		<select
-			id="per_page"
-			name="per_page"
-			class="select !w-auto !py-1.5"
-			hx-get={ p.BaseURL }
-			hx-target="#content"
-			hx-push-url="true"
-			hx-include="[name='page']"
-		>
-			for _, opt := range options {
-				<option
-					value={ strconv.Itoa(opt) }
-					if opt == p.PerPage {
-						selected
-					}
-				>
-					{ fmt.Sprintf("%d per page", opt) }
-				</option>
-			}
-		</select>
+		@ui.Label(ui.LabelProps{For: "per-page", Class: "mb-0 font-normal"}) {
+			Show
+		}
+		@ui.Select(ui.SelectProps{
+			ID:           "per-page",
+			Name:         "per_page",
+			Options:      perPageOptions(options),
+			Selected:     strconv.Itoa(p.PerPage),
+			ControlClass: "w-auto py-1.5",
+			Attrs: templ.Attributes{
+				"hx-get":      p.BaseURL,
+				"hx-target":   "#content",
+				"hx-push-url": "true",
+				"hx-include":  "[name='page']",
+			},
+		})
 	</div>
+}
+
+// perPageOptions renders page sizes as "N per page".
+func perPageOptions(sizes []int) []ui.SelectOption {
+	opts := make([]ui.SelectOption, 0, len(sizes))
+	for _, n := range sizes {
+		opts = append(opts, ui.SelectOption{Value: strconv.Itoa(n), Label: fmt.Sprintf("%d per page", n)})
+	}
+	return opts
 }

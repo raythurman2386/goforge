@@ -92,15 +92,9 @@ templ AddVariableModal(envID string, csrfToken string) {
 	@Modal("Add Environment Variable") {
 		<form hx-post={ "/envs/" + envID + "/variables" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
-			@Input("Key", "key", "text", "", true)
-			@Input("Value", "value", "text", "", true)
-			
-			<div class="flex items-center mb-4">
-				<input id="is_secret" name="is_secret" type="checkbox" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded dark:text-primary-400 dark:border-gray-700" />
-				<label for="is_secret" class="ml-2 block text-sm text-gray-900 dark:text-gray-100">
-					Is Secret (value will be masked)
-				</label>
-			</div>
+			@ui.Input(ui.InputProps{ID: "variable-key", Name: "key", Label: "Key", Autocomplete: "off", Required: true, Class: "mb-4", Attrs: templ.Attributes{"spellcheck": "false"}})
+			@ui.Input(ui.InputProps{ID: "variable-value", Name: "value", Label: "Value", Autocomplete: "off", Required: true, Class: "mb-4", Attrs: templ.Attributes{"spellcheck": "false"}})
+			@ui.Checkbox(ui.CheckboxProps{ID: "variable-secret", Name: "is_secret", Label: "Is Secret", Description: "The value will be masked.", Class: "mb-4"})
 
 			<div class="mt-5 flex justify-end space-x-3">
 				@ui.Button(ui.ButtonProps{

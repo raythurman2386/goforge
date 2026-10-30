@@ -1,6 +1,6 @@
 // Package devui is the UI kit gallery, served at /dev/ui only when
 // GOFORGE_DEV_MODE=true (see web.Router). It shows the design tokens, the
-// legacy form and table classes restated on them, and each components/ui
+// legacy table classes restated on them, and each components/ui
 // primitive with its variants. verify.sh drive-ui-a11y scans it with axe in
 // light and dark.
 package devui
@@ -164,25 +164,40 @@ templ Gallery(csrfToken string) {
 					{Label: "Deployments"},
 				})
 			}
-			@section("forms", "Form controls (legacy classes on tokens)") {
-				<form class="grid gap-4 sm:grid-cols-2" action="#">
-					<div>
-						<label for="gallery-name" class="label">
-							Name
-							<span class="text-red-600 dark:text-red-400" aria-hidden="true">*</span>
-							@ui.VisuallyHidden(nil) {
-								(required)
-							}
-						</label>
-						<input id="gallery-name" name="gallery_name" type="text" class="input" placeholder="my-app" aria-describedby="gallery-name-help" required/>
-						<p id="gallery-name-help" class="mt-1.5 text-xs text-muted-foreground">Lowercase letters, digits, and dashes.</p>
+			@section("forms", "Form fields") {
+				<form class="grid gap-4 sm:grid-cols-2" action="#" data-testid="gallery-forms">
+					@ui.Input(ui.InputProps{ID: "gallery-name", Name: "gallery_name", Label: "Name", Placeholder: "my-app", Autocomplete: "off", Required: true, Help: "Lowercase letters, digits, and dashes."})
+					@ui.Input(ui.InputProps{ID: "gallery-email", Name: "gallery_email", Type: "email", Label: "Email", Value: "not-an-email", Autocomplete: "email", Error: "Enter an email address like you@example.com."})
+					@ui.Input(ui.InputProps{ID: "gallery-disabled", Name: "gallery_disabled", Label: "Disabled", Value: "read only here", Disabled: true})
+					@ui.Input(ui.InputProps{ID: "gallery-port", Name: "gallery_port", Type: "number", Label: "Port", Value: "8080", Help: "Help and error together:", Error: "Port must be between 1 and 65535.", Attrs: templ.Attributes{"min": "1", "max": "65535"}})
+					@ui.Select(ui.SelectProps{ID: "gallery-branch", Name: "gallery_branch", Label: "Branch", Options: ui.StringOptions([]string{"main", "develop"}), Selected: "main"})
+					@ui.Select(ui.SelectProps{ID: "gallery-level", Name: "gallery_level", Label: "Log level (optional)", Options: ui.StringOptions([]string{"debug", "info", "warn"}), Blank: true, BlankLabel: "Default", Help: "A blank first choice for optional fields."})
+					@ui.Textarea(ui.TextareaProps{ID: "gallery-notes", Name: "gallery_notes", Label: "Notes", Placeholder: "Anything the next deploy should know", Help: "Textarea has the same Field wiring as Input.", Class: "sm:col-span-2"})
+					<div class="space-y-3">
+						@ui.Label(ui.LabelProps{For: "gallery-standalone", Required: true}) {
+							Standalone Label
+						}
+						@ui.Input(ui.InputProps{ID: "gallery-standalone", Name: "gallery_standalone", Required: true})
 					</div>
-					<div>
-						<label for="gallery-branch" class="label">Branch</label>
-						<select id="gallery-branch" name="gallery_branch" class="select">
-							<option>main</option>
-							<option>develop</option>
-						</select>
+				</form>
+			}
+			@section("checkboxes", "Checkbox and Switch") {
+				<form class="grid gap-6 sm:grid-cols-2" action="#">
+					<div class="space-y-3">
+						@ui.Checkbox(ui.CheckboxProps{ID: "gallery-remember", Name: "gallery_remember", Label: "Remember me"})
+						@ui.Checkbox(ui.CheckboxProps{ID: "gallery-secret", Name: "gallery_secret", Label: "Is Secret", Description: "The value will be masked.", Checked: true})
+						@ui.Checkbox(ui.CheckboxProps{ID: "gallery-config-bool", Name: "gallery_config_bool", Value: "true", Label: "Config bool (hidden false)", Description: "Posts true when checked and false when not.", HiddenFalse: true})
+						@ui.Checkbox(ui.CheckboxProps{ID: "gallery-checkbox-disabled", Name: "gallery_checkbox_disabled", Label: "Disabled", Disabled: true})
+					</div>
+					@ui.CheckboxGroup(ui.CheckboxGroupProps{Legend: "Scopes", DescribedBy: "gallery-scopes-help"}) {
+						<p id="gallery-scopes-help" class="text-xs text-muted-foreground">A fieldset and legend group the boxes.</p>
+						@ui.Checkbox(ui.CheckboxProps{ID: "gallery-scope-read", Name: "gallery_scopes", Value: "read", Label: "read", Checked: true})
+						@ui.Checkbox(ui.CheckboxProps{ID: "gallery-scope-write", Name: "gallery_scopes", Value: "write", Label: "write"})
+					}
+					<div class="space-y-3 sm:col-span-2">
+						@ui.Switch(ui.CheckboxProps{ID: "gallery-switch-on", Name: "gallery_enabled", Value: "true", Label: "Enabled", Description: "A switch is a native checkbox with role=switch.", Checked: true})
+						@ui.Switch(ui.CheckboxProps{ID: "gallery-switch-off", Name: "gallery_schedule_off", Value: "true", Label: "No nightly schedule"})
+						@ui.Switch(ui.CheckboxProps{ID: "gallery-switch-disabled", Name: "gallery_switch_disabled", Value: "true", Label: "Disabled switch", Disabled: true})
 					</div>
 				</form>
 			}
@@ -239,7 +254,7 @@ templ Gallery(csrfToken string) {
 			}
 			@section("components", "Components") {
 				<p class="text-sm text-muted-foreground">
-					Static primitives above: Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb. Form fields, Dialog, Dropdown, Popover, Tooltip, Tabs, Table, and Sheet land here with their variants as their PRs merge.
+					Primitives above: Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb, Label, Field, Input, Textarea, Select, Checkbox, Switch. Dialog, Dropdown, Popover, Tooltip, Tabs, Table, and Sheet land here with their variants as their PRs merge.
 				</p>
 			}
 		</main>

@@ -1,0 +1,109 @@
+package ui
+
+// Checkbox is a native checkbox with its label to the right and an
+// optional description (aria-describedby). Children replace Label when the
+// label needs markup.
+//
+//	@ui.Checkbox(ui.CheckboxProps{ID: "login-remember", Name: "remember_me", Label: "Remember me"})
+templ Checkbox(p CheckboxProps) {
+	@checkRow(p, false) {
+		{ children... }
+	}
+}
+
+// Switch is an on/off setting: a native checkbox with role="switch", so the
+// form posts exactly what a checkbox posts. Use it for settings that take
+// effect as a whole (enabled, schedule off), not for picking items.
+templ Switch(p CheckboxProps) {
+	@checkRow(p, true) {
+		{ children... }
+	}
+}
+
+templ checkRow(p CheckboxProps, isSwitch bool) {
+	<div class={ Class("flex items-start gap-3", p.Class) }>
+		<div class="flex h-6 items-center">
+			if isSwitch {
+				@switchControl(p)
+			} else {
+				@CheckboxControl(p)
+			}
+			if p.HiddenFalse {
+				<input type="hidden" name={ p.Name } value="false"/>
+			}
+		</div>
+		<div class="min-w-0 text-sm leading-6">
+			<label for={ p.id() } class="font-medium text-label">
+				if p.Label != "" {
+					{ p.Label }
+				} else {
+					{ children... }
+				}
+				@requiredMark(p.Required)
+			</label>
+			if p.Description != "" {
+				<p id={ DescriptionID(p.id()) } class="text-xs text-muted-foreground">{ p.Description }</p>
+			}
+		</div>
+	</div>
+}
+
+// CheckboxControl is the bare checkbox, for a row the page lays out itself
+// (for example a whole card wrapped in a <label>). The page labels it.
+templ CheckboxControl(p CheckboxProps) {
+	<input
+		type="checkbox"
+		id={ p.id() }
+		name={ p.Name }
+		if p.Value != "" {
+			value={ p.Value }
+		}
+		checked?={ p.Checked }
+		disabled?={ p.Disabled }
+		required?={ p.Required }
+		if p.describedBy() != "" {
+			aria-describedby={ p.describedBy() }
+		}
+		class={ checkboxClass() }
+		{ p.Attrs... }
+	/>
+}
+
+templ switchControl(p CheckboxProps) {
+	<input
+		type="checkbox"
+		role="switch"
+		id={ p.id() }
+		name={ p.Name }
+		if p.Value != "" {
+			value={ p.Value }
+		}
+		checked?={ p.Checked }
+		disabled?={ p.Disabled }
+		required?={ p.Required }
+		if p.describedBy() != "" {
+			aria-describedby={ p.describedBy() }
+		}
+		class={ switchClass() }
+		{ p.Attrs... }
+	/>
+}
+
+// CheckboxGroup is a <fieldset> with a <legend> around related checkboxes
+// (the children). Put group help inside and list its id in DescribedBy.
+templ CheckboxGroup(p CheckboxGroupProps) {
+	<fieldset
+		if p.DescribedBy != "" {
+			aria-describedby={ p.DescribedBy }
+		}
+		{ Attrs(templ.Attributes{"class": p.Class}, p.Attrs)... }
+	>
+		<legend class="label">
+			{ p.Legend }
+			@requiredMark(p.Required)
+		</legend>
+		<div class="space-y-2">
+			{ children... }
+		</div>
+	</fieldset>
+}

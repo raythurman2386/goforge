@@ -412,15 +412,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 				</div>
 				<div class="p-6">
 					<form hx-post={ "/projects/" + project.ID + "/services" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator" class="flex items-end space-x-4">
-						<div class="flex-1">
-							<label for="service_instance_id" class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Service</label>
-							<select name="service_instance_id" id="service_instance_id" class="select" required>
-								<option value="">Select a service...</option>
-								for _, svc := range availableServices {
-									<option value={ svc.ID }>{ svc.Name } ({ svc.TemplateName })</option>
-								}
-							</select>
-						</div>
+						@ui.Select(ui.SelectProps{ID: "attach-service", Name: "service_instance_id", Label: "Service", Options: serviceOptions(availableServices), Blank: true, BlankLabel: "Select a service...", Required: true, Class: "flex-1"})
 						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
 							<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"></path>
@@ -459,15 +451,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 							<p class="text-sm text-gray-500 dark:text-gray-400">Settings applied to all environments unless overridden.</p>
 						</div>
 
-						<div class="sm:col-span-4">
-							<label for="custom_domain" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Default Domain</label>
-							<div class="mt-1">
-								<input type="text" name="custom_domain" id="custom_domain" 
-									value={ project.CustomDomain.String }
-									class="input" 
-									placeholder="example.com" />
-							</div>
-						</div>
+						@ui.Input(ui.InputProps{ID: "settings-custom-domain", Name: "custom_domain", Label: "Default Domain", Value: project.CustomDomain.String, Placeholder: "example.com", Class: "sm:col-span-4"})
 					</div>
 
 					<!-- Environment Overrides Section -->
@@ -482,44 +466,9 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 							<p class="text-sm text-gray-500 dark:text-gray-400">Specific settings for this environment.</p>
 						</div>
 
-						<div class="sm:col-span-3">
-							<label for="domain" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Domain</label>
-							<div class="mt-1">
-								<input type="text" name="domain" id="domain" 
-									value={ currentEnv.Domain.String }
-									class="input" 
-									placeholder="env.example.com" />
-							</div>
-							<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-								Overrides global default.
-							</p>
-						</div>
-
-						<div class="sm:col-span-3">
-							<label for="port" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Application Port</label>
-							<div class="mt-1">
-								<input type="number" name="port" id="port" 
-									value={ getPort(currentEnv) }
-									class="input" 
-									placeholder="80" />
-							</div>
-							<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-								Internal port (e.g., 3000). Default: 80.
-							</p>
-						</div>
-
-						<div class="sm:col-span-6">
-							<label for="branch" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Git Branch</label>
-							<div class="mt-1">
-								<input type="text" name="branch" id="branch" 
-									value={ currentEnv.Branch.String }
-									class="input" 
-									placeholder={ project.DefaultBranch } />
-							</div>
-							<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-								Deploys from { project.DefaultBranch } when empty.
-							</p>
-						</div>
+						@ui.Input(ui.InputProps{ID: "settings-domain", Name: "domain", Label: "Domain", Value: currentEnv.Domain.String, Placeholder: "env.example.com", Help: "Overrides global default.", Class: "sm:col-span-3"})
+						@ui.Input(ui.InputProps{ID: "settings-port", Name: "port", Type: "number", Label: "Application Port", Value: getPort(currentEnv), Placeholder: "80", Help: "Internal port (e.g., 3000). Default: 80.", Class: "sm:col-span-3"})
+						@ui.Input(ui.InputProps{ID: "settings-branch", Name: "branch", Label: "Git Branch", Value: currentEnv.Branch.String, Placeholder: project.DefaultBranch, Help: "Deploys from " + project.DefaultBranch + " when empty.", Class: "sm:col-span-6"})
 
 						<div class="sm:col-span-6 flex items-center justify-between pt-4">
 							<p class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">

@@ -11,18 +11,9 @@ templ Register(csrfToken, errorMessage string) {
 		@ui.Card(ui.CardProps{}) {
 			<form class="space-y-5" action="/auth/register" method="POST">
 				<input type="hidden" name="csrf_token" value={ csrfToken }/>
-				<div>
-					<label for="email-address" class="label">Email address</label>
-					<input id="email-address" name="email" type="email" autocomplete="email" required class="input" placeholder="you@example.com"/>
-				</div>
-				<div>
-					<label for="password" class="label">Password</label>
-					<input id="password" name="password" type="password" autocomplete="new-password" required class="input"/>
-				</div>
-				<div>
-					<label for="confirm-password" class="label">Confirm password</label>
-					<input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" required class="input"/>
-				</div>
+				@ui.Input(ui.InputProps{ID: "register-email", Name: "email", Type: "email", Label: "Email address", Autocomplete: "email", Placeholder: "you@example.com", Required: true})
+				@ui.Input(ui.InputProps{ID: "register-password", Name: "password", Type: "password", Label: "Password", Autocomplete: "new-password", Required: true})
+				@ui.Input(ui.InputProps{ID: "register-confirm-password", Name: "confirm_password", Type: "password", Label: "Confirm password", Autocomplete: "new-password", Required: true})
 				if errorMessage != "" {
 					@ui.AlertMessage(ui.AlertError, errorMessage)
 				}

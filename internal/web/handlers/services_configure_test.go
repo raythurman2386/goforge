@@ -60,7 +60,7 @@ func TestServiceHandler_Configure_DomainDefaults(t *testing.T) {
 			t.Error("proxy mode still suggests a .localhost domain")
 		}
 		for _, want := range []string{
-			`id="domain" name="domain" type="text" value=""`,
+			`id="svc-domain" name="domain" type="text" value=""`,
 			`placeholder="vaultwarden-app.example.com"`,
 			"first-level host",
 			"*.apps.example.com",
@@ -117,10 +117,10 @@ docker:
 	}
 	body := rr.Body.String()
 	for _, want := range []string{
-		`id="disable_registration" name="disable_registration" type="checkbox" value="true" checked`,
+		`<input type="checkbox" id="svc-disable_registration" name="disable_registration" value="true" checked class="checkbox">`,
 		`<input type="hidden" name="disable_registration" value="false">`,
-		`id="require_signin_view" name="require_signin_view" type="checkbox" value="true" class=`,
-		`<select id="log_level" name="log_level" required`,
+		`<input type="checkbox" id="svc-require_signin_view" name="require_signin_view" value="true" class="checkbox">`,
+		`<select id="svc-log_level" name="log_level" required`,
 		`<option value="debug" selected>debug</option>`,
 		`<option value="info">info</option>`,
 	} {
