@@ -59,7 +59,7 @@ This is the supported way to run GoForge. You need Docker Engine with the Compos
 
 - **Registration:** the first account can always register. After that, `/auth/register` returns `403` unless `GOFORGE_ENABLE_REGISTRATION=true`.
 - **Admin role:** every account is created as `user`. The account whose email matches `GOFORGE_ADMIN_EMAIL` becomes `admin`, at account creation or at the next startup. The admin role is required for host operations such as Docker prune.
-- **Ports:** Compose publishes the app on `127.0.0.1:8080` only. Traefik on ports 80 and 443 is the public entrypoint. Postgres is not published on the host.
+- **Ports:** Compose publishes the app on `127.0.0.1:8080` only. Traefik on ports 80 and 443 (all interfaces) is the entrypoint for direct installs, which need them for Let's Encrypt. With Cloudflare Tunnel, cloudflared reaches Traefik over the Docker network, so bind 80 and 443 to `127.0.0.1` (or drop them) in a `docker-compose.override.yml`. Postgres is not published on the host.
 - **Dev mode:** `GOFORGE_DEV_MODE` defaults to `false`. Dev mode generates missing secrets and relaxes config validation. Turn it on only on a local machine.
 
 ### Developing from source
@@ -134,7 +134,7 @@ GoForge follows a clean architecture with:
 
 3. **Network Security**
    - GoForge is designed to work with **Cloudflare Tunnel** (recommended)
-   - Compose publishes the app on `127.0.0.1` only. Traefik on 80 and 443 is the public entrypoint
+   - Compose publishes the app on `127.0.0.1` only. Traefik on 80 and 443 is the entrypoint for direct installs (Let's Encrypt). With Cloudflare Tunnel, bind 80 and 443 to `127.0.0.1` in a `docker-compose.override.yml`
    - No inbound ports needed - tunnel connects outbound to Cloudflare
    - Restrict access to the Docker socket
    - Use TLS/SSL for all external connections (handled by Cloudflare)

@@ -43,6 +43,9 @@ traefik:
     The following variables are used only in `docker-compose.yml` and are not part of GoForge's Go application configuration:
     `TRAEFIK_DASHBOARD_PORT`, `TRAEFIK_DASHBOARD_INSECURE`, `TRAEFIK_LOG_LEVEL`, `GOFORGE_DOMAIN`.
 
+!!! note "Dashboard"
+    The Traefik API and dashboard are off by default (`--api`, `--api.dashboard`, and `--api.insecure` follow `TRAEFIK_DASHBOARD_INSECURE`, default `false`). With `--api=false` the `api@internal` service does not exist, so no router, including one added through container labels, can expose it. When enabled they are unauthenticated and served on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}` only. No router in the repo compose file publishes `api@internal` on the web or websecure entrypoints.
+
 ## Traefik Labels
 
 GoForge generates Traefik labels for deployed containers. The label generation includes:

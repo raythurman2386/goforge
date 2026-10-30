@@ -8,7 +8,17 @@ The recommended production deployment method using Docker Compose.
 - A domain name pointing to your server
 - Ports 80 and 443 available
 
-Compose publishes GoForge on `127.0.0.1:8080` for local access. Traefik on ports 80 and 443 is the public entrypoint. `.env.example` leaves `GOFORGE_DEV_MODE=false`.
+Compose publishes GoForge on `127.0.0.1:8080` for local access. Traefik on ports 80 and 443 (all interfaces) is the entrypoint for direct installs. The Traefik dashboard is off, and its port is bound to `127.0.0.1`. `.env.example` leaves `GOFORGE_DEV_MODE=false`.
+
+With Cloudflare Tunnel (recommended), Traefik needs no public host port. Bind 80 and 443 to loopback in a `docker-compose.override.yml` next to `docker-compose.yml`:
+
+```yaml
+services:
+  traefik:
+    ports: !override
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+```
 
 ## Setup
 
@@ -154,7 +164,7 @@ sudo ufw enable
 
 ### Docker Socket
 
-The GoForge container requires access to the Docker socket. This grants full Docker daemon access. Mitigations:
+The GoForge container mounts the Docker socket read-write and runs as root. Access to the Docker API is root on the host, and Traefik's `:ro` mount does not limit API calls either. See "Docker socket trust model" in `SECURITY.md`. Mitigations:
 
 - Run on a dedicated server
 - Use Docker socket proxy (like Tecnativa's docker-socket-proxy) to limit API access
@@ -162,8 +172,10 @@ The GoForge container requires access to the Docker socket. This grants full Doc
 
 ### Traefik Dashboard
 
-Disable the dashboard in production or add authentication:
+The API and dashboard are off by default: `--api`, `--api.dashboard`, and `--api.insecure` all follow `TRAEFIK_DASHBOARD_INSECURE`, so `api@internal` does not exist and no router can expose it. `TRAEFIK_DASHBOARD_INSECURE=true` turns them on without authentication on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}` (reach it with an SSH tunnel). Leave it off in production:
 
 ```bash
 TRAEFIK_DASHBOARD_INSECURE=false
 ```
+
+No router in the repo compose file exposes `api@internal` on the web or websecure entrypoints. If you need the dashboard on a hostname, enable the API (`--api=true`, `--api.dashboard=true`) in an override and add your own router with an authentication middleware (for example `basicauth`) on `websecure`.

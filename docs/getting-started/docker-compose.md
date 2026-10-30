@@ -24,7 +24,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-GoForge is published on `127.0.0.1:8080`, so `http://localhost:8080` works on the host and the port is not open on the public interface. Traefik on ports 80 and 443 is the public entrypoint. The app process still listens on `0.0.0.0` inside the container so Traefik can reach it over the Docker network.
+GoForge is published on `127.0.0.1:8080`, so `http://localhost:8080` works on the host and the port is not open on the public interface. Traefik on ports 80 and 443 is the entrypoint for direct installs (with Cloudflare Tunnel you can bind them to `127.0.0.1` in an override). The Traefik dashboard is off by default. The app process still listens on `0.0.0.0` inside the container so Traefik can reach it over the Docker network.
 
 ## Services Overview
 
@@ -34,7 +34,7 @@ The `docker-compose.yml` defines these services:
 |---------|-------------|------|
 | `goforge` | Main application | 127.0.0.1:8080 |
 | `db` | PostgreSQL 15 | none on the host (5432 inside the Compose network) |
-| `traefik` | Reverse proxy with auto-SSL | 80, 443 |
+| `traefik` | Reverse proxy with auto-SSL | 80, 443; dashboard off, 127.0.0.1:8081 only when `TRAEFIK_DASHBOARD_INSECURE=true` |
 | `cloudflared` | Cloudflare Tunnel (optional, requires `--profile cloudflare`) | -- |
 
 ## Configuration

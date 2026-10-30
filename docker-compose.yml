@@ -40,6 +40,9 @@ services:
       - BACKUP_RETENTION_DAILY=${BACKUP_RETENTION_DAILY:-7}
       - BACKUP_TIMEOUT=${BACKUP_TIMEOUT:-2h}
     volumes:
+      # Read-write Docker socket: GoForge builds, runs, and removes containers.
+      # Whoever controls this container, or can reach this socket, has root on
+      # the host. See SECURITY.md, "Docker socket trust model".
       - /var/run/docker.sock:/var/run/docker.sock
       - goforge_data:/app/data
     depends_on:
@@ -58,8 +61,8 @@ services:
       - "traefik.http.routers.goforge-http.entrypoints=web"
       - "traefik.http.routers.goforge-http.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-    # Loopback only. Traefik on 80/443 is the public entrypoint.
-    # 127.0.0.1 still answers http://localhost:8080 on the host.
+    # Loopback only. Traefik on 80/443 is the entrypoint for direct (LAN or
+    # public IP) installs. 127.0.0.1 still answers http://localhost:8080 on the host.
     ports:
       - "127.0.0.1:${GOFORGE_PORT:-8080}:${GOFORGE_PORT:-8080}"
     networks:
@@ -87,8 +90,15 @@ services:
     image: traefik:v3.6
     restart: unless-stopped
     command:
-      # API and dashboard
-      - "--api.dashboard=true"
+      # API and dashboard: off by default. With --api=false the api@internal
+      # service does not exist, so no router (including one added through
+      # container labels) can expose it. TRAEFIK_DASHBOARD_INSECURE=true turns on
+      # the unauthenticated API and dashboard on Traefik's internal :8080
+      # entrypoint, which is published on 127.0.0.1 only (local debugging, or an
+      # SSH tunnel). No router in this file publishes api@internal on the web or
+      # websecure entrypoints.
+      - "--api=${TRAEFIK_DASHBOARD_INSECURE:-false}"
+      - "--api.dashboard=${TRAEFIK_DASHBOARD_INSECURE:-false}"
       - "--api.insecure=${TRAEFIK_DASHBOARD_INSECURE:-false}"
       # Docker provider
       - "--providers.docker=true"
@@ -106,27 +116,30 @@ services:
       - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
     environment:
       - DOCKER_API_VERSION=1.44
+    # 80/443 are published on all interfaces for direct installs (LAN or a public
+    # IP with Let's Encrypt). With Cloudflare Tunnel, cloudflared reaches Traefik
+    # over the traefik network and these host ports are not needed: drop them or
+    # bind them to 127.0.0.1 in a docker-compose.override.yml.
+    # The dashboard port is loopback only and serves nothing unless
+    # TRAEFIK_DASHBOARD_INSECURE=true.
     ports:
       - "80:80"
       - "443:443"
-      - "${TRAEFIK_DASHBOARD_PORT:-8081}:8080"
+      - "127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}:8080"
     volumes:
+      # :ro stops Traefik from replacing the socket file; it does not limit
+      # Docker API calls made through it. See SECURITY.md.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_letsencrypt:/letsencrypt
-    labels:
-      # Dashboard routing (optional, requires auth in production)
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${GOFORGE_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
-      - "traefik.http.routers.traefik-dashboard.service=api@internal"
     networks:
       - traefik
 
-  # Cloudflare Tunnel for secure domain management (optional)
+  # Cloudflare Tunnel (optional, recommended exposure model; profile "cloudflare")
   # To use: set CLOUDFLARE_TUNNEL_TOKEN in your environment
   # Get a token from: https://one.dash.cloudflare.com/ -> Zero Trust -> Networks -> Tunnels
+  # Pinned; bump deliberately after reading the cloudflared release notes.
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.6.0
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:

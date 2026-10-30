@@ -22,7 +22,8 @@ Before deploying GoForge to production, ensure:
 - [ ] Strong database password (not the default `password`)
 - [ ] `DATABASE_URL` uses `sslmode=require` or stronger
 - [ ] GitHub OAuth callback URL uses HTTPS
-- [ ] Traefik dashboard disabled or authenticated
+- [ ] Traefik dashboard off (`TRAEFIK_DASHBOARD_INSECURE=false`, the default)
+- [ ] Docker socket and `docker` group access treated as root (see `SECURITY.md`)
 
 ### Networking
 

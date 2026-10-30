@@ -85,7 +85,7 @@ See [Authentication Configuration](authentication.md) for setup instructions.
 | `ACME_EMAIL` | (empty in app code; `admin@example.com` in docker-compose.yml) | Email for Let's Encrypt certificate registration |
 
 !!! note "Compose-only variables"
-    `TRAEFIK_DASHBOARD_PORT`, `TRAEFIK_DASHBOARD_INSECURE`, and `TRAEFIK_LOG_LEVEL` are used only in `docker-compose.yml` and are not part of GoForge's Go application configuration.
+    `TRAEFIK_DASHBOARD_PORT`, `TRAEFIK_DASHBOARD_INSECURE`, and `TRAEFIK_LOG_LEVEL` are used only in `docker-compose.yml` and are not part of GoForge's Go application configuration. `TRAEFIK_DASHBOARD_INSECURE` (default `false`) turns the Traefik API and dashboard on, unauthenticated, on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT}` only.
 
 See [Traefik & SSL Configuration](traefik.md) for details.
 

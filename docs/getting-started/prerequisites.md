@@ -104,4 +104,4 @@ make lint   # runs go tool golangci-lint run ./...
 | OS | Linux (amd64/arm64) | Ubuntu 22.04+ / Debian 12+ |
 
 !!! note "Docker socket access"
-    GoForge requires access to the Docker daemon socket (`/var/run/docker.sock`) to manage containers. The user running GoForge must be in the `docker` group or run as root.
+    GoForge requires access to the Docker daemon socket (`/var/run/docker.sock`) to manage containers. The user running GoForge must be in the `docker` group or run as root. Docker socket access and `docker` group membership are root-equivalent on the host; see "Docker socket trust model" in `SECURITY.md`.

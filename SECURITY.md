@@ -59,15 +59,35 @@ We take security vulnerabilities seriously. If you find a security issue:
 
 - Registration is closed after the first account unless `GOFORGE_ENABLE_REGISTRATION=true`.
 - `GOFORGE_DEV_MODE` defaults to `false`. Outside dev mode GoForge refuses to start without `DATABASE_URL`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET`.
-- Docker Compose publishes the app on `127.0.0.1` only. Traefik on 80 and 443 is the public entrypoint. Postgres is not published on the host.
+- Docker Compose publishes the app on `127.0.0.1` only. Postgres is not published on the host.
+- The Traefik API and dashboard are off: `--api`, `--api.dashboard`, and `--api.insecure` all follow `TRAEFIK_DASHBOARD_INSECURE` (default `false`), so the `api@internal` service does not exist and no router, including one added through container labels, can expose it. `TRAEFIK_DASHBOARD_INSECURE=true` turns them on for local debugging only, on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}`. No router in the repo compose file publishes `api@internal` on the web or websecure entrypoints.
+- Image tags are pinned: `cloudflare/cloudflared:2026.6.0` in Compose and `alpine:3.24` for the runtime and MCP images.
+- Traefik on 80 and 443 is published on all interfaces, for direct (LAN or public IP with Let's Encrypt) installs. With Cloudflare Tunnel those host ports are not needed; bind them to `127.0.0.1` or drop them in a `docker-compose.override.yml`.
+
+## Docker socket trust model
+
+GoForge builds images and creates, stops, and removes containers through the Docker Engine API. `docker-compose.yml` mounts `/var/run/docker.sock` read-write into the `goforge` container, and the app runs as root inside it.
+
+- **The Docker API is root on the host.** Anything that can send requests to that socket can start a privileged container, bind-mount `/`, and act as root on the host. A compromise of the GoForge process, or of anything that can execute inside its container, is a host compromise.
+- **`:ro` does not make the socket read-only.** Traefik's mount is `/var/run/docker.sock:/var/run/docker.sock:ro`. That stops the socket file from being replaced; it does not limit which API calls go through it. Treat Traefik's socket access as equally powerful. Traefik uses it to read container labels for routing.
+- **`docker` group membership is root-equivalent.** Add only people who would also get `sudo`. Anyone who can run `docker exec` in the `goforge` or `traefik` container also holds the socket.
+- **Only `goforge` and `traefik` hold the socket.** The MCP server image (`--target mcp`) runs as an unprivileged user with no socket, no database, and no published port. GoForge does not mount the socket into the project and one-click service containers it deploys.
+
+What reduces the blast radius:
+
+- Run GoForge on a host (or VM) dedicated to it and the apps it deploys.
+- Put a Docker API filtering proxy (for example Tecnativa's `docker-socket-proxy`) in front of Traefik, which only needs read access to containers and networks. GoForge itself needs build, container, image, network, and volume write calls, so a proxy limits it less.
+- Rootless Docker or user-namespace remapping limits what host root means for the daemon. GoForge has not been tested on rootless Docker.
+- Keep the web UI behind the intended exposure model: **Cloudflare Tunnel** to Traefik over the Docker network, with host ports bound to `127.0.0.1` (or not published) via a `docker-compose.override.yml`. Then nothing on the host's public interfaces reaches Traefik or GoForge.
 
 ## Security Best Practices for Deployment
 
 ### Minimum Requirements
 - [ ] Use **Cloudflare Tunnel** for external access (recommended - no inbound ports needed)
-- [ ] Traefik handles internal container routing only (not exposed publicly)
+- [ ] Traefik handles internal container routing only (host ports 80/443 bound to `127.0.0.1` or unpublished in an override)
+- [ ] Keep the Traefik dashboard off (`TRAEFIK_DASHBOARD_INSECURE=false`, the default)
 - [ ] Use strong, unique secrets for all credentials
-- [ ] Restrict access to Docker socket
+- [ ] Restrict access to Docker socket (see "Docker socket trust model" above)
 - [ ] Enable firewall rules (allow outbound to Cloudflare, block unnecessary inbound)
 - [ ] Regular security updates and patches
 
