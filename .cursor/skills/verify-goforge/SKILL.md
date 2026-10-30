@@ -1,6 +1,6 @@
 ---
 name: verify-goforge
-description: "Drive the GoForge HTMX UI on a single Docker Compose stack and prove registration, the admin grant, login and projects, deploy log replay, container ownership, deployment cancel, and one-click service credentials. Use when verifying GoForge, reproducing a UI bug, or checking a change against the feature map."
+description: "Drive the GoForge HTMX UI on a single Docker Compose stack and prove registration, the admin grant, login and projects, deploy log replay, container ownership, deployment cancel, one-click service credentials, backup settings, and MCP over HTTP with Profile tokens. Use when verifying GoForge, reproducing a UI bug, or checking a change against the feature map."
 ---
 
 # Verify GoForge
@@ -39,6 +39,19 @@ Do not print `stack.env`.
 `docker-compose.yml` publishes the app on `127.0.0.1:8080` only, Traefik on `80` and `443`, and the Traefik dashboard port on `127.0.0.1:8081` (the dashboard is off; `TRAEFIK_DASHBOARD_INSECURE=false`). Postgres is not published. It also creates a network named `traefik`. Two stacks cannot run side by side. Launch exits `1` when `80`, `443`, `8080`, or `8081` is listening, when the `traefik` network already exists, or when project `goforge-verify` already has containers. Do not drive an instance this run did not start.
 
 A fresh volume has zero users. The first registration is always allowed. After that, registration is closed and `/auth/register` returns `403`. Every account is created as `user`. The account whose email matches `GOFORGE_ADMIN_EMAIL`, ignoring case, is created as `admin`, and startup promotes an existing match.
+
+## Host mode
+
+Use host mode when `launch` refuses because `127.0.0.1:8080` is taken. On minis the live `goforge-goforge-1` holds it. Do not stop the live stack. Build the branch and run `goforge serve` on the host against a throwaway Postgres container:
+
+- Postgres: `postgres:17-alpine` published on a free `127.0.0.1` port, with a fresh database. Never a live database.
+- Serve: `GOFORGE_PORT=18080`, `GOFORGE_HOST=127.0.0.1`, `GOFORGE_BASE_URL=http://127.0.0.1:18080`, random `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET` in a mode `600` env file, `GOFORGE_ENABLE_REGISTRATION=true`, `GOFORGE_ADMIN_EMAIL=verify-admin@example.test`, `LOG_FORMAT=json`, and stdout to `/tmp/goforge-verify/host-app.log`.
+- Point the drives at it with `GOFORGE_VERIFY_BASE`, `GOFORGE_VERIFY_PSQL` (a psql command for that database; `-c <sql>` is appended), and `GOFORGE_VERIFY_APP_LOGS` (a command that prints the app log).
+- Create `/tmp/goforge-verify/state` with mode `700` first. `launch` normally makes it.
+- Skip `doctor`. It reads the Compose project. Docker is not reachable from a host serve run as a non-root user, so `/health/ready` reports `not_ready` with `"database":"ok"`. Auth, token, and MCP drives only need the database.
+- Stop the host serve by its PID, not by process name. Then remove the Postgres container with `-v`.
+
+[features/backups.md](features/backups.md) and [features/mcp-http.md](features/mcp-http.md) give the exact commands. With registration open, the `register-closed*` and `register-admin-role` lines in `register-verdict.txt` read `fail`. That is expected in host mode.
 
 ## Doctor
 
@@ -80,7 +93,7 @@ Authorization status codes after #28:
 - Another account's project id, or a deployment id under a project it does not belong to (get, cancel, rollback, status, log stream, trigger with another project's `env_id`), is `404`. Do not expect `403` there.
 - Another account's container (detail, logs, stats, stop, restart) is still `403` `access denied`.
 
-Scripted journeys: `verify.sh drive-register` then `verify.sh drive-login`. The other feature files give the curl and SQL for their journey. Rate limit is 30 requests per second with burst 60.
+Scripted journeys: `verify.sh drive-register` then `verify.sh drive-login`, then `drive-backup-settings` or `drive-mcp-http`. The other feature files give the curl and SQL for their journey. Rate limit is 30 requests per second with burst 60.
 
 ## Evidence
 
@@ -117,18 +130,22 @@ The helper is `.cursor/skills/verify-goforge/scripts/verify.sh`.
 .cursor/skills/verify-goforge/scripts/verify.sh doctor
 .cursor/skills/verify-goforge/scripts/verify.sh drive-register
 .cursor/skills/verify-goforge/scripts/verify.sh drive-login
+.cursor/skills/verify-goforge/scripts/verify.sh drive-backup-settings
+.cursor/skills/verify-goforge/scripts/verify.sh drive-mcp-http
 .cursor/skills/verify-goforge/scripts/verify.sh psql "select count(*) from users"
 .cursor/skills/verify-goforge/scripts/verify.sh check-sealed verify-pg
 .cursor/skills/verify-goforge/scripts/verify.sh cleanup
 ```
 
-Environment overrides: `GOFORGE_VERIFY_DOCKER`, `GOFORGE_VERIFY_PROOF`, `GOFORGE_VERIFY_ADMIN_EMAIL`, `GOFORGE_VERIFY_REGISTER_EMAIL`, `GOFORGE_VERIFY_ENABLE_REGISTRATION`.
+Environment overrides: `GOFORGE_VERIFY_DOCKER`, `GOFORGE_VERIFY_PROOF`, `GOFORGE_VERIFY_BASE`, `GOFORGE_VERIFY_PSQL`, `GOFORGE_VERIFY_APP_LOGS`, `GOFORGE_VERIFY_ADMIN_EMAIL`, `GOFORGE_VERIFY_REGISTER_EMAIL`, `GOFORGE_VERIFY_ENABLE_REGISTRATION`.
 
 `psql` rejects SQL that mentions `password`, `secret`, `token`, `connection_info`, or `config`. `check-sealed` is the only command that reads those columns. It prints two booleans and deletes the row dump.
 
 `drive-register` exits `0` when the harness finished and wrote `register-verdict.txt`. A product miss such as registration staying open or the role not being `admin` is a `fail` line inside that file, not a harness failure. Exit `2` when the account never reaches `/dashboard`. Exit `1` when launch or doctor is refused.
 
 `drive-login` needs the password `drive-register` stored in the state directory. It logs in with the lowercase admin email, opens `/projects`, creates project `verify-smoke`, and checks that the list shows it. It writes `login-verdict.txt` and exits `2` only when login fails.
+
+`drive-mcp-http` needs `drive-register` and `drive-login` first, and `GOFORGE_PROTECTED_SERVICES` set to one UUID on the stack. It mints tokens through the Profile form into mode `600` files in the state directory, sends them with `curl -H @file`, and deletes them before it exits. It writes `mcp-http-verdict.txt` and exits `2` when the harness could not run or a token value appears in the verdict. A failed sub-feature is a `fail` line, not an exit code.
 
 ## Maintenance
 

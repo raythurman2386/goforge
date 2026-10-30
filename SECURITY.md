@@ -74,7 +74,7 @@ GoForge builds images and creates, stops, and removes containers through the Doc
 - **The Docker API is root on the host.** Anything that can send requests to that socket can start a privileged container, bind-mount `/`, and act as root on the host. A compromise of the GoForge process, or of anything that can execute inside its container, is a host compromise.
 - **`:ro` does not make the socket read-only.** Traefik's mount is `/var/run/docker.sock:/var/run/docker.sock:ro`. That stops the socket file from being replaced; it does not limit which API calls go through it. Treat Traefik's socket access as equally powerful. Traefik uses it to read container labels for routing.
 - **`docker` group membership is root-equivalent.** Add only people who would also get `sudo`. Anyone who can run `docker exec` in the `goforge` or `traefik` container also holds the socket.
-- **Only `goforge` and `traefik` hold the socket.** The MCP server image (`--target mcp`) runs as an unprivileged user with no socket, no database, and no published port. GoForge does not mount the socket into the project and one-click service containers it deploys.
+- **Only `goforge` and `traefik` hold the socket.** The MCP tools are served by `goforge` itself at `/mcp` and reach Docker only through the `/api/v1` handler and its checks; they add no socket mount. The optional stdio fallback image (`--target mcp`) runs as an unprivileged user with no socket, no database, and no published port. GoForge does not mount the socket into the project and one-click service containers it deploys.
 
 What reduces the blast radius:
 

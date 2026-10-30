@@ -1,7 +1,9 @@
 # API v1 Reference
 
-`/api/v1` is a JSON API for automation. The GoForge MCP server
-(`cmd/goforge-mcp`, see [MCP server](../guides/mcp.md)) is its main client.
+`/api/v1` is a JSON API for automation. The GoForge MCP tools (served at
+`/mcp`, and by the `cmd/goforge-mcp` stdio fallback; see
+[MCP server](../guides/mcp.md)) are its main client: every MCP tool call is
+one `/api/v1` request with the caller's token.
 
 - **Bearer only.** Send `Authorization: Bearer <token>`. Session cookies are
   ignored, so the API is outside the CSRF group and a browser session cannot
@@ -17,8 +19,15 @@ Route definitions: `internal/apiv1/handler.go`.
 
 ## Tokens and scopes
 
-Create a token in **Settings → Profile → API Tokens → Generate Token**. Pick a
-name, an expiry, and the scopes. The raw token is shown once.
+Create a token in **Settings → Profile → API Tokens → Generate Token** (or
+**MCP → Generate MCP token** for the MCP preset: `read` + `write`, 90 days).
+Pick a name, an expiry, and the scopes. The raw token is shown once. Tokens
+created since migration `021_api_token_hint` start with `gf_` and store a
+non-secret hint (`gf_…a1b2`) shown in the token list; older tokens keep
+working without a prefix or hint. **Rotate** puts a new secret on the same
+row (same id, name, scopes, expiry) and the old secret stops working at once.
+Create, rotate, and revoke write `api_token.create`, `api_token.rotate`, and
+`api_token.revoke` audit rows without the token or hint.
 
 | Scope | Grants |
 |-------|--------|
@@ -27,8 +36,9 @@ name, an expiry, and the scopes. The raw token is shown once.
 | `protected` | Stop, config edit, and image update of a protected service. Combine it with `write`; on its own it grants nothing else |
 | `full` | Legacy. Tokens created before scopes existed, or with no box checked, are `full`: `read` and `write` on `/api/v1`, never `protected`, and the only kind the UI routes accept |
 
-A scoped token (`read`, `write`, `protected`) only works on `/api/v1`; the UI
-routes answer it `401`. Migration `018_api_token_scopes` adds
+A scoped token (`read`, `write`, `protected`) only works on `/api/v1` and
+`/mcp`; the UI routes answer it `401`. `/mcp` refuses `full` tokens (`403
+insufficient_scope`) and tokens with only `protected`. Migration `018_api_token_scopes` adds
 `api_tokens.scopes` and sets every existing token to `{full}`.
 
 ## Errors

@@ -8,8 +8,8 @@ This page documents the complete directory layout of the GoForge codebase.
 goforge/
 ├── cmd/goforge/           # Application entry point
 │   └── main.go            # CLI setup (serve, migrate, backup run)
-├── cmd/goforge-mcp/       # MCP server over stdio
-│   └── main.go            # Calls /api/v1 with a scoped token
+├── cmd/goforge-mcp/       # MCP stdio fallback (the server also serves /mcp)
+│   └── main.go            # Calls /api/v1 over HTTPS with a scoped token
 ├── internal/              # Private application packages
 │   ├── apiv1/             # Bearer-token JSON API under /api/v1
 │   ├── auth/              # Authentication and authorization
@@ -20,7 +20,8 @@ goforge/
 │   ├── docker/            # Docker SDK wrapper
 │   ├── git/               # Git provider integrations
 │   ├── logger/            # Structured logging
-│   ├── mcpserver/         # MCP tools for cmd/goforge-mcp
+│   ├── mcphttp/           # /mcp: MCP over streamable HTTP for Profile tokens
+│   ├── mcpserver/         # MCP tools (shared by /mcp and cmd/goforge-mcp)
 │   ├── models/            # Domain models
 │   ├── monitor/           # Container metrics
 │   ├── pagination/        # Pagination utilities
@@ -54,7 +55,7 @@ The application entry point using Cobra for CLI structure.
 
 ### `cmd/goforge-mcp/`
 
-The MCP server binary. Built with `make build-mcp` or the Dockerfile `mcp` target. See [MCP Server](../guides/mcp.md).
+The MCP stdio fallback, for clients that cannot use `/mcp` over HTTP. Built with `make build-mcp` or the Dockerfile `mcp` target. Point it at the public HTTPS URL. See [MCP Server](../guides/mcp.md#stdio-fallback).
 
 | File | Purpose |
 |------|---------|
@@ -188,14 +189,23 @@ Git provider integrations.
 | `gitea.go` | Gitea API (repos, branches, tags) |
 | `ssh.go` | Ed25519 SSH key generation, SSH auth |
 
-### `internal/mcpserver/`
+### `internal/mcphttp/`
 
-The MCP server used by `cmd/goforge-mcp`. See [MCP Server](../guides/mcp.md).
+`/mcp` on `goforge serve`. See [MCP Server](../guides/mcp.md).
 
 | File | Purpose |
 |------|---------|
-| `config.go` | Package doc and configuration (API URL, token, `GOFORGE_MCP_ALLOW_WRITES`) |
-| `server.go` | MCP server setup and tool registration |
+| `mcphttp.go` | `http.CrossOriginProtection`, bearer auth (`auth.AuthenticateBearer`; `full` refused), and the go-sdk streamable HTTP handler (stateless, JSON). Builds one `mcpserver` per request with the caller's token; write tools only with `write` |
+| `transport.go` | In-process `http.RoundTripper` that serves `mcpserver`'s `/api/v1` calls with the API handler, keeping the caller's peer address and proxy headers for the audit IP |
+
+### `internal/mcpserver/`
+
+The MCP tools, shared by `/mcp` (`internal/mcphttp`) and `cmd/goforge-mcp`. See [MCP Server](../guides/mcp.md).
+
+| File | Purpose |
+|------|---------|
+| `config.go` | Package doc and configuration (API URL, token, `GOFORGE_MCP_ALLOW_WRITES`, `WriteRefusal` for `/mcp` read tokens) |
+| `server.go` | MCP server setup, tool registration, and the write refusal middleware |
 | `client.go` | HTTP client for `/api/v1` |
 | `reads.go` | Read tools |
 | `writes.go` | Gated write tools, registered only when writes are allowed |

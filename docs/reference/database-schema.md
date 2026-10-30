@@ -338,6 +338,7 @@ Personal API tokens. Only a hash of the token is stored; the raw token is shown 
 | `user_id` | `UUID` | FK -> users(id) ON DELETE CASCADE, NOT NULL | Owning user |
 | `name` | `VARCHAR(255)` | NOT NULL | Token name |
 | `token_hash` | `VARCHAR(255)` | UNIQUE, NOT NULL | Hash of the token |
+| `token_hint` | `VARCHAR(32)` | NOT NULL, default `''` | Non-secret label, `gf_…` plus the last 4 characters; empty for tokens created before migration 021. Replaced on rotate |
 | `scopes` | `TEXT[]` | NOT NULL, default `'{full}'`, CHECK non-empty subset of `full`, `read`, `write`, `protected` | What the token may do. See [API v1](api-v1.md#tokens-and-scopes) |
 | `last_used_at` | `TIMESTAMPTZ` | Nullable | Last use |
 | `expires_at` | `TIMESTAMPTZ` | Nullable | Expiry (null for no expiry) |
@@ -345,7 +346,7 @@ Personal API tokens. Only a hash of the token is stored; the raw token is shown 
 
 **Indexes**: `idx_api_tokens_user_id` (user_id), `idx_api_tokens_token_hash` (token_hash)
 
-**Migrations**: `013_create_api_tokens`, `018_api_token_scopes` (adds `scopes`; existing tokens become `{full}`)
+**Migrations**: `013_create_api_tokens`, `018_api_token_scopes` (adds `scopes`; existing tokens become `{full}`), `021_api_token_hint` (adds `token_hint`)
 
 ---
 
