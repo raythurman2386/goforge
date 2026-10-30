@@ -4,12 +4,12 @@ import (
 	"context"
 	"io"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // StreamLogs streams logs for a container.
 func (c *Client) StreamLogs(ctx context.Context, id string, follow bool) (io.ReadCloser, error) {
-	opts := container.LogsOptions{
+	opts := client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     follow,
@@ -30,7 +30,7 @@ type LogsOptions struct {
 // ContainerLogs returns a bounded, non-following log stream for a container.
 // The stream is multiplexed for non-TTY containers; demux it with stdcopy.
 func (c *Client) ContainerLogs(ctx context.Context, id string, opts LogsOptions) (io.ReadCloser, error) {
-	return c.docker.ContainerLogs(ctx, id, container.LogsOptions{
+	return c.docker.ContainerLogs(ctx, id, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     false,

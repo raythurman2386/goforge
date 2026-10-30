@@ -3,9 +3,11 @@ package monitor
 import (
 	"testing"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/build"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 )
@@ -14,21 +16,21 @@ func TestCalculateDiskUsage_ManagedOnly(t *testing.T) {
 	t.Parallel()
 
 	managed := map[string]string{docker.ManagedLabelKey: docker.ManagedLabelValue}
-	usage := &types.DiskUsage{
-		Images: []*image.Summary{
+	usage := &client.DiskUsageResult{
+		Images: client.ImagesDiskUsage{Items: []image.Summary{
 			{Size: 10, Containers: 0, Labels: managed},
 			{Size: 99, Containers: 0, Labels: map[string]string{"app": "other"}},
-		},
-		Containers: []*types.Container{
+		}},
+		Containers: client.ContainersDiskUsage{Items: []container.Summary{
 			{SizeRw: 5, State: "running", Labels: managed},
 			{SizeRw: 4, State: "exited", Labels: managed},
 			{SizeRw: 50, State: "exited"},
-		},
-		Volumes: []*volume.Volume{
+		}},
+		Volumes: client.VolumesDiskUsage{Items: []volume.Volume{
 			{Name: "goforge-vol-db", UsageData: &volume.UsageData{Size: 7}},
 			{Name: "other-data", UsageData: &volume.UsageData{Size: 70}},
-		},
-		BuildCache: []*types.BuildCache{{Size: 3}},
+		}},
+		BuildCache: client.BuildCacheDiskUsage{Items: []build.CacheRecord{{Size: 3}}},
 	}
 
 	info := (&Collector{}).calculateDiskUsage(usage)

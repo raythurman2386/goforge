@@ -142,7 +142,7 @@ stateDiagram-v2
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Language | Go 1.25 | Backend, CLI, all server-side logic |
+| Language | Go 1.26 | Backend, CLI, all server-side logic |
 | Router | go-chi/chi/v5 | HTTP routing and middleware |
 | Templates | a-h/templ | Type-safe server-side HTML templates |
 | Frontend | HTMX 2 | Dynamic UI without JavaScript frameworks |

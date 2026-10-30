@@ -2,14 +2,14 @@ package docker
 
 import (
 	"context"
+	"net/netip"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 func TestCreateContainer_ResourceLimits(t *testing.T) {
@@ -29,9 +29,9 @@ func TestCreateContainer_ResourceLimits(t *testing.T) {
 			t.Parallel()
 			var got *container.HostConfig
 			c := &Client{docker: &mockDockerAPI{
-				containerCreateFunc: func(_ context.Context, _ *container.Config, hc *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
-					got = hc
-					return container.CreateResponse{ID: "c1"}, nil
+				containerCreateFunc: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+					got = opts.HostConfig
+					return client.ContainerCreateResult{ID: "c1"}, nil
 				},
 			}}
 			if _, err := c.CreateContainer(context.Background(), ContainerOptions{
@@ -60,29 +60,39 @@ func TestCreateContainer_PortBindings(t *testing.T) {
 	tests := []struct {
 		name        string
 		mappings    []PortBinding
-		wantBinding map[string][]nat.PortBinding
+		wantBinding map[string][]network.PortBinding
 		wantExposed []string
 		wantErr     string
 	}{
 		{
 			name:        "no mappings publishes nothing",
-			wantBinding: map[string][]nat.PortBinding{},
+			wantBinding: map[string][]network.PortBinding{},
 		},
 		{
 			name:        "loopback tcp",
 			mappings:    []PortBinding{{ContainerPort: "22", Protocol: "tcp", HostIP: "127.0.0.1", HostPort: "2223"}},
-			wantBinding: map[string][]nat.PortBinding{"22/tcp": {{HostIP: "127.0.0.1", HostPort: "2223"}}},
+			wantBinding: map[string][]network.PortBinding{"22/tcp": {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "2223"}}},
 			wantExposed: []string{"22/tcp"},
 		},
 		{
 			name:        "empty protocol means tcp",
 			mappings:    []PortBinding{{ContainerPort: "22", HostIP: "127.0.0.1", HostPort: "2223"}},
-			wantBinding: map[string][]nat.PortBinding{"22/tcp": {{HostIP: "127.0.0.1", HostPort: "2223"}}},
+			wantBinding: map[string][]network.PortBinding{"22/tcp": {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "2223"}}},
 			wantExposed: []string{"22/tcp"},
 		},
 		{name: "empty host IP refused", mappings: []PortBinding{{ContainerPort: "22", HostPort: "2223"}}, wantErr: "host IP is required"},
 		{name: "0.0.0.0 refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "0.0.0.0", HostPort: "2223"}}, wantErr: "not allowed"},
 		{name: ":: refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "::", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "::ffff:0.0.0.0 refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "::ffff:0.0.0.0", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "zoned link-local refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "fe80::1%eth0", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "zoned loopback refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "::1%lo", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "garbage host IP refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "not-an-ip", HostPort: "2223"}}, wantErr: "not allowed"},
+		{
+			name:        "::ffff:127.0.0.1 binds as 127.0.0.1",
+			mappings:    []PortBinding{{ContainerPort: "22", HostIP: "::ffff:127.0.0.1", HostPort: "2223"}},
+			wantBinding: map[string][]network.PortBinding{"22/tcp": {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "2223"}}},
+			wantExposed: []string{"22/tcp"},
+		},
 		{name: "empty host port refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "127.0.0.1"}}, wantErr: "host port is required"},
 	}
 	for _, tt := range tests {
@@ -91,9 +101,9 @@ func TestCreateContainer_PortBindings(t *testing.T) {
 			var gotHC *container.HostConfig
 			var gotCfg *container.Config
 			c := &Client{docker: &mockDockerAPI{
-				containerCreateFunc: func(_ context.Context, cfg *container.Config, hc *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
-					gotCfg, gotHC = cfg, hc
-					return container.CreateResponse{ID: "c1"}, nil
+				containerCreateFunc: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+					gotCfg, gotHC = opts.Config, opts.HostConfig
+					return client.ContainerCreateResult{ID: "c1"}, nil
 				},
 			}}
 			_, err := c.CreateContainer(context.Background(), ContainerOptions{Name: "svc", Image: "gitea/gitea:1", PortMappings: tt.mappings})
@@ -113,7 +123,7 @@ func TestCreateContainer_PortBindings(t *testing.T) {
 				t.Fatalf("PortBindings = %v, want %v", gotHC.PortBindings, tt.wantBinding)
 			}
 			for port, want := range tt.wantBinding {
-				got := gotHC.PortBindings[nat.Port(port)]
+				got := gotHC.PortBindings[network.MustParsePort(port)]
 				if !slices.Equal(got, want) {
 					t.Errorf("PortBindings[%s] = %v, want %v", port, got, want)
 				}
@@ -122,7 +132,7 @@ func TestCreateContainer_PortBindings(t *testing.T) {
 				t.Errorf("ExposedPorts = %v, want %v", gotCfg.ExposedPorts, tt.wantExposed)
 			}
 			for _, p := range tt.wantExposed {
-				if _, ok := gotCfg.ExposedPorts[nat.Port(p)]; !ok {
+				if _, ok := gotCfg.ExposedPorts[network.MustParsePort(p)]; !ok {
 					t.Errorf("ExposedPorts missing %s", p)
 				}
 			}
@@ -134,9 +144,9 @@ func TestRenameContainer(t *testing.T) {
 	t.Parallel()
 	var gotID, gotName string
 	c := &Client{docker: &mockDockerAPI{
-		containerRenameFunc: func(_ context.Context, id, name string) error {
-			gotID, gotName = id, name
-			return nil
+		containerRenameFunc: func(_ context.Context, id string, opts client.ContainerRenameOptions) (client.ContainerRenameResult, error) {
+			gotID, gotName = id, opts.NewName
+			return client.ContainerRenameResult{}, nil
 		},
 	}}
 	if err := c.RenameContainer(context.Background(), "abc", "svc-replaced"); err != nil {
@@ -161,9 +171,9 @@ func TestCreateContainer_Cmd(t *testing.T) {
 			t.Parallel()
 			var got *container.Config
 			c := &Client{docker: &mockDockerAPI{
-				containerCreateFunc: func(_ context.Context, cfg *container.Config, _ *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
-					got = cfg
-					return container.CreateResponse{ID: "c1"}, nil
+				containerCreateFunc: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+					got = opts.Config
+					return client.ContainerCreateResult{ID: "c1"}, nil
 				},
 			}}
 			if _, err := c.CreateContainer(context.Background(), ContainerOptions{Name: "svc", Image: "redis:7", Cmd: tt.cmd}); err != nil {
@@ -172,7 +182,7 @@ func TestCreateContainer_Cmd(t *testing.T) {
 			if got == nil {
 				t.Fatal("ContainerCreate was not called")
 			}
-			if !slices.Equal([]string(got.Cmd), tt.cmd) {
+			if !slices.Equal(got.Cmd, tt.cmd) {
 				t.Errorf("Config.Cmd = %q, want %q", got.Cmd, tt.cmd)
 			}
 		})

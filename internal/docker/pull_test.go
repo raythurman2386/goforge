@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 )
 
 // errReader fails mid-stream, like a pull that drops after it starts.
@@ -21,13 +21,13 @@ func TestClient_PullImage_PullsEvenWhenImageIsLocal(t *testing.T) {
 	var inspected bool
 	var pulled []string
 	c := &Client{docker: &mockDockerAPI{
-		imageInspectFunc: func(context.Context, string) (types.ImageInspect, []byte, error) {
+		imageInspectFunc: func(context.Context, string) (client.ImageInspectResult, error) {
 			inspected = true
-			return types.ImageInspect{ID: "sha256:old"}, nil, nil
+			return client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:old"}}, nil
 		},
-		imagePullFunc: func(_ context.Context, ref string, _ image.PullOptions) (io.ReadCloser, error) {
+		imagePullFunc: func(_ context.Context, ref string, _ client.ImagePullOptions) (client.ImagePullResponse, error) {
 			pulled = append(pulled, ref)
-			return io.NopCloser(strings.NewReader(`{"status":"Downloaded newer image"}`)), nil
+			return pullBody(`{"status":"Downloaded newer image"}`), nil
 		},
 	}}
 
@@ -46,13 +46,13 @@ func TestClient_PullImage_Errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
-		pull func(context.Context, string, image.PullOptions) (io.ReadCloser, error)
+		pull func(context.Context, string, client.ImagePullOptions) (client.ImagePullResponse, error)
 	}{
-		{"registry refuses", func(context.Context, string, image.PullOptions) (io.ReadCloser, error) {
+		{"registry refuses", func(context.Context, string, client.ImagePullOptions) (client.ImagePullResponse, error) {
 			return nil, errors.New("unauthorized")
 		}},
-		{"stream breaks", func(context.Context, string, image.PullOptions) (io.ReadCloser, error) {
-			return io.NopCloser(errReader{}), nil
+		{"stream breaks", func(context.Context, string, client.ImagePullOptions) (client.ImagePullResponse, error) {
+			return pullResponse{io.NopCloser(errReader{})}, nil
 		}},
 	}
 	for _, tt := range tests {

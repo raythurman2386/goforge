@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
@@ -298,8 +299,27 @@ type limitsDTO struct {
 	CPUs        float64 `json:"cpus"`
 }
 
-func toContainerState(info *types.ContainerJSON) *containerStateDTO {
-	if info == nil || info.ContainerJSONBase == nil {
+// appendPortBindings flattens a port map into DTO rows; an exposed port with
+// no host binding gets one row with only Container set.
+func appendPortBindings(out []portBindingDTO, ports network.PortMap) []portBindingDTO {
+	for port, bindings := range ports {
+		if len(bindings) == 0 {
+			out = append(out, portBindingDTO{Container: port.String()})
+		}
+		for _, b := range bindings {
+			hostIP := ""
+			if b.HostIP.IsValid() {
+				hostIP = b.HostIP.String()
+			}
+			out = append(out, portBindingDTO{Container: port.String(), HostIP: hostIP, HostPort: b.HostPort})
+		}
+	}
+	return out
+}
+
+func toContainerState(info *container.InspectResponse) *containerStateDTO {
+	// An inspect response without an ID carries no container.
+	if info == nil || info.ID == "" {
 		return nil
 	}
 	out := &containerStateDTO{
@@ -323,28 +343,21 @@ func toContainerState(info *types.ContainerJSON) *containerStateDTO {
 		}
 	}
 	if s := info.State; s != nil {
-		out.State = s.Status
+		out.State = string(s.Status)
 		out.Running = s.Running
 		out.ExitCode = s.ExitCode
 		out.OOMKilled = s.OOMKilled
 		out.StartedAt = s.StartedAt
 		out.FinishedAt = s.FinishedAt
 		if s.Health != nil {
-			out.Health = s.Health.Status
+			out.Health = string(s.Health.Status)
 		}
 	}
 	if info.HostConfig != nil {
 		out.Limits = limitsDTO{MemoryBytes: info.HostConfig.Memory, CPUs: float64(info.HostConfig.NanoCPUs) / 1e9}
 	}
 	if info.NetworkSettings != nil {
-		for port, bindings := range info.NetworkSettings.Ports {
-			if len(bindings) == 0 {
-				out.Ports = append(out.Ports, portBindingDTO{Container: string(port)})
-			}
-			for _, b := range bindings {
-				out.Ports = append(out.Ports, portBindingDTO{Container: string(port), HostIP: b.HostIP, HostPort: b.HostPort})
-			}
-		}
+		out.Ports = appendPortBindings(out.Ports, info.NetworkSettings.Ports)
 		for name := range info.NetworkSettings.Networks {
 			out.Networks = append(out.Networks, name)
 		}

@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/pkg/archive"
+	"github.com/moby/go-archive"
+	"github.com/moby/moby/client"
 )
 
 // BuildOptions represents options for building a Docker image.
@@ -26,7 +26,7 @@ func (c *Client) BuildImage(ctx context.Context, opts BuildOptions, output io.Wr
 		return fmt.Errorf("failed to create tar archive: %w", err)
 	}
 
-	buildOptions := types.ImageBuildOptions{
+	buildOptions := client.ImageBuildOptions{
 		Dockerfile: opts.Dockerfile,
 		Tags:       []string{opts.ImageName},
 		BuildArgs:  opts.BuildArgs,

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/go-chi/chi/v5"
+	"github.com/moby/moby/api/pkg/stdcopy"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -447,7 +447,7 @@ func (h *Handler) listContainers(w http.ResponseWriter, r *http.Request) {
 		if list, listErr := h.deps.Docker.ListContainers(ctx, true); listErr == nil {
 			dockerOK = true
 			for i := range list {
-				live[list[i].ID] = list[i].State
+				live[list[i].ID] = string(list[i].State)
 			}
 		}
 	}

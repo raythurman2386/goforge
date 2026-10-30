@@ -6,39 +6,35 @@ import (
 	"io"
 	"strings"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	cerrdefs "github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
-// dockerAPI defines the Docker client interface for testing.
+// dockerAPI is the subset of the Moby client (github.com/moby/moby/client)
+// that GoForge uses. Tests substitute a fake.
 type dockerAPI interface {
-	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
-	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
-	ImageBuild(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error)
-	ImagesPrune(ctx context.Context, pruneFilters filters.Args) (image.PruneReport, error)
-	ImageRemove(ctx context.Context, imageID string, options image.RemoveOptions) ([]image.DeleteResponse, error)
-	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
-	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
-	ContainerRestart(ctx context.Context, containerID string, options container.StopOptions) error
-	ContainerStop(ctx context.Context, containerID string, options container.StopOptions) error
-	ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error
-	ContainerRename(ctx context.Context, containerID, newContainerName string) error
-	ContainerStats(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
-	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
-	ContainersPrune(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
-	ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error)
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	ContainerExecCreate(ctx context.Context, containerID string, options container.ExecOptions) (types.IDResponse, error)
-	ContainerExecAttach(ctx context.Context, execID string, options container.ExecAttachOptions) (types.HijackedResponse, error)
-	ContainerExecInspect(ctx context.Context, execID string) (container.ExecInspect, error)
-	DiskUsage(ctx context.Context, options types.DiskUsageOptions) (types.DiskUsage, error)
-	Ping(ctx context.Context) (types.Ping, error)
+	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (client.ImageInspectResult, error)
+	ImagePull(ctx context.Context, ref string, options client.ImagePullOptions) (client.ImagePullResponse, error)
+	ImageBuild(ctx context.Context, buildContext io.Reader, options client.ImageBuildOptions) (client.ImageBuildResult, error)
+	ImagePrune(ctx context.Context, options client.ImagePruneOptions) (client.ImagePruneResult, error)
+	ImageRemove(ctx context.Context, imageID string, options client.ImageRemoveOptions) (client.ImageRemoveResult, error)
+	ContainerCreate(ctx context.Context, options client.ContainerCreateOptions) (client.ContainerCreateResult, error)
+	ContainerStart(ctx context.Context, containerID string, options client.ContainerStartOptions) (client.ContainerStartResult, error)
+	ContainerRestart(ctx context.Context, containerID string, options client.ContainerRestartOptions) (client.ContainerRestartResult, error)
+	ContainerStop(ctx context.Context, containerID string, options client.ContainerStopOptions) (client.ContainerStopResult, error)
+	ContainerRemove(ctx context.Context, containerID string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+	ContainerRename(ctx context.Context, containerID string, options client.ContainerRenameOptions) (client.ContainerRenameResult, error)
+	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
+	ContainerLogs(ctx context.Context, containerID string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error)
+	ContainerPrune(ctx context.Context, options client.ContainerPruneOptions) (client.ContainerPruneResult, error)
+	ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error)
+	ContainerInspect(ctx context.Context, containerID string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error)
+	ExecCreate(ctx context.Context, containerID string, options client.ExecCreateOptions) (client.ExecCreateResult, error)
+	ExecAttach(ctx context.Context, execID string, options client.ExecAttachOptions) (client.ExecAttachResult, error)
+	ExecInspect(ctx context.Context, execID string, options client.ExecInspectOptions) (client.ExecInspectResult, error)
+	DiskUsage(ctx context.Context, options client.DiskUsageOptions) (client.DiskUsageResult, error)
+	Ping(ctx context.Context, options client.PingOptions) (client.PingResult, error)
 	Close() error
 }
 
@@ -53,9 +49,8 @@ func NewClient(host string) (*Client, error) {
 	if host != "" {
 		opts = append(opts, client.WithHost(host))
 	}
-	opts = append(opts, client.WithAPIVersionNegotiation())
 
-	cli, err := client.NewClientWithOpts(opts...)
+	cli, err := client.New(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
@@ -65,11 +60,11 @@ func NewClient(host string) (*Client, error) {
 
 // ImageExists reports whether imageName is present locally.
 func (c *Client) ImageExists(ctx context.Context, imageName string) (bool, error) {
-	_, _, err := c.docker.ImageInspectWithRaw(ctx, imageName)
+	_, err := c.docker.ImageInspect(ctx, imageName)
 	if err == nil {
 		return true, nil
 	}
-	if errdefs.IsNotFound(err) {
+	if cerrdefs.IsNotFound(err) {
 		return false, nil
 	}
 	return false, fmt.Errorf("failed to inspect image %s: %w", imageName, err)
@@ -79,7 +74,7 @@ func (c *Client) ImageExists(ctx context.Context, imageName string) (bool, error
 // a local image, so locally built app images (which are not in any registry)
 // are used as-is. Service deploys refresh mutable tags with PullImage instead.
 func (c *Client) EnsureImage(ctx context.Context, imageName string) error {
-	if _, _, err := c.docker.ImageInspectWithRaw(ctx, imageName); err == nil {
+	if _, err := c.docker.ImageInspect(ctx, imageName); err == nil {
 		return nil
 	}
 	return c.PullImage(ctx, imageName)
@@ -89,7 +84,7 @@ func (c *Client) EnsureImage(ctx context.Context, imageName string) error {
 // so a moved tag such as latest resolves to the registry's current image.
 // Pulling an unchanged tag only checks the manifest and downloads nothing.
 func (c *Client) PullImage(ctx context.Context, imageName string) error {
-	reader, err := c.docker.ImagePull(ctx, imageName, image.PullOptions{})
+	reader, err := c.docker.ImagePull(ctx, imageName, client.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to pull image %s: %w", imageName, err)
 	}
@@ -110,14 +105,15 @@ func IsDigestReference(ref string) bool {
 	return strings.Contains(ref, "@")
 }
 
-// GetStats returns statistics for a container.
-func (c *Client) GetStats(ctx context.Context, id string) (container.StatsResponseReader, error) {
-	return c.docker.ContainerStats(ctx, id, false)
+// GetStats returns a one-shot statistics snapshot for a container. The caller
+// closes Body.
+func (c *Client) GetStats(ctx context.Context, id string) (client.ContainerStatsResult, error) {
+	return c.docker.ContainerStats(ctx, id, client.ContainerStatsOptions{Stream: false})
 }
 
 // Ping checks the connection to the Docker daemon.
 func (c *Client) Ping(ctx context.Context) error {
-	_, err := c.docker.Ping(ctx)
+	_, err := c.docker.Ping(ctx, client.PingOptions{})
 	return err
 }
 
@@ -126,9 +122,15 @@ func (c *Client) Close() error {
 	return c.docker.Close()
 }
 
-// DiskUsage returns system-wide disk usage information.
-func (c *Client) DiskUsage(ctx context.Context) (*types.DiskUsage, error) {
-	usage, err := c.docker.DiskUsage(ctx, types.DiskUsageOptions{})
+// DiskUsage returns system-wide disk usage information, with per-object items.
+func (c *Client) DiskUsage(ctx context.Context) (*client.DiskUsageResult, error) {
+	usage, err := c.docker.DiskUsage(ctx, client.DiskUsageOptions{
+		Containers: true,
+		Images:     true,
+		Volumes:    true,
+		BuildCache: true,
+		Verbose:    true,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -136,10 +138,14 @@ func (c *Client) DiskUsage(ctx context.Context) (*types.DiskUsage, error) {
 }
 
 // ListContainers returns GoForge-managed containers from Docker.
-func (c *Client) ListContainers(ctx context.Context, all bool) ([]types.Container, error) {
-	options := container.ListOptions{
+func (c *Client) ListContainers(ctx context.Context, all bool) ([]container.Summary, error) {
+	options := client.ContainerListOptions{
 		All:     all,
-		Filters: filters.NewArgs(filters.Arg("label", ManagedLabelFilter)),
+		Filters: make(client.Filters).Add("label", ManagedLabelFilter),
 	}
-	return c.docker.ContainerList(ctx, options)
+	res, err := c.docker.ContainerList(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return res.Items, nil
 }

@@ -3,12 +3,11 @@ package docker
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 // RestartUnlessStopped is the restart policy used for GoForge-managed containers.
@@ -58,32 +57,37 @@ type PortBinding struct {
 }
 
 // portBindings converts bindings into Docker's exposed-port set and port map.
-func portBindings(bindings []PortBinding) (nat.PortSet, nat.PortMap, error) {
+func portBindings(bindings []PortBinding) (exposed network.PortSet, pm network.PortMap, err error) {
 	if len(bindings) == 0 {
-		return nil, nat.PortMap{}, nil
+		return nil, network.PortMap{}, nil
 	}
-	exposed := make(nat.PortSet, len(bindings))
-	pm := make(nat.PortMap, len(bindings))
+	exposed = make(network.PortSet, len(bindings))
+	pm = make(network.PortMap, len(bindings))
 	for _, b := range bindings {
 		proto := b.Protocol
 		if proto == "" {
 			proto = "tcp"
 		}
-		p, err := nat.NewPort(proto, b.ContainerPort)
+		p, err := network.ParsePort(b.ContainerPort + "/" + proto)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid port %s/%s: %w", b.ContainerPort, proto, err)
 		}
 		if b.HostIP == "" {
 			return nil, nil, fmt.Errorf("port %s: host IP is required; refusing to publish on all interfaces", p)
 		}
-		if ip := net.ParseIP(b.HostIP); ip == nil || ip.IsUnspecified() {
+		// Unmap so ::ffff:0.0.0.0 is caught as unspecified and
+		// ::ffff:127.0.0.1 binds as 127.0.0.1; refuse zoned addresses
+		// (fe80::1%eth0), which net.ParseIP never accepted.
+		ip, ipErr := netip.ParseAddr(b.HostIP)
+		ip = ip.Unmap()
+		if ipErr != nil || ip.Zone() != "" || ip.IsUnspecified() {
 			return nil, nil, fmt.Errorf("port %s: host IP %q is not allowed; publish on a specific address such as 127.0.0.1", p, b.HostIP)
 		}
 		if b.HostPort == "" {
 			return nil, nil, fmt.Errorf("port %s: host port is required", p)
 		}
 		exposed[p] = struct{}{}
-		pm[p] = append(pm[p], nat.PortBinding{HostIP: b.HostIP, HostPort: b.HostPort})
+		pm[p] = append(pm[p], network.PortBinding{HostIP: ip, HostPort: b.HostPort})
 	}
 	return exposed, pm, nil
 }
@@ -131,12 +135,17 @@ func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (st
 		networkingConfig.EndpointsConfig[opts.NetworkName] = &network.EndpointSettings{}
 	}
 
-	resp, err := c.docker.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, opts.Name)
+	resp, err := c.docker.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config:           config,
+		HostConfig:       hostConfig,
+		NetworkingConfig: networkingConfig,
+		Name:             opts.Name,
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create container: %w", err)
 	}
 
-	if err := c.docker.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if _, err := c.docker.ContainerStart(ctx, resp.ID, client.ContainerStartOptions{}); err != nil {
 		return resp.ID, fmt.Errorf("failed to start container: %w", err)
 	}
 
@@ -145,7 +154,7 @@ func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (st
 
 // StopContainer stops a container.
 func (c *Client) StopContainer(ctx context.Context, id string) error {
-	if err := c.docker.ContainerStop(ctx, id, container.StopOptions{}); err != nil {
+	if _, err := c.docker.ContainerStop(ctx, id, client.ContainerStopOptions{}); err != nil {
 		return fmt.Errorf("failed to stop container: %w", err)
 	}
 	return nil
@@ -153,7 +162,7 @@ func (c *Client) StopContainer(ctx context.Context, id string) error {
 
 // RemoveContainer removes a container.
 func (c *Client) RemoveContainer(ctx context.Context, id string) error {
-	if err := c.docker.ContainerRemove(ctx, id, container.RemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
+	if _, err := c.docker.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
 		return fmt.Errorf("failed to remove container: %w", err)
 	}
 	return nil
@@ -161,7 +170,7 @@ func (c *Client) RemoveContainer(ctx context.Context, id string) error {
 
 // RenameContainer gives an existing container a new name.
 func (c *Client) RenameContainer(ctx context.Context, id, newName string) error {
-	if err := c.docker.ContainerRename(ctx, id, newName); err != nil {
+	if _, err := c.docker.ContainerRename(ctx, id, client.ContainerRenameOptions{NewName: newName}); err != nil {
 		return fmt.Errorf("failed to rename container: %w", err)
 	}
 	return nil
@@ -169,7 +178,7 @@ func (c *Client) RenameContainer(ctx context.Context, id, newName string) error 
 
 // StartContainer starts an existing container.
 func (c *Client) StartContainer(ctx context.Context, id string) error {
-	if err := c.docker.ContainerStart(ctx, id, container.StartOptions{}); err != nil {
+	if _, err := c.docker.ContainerStart(ctx, id, client.ContainerStartOptions{}); err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
 	return nil
@@ -177,13 +186,17 @@ func (c *Client) StartContainer(ctx context.Context, id string) error {
 
 // RestartContainer restarts a container.
 func (c *Client) RestartContainer(ctx context.Context, id string) error {
-	if err := c.docker.ContainerRestart(ctx, id, container.StopOptions{}); err != nil {
+	if _, err := c.docker.ContainerRestart(ctx, id, client.ContainerRestartOptions{}); err != nil {
 		return fmt.Errorf("failed to restart container: %w", err)
 	}
 	return nil
 }
 
 // InspectContainer gets details about a container.
-func (c *Client) InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error) {
-	return c.docker.ContainerInspect(ctx, id)
+func (c *Client) InspectContainer(ctx context.Context, id string) (container.InspectResponse, error) {
+	res, err := c.docker.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+	if err != nil {
+		return container.InspectResponse{}, err
+	}
+	return res.Container, nil
 }

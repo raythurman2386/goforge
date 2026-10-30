@@ -13,7 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/docker/docker/api/types"
+	"github.com/moby/moby/api/types/container"
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/backup"
@@ -99,8 +99,8 @@ type Containers interface {
 
 // Docker is the subset of the Docker client the API calls.
 type Docker interface {
-	ListContainers(ctx context.Context, all bool) ([]types.Container, error)
-	InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error)
+	ListContainers(ctx context.Context, all bool) ([]container.Summary, error)
+	InspectContainer(ctx context.Context, id string) (container.InspectResponse, error)
 	StopContainer(ctx context.Context, id string) error
 	RestartContainer(ctx context.Context, id string) error
 	ContainerLogs(ctx context.Context, id string, opts docker.LogsOptions) (io.ReadCloser, error)

@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/docker/docker/api/types"
 	"github.com/go-chi/chi/v5"
+	"github.com/moby/moby/api/types/container"
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
@@ -66,7 +66,7 @@ func (h *ContainerHandler) ListAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dockerContainers []types.Container
+	var dockerContainers []container.Summary
 	for i := range allDockerContainers {
 		if _, ok := trackedDockerIDs[allDockerContainers[i].ID]; ok {
 			dockerContainers = append(dockerContainers, allDockerContainers[i])

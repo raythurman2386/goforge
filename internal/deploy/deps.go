@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/git"
@@ -61,7 +61,7 @@ type gitCloner interface {
 type containerRuntime interface {
 	BuildImage(ctx context.Context, opts docker.BuildOptions, output io.Writer) error
 	CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error)
-	InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error)
+	InspectContainer(ctx context.Context, id string) (container.InspectResponse, error)
 	StopContainer(ctx context.Context, id string) error
 	PruneImages(ctx context.Context) (image.PruneReport, error)
 }

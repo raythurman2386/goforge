@@ -315,8 +315,8 @@ func (s *Service) performHealthCheck(ctx context.Context, p *models.Project, env
 	}
 
 	ipAddress := ""
-	if network, ok := containerInfo.NetworkSettings.Networks[s.traefikNetwork]; ok {
-		ipAddress = network.IPAddress
+	if network, ok := containerInfo.NetworkSettings.Networks[s.traefikNetwork]; ok && network.IPAddress.IsValid() {
+		ipAddress = network.IPAddress.String()
 	}
 	if ipAddress == "" {
 		return fmt.Errorf("health check failed: container has no IP on network %s", s.traefikNetwork)

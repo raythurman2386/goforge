@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
@@ -84,7 +84,7 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 
 		stats.TotalContainers = len(allContainers)
 
-		var runningContainers []types.Container
+		var runningContainers []container.Summary
 		for i := range allContainers {
 			if allContainers[i].State == "running" {
 				runningContainers = append(runningContainers, allContainers[i])
@@ -146,14 +146,15 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 // Images and containers must carry goforge.managed=true. Volumes are included
 // when their name contains "goforge". Build cache cannot be filtered by label,
 // so that total is the engine-wide cache size.
-func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskUsageInfo {
+func (c *Collector) calculateDiskUsage(diskUsage *client.DiskUsageResult) *models.DiskUsageInfo {
 	info := &models.DiskUsageInfo{}
 	if diskUsage == nil {
 		return info
 	}
 
-	for _, img := range diskUsage.Images {
-		if img == nil || !managedDockerLabels(img.Labels) {
+	for i := range diskUsage.Images.Items {
+		img := &diskUsage.Images.Items[i]
+		if !managedDockerLabels(img.Labels) {
 			continue
 		}
 		info.ImagesSize += img.Size
@@ -162,8 +163,9 @@ func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskU
 		}
 	}
 
-	for _, ctr := range diskUsage.Containers {
-		if ctr == nil || !managedDockerLabels(ctr.Labels) || ctr.SizeRw <= 0 {
+	for i := range diskUsage.Containers.Items {
+		ctr := &diskUsage.Containers.Items[i]
+		if !managedDockerLabels(ctr.Labels) || ctr.SizeRw <= 0 {
 			continue
 		}
 		info.ContainersSize += ctr.SizeRw
@@ -172,17 +174,16 @@ func (c *Collector) calculateDiskUsage(diskUsage *types.DiskUsage) *models.DiskU
 		}
 	}
 
-	for _, vol := range diskUsage.Volumes {
-		if vol == nil || vol.UsageData == nil || !strings.Contains(vol.Name, "goforge") {
+	for i := range diskUsage.Volumes.Items {
+		vol := &diskUsage.Volumes.Items[i]
+		if vol.UsageData == nil || !strings.Contains(vol.Name, "goforge") {
 			continue
 		}
 		info.VolumesSize += vol.UsageData.Size
 	}
 
-	for _, cache := range diskUsage.BuildCache {
-		if cache != nil {
-			info.BuildCacheSize += cache.Size
-		}
+	for i := range diskUsage.BuildCache.Items {
+		info.BuildCacheSize += diskUsage.BuildCache.Items[i].Size
 	}
 
 	return info

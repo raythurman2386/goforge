@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -16,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
 	"github.com/google/uuid"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/git"
@@ -543,11 +544,11 @@ func (f *fakeRuntime) CreateContainer(_ context.Context, opts docker.ContainerOp
 	return "container-1", nil
 }
 
-func (f *fakeRuntime) InspectContainer(_ context.Context, _ string) (types.ContainerJSON, error) {
-	return types.ContainerJSON{
-		NetworkSettings: &types.NetworkSettings{
+func (f *fakeRuntime) InspectContainer(_ context.Context, _ string) (container.InspectResponse, error) {
+	return container.InspectResponse{
+		NetworkSettings: &container.NetworkSettings{
 			Networks: map[string]*network.EndpointSettings{
-				"traefik": {IPAddress: "127.0.0.1"},
+				"traefik": {IPAddress: netip.MustParseAddr("127.0.0.1")},
 			},
 		},
 	}, nil

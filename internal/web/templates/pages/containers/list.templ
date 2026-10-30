@@ -3,7 +3,7 @@ package containers
 import (
 	"strings"
 
-	"github.com/docker/docker/api/types"
+	"github.com/moby/moby/api/types/container"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
@@ -46,7 +46,7 @@ templ List(csrfToken string) {
 	}
 }
 
-templ ListAPI(trackedContainers []*models.Container, dockerContainers []types.Container) {
+templ ListAPI(trackedContainers []*models.Container, dockerContainers []container.Summary) {
 	if len(dockerContainers) == 0 {
 		<tr>
 			<td colspan="5">
@@ -64,7 +64,7 @@ templ ListAPI(trackedContainers []*models.Container, dockerContainers []types.Co
 	}
 }
 
-templ ContainerRow(dc types.Container, tracked []*models.Container) {
+templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 	<tr class="hover:bg-gray-50/60 transition-colors dark:hover:bg-gray-800/50">
 		<td class="table-td pl-6 font-medium text-gray-900 dark:text-gray-100">
 			<a href={ templ.URL("/containers/" + dc.ID) } class="block truncate hover:text-primary-700 dark:hover:text-primary-300" title={ containerName(dc) }>
@@ -75,7 +75,7 @@ templ ContainerRow(dc types.Container, tracked []*models.Container) {
 			<span class="block truncate font-mono text-xs text-gray-600 dark:text-gray-400" title={ dc.Image }>{ dc.Image }</span>
 		</td>
 		<td class="table-td">
-			@components.StatusBadge("container", dc.State)
+			@components.StatusBadge("container", string(dc.State))
 		</td>
 		<td class="table-td text-gray-600 dark:text-gray-400">
 			{ containerType(dc, tracked) }
@@ -122,14 +122,14 @@ templ ContainerRow(dc types.Container, tracked []*models.Container) {
 }
 
 // containerName is the Docker name without the leading slash.
-func containerName(dc types.Container) string {
+func containerName(dc container.Summary) string {
 	if len(dc.Names) == 0 {
 		return truncateID(dc.ID)
 	}
 	return strings.TrimPrefix(dc.Names[0], "/")
 }
 
-func containerType(dc types.Container, tracked []*models.Container) string {
+func containerType(dc container.Summary, tracked []*models.Container) string {
 	for _, tc := range tracked {
 		if tc.DockerID == dc.ID {
 			if tc.DeploymentID.Valid {

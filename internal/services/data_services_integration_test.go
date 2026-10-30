@@ -20,9 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
@@ -44,12 +42,12 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	api, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	api, err := client.New(client.FromEnv)
 	if err != nil {
 		t.Skipf("docker client: %v", err)
 	}
 	defer api.Close()
-	if _, pingErr := api.Ping(ctx); pingErr != nil {
+	if _, pingErr := api.Ping(ctx, client.PingOptions{}); pingErr != nil {
 		t.Skipf("docker not reachable: %v", pingErr)
 	}
 	dc, err := docker.NewClient("")
@@ -64,13 +62,13 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 	}
 	tag := hex.EncodeToString(suffix)
 	netName := "goforge-itdata-" + tag
-	if _, err = api.NetworkCreate(ctx, netName, network.CreateOptions{}); err != nil {
+	if _, err = api.NetworkCreate(ctx, netName, client.NetworkCreateOptions{}); err != nil {
 		t.Fatalf("create network: %v", err)
 	}
 	t.Cleanup(func() {
 		cctx, ccancel := context.WithTimeout(context.Background(), time.Minute)
 		defer ccancel()
-		if rmErr := api.NetworkRemove(cctx, netName); rmErr != nil {
+		if _, rmErr := api.NetworkRemove(cctx, netName, client.NetworkRemoveOptions{}); rmErr != nil {
 			t.Logf("remove network %s: %v", netName, rmErr)
 		}
 	})
@@ -109,7 +107,7 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 				}
 			}
 			for _, v := range tmpl.Docker.Volumes {
-				if rmErr := api.VolumeRemove(cctx, VolumeName(id, v.Name), true); rmErr != nil {
+				if _, rmErr := api.VolumeRemove(cctx, VolumeName(id, v.Name), client.VolumeRemoveOptions{Force: true}); rmErr != nil {
 					t.Logf("remove volume: %v", rmErr)
 				}
 			}
@@ -122,7 +120,7 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 		if tErr = dc.WaitHealthy(hctx, dockerID, time.Second); tErr != nil {
 			t.Fatalf("%s did not become healthy: %v", tmplName, tErr)
 		}
-		info, tErr := api.ContainerInspect(ctx, dockerID)
+		info, tErr := inspectContainer(ctx, api, dockerID)
 		if tErr != nil {
 			t.Fatal(tErr)
 		}
@@ -137,7 +135,7 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 		if len(info.HostConfig.PortBindings) != 0 {
 			t.Errorf("PortBindings = %v, want none", info.HostConfig.PortBindings)
 		}
-		return dockerID, info.NetworkSettings.Networks[netName].IPAddress, spec
+		return dockerID, info.NetworkSettings.Networks[netName].IPAddress.String(), spec
 	}
 
 	// sh runs script in the container and returns its trimmed output; a
@@ -205,7 +203,7 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 				t.Log("AUTH with the instance password then PING -> +OK|+PONG")
 			}
 
-			info, iErr := api.ContainerInspect(ctx, dockerID)
+			info, iErr := inspectContainer(ctx, api, dockerID)
 			if iErr != nil {
 				t.Fatal(iErr)
 			}
@@ -252,20 +250,20 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 			// denies root writing the redis-owned file (exit 2).
 			t.Run("restart", func(t *testing.T) {
 				for n := 1; n <= 2; n++ {
-					if rErr := api.ContainerRestart(ctx, dockerID, container.StopOptions{}); rErr != nil {
+					if _, rErr := api.ContainerRestart(ctx, dockerID, client.ContainerRestartOptions{}); rErr != nil {
 						t.Fatalf("restart %d: %v", n, rErr)
 					}
 					hctx, hcancel := context.WithTimeout(ctx, 2*time.Minute)
 					hErr := dc.WaitHealthy(hctx, dockerID, time.Second)
 					hcancel()
-					st, sErr := api.ContainerInspect(ctx, dockerID)
+					st, sErr := inspectContainer(ctx, api, dockerID)
 					if sErr != nil {
 						t.Fatal(sErr)
 					}
 					if hErr != nil || !st.State.Running {
 						t.Fatalf("restart %d: running=%v exit=%d healthy err=%v", n, st.State.Running, st.State.ExitCode, hErr)
 					}
-					ip := st.NetworkSettings.Networks[netName].IPAddress
+					ip := st.NetworkSettings.Networks[netName].IPAddress.String()
 					raddr := net.JoinHostPort(ip, "6379")
 					if got := resp(t, raddr, "PING"); !strings.HasPrefix(got, "-NOAUTH") {
 						t.Errorf("restart %d: unauthenticated PING = %q, want -NOAUTH", n, got)

@@ -7,8 +7,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/client"
 )
 
 // maxStreamStderr caps how much stderr ExecStream keeps. Stderr is only used
@@ -39,7 +39,7 @@ func (c *Client) ExecStream(ctx context.Context, id string, opts ExecOptions, st
 	if stdout == nil {
 		return ExecStreamResult{}, errors.New("exec: nil stdout writer")
 	}
-	created, err := c.docker.ContainerExecCreate(ctx, id, container.ExecOptions{
+	created, err := c.docker.ExecCreate(ctx, id, client.ExecCreateOptions{
 		User:         opts.User,
 		Env:          opts.Env,
 		Cmd:          opts.Cmd,
@@ -50,7 +50,7 @@ func (c *Client) ExecStream(ctx context.Context, id string, opts ExecOptions, st
 		return ExecStreamResult{}, fmt.Errorf("failed to create exec: %w", err)
 	}
 
-	resp, err := c.docker.ContainerExecAttach(ctx, created.ID, container.ExecAttachOptions{})
+	resp, err := c.docker.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
 	if err != nil {
 		return ExecStreamResult{}, fmt.Errorf("failed to attach exec: %w", err)
 	}
@@ -68,7 +68,7 @@ func (c *Client) ExecStream(ctx context.Context, id string, opts ExecOptions, st
 	}
 
 	for {
-		inspect, inspErr := c.docker.ContainerExecInspect(ctx, created.ID)
+		inspect, inspErr := c.docker.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
 		if inspErr != nil {
 			return ExecStreamResult{}, fmt.Errorf("failed to inspect exec: %w", inspErr)
 		}
