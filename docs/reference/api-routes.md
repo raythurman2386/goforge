@@ -8,7 +8,7 @@ All routes pass through the following middleware (in order):
 
 1. **Recoverer** - Catches panics and returns 500
 2. **SecurityHeaders** - CSP `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, and HSTS on HTTPS (see [Security](../security.md#security-headers))
-3. **RateLimit** - 30 requests/second, burst of 60, per client IP (`CF-Connecting-IP` or rightmost untrusted `X-Forwarded-For` hop from a `TRUSTED_PROXIES` peer)
+3. **RateLimit** - 30 requests/second, burst of 60, per client IP (rightmost untrusted `X-Forwarded-For` hop from a `TRUSTED_PROXIES` peer, or `CF-Connecting-IP` first when `CLOUDFLARE_PROXY_MODE=true`)
 
 The JSON API under `/api/v1` stops here. It authenticates bearer tokens itself,
 ignores session cookies, checks token scopes, and is outside the CSRF group. See

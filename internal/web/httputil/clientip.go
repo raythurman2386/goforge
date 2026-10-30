@@ -15,22 +15,45 @@ const (
 	headerXRealIP        = "X-Real-IP"
 )
 
+// ProxyTrust says which proxy headers ClientIP may read.
+type ProxyTrust struct {
+	// Proxies are the peers whose proxy headers are read. Empty means no
+	// header is read and the peer address is the client.
+	Proxies []*net.IPNet
+	// CloudflareConnectingIP enables CF-Connecting-IP from a trusted peer.
+	// Only set it when every request reaches GoForge through Cloudflare
+	// (CLOUDFLARE_PROXY_MODE). Traefik forwards the header untouched, so a
+	// client that reaches Traefik directly could otherwise choose its own IP.
+	CloudflareConnectingIP bool
+}
+
+// NewProxyTrust builds a ProxyTrust from TRUSTED_PROXIES and
+// CLOUDFLARE_PROXY_MODE. An empty cidrs list trusts DefaultTrustedProxies.
+func NewProxyTrust(cidrs []string, cloudflareProxyMode bool) ProxyTrust {
+	proxies := DefaultTrustedProxies()
+	if len(cidrs) > 0 {
+		proxies = ParseTrustedProxies(cidrs)
+	}
+	return ProxyTrust{Proxies: proxies, CloudflareConnectingIP: cloudflareProxyMode}
+}
+
 // ClientIP returns the client IP for r. See ClientIPFromHeaders.
-func ClientIP(r *http.Request, trustedProxies []*net.IPNet) string {
-	return ClientIPFromHeaders(r.RemoteAddr, r.Header, trustedProxies)
+func ClientIP(r *http.Request, trust ProxyTrust) string {
+	return ClientIPFromHeaders(r.RemoteAddr, r.Header, trust)
 }
 
 // ClientIPFromHeaders extracts the real client IP address.
 //
 // Proxy headers are only read when the direct peer (remoteAddr) is inside
-// trustedProxies. Otherwise, or when trustedProxies is empty, the peer address
+// trust.Proxies. Otherwise, or when trust.Proxies is empty, the peer address
 // (port stripped) is returned and every proxy header is ignored.
 //
 // From a trusted peer the order is:
 //
-//  1. CF-Connecting-IP, when it holds a valid IP. Cloudflare's edge overwrites
-//     this header, so a client cannot choose it when traffic arrives through
-//     Cloudflare (Tunnel or proxy).
+//  1. CF-Connecting-IP, only when trust.CloudflareConnectingIP is set and the
+//     header holds a valid IP. Cloudflare's edge overwrites this header, but
+//     Traefik passes it through, so it is only safe when every request comes
+//     through Cloudflare. With the option off the header is ignored.
 //  2. X-Forwarded-For, walked right to left: the first hop that is not a
 //     trusted proxy is the client. Every proxy appends the address it saw, so
 //     only the rightmost untrusted entry is known to be real; anything left of
@@ -39,17 +62,19 @@ func ClientIP(r *http.Request, trustedProxies []*net.IPNet) string {
 //     hop is trusted, the leftmost hop is returned.
 //  3. X-Real-IP, when it holds a valid IP.
 //  4. The peer address.
-func ClientIPFromHeaders(remoteAddr string, h http.Header, trustedProxies []*net.IPNet) string {
+func ClientIPFromHeaders(remoteAddr string, h http.Header, trust ProxyTrust) string {
 	peer := stripPort(remoteAddr)
-	if len(trustedProxies) == 0 || !isTrustedProxy(peer, trustedProxies) {
+	if len(trust.Proxies) == 0 || !isTrustedProxy(peer, trust.Proxies) {
 		return peer
 	}
 
-	if ip := parseIP(h.Get(headerCFConnectingIP)); ip != "" {
-		return ip
+	if trust.CloudflareConnectingIP {
+		if ip := parseIP(h.Get(headerCFConnectingIP)); ip != "" {
+			return ip
+		}
 	}
 
-	if ip, ok := rightmostUntrusted(h.Values(headerXForwardedFor), peer, trustedProxies); ok {
+	if ip, ok := rightmostUntrusted(h.Values(headerXForwardedFor), peer, trust.Proxies); ok {
 		return ip
 	}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/handlers"
+	"github.com/raythurman2386/goforge/internal/web/httputil"
 	"github.com/raythurman2386/goforge/internal/web/middleware"
 	"github.com/raythurman2386/goforge/internal/webhook"
 )
@@ -79,7 +80,7 @@ func setupTestRouterWithAPI(t *testing.T, db *sql.DB, cfg *config.Config, apiV1 
 
 	hh := handlers.NewHealthHandler(nil, nil, logger)
 	ch := handlers.NewContainerHandler(nil, nil, nil, logger) // Container handler with nil dependencies for testing
-	rl := middleware.NewRateLimiter(100, 200, nil)
+	rl := middleware.NewRateLimiter(100, 200, httputil.ProxyTrust{})
 	t.Cleanup(rl.Stop)
 	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch, apiV1)
 }

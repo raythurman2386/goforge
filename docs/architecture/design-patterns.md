@@ -131,11 +131,11 @@ The HTTP middleware chain follows a layered security model:
 ```
 Request
   -> Recovery (panic handler)
-   -> Security headers
-    -> Rate Limiting (client IP)
-      -> Session Loading (optional auth)
-        -> CSRF Validation (state-changing methods)
-          -> Handler
+    -> Security headers
+      -> Rate Limiting (client IP)
+        -> Session Loading (optional auth)
+          -> CSRF Validation (state-changing methods)
+            -> Handler
 ```
 
 ## Template Composition

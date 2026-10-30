@@ -402,11 +402,9 @@ func runServer() error {
 	containerHandler := handlers.NewContainerHandler(containerRepo, instanceRepo, dockerClient, logger.WithComponent(log, "containers"))
 
 	// Rate limiter (stopped during graceful shutdown)
-	trustedProxies := httputil.DefaultTrustedProxies()
-	if len(cfg.TrustedProxies) > 0 {
-		trustedProxies = httputil.ParseTrustedProxies(cfg.TrustedProxies)
-	}
-	rateLimiter := middleware.NewRateLimiter(30, 60, trustedProxies)
+	// CF-Connecting-IP is only read with CLOUDFLARE_PROXY_MODE (see httputil.ProxyTrust).
+	proxyTrust := httputil.NewProxyTrust(cfg.TrustedProxies, cfg.CloudflareProxyMode)
+	rateLimiter := middleware.NewRateLimiter(30, 60, proxyTrust)
 	defer rateLimiter.Stop()
 
 	// JSON API v1 for the GoForge MCP server (bearer tokens with scopes).
@@ -432,7 +430,7 @@ func runServer() error {
 		Logger:      logger.WithComponent(log, "api_v1"),
 		Version:     version,
 		ClientIP: func(r *http.Request) string {
-			return httputil.ClientIP(r, trustedProxies)
+			return httputil.ClientIP(r, proxyTrust)
 		},
 		ProtectedServices: cfg.ProtectedServices,
 	}).Routes()

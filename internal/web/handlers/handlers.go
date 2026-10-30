@@ -4,7 +4,6 @@ package handlers
 import (
 	"fmt"
 	"html"
-	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -17,28 +16,27 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/errors"
 )
 
-// trustedProxies holds the parsed trusted proxy CIDRs for IP extraction.
-// Initialized via SetTrustedProxies during application startup.
-var trustedProxies []*net.IPNet
+// proxyTrust decides which proxy headers getClientIP reads.
+// Initialized via SetProxyTrust during application startup.
+var proxyTrust = httputil.ProxyTrust{Proxies: httputil.DefaultTrustedProxies()}
 
 // htmxTrue is the value of the HX-Request header for HTMX requests.
 const htmxTrue = "true"
 
-// SetTrustedProxies configures which proxy CIDRs are trusted for
-// CF-Connecting-IP / X-Forwarded-For / X-Real-IP header extraction. If proxies is nil,
-// DefaultTrustedProxies (private/loopback networks) are used.
-func SetTrustedProxies(proxies []*net.IPNet) {
-	if proxies != nil {
-		trustedProxies = proxies
-	} else {
-		trustedProxies = httputil.DefaultTrustedProxies()
+// SetProxyTrust configures which proxies' X-Forwarded-For / X-Real-IP (and,
+// when enabled, CF-Connecting-IP) headers are read. Nil Proxies means
+// DefaultTrustedProxies (private/loopback networks).
+func SetProxyTrust(trust httputil.ProxyTrust) {
+	if trust.Proxies == nil {
+		trust.Proxies = httputil.DefaultTrustedProxies()
 	}
+	proxyTrust = trust
 }
 
 // getClientIP extracts the real client IP address from a request,
 // only trusting proxy headers when the direct peer is a trusted proxy.
 func getClientIP(r *http.Request) string {
-	return httputil.ClientIP(r, trustedProxies)
+	return httputil.ClientIP(r, proxyTrust)
 }
 
 // RenderError renders an error page or an HTMX-compatible error fragment.

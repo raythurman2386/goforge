@@ -138,12 +138,12 @@ GoForge is designed to work with **Cloudflare Tunnel** for secure public access:
 
 The client IP keys the rate limiter, the login lockout, and audit rows (`internal/web/httputil/clientip.go`). Proxy headers are read only when the direct peer is in `TRUSTED_PROXIES` (default: loopback and private ranges). From a trusted peer, GoForge uses, in order:
 
-1. `CF-Connecting-IP`, when it is a valid IP. Cloudflare sets it at the edge, so a client cannot choose it for traffic that arrives through Cloudflare.
+1. `CF-Connecting-IP`, when it is a valid IP, **only if `CLOUDFLARE_PROXY_MODE=true`**. With the default (`false`) this header is ignored, even from a trusted peer.
 2. The rightmost `X-Forwarded-For` hop that is not a trusted proxy. The leftmost entries are written by the client and are never used on their own; a hop that is not an IP stops the walk at the last trusted hop.
 3. `X-Real-IP`, when it is a valid IP.
 4. The peer address.
 
-If something other than Cloudflare can reach Traefik directly (for example a LAN port), that client can set `CF-Connecting-IP`. Keep Traefik reachable only through the tunnel, or narrow `TRUSTED_PROXIES`.
+Cloudflare overwrites `CF-Connecting-IP` at its edge, but Traefik forwards it exactly as the client sent it. If a client can reach Traefik without going through Cloudflare (no Cloudflare at all, or a LAN/host port next to a tunnel), it can choose that header. That is why it is opt-in. Only set `CLOUDFLARE_PROXY_MODE=true` when every request reaches Traefik through Cloudflare. Without it, tunnel users fall back to `X-Forwarded-For`, and cloudflared's address may be the key they share.
 
 ### Docker Network Isolation
 

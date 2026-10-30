@@ -38,8 +38,8 @@ func postLogin(h *AuthHandler, remote, xff, email, password string) *httptest.Re
 }
 
 func TestLogin_ThrottleFailsClosed(t *testing.T) {
-	SetTrustedProxies(httputil.DefaultTrustedProxies())
-	t.Cleanup(func() { SetTrustedProxies(nil) })
+	SetProxyTrust(httputil.NewProxyTrust(nil, false))
+	t.Cleanup(func() { SetProxyTrust(httputil.ProxyTrust{}) })
 
 	lt := middleware.NewLoginThrottle(3, 0, 15*time.Minute, 15*time.Minute)
 	t.Cleanup(lt.Stop)
@@ -76,5 +76,38 @@ func TestLogin_ThrottleFailsClosed(t *testing.T) {
 	// A different client is unaffected.
 	if rec := postLogin(h, "172.18.0.5:1", "198.51.100.8", "admin@example.test", "wrong"); rec.Code != http.StatusUnauthorized {
 		t.Errorf("other client status = %d, want 401", rec.Code)
+	}
+}
+
+// With CLOUDFLARE_PROXY_MODE off (default), rotating a spoofed
+// CF-Connecting-IP through Traefik does not dodge the per-IP lockout.
+func TestLogin_ThrottleIgnoresSpoofedCFByDefault(t *testing.T) {
+	SetProxyTrust(httputil.NewProxyTrust(nil, false))
+	t.Cleanup(func() { SetProxyTrust(httputil.ProxyTrust{}) })
+
+	lt := middleware.NewLoginThrottle(3, 0, 15*time.Minute, 15*time.Minute)
+	t.Cleanup(lt.Stop)
+	authn := &countingAuthenticator{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := NewAuthHandler(nil, nil, nil, authn, nil, false, logger).WithLoginThrottle(lt)
+
+	post := func(cf string) *httptest.ResponseRecorder {
+		form := url.Values{"email": {"admin@example.test"}, "password": {"wrong"}}
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = "172.18.0.5:1"
+		req.Header.Set("CF-Connecting-IP", cf)
+		req.Header.Set("X-Forwarded-For", "198.51.100.7")
+		rec := httptest.NewRecorder()
+		h.Login(rec, req)
+		return rec
+	}
+	for i, spoof := range []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"} {
+		if rec := post(spoof); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d status = %d, want 401", i+1, rec.Code)
+		}
+	}
+	if rec := post("4.4.4.4"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status after 3 failures with rotating CF = %d, want 429", rec.Code)
 	}
 }

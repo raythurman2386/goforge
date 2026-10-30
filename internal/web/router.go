@@ -39,14 +39,9 @@ func Router(
 ) http.Handler {
 	r := chi.NewRouter()
 
-	// Parse trusted proxy CIDRs from config (defaults to private/loopback networks)
-	trustedProxies := httputil.DefaultTrustedProxies()
-	if len(cfg.TrustedProxies) > 0 {
-		trustedProxies = httputil.ParseTrustedProxies(cfg.TrustedProxies)
-	}
-
-	// Initialize handler-level trusted proxies for getClientIP
-	handlers.SetTrustedProxies(trustedProxies)
+	// Client IP trust for getClientIP: TRUSTED_PROXIES (default private/loopback);
+	// CF-Connecting-IP only with CLOUDFLARE_PROXY_MODE.
+	handlers.SetProxyTrust(httputil.NewProxyTrust(cfg.TrustedProxies, cfg.CloudflareProxyMode))
 
 	// Middleware stack
 	r.Use(chi_middleware.Recoverer)
