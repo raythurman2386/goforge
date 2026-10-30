@@ -50,11 +50,12 @@ mkdocs build --strict
 
 # Code generation
 make templ                          # Generate templ templates (*_templ.go files)
-make css                            # Compile TailwindCSS (v3.4.17; v4 does not work)
-make css-check                      # make css, then scripts/class_check.py: fails on literal
-                                    # class="..." tokens in .templ and handler files that are
-                                    # missing from output.css (CI css job). Without the CLI:
-                                    # make css-check TAILWIND="npx --yes tailwindcss@3.4.17"
+make css                            # Compile TailwindCSS v3.4.17 (standalone CLI if it is
+                                    # v3.4.17, else npx tailwindcss@3.4.17); fails otherwise
+make css-check                      # Rebuild output.css, then scripts/class_check.py: fails on
+                                    # class tokens (class="...", class={ ... }, *Class() helpers,
+                                    # app.js LEVEL_CLASSES/className) missing from output.css
+                                    # (CI css job)
 
 # Database
 make migrate                        # Run migrations up

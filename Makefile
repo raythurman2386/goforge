@@ -13,10 +13,26 @@ BINARY_PATH=bin/$(BINARY_NAME)
 # Tools
 TEMPL=go tool templ
 # Tailwind CLI. Must be v$(TAILWIND_VERSION), the version the Dockerfile and the
-# CI css job use; v4 cannot read tailwind.config.js. Without a standalone
-# binary: make css-check TAILWIND="npx --yes tailwindcss@3.4.17"
-TAILWIND?=tailwindcss
+# CI css job use; v4 cannot read tailwind.config.js. Empty TAILWIND picks a
+# standalone `tailwindcss` on PATH if it is v$(TAILWIND_VERSION), else
+# `npx --yes tailwindcss@$(TAILWIND_VERSION)`. css, css-watch, and css-check fail
+# (no placeholder, no stale output.css) when no v$(TAILWIND_VERSION) CLI runs.
+TAILWIND?=
 TAILWIND_VERSION=3.4.17
+# Shell snippet: sets $$tw to a v$(TAILWIND_VERSION) Tailwind command or exits 1.
+TAILWIND_RESOLVE=set -e; tw="$(TAILWIND)"; \
+	if [ -z "$$tw" ]; then \
+		if command -v tailwindcss >/dev/null 2>&1 && tailwindcss --help 2>&1 | grep -q "v$(TAILWIND_VERSION)"; then \
+			tw=tailwindcss; \
+		elif command -v npx >/dev/null 2>&1; then \
+			tw="npx --yes tailwindcss@$(TAILWIND_VERSION)"; \
+		else \
+			echo "error: Tailwind v$(TAILWIND_VERSION) not found: install the standalone CLI (make install-tools) or Node (for npx)" >&2; exit 1; \
+		fi; \
+	fi; \
+	if ! $$tw --help 2>&1 | grep -q "v$(TAILWIND_VERSION)"; then \
+		echo "error: '$$tw' is not Tailwind v$(TAILWIND_VERSION) (Dockerfile and CI use v$(TAILWIND_VERSION)); set TAILWIND=\"npx --yes tailwindcss@$(TAILWIND_VERSION)\"" >&2; exit 1; \
+	fi
 AIR=air
 GOLINT=go tool golangci-lint
 
@@ -89,21 +105,20 @@ templ-watch:
 
 ## css: Compile TailwindCSS
 css:
-	@if command -v $(firstword $(TAILWIND)) >/dev/null 2>&1; then \
-		$(TAILWIND) --help 2>&1 | grep -q "v$(TAILWIND_VERSION)" || \
-			echo "warning: $(TAILWIND) is not Tailwind v$(TAILWIND_VERSION) (Dockerfile and CI use v$(TAILWIND_VERSION))"; \
-		$(TAILWIND) -i ./static/css/input.css -o ./static/css/output.css --minify; \
-	else \
-		echo "tailwindcss not installed, using placeholder CSS"; \
-	fi
+	@$(TAILWIND_RESOLVE); \
+	echo "$$tw -i ./static/css/input.css -o ./static/css/output.css --minify"; \
+	$$tw -i ./static/css/input.css -o ./static/css/output.css --minify
 
-## css-check: Build CSS and fail on class tokens missing from output.css
-css-check: css
+## css-check: Rebuild CSS from scratch and fail on class tokens missing from output.css
+css-check:
+	rm -f static/css/output.css
+	@$(MAKE) --no-print-directory css
 	python3 scripts/class_check.py static/css/output.css
 
 ## css-watch: Watch and compile TailwindCSS
 css-watch:
-	$(TAILWIND) -i ./static/css/input.css -o ./static/css/output.css --watch
+	@$(TAILWIND_RESOLVE); \
+	$$tw -i ./static/css/input.css -o ./static/css/output.css --watch
 
 ## migrate: Run database migrations up
 migrate:

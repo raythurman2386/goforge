@@ -30,8 +30,8 @@ make dev                 # http://localhost:8080 with GOFORGE_DEV_MODE=true
 ```
 
 You need Go 1.26 or newer, Docker Engine, a PostgreSQL you can reach (CI uses
-16, the Compose stack uses 15), and the Tailwind CSS v3 standalone CLI for
-`make css`. Full setup: [docs/development/setup.md](docs/development/setup.md).
+16, the Compose stack uses 15), and the Tailwind CSS v3.4.17 standalone CLI
+or Node (`npx`) for `make css`. Full setup: [docs/development/setup.md](docs/development/setup.md).
 
 `make dev` turns on dev mode for that one process. Never copy a dev-mode
 environment to a server.

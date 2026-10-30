@@ -66,11 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added UI toast feedback for "Prune System" action in settings
 - Added `/goforge` build artifact to `.gitignore`
 
+- `make css` and `make css-watch` run Tailwind v3.4.17 only: the standalone `tailwindcss` on `PATH` when it reports v3.4.17, else `npx --yes tailwindcss@3.4.17`. A missing CLI or another version is now an error instead of a warning or "placeholder CSS" with exit 0. `make css-check` deletes `output.css` before rebuilding, so it cannot pass on a stale file (aesthetics Goal 3 nits, #68)
+- `scripts/class_check.py` also checks dynamic classes: string literals in templ `class={ ... }` expressions (including `templ.KV` keys), `return "..."` strings in `*Class` Go helpers under `internal/web/templates` (`statusBadgeClass`, `alertClass`, `logLevelBadgeClass`, `backupLineClass`, ...), `Skeleton` arguments, and `static/js/app.js` `LEVEL_CLASSES`, `.className`, and `classList` literals. It fails on an `output.css` with under 200 selectors (placeholder or failed build) (aesthetics Goal 3 nits, #68)
+- Error pages are auth-aware (B17): signed-in users get the app shell (sidebar, Log out) and "Back to dashboard"; signed-out visitors get a "Sign in" link instead of `/dashboard`, which only redirected them to `/login`. `errors.ErrorPage`, `NotFound`, `Forbidden`, and `InternalError` take a `signedIn bool` (aesthetics Goal 3 nits)
+- `.select` chevron uses gray-400 (`#9ca3af`) in dark mode instead of gray-500 (aesthetics Goal 3 nits, #68)
+
 ### Deprecated
 
 ### Removed
 - `components/nav.templ` (no callers) (#65); `components.Table`, the old `Loading`, and the unused `.glass`, `.glass-dark`, `.btn-ghost` classes (#67)
 - `scripts/tailwind.sh`, a duplicate of `make css` (security Goal 4)
+- Unused `.sidebar-link`, `.sidebar-link-active`, `.sidebar-link-inactive` CSS; the sidebar styles links inline with `aria-[current=page]` variants, so Tailwind purged these (aesthetics Goal 3 nits, #68)
 - Removed orphaned `CustomDomain` model and `internal/domain` logic that had no database repository
 
 ### Fixed

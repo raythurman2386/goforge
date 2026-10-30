@@ -280,7 +280,7 @@ Parked items need Raymond's OK before anyone starts them.
 
 - [ ] **#48 Service edit CAS** (parked): compare-and-swap on service config edits
 - [ ] **Backup restore** (parked): restore tooling or a run-now path; restore is manual today (`docs/deployment/backup.md`)
-- [ ] **Aesthetics Goal 3 nits** (parked): `class_check.py` only sees literal `class="..."` strings; no repo-local Tailwind pin (the CLI comes from `PATH`, `make css` only warns on a version mismatch); unused sidebar dark tokens; `select` chevron in dark mode
+- [x] **Aesthetics Goal 3 nits** (#68 leftovers): `class_check.py` also checks `class={ ... }`, `*Class()` helpers, and `app.js` classes; `make css` fails unless it runs Tailwind v3.4.17 (standalone or `npx`); unused `.sidebar-link*` removed; dark `select` chevron; auth-aware error page (B17)
 - [ ] **Deadcode sweep** (parked): `deadcode ./...` reported 96 unreachable functions on 2026-10-29. Not removed in the cleanup goal; needs a reviewed pass
 - [ ] **Stale remote branches** (needs Raymond's OK): about 30 squash-merged branches remain on `origin` (for example `ui/shell-fixes`, `security/auth-edge-hardening`, `fix/4x-*`). Delete only with approval
 - [ ] **Open audit findings** (2026-10-29), documented in `SECURITY.md`: `/health/ready` is public and returns error text (HEALTH-READY-PUBLIC); `BACKUP_S3_*` credentials in container env (ENV-CREDS); main image runs as root

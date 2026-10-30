@@ -136,7 +136,9 @@ make css-watch
 make css-check
 ```
 
-`make css` expects the Tailwind v3.4.17 standalone CLI (the Dockerfile and CI pin that version) and warns when a different version is on `PATH`. Without it, run `make css-check TAILWIND="npx --yes tailwindcss@3.4.17"`. `scripts/class_check.py` only sees literal `class="..."` attributes in `.templ` files and handlers; classes built at runtime are not checked.
+`make css` uses Tailwind v3.4.17, the version the Dockerfile and CI pin: the standalone `tailwindcss` on `PATH` if it reports v3.4.17, otherwise `npx --yes tailwindcss@3.4.17`. It fails (no placeholder CSS) when neither works or when `TAILWIND=...` names another version. `make css-check` deletes `output.css` first, so it never checks a stale file.
+
+`scripts/class_check.py` checks these class sources against `output.css`: literal `class="..."` attributes in `.templ` files and handlers; string literals inside templ `class={ ... }` expressions (including `templ.KV` keys); `return "..."` strings in Go helpers named `*Class` under `internal/web/templates` (`statusBadgeClass`, `alertClass`, `logLevelBadgeClass`, `backupLineClass`, ...); string arguments to `Skeleton`; and in `static/js/app.js`, `LEVEL_CLASSES` values, `.className` literals, and `classList.add/remove/toggle` arguments. A class assembled from a runtime value (for example `"w-" + n`) cannot be checked, and Tailwind would not compile it either: keep every class a complete literal in one of those places.
 
 ### Configuration
 
