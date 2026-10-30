@@ -135,7 +135,7 @@ server-side list. `GET /services` and `GET /services/{id}` show
 | `GET` | `/api/v1/containers/{id}/logs?tail=&since=` | Last log lines (200, max 5000, 2 MB). Known service secrets are redacted |
 | `GET` | `/api/v1/containers/{id}/stats` | One CPU, memory, network sample |
 | `GET` | `/api/v1/audit-log?limit=&offset=&resource_type=&resource_id=&action=&all_users=` | Your audit rows (limit 50, max 500). `all_users=true` works for admins only |
-| `GET` | `/api/v1/backups` | Backup status, admin only (403 otherwise): `enabled`, `bucket`, `prefix`, `schedule`, `retention_daily`, `next_run_at`, `last_run`, `last_success`, `recent` (10 newest `backup_runs` rows). Never returns credentials or the endpoint. There is no run-now write in v1 |
+| `GET` | `/api/v1/backups` | Backup status, admin only (403 otherwise): `enabled`, `configured_by` (`settings` or `environment`), `bucket`, `prefix`, `schedule`, `retention_daily`, `next_run_at`, `last_run`, `last_success`, `recent` (10 newest `backup_runs` rows). Never returns credentials or the endpoint. There is no run-now write in v1 |
 | `GET` | `/api/v1/git-sources` | Your git sources (`has_token` only, never the token) |
 | `GET` | `/api/v1/git-sources/{id}/repos` | Repositories the source can see |
 | `GET` | `/api/v1/git-sources/{id}/branches?repo=owner/name` | Branches |

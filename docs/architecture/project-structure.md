@@ -84,8 +84,10 @@ Nightly, backup-only copies of GoForge state to S3-compatible storage. See [Back
 | File | Purpose |
 |------|---------|
 | `doc.go` | Package overview and object layout |
-| `setup.go` | Builds the runner from config; `ErrDisabled` when `BACKUP_S3_BUCKET` is unset |
-| `scheduler.go` | Runs the runner at each scheduled time inside `goforge serve` |
+| `setup.go` | Builds the runner from config; `ErrDisabled` when no bucket is set or backups are turned off |
+| `settings.go` | Saved settings vs `BACKUP_*` (the saved row wins), first-start import, form save and Test connection |
+| `manager.go` | Owns the schedule loop in `goforge serve` and swaps it when settings are saved, without stopping a run in progress |
+| `scheduler.go` | Runs the runner at each scheduled time |
 | `runner.go` | One run: advisory lock, `backup_runs` row, targets, manifest, retention |
 | `target.go` | Target and artifact types |
 | `appdb.go` | GoForge database dump with the local `pg_dump` |

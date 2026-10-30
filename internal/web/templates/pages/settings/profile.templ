@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/backup"
@@ -10,8 +11,9 @@ import (
 )
 
 // Profile renders the profile page. backups is nil for non-admins, which
-// hides the Backups card.
-templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
+// hides the Backups card. backupForm is the admin settings form; nil shows
+// the card read-only.
+templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView) {
 	@layouts.AppLayout("Profile Settings", csrfToken) {
 		<div class="max-w-2xl mx-auto">
 			@components.PageHeader("Profile Settings", "Manage your account information and security.")
@@ -91,7 +93,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 			}
 
 			if backups != nil {
-				@BackupCard(backups)
+				@BackupCard(backups, backupForm, csrfToken)
 			}
 
 			<!-- API Tokens -->
@@ -108,7 +110,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 				<p class="text-sm text-gray-500 mb-4 dark:text-gray-400">API tokens allow programmatic access to your account. Keep them secure!</p>
 				
 				<div class="mb-4">
-					@components.AlertMessage("warning", "Work in progress: API token authentication is planned for future releases. Currently tokens can be created for future use.")
+					@components.AlertMessage("info", "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1, which the GoForge MCP server uses. Full tokens also work on the web routes.")
 				</div>
 
 				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-gray-100 animate-fade-in dark:divide-gray-800">
@@ -247,14 +249,16 @@ func formatDate(t time.Time) string {
 	return t.Format("Jan 2, 2006")
 }
 
-// BackupCard is the admin-only "Last backup" line. Read-only: v1 has no
-// run-now button; use `goforge backup run`.
-templ BackupCard(st *backup.Status) {
+// BackupCard is the admin-only Backups card: the last-run status line and,
+// when form is set, the settings form. The form never contains the secret
+// access key; it only says whether one is stored. There is no run-now
+// button; use `goforge backup run`.
+templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string) {
 	<div class="card mb-8" id="backup-status">
 		<h3 class="card-title mb-2">Backups</h3>
 		if !st.Enabled {
-			<p class="text-sm text-gray-500 dark:text-gray-400">
-				Backups are off. Set <code>BACKUP_S3_BUCKET</code> and the other <code>BACKUP_*</code> settings to turn on nightly backups.
+			<p class={ "text-sm", backupOffClass(form) } data-testid="backup-off">
+				{ backupOffLine(st, form) }
 			</p>
 		} else {
 			<p class={ "text-sm", backupLineClass(st) } data-testid="backup-last">
@@ -267,5 +271,87 @@ templ BackupCard(st *backup.Status) {
 				{ backupScheduleLine(st) }
 			</p>
 		}
+		if form != nil {
+			@backupSettingsForm(form, csrfToken)
+		}
 	</div>
+}
+
+templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
+	<form class="mt-6 border-t border-gray-100 pt-4 dark:border-gray-800" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+		<input type="hidden" name="csrf_token" value={ csrfToken }/>
+		<p class="mb-4 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-source">{ backupSourceLine(f) }</p>
+		<div class="mb-4 flex items-center gap-2">
+			<input id="backup-enabled" type="checkbox" name="enabled" value="true" checked?={ f.Enabled }/>
+			<label for="backup-enabled" class="text-sm font-medium text-gray-700 dark:text-gray-300">Enabled</label>
+			<span class="text-xs text-gray-500 dark:text-gray-400">Turning this off stops the schedule and keeps the settings.</span>
+		</div>
+		<div class="grid gap-4 sm:grid-cols-2">
+			<div class="sm:col-span-2">
+				<label for="backup-endpoint" class="label">Endpoint</label>
+				<input id="backup-endpoint" name="endpoint" type="url" class="input" value={ f.Endpoint } placeholder="https://<account>.r2.cloudflarestorage.com"/>
+			</div>
+			<div>
+				<label for="backup-bucket" class="label">Bucket</label>
+				<input id="backup-bucket" name="bucket" class="input" value={ f.Bucket }/>
+			</div>
+			<div>
+				<label for="backup-prefix" class="label">Prefix</label>
+				<input id="backup-prefix" name="prefix" class="input" value={ f.Prefix } placeholder="goforge/"/>
+			</div>
+			<div>
+				<label for="backup-region" class="label">Region</label>
+				<input id="backup-region" name="region" class="input" value={ f.Region } placeholder="auto"/>
+			</div>
+			<div class="flex items-end gap-2 pb-2">
+				<input id="backup-path-style" type="checkbox" name="force_path_style" value="true" checked?={ f.ForcePathStyle }/>
+				<label for="backup-path-style" class="text-sm text-gray-700 dark:text-gray-300">Path-style URLs (MinIO, Garage)</label>
+			</div>
+			<div>
+				<label for="backup-access-key" class="label">Access key ID</label>
+				<input id="backup-access-key" name="access_key_id" class="input" value="" autocomplete="off" spellcheck="false" placeholder={ accessKeyPlaceholder(f) }/>
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-access-key-state">{ accessKeyState(f) }</p>
+			</div>
+			<div>
+				<label for="backup-secret" class="label">Secret access key</label>
+				<input id="backup-secret" name="secret_access_key" type="password" class="input" value="" autocomplete="new-password" placeholder={ secretPlaceholder(f) }/>
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-secret-state">{ secretState(f) }</p>
+			</div>
+			if f.AccessKeySet || f.SecretSet {
+				<div class="sm:col-span-2 flex items-center gap-2">
+					<input id="backup-clear-creds" type="checkbox" name="clear_credentials" value="true"/>
+					<label for="backup-clear-creds" class="text-sm text-gray-700 dark:text-gray-300">Remove the stored keys (backups must be off)</label>
+				</div>
+			}
+			<div>
+				<label for="backup-schedule-time" class="label">Nightly at</label>
+				<input id="backup-schedule-time" name="schedule_time" type="time" class="input" value={ f.ScheduleTime }/>
+			</div>
+			<div>
+				<label for="backup-schedule-zone" class="label">Time zone</label>
+				<input id="backup-schedule-zone" name="schedule_zone" class="input" value={ f.ScheduleZone } placeholder="America/Chicago"/>
+			</div>
+			<div class="sm:col-span-2 flex items-center gap-2">
+				<input id="backup-schedule-off" type="checkbox" name="schedule_off" value="true" checked?={ f.ScheduleOff }/>
+				<label for="backup-schedule-off" class="text-sm text-gray-700 dark:text-gray-300">No nightly schedule (run with <code>goforge backup run</code>)</label>
+			</div>
+			<div>
+				<label for="backup-retention" class="label">Keep daily backups (days)</label>
+				<input id="backup-retention" name="retention_daily" type="number" min="1" max="366" class="input" value={ fmt.Sprint(f.RetentionDaily) }/>
+			</div>
+			<div>
+				<label for="backup-timeout" class="label">Run timeout</label>
+				<input id="backup-timeout" name="timeout" class="input" value={ f.Timeout } placeholder="2h"/>
+			</div>
+		</div>
+		<div class="mt-4 flex justify-end gap-2">
+			<button type="button" class="btn-secondary" data-testid="backup-test" hx-post="/settings/backups/test" hx-include="closest form" hx-swap="none" hx-target="this">
+				Test connection
+			</button>
+			<button type="submit" class="btn-primary" data-testid="backup-save">
+				Save backup settings
+				@components.Spinner()
+			</button>
+		</div>
+	</form>
 }

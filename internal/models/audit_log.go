@@ -39,6 +39,9 @@ const (
 	AuditActionDeploy = "deploy"
 	AuditActionLogin  = "login"
 	AuditActionLogout = "logout"
+	// AuditActionBackupSettingsUpdate records a save of the admin Backups
+	// form. Details hold {"changed": [field names]}, never values.
+	AuditActionBackupSettingsUpdate = "backup.settings.update"
 )
 
 // Common resource types
@@ -49,4 +52,5 @@ const (
 	ResourceTypeDeployment      = "deployment"
 	ResourceTypeServiceInstance = "service_instance"
 	ResourceTypeGitSource       = "git_source"
+	ResourceTypeBackupSettings  = "backup_settings"
 )

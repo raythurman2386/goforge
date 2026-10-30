@@ -16,6 +16,7 @@ erDiagram
     users ||--o{ service_instances : owns
     users ||--o{ audit_logs : generates
     users ||--o{ api_tokens : owns
+    users |o--o| backup_settings : updates
     projects ||--o{ environments : has
     projects }o--o| git_sources : uses
     environments ||--o{ env_variables : has
@@ -372,6 +373,32 @@ One row per backup run, from the nightly scheduler or `goforge backup run`. Hold
 
 ---
 
+### backup_settings
+
+The backup destination and policy an admin saves in Settings → Profile. At most one row (`id = 1`). Once the row exists it wins over the `BACKUP_*` environment. With no row GoForge uses the environment, and on first start copies `BACKUP_*` into the row when `BACKUP_S3_BUCKET` is set. See [Backup & Restore](../deployment/backup.md#turn-it-on).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `SMALLINT` | PK, default `1`, CHECK `id = 1` | Single row |
+| `enabled` | `BOOLEAN` | NOT NULL, default `FALSE` | Off pauses backups and keeps the other columns |
+| `endpoint` | `TEXT` | NOT NULL, default `''` | S3 endpoint URL |
+| `region` | `TEXT` | NOT NULL, default `'auto'` | Region |
+| `bucket` | `TEXT` | NOT NULL, default `''` | Bucket |
+| `prefix` | `TEXT` | NOT NULL, default `'goforge/'` | Key prefix |
+| `access_key_id_sealed` | `TEXT` | NOT NULL, default `''` | Access key ID encrypted with `ENCRYPTION_KEY` (AES-GCM, base64); `''` when unset |
+| `secret_access_key_sealed` | `TEXT` | NOT NULL, default `''` | Secret key encrypted with `ENCRYPTION_KEY`; never sent to the browser |
+| `force_path_style` | `BOOLEAN` | NOT NULL, default `FALSE` | Path-style requests (MinIO) |
+| `schedule` | `TEXT` | NOT NULL, default `'02:00 America/Chicago'` | `HH:MM Zone/Name` or `off` |
+| `retention_daily` | `INTEGER` | NOT NULL, default `7`, CHECK 1-366 | Complete days kept |
+| `timeout_seconds` | `BIGINT` | NOT NULL, default `7200`, CHECK > 0 | Upper limit for one run |
+| `updated_by` | `UUID` | FK -> users(id) ON DELETE SET NULL | Admin who last saved |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Creation time |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Last save |
+
+**Migration**: `020_backup_settings`
+
+---
+
 ## Database Functions
 
 ### cleanup_old_data()
@@ -412,5 +439,6 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 017 | `user_email_case` | Lowercase emails, unique ignoring case |
 | 018 | `api_token_scopes` | `api_tokens.scopes` (`full`, `read`, `write`, `protected`) |
 | 019 | `backup_runs` | One row per backup run |
+| 020 | `backup_settings` | Admin-edited backup settings, keys sealed with `ENCRYPTION_KEY` |
 
 All migrations have corresponding `.down.sql` files for rollback support.

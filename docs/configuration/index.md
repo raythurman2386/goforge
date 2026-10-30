@@ -129,16 +129,16 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 ## Backups
 
-Nightly backups to S3-compatible storage. Off while `BACKUP_S3_BUCKET` is empty. See [Backup & Restore](../deployment/backup.md).
+Nightly backups to S3-compatible storage. An admin edits these in **Settings → Profile → Backups**, and a save applies without a restart. The variables below are the starting point: with no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies them into the saved settings on its first start. Once saved settings exist they win, and later changes to these variables are ignored with a warning in the log; an incomplete or invalid `BACKUP_*` set no longer stops startup then. With no saved settings, an invalid set stops GoForge at startup. After the import, remove every `BACKUP_*` line from your env file (`.env`). With neither, backups are off. `goforge backup run` uses the same settings. See [Backup & Restore](../deployment/backup.md#turn-it-on).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BACKUP_S3_ENDPOINT` | (empty) | Endpoint URL, `http` or `https`, no credentials or path. Required with a bucket. R2: `https://<account id>.r2.cloudflarestorage.com` |
 | `BACKUP_S3_REGION` | `auto` | Region. `auto` works for R2 |
-| `BACKUP_S3_BUCKET` | (empty) | Bucket. Setting it turns backups on |
+| `BACKUP_S3_BUCKET` | (empty) | Bucket. Setting it turns backups on, until saved settings exist |
 | `BACKUP_S3_PREFIX` | `goforge/` | Key prefix inside the bucket. A trailing `/` is added. No `..` or `\` |
 | `BACKUP_S3_ACCESS_KEY_ID` | (empty) | Access key. Required with a bucket |
-| `BACKUP_S3_SECRET_ACCESS_KEY` | (empty) | Secret key. Required with a bucket. Redacted from errors and logs |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | (empty) | Secret key. Required with a bucket. Redacted from errors and logs. Saved settings store it encrypted with `ENCRYPTION_KEY` |
 | `BACKUP_S3_FORCE_PATH_STYLE` | `false` | Path-style requests. Set `true` for MinIO |
 | `BACKUP_SCHEDULE` | `02:00 America/Chicago` | Daily time as `HH:MM Zone/Name`, or `off` to run only with `goforge backup run` |
 | `BACKUP_RETENTION_DAILY` | `7` | Complete days kept (1-366) |

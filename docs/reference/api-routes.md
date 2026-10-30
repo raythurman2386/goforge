@@ -188,6 +188,8 @@ Used by HTMX components for dynamic repository/branch selection.
 | `POST` | `/settings/git` | `settingsHandler.CreateGitSource` | Add a git source |
 | `GET` | `/settings/git/new` | `settingsHandler.NewGitSourceModal` | New git source modal (HTMX) |
 | `DELETE` | `/settings/git/{id}` | `settingsHandler.DeleteGitSource` | Remove a git source |
+| `PUT` | `/settings/backups` | `settingsHandler.UpdateBackupSettings` | Save backup settings, admin only (`403` otherwise). Applies without a restart. A blank secret keeps the stored one. Audited as `backup.settings.update` with changed field names only. Returns the Backups card; `400` names the bad field. `Cache-Control: no-store` |
+| `POST` | `/settings/backups/test` | `settingsHandler.TestBackupConnection` | Test the form's destination, admin only. Lists one object under the prefix (10 s limit), writes nothing, saves nothing. `200` or `502` with a redacted reason. `Cache-Control: no-store` |
 
 ---
 

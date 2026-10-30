@@ -4,7 +4,9 @@ set -euo pipefail
 umask 077
 
 PROJECT=goforge-verify
-BASE=http://127.0.0.1:8080
+# GOFORGE_VERIFY_BASE, GOFORGE_VERIFY_PSQL, and GOFORGE_VERIFY_APP_LOGS point
+# the drives at a stack verify.sh did not launch (see features/backups.md).
+BASE="${GOFORGE_VERIFY_BASE:-http://127.0.0.1:8080}"
 VERIFY_DIR=/tmp/goforge-verify
 STATE_DIR="$VERIFY_DIR/state"
 ROOT=$(git rev-parse --show-toplevel)
@@ -31,7 +33,7 @@ case "$EVIDENCE" in
 esac
 
 usage() {
-  echo "usage: verify.sh launch|doctor|drive-register|drive-login|psql|check-sealed|cleanup" >&2
+  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-backup-settings|check-backup-sealed|psql|check-sealed|cleanup" >&2
   exit 1
 }
 
@@ -67,6 +69,14 @@ PY
 
 db_psql() {
   local sql="$1"
+  if [[ -n "${GOFORGE_VERIFY_PSQL:-}" ]]; then
+    # A command that runs psql -tA with -c appended, e.g.
+    # "sudo -n docker exec -i gfbk-test-pg psql -U goforge -d goforge -v ON_ERROR_STOP=1 -tA".
+    local -a cmd
+    read -r -a cmd <<<"$GOFORGE_VERIFY_PSQL"
+    "${cmd[@]}" -c "$sql"
+    return
+  fi
   compose exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -tAc "$1"' sh "$sql"
 }
 
@@ -606,6 +616,360 @@ PY
   return "$rc"
 }
 
+# ---- Backup settings (Settings → Profile) ----------------------------------
+# A throwaway MinIO the app can reach. Keys live in $STATE_DIR (mode 600) and
+# are never printed.
+BK_MINIO=gfbk-verify-minio
+BK_BUCKET=gfbk-verify
+BK_IMAGE="${GOFORGE_VERIFY_MINIO_IMAGE:-cgr.dev/chainguard/minio:latest}"
+
+app_logs() {
+  if [[ -n "${GOFORGE_VERIFY_APP_LOGS:-}" ]]; then
+    local -a cmd
+    read -r -a cmd <<<"$GOFORGE_VERIFY_APP_LOGS"
+    "${cmd[@]}" 2>&1
+    return
+  fi
+  compose logs --no-color goforge 2>&1
+}
+
+# check_backup_sealed prints booleans only: both sealed columns are set and
+# neither holds the plaintext key.
+cmd_check_backup_sealed() {
+  local row="$STATE_DIR/backup-row.txt"
+  if [[ ! -f "$STATE_DIR/minio.user" ]]; then
+    echo "missing $STATE_DIR/minio.user. Run drive-backup-settings first." >&2
+    exit 1
+  fi
+  install -m 600 /dev/null "$row"
+  db_psql "select access_key_id_sealed || E'\n' || secret_access_key_sealed from backup_settings" >"$row" || true
+  local rc=0
+  set +e
+  python3 - "$row" "$STATE_DIR/minio.user" "$STATE_DIR/minio.password" <<'PY'
+import pathlib, sys
+lines = pathlib.Path(sys.argv[1]).read_text(errors="replace").strip().splitlines()
+ak = pathlib.Path(sys.argv[2]).read_text().strip()
+sk = pathlib.Path(sys.argv[3]).read_text().strip()
+if len(lines) != 2:
+    print("row=missing")
+    raise SystemExit(2)
+text = "\n".join(lines)
+print("row=present")
+print("access_key_sealed=" + ("yes" if lines[0] and lines[0] != ak else "no"))
+print("secret_sealed=" + ("yes" if lines[1] and lines[1] != sk else "no"))
+print("plaintext_access_key_present=" + ("yes" if ak in text else "no"))
+print("plaintext_secret_present=" + ("yes" if sk in text else "no"))
+raise SystemExit(0 if lines[0] != ak and lines[1] != sk and ak not in text and sk not in text else 2)
+PY
+  rc=$?
+  set -e
+  rm -f "$row"
+  return "$rc"
+}
+
+bk_minio_up() {
+  "${DOCKER[@]}" rm -f "$BK_MINIO" >/dev/null 2>&1 || true
+  openssl rand -hex 10 >"$STATE_DIR/minio.user"
+  openssl rand -hex 20 >"$STATE_DIR/minio.password"
+  chmod 600 "$STATE_DIR/minio.user" "$STATE_DIR/minio.password"
+  local -a net=()
+  if [[ -z "${GOFORGE_VERIFY_BASE:-}" ]]; then
+    net=(--network "${PROJECT}_default")
+  fi
+  # An env file, not -e or a pipe: sudo drops both, and argv is visible in ps.
+  local envf="$STATE_DIR/minio.env"
+  install -m 600 /dev/null "$envf"
+  printf 'MINIO_ROOT_USER=%s\nMINIO_ROOT_PASSWORD=%s\n' "$(cat "$STATE_DIR/minio.user")" "$(cat "$STATE_DIR/minio.password")" >"$envf"
+  "${DOCKER[@]}" run -d --name "$BK_MINIO" "${net[@]}" -p 127.0.0.1::9000 --env-file "$envf" \
+    "$BK_IMAGE" server /data >/dev/null
+  rm -f "$envf"
+  local hostport
+  hostport=$("${DOCKER[@]}" port "$BK_MINIO" 9000 | head -1)
+  printf '%s' "${hostport##*:}" >"$STATE_DIR/minio.port"
+  local i
+  for i in $(seq 1 30); do
+    if curl -sS -o /dev/null "http://127.0.0.1:$(cat "$STATE_DIR/minio.port")/minio/health/live" 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+  local netrc="$STATE_DIR/minio.netrc"
+  install -m 600 /dev/null "$netrc"
+  printf 'machine 127.0.0.1 login %s password %s\n' "$(cat "$STATE_DIR/minio.user")" "$(cat "$STATE_DIR/minio.password")" >"$netrc"
+  curl -sS -o /dev/null -w '%{http_code}' --aws-sigv4 "aws:amz:us-east-1:s3" --netrc-file "$netrc" \
+    -X PUT "http://127.0.0.1:$(cat "$STATE_DIR/minio.port")/$BK_BUCKET" || true
+  rm -f "$netrc"
+}
+
+# bk_endpoint is the MinIO URL as the app sees it.
+bk_endpoint() {
+  if [[ -n "${GOFORGE_VERIFY_BASE:-}" ]]; then
+    printf 'http://127.0.0.1:%s' "$(cat "$STATE_DIR/minio.port")"
+  else
+    printf 'http://%s:9000' "$BK_MINIO"
+  fi
+}
+
+# bk_login signs in as email with the password file into jar.
+bk_login() {
+  local jar="$1" email="$2" pwfile="$3"
+  rm -f "$jar"
+  curl -sS -c "$jar" -o /dev/null "$BASE/login" || true
+  curl -sS -c "$jar" -b "$jar" -o /dev/null -w '%{http_code}' -X POST "$BASE/auth/login" \
+    --data-urlencode "csrf_token=$(csrf_from_jar "$jar")" \
+    --data-urlencode "email=$email" \
+    --data-urlencode "password@$pwfile" || true
+}
+
+# bk_send METHOD PATH JAR OUT [curl args...] sends an HTMX form request with
+# the jar's CSRF token and prints the status.
+bk_send() {
+  local method="$1" path="$2" jar="$3" out="$4"
+  shift 4
+  curl -sS -b "$jar" -c "$jar" -o "$out" -w '%{http_code}' -X "$method" "$BASE$path" \
+    -H "HX-Request: true" -H "X-CSRF-Token: $(csrf_from_jar "$jar")" "$@" || true
+}
+
+# bk_leaks FILE prints yes when FILE holds a MinIO key or the wrong secret.
+bk_leaks() {
+  python3 - "$1" "$STATE_DIR/minio.user" "$STATE_DIR/minio.password" "$STATE_DIR/wrong.secret" <<'PY'
+import pathlib, sys
+text = pathlib.Path(sys.argv[1]).read_text(errors="replace") if pathlib.Path(sys.argv[1]).exists() else ""
+vals = [pathlib.Path(p).read_text().strip() for p in sys.argv[2:] if pathlib.Path(p).exists()]
+print("yes" if any(v and v in text for v in vals) else "no")
+PY
+}
+
+bk_count_log() {
+  app_logs | grep -c -- "$1" || true
+}
+
+cmd_drive_backup_settings() {
+  need_cmd curl
+  need_cmd python3
+  need_cmd openssl
+  install -d -m 755 "$EVIDENCE"
+  install -d -m 700 "$STATE_DIR"
+  if [[ ! -f "$STATE_DIR/register.password" ]]; then
+    echo "missing $STATE_DIR/register.password. Run drive-register first." >&2
+    exit 1
+  fi
+  local verdict="$EVIDENCE/backup-settings-verdict.txt"
+  local jar="$STATE_DIR/jar-backup.txt" page="$STATE_DIR/bk-page.html" out="$STATE_DIR/bk-out.html" hdr="$STATE_DIR/bk.headers"
+  local admin_email
+  admin_email=$(printf '%s' "$ADMIN_EMAIL" | tr '[:upper:]' '[:lower:]')
+  local harness=ok edit=fail masked=fail sealed=fail live=fail blank=fail csrf=fail nonadmin=skipped test_ok=fail test_bad=fail disable=fail audit=fail
+
+  local login_status bucket_status
+  login_status=$(bk_login "$jar" "$admin_email" "$STATE_DIR/register.password")
+  [[ "$login_status" == "303" ]] || harness=fail
+  bucket_status=$(bk_minio_up)
+  [[ "$bucket_status" == "200" ]] || harness=fail
+  openssl rand -hex 16 | sed 's/^/wrong-/' >"$STATE_DIR/wrong.secret"
+  chmod 600 "$STATE_DIR/wrong.secret"
+
+  # Fresh stack: no BACKUP_* env, so the card is off and the form is empty.
+  local profile_status cache_control form_present off_before
+  profile_status=$(curl -sS -b "$jar" -c "$jar" -D "$hdr" -o "$page" -w '%{http_code}' "$BASE/settings/profile" || true)
+  cache_control=$(header_value "$hdr" "Cache-Control")
+  form_present=$(body_has "$page" 'data-testid="backup-settings-form"')
+  off_before=$(body_has "$page" "Backups are off")
+
+  # backup-settings-admin-edit + live-apply: save, then the card shows the
+  # new schedule and the scheduler logs it without a restart.
+  local sched_before save_status save_toast save_leak
+  sched_before=$(bk_count_log "next backup scheduled")
+  save_status=$(bk_send PUT /settings/backups "$jar" "$out" \
+    --data-urlencode "enabled=true" --data-urlencode "endpoint=$(bk_endpoint)" \
+    --data-urlencode "region=us-east-1" --data-urlencode "bucket=$BK_BUCKET" --data-urlencode "prefix=verify/" \
+    --data-urlencode "access_key_id@$STATE_DIR/minio.user" --data-urlencode "secret_access_key@$STATE_DIR/minio.password" \
+    --data-urlencode "force_path_style=true" --data-urlencode "schedule_time=03:30" --data-urlencode "schedule_zone=UTC" \
+    --data-urlencode "retention_daily=7" --data-urlencode "timeout=2h")
+  save_toast=$(body_has "$out" "Backup settings saved")
+  save_leak=$(bk_leaks "$out")
+  if [[ "$save_status" == "200" && "$save_toast" == "yes" && "$save_leak" == "no" ]]; then
+    edit=pass
+  fi
+  sleep 2
+  local sched_after card_schedule
+  sched_after=$(bk_count_log "next backup scheduled")
+  curl -sS -b "$jar" -c "$jar" -o "$page" "$BASE/settings/profile" >/dev/null || true
+  card_schedule=$(body_has "$page" "Schedule 03:30 UTC, keeping 7 days, to $BK_BUCKET/verify/.")
+  if [[ "$card_schedule" == "yes" && "$sched_after" -gt "$sched_before" ]]; then
+    live=pass
+  fi
+
+  # backup-settings-secret-masked
+  local page_leak hint_shown secret_state ak_last4
+  ak_last4=$(tr -d "\n" <"$STATE_DIR/minio.user" | tail -c 4)
+  page_leak=$(bk_leaks "$page")
+  hint_shown=$(body_has "$page" "ending in $ak_last4")
+  secret_state=$(body_has "$page" "Set. Leave blank to keep it; type a new one to rotate it.")
+  if [[ "$page_leak" == "no" && "$hint_shown" == "yes" && "$secret_state" == "yes" ]]; then
+    masked=pass
+  fi
+  local sealed_out
+  sealed_out=$(cmd_check_backup_sealed 2>&1 || true)
+  if grep -q "access_key_sealed=yes" <<<"$sealed_out" && grep -q "secret_sealed=yes" <<<"$sealed_out" &&
+     grep -q "plaintext_secret_present=no" <<<"$sealed_out" && grep -q "plaintext_access_key_present=no" <<<"$sealed_out"; then
+    sealed=pass
+  fi
+
+  # backup-settings-test-connection: blank keys test the stored ones.
+  local test_status test_body bad_status bad_leak
+  test_status=$(bk_send POST /settings/backups/test "$jar" "$out" \
+    --data-urlencode "endpoint=$(bk_endpoint)" --data-urlencode "region=us-east-1" --data-urlencode "bucket=$BK_BUCKET" \
+    --data-urlencode "prefix=verify/" --data-urlencode "force_path_style=true" --data-urlencode "schedule_time=03:30" \
+    --data-urlencode "schedule_zone=UTC" --data-urlencode "retention_daily=7" --data-urlencode "timeout=2h")
+  test_body=$(body_has "$out" "Connected.")
+  [[ "$test_status" == "200" && "$test_body" == "yes" ]] && test_ok=pass
+  bad_status=$(bk_send POST /settings/backups/test "$jar" "$out" \
+    --data-urlencode "endpoint=$(bk_endpoint)" --data-urlencode "region=us-east-1" --data-urlencode "bucket=$BK_BUCKET" \
+    --data-urlencode "prefix=verify/" --data-urlencode "force_path_style=true" --data-urlencode "secret_access_key@$STATE_DIR/wrong.secret" \
+    --data-urlencode "schedule_time=03:30" --data-urlencode "schedule_zone=UTC" --data-urlencode "retention_daily=7" --data-urlencode "timeout=2h")
+  bad_leak=$(bk_leaks "$out")
+  [[ "$bad_status" == "502" && "$bad_leak" == "no" ]] && test_bad=pass
+
+  # backup-settings-blank-keeps: save with blank keys, then test again.
+  local blank_status blank_test retention_after
+  blank_status=$(bk_send PUT /settings/backups "$jar" "$out" \
+    --data-urlencode "enabled=true" --data-urlencode "endpoint=$(bk_endpoint)" --data-urlencode "region=us-east-1" \
+    --data-urlencode "bucket=$BK_BUCKET" --data-urlencode "prefix=verify/" --data-urlencode "force_path_style=true" \
+    --data-urlencode "schedule_time=03:30" --data-urlencode "schedule_zone=UTC" --data-urlencode "retention_daily=5" --data-urlencode "timeout=2h")
+  blank_test=$(bk_send POST /settings/backups/test "$jar" "$out" \
+    --data-urlencode "endpoint=$(bk_endpoint)" --data-urlencode "region=us-east-1" --data-urlencode "bucket=$BK_BUCKET" \
+    --data-urlencode "prefix=verify/" --data-urlencode "force_path_style=true" --data-urlencode "schedule_time=03:30" \
+    --data-urlencode "schedule_zone=UTC" --data-urlencode "retention_daily=5" --data-urlencode "timeout=2h")
+  retention_after=$(db_psql "select retention_daily from backup_settings" | tr -d '[:space:]')
+  [[ "$blank_status" == "200" && "$blank_test" == "200" && "$retention_after" == "5" ]] && blank=pass
+
+  # backup-settings-csrf-403
+  local csrf_status retention_csrf
+  csrf_status=$(curl -sS -b "$jar" -o /dev/null -w '%{http_code}' -X PUT "$BASE/settings/backups" -H "HX-Request: true" \
+    --data-urlencode "enabled=true" --data-urlencode "bucket=$BK_BUCKET" --data-urlencode "retention_daily=9" || true)
+  retention_csrf=$(db_psql "select retention_daily from backup_settings" | tr -d '[:space:]')
+  [[ "$csrf_status" == "403" && "$retention_csrf" == "5" ]] && csrf=pass
+
+  # backup-settings-nonadmin-403 (needs GOFORGE_VERIFY_ENABLE_REGISTRATION=true)
+  local na_reg="n/a" na_card="n/a" na_put="n/a" na_test="n/a"
+  if [[ "$ENABLE_REGISTRATION" == "true" ]]; then
+    local jar_u="$STATE_DIR/jar-user.txt"
+    rm -f "$jar_u"
+    curl -sS -c "$jar_u" -o /dev/null "$BASE/auth/register" || true
+    na_reg=$(curl -sS -c "$jar_u" -b "$jar_u" -o /dev/null -w '%{http_code}' -X POST "$BASE/auth/register" \
+      --data-urlencode "csrf_token=$(csrf_from_jar "$jar_u")" --data-urlencode "email=verify-user@example.test" \
+      --data-urlencode "password@$STATE_DIR/register.password" --data-urlencode "confirm_password@$STATE_DIR/register.password" || true)
+    curl -sS -b "$jar_u" -c "$jar_u" -o "$page" "$BASE/settings/profile" >/dev/null || true
+    if [[ "$(body_has "$page" 'id="backup-status"')" == "no" ]]; then na_card=hidden; else na_card=shown; fi
+    na_put=$(bk_send PUT /settings/backups "$jar_u" "$out" --data-urlencode "enabled=false" --data-urlencode "bucket=x" \
+      --data-urlencode "region=auto" --data-urlencode "retention_daily=7" --data-urlencode "timeout=2h" --data-urlencode "schedule_off=true")
+    na_test=$(bk_send POST /settings/backups/test "$jar_u" "$out" --data-urlencode "bucket=x")
+    nonadmin=fail
+    [[ "$na_reg" == "303" && "$na_card" == "hidden" && "$na_put" == "403" && "$na_test" == "403" ]] && nonadmin=pass
+    rm -f "$jar_u"
+  fi
+
+  # Disable keeps the destination and stops the scheduler.
+  local dis_status dis_row dis_card dis_log
+  dis_status=$(bk_send PUT /settings/backups "$jar" "$out" \
+    --data-urlencode "endpoint=$(bk_endpoint)" --data-urlencode "region=us-east-1" --data-urlencode "bucket=$BK_BUCKET" \
+    --data-urlencode "prefix=verify/" --data-urlencode "force_path_style=true" --data-urlencode "schedule_time=03:30" \
+    --data-urlencode "schedule_zone=UTC" --data-urlencode "retention_daily=5" --data-urlencode "timeout=2h")
+  sleep 1
+  dis_row=$(db_psql "select enabled::text || ',' || bucket || ',' || (secret_access_key_sealed <> '')::text from backup_settings" 2>/dev/null | tr -d '[:space:]')
+  curl -sS -b "$jar" -c "$jar" -o "$page" "$BASE/settings/profile" >/dev/null || true
+  dis_card=$(body_has "$page" "Backups are off")
+  dis_log=$(bk_count_log "backups disabled")
+  [[ "$dis_status" == "200" && "$dis_row" == "false,$BK_BUCKET,true" && "$dis_card" == "yes" && "$dis_log" -ge 1 ]] && disable=pass
+
+  # Audit rows hold field names only.
+  local audit_file="$STATE_DIR/audit.txt" audit_rows audit_leak audit_fields
+  install -m 600 /dev/null "$audit_file"
+  db_psql "select details::text from audit_logs where action = 'backup.settings.update' order by created_at" >"$audit_file" || true
+  audit_rows=$(grep -c . "$audit_file" || true)
+  audit_leak=$(bk_leaks "$audit_file")
+  audit_fields=$(python3 - "$audit_file" <<'PY'
+import json, pathlib, sys
+out = []
+for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+    if line.strip():
+        d = json.loads(line)
+        out.append("+".join(d.get("changed", [])) + ("" if set(d) == {"changed"} else "+EXTRA_KEYS"))
+print(" | ".join(out))
+PY
+)
+  [[ "$audit_rows" -ge 3 && "$audit_leak" == "no" && "$audit_fields" != *EXTRA_KEYS* ]] && audit=pass
+  rm -f "$audit_file"
+
+  local log_leak_file log_leak log_lines
+  log_leak_file=$(mktemp "$STATE_DIR/app-log-scan.XXXXXX")
+  app_logs >"$log_leak_file"
+  log_lines=$(wc -l <"$log_leak_file" | tr -d ' ')
+  log_leak=$(bk_leaks "$log_leak_file")
+  rm -f "$log_leak_file"
+  # An empty capture would make the leak check pass vacuously.
+  [[ "$log_lines" -gt 0 && "$log_leak" == "no" ]] || harness=fail
+
+  cat >"$verdict" <<EOF
+harness=$harness
+backup-settings-admin-edit=$edit
+backup-settings-secret-masked=$masked
+backup-settings-sealed=$sealed
+backup-settings-live-apply=$live
+backup-settings-test-connection=$test_ok
+backup-settings-test-wrong-secret=$test_bad
+backup-settings-blank-keeps=$blank
+backup-settings-csrf-403=$csrf
+backup-settings-nonadmin-403=$nonadmin
+backup-settings-disable-keeps=$disable
+backup-settings-audit-names-only=$audit
+admin-login-status=$login_status
+minio-bucket-status=$bucket_status
+profile-status=$profile_status
+profile-cache-control=$cache_control
+profile-form-present=$form_present
+profile-off-before-save=$off_before
+save-status=$save_status
+save-response-leaks-key=$save_leak
+scheduler-log-lines-before=$sched_before
+scheduler-log-lines-after=$sched_after
+card-shows-new-schedule=$card_schedule
+profile-leaks-key=$page_leak
+access-key-hint-last4=$hint_shown
+secret-state-line=$secret_state
+$(printf '%s\n' "$sealed_out" | sed 's/^/sealed-/')
+test-connection-status=$test_status
+test-wrong-secret-status=$bad_status
+test-wrong-secret-leaks=$bad_leak
+blank-save-status=$blank_status
+blank-test-status=$blank_test
+retention-after-blank-save=$retention_after
+csrf-missing-status=$csrf_status
+retention-after-csrf-attempt=$retention_csrf
+nonadmin-register-status=$na_reg
+nonadmin-card=$na_card
+nonadmin-put-status=$na_put
+nonadmin-test-status=$na_test
+disable-status=$dis_status
+disable-row-enabled-bucket-secretset=$dis_row
+disable-card-off=$dis_card
+disable-log-lines=$dis_log
+audit-rows=$audit_rows
+audit-changed-fields=$audit_fields
+audit-leaks-key=$audit_leak
+app-log-lines=$log_lines
+app-log-leaks-key=$log_leak
+EOF
+  chmod 644 "$verdict"
+  rm -f "$page" "$out" "$hdr" "$jar"
+  "${DOCKER[@]}" rm -f -v "$BK_MINIO" >/dev/null 2>&1 || true
+  cat "$verdict"
+  if [[ "$harness" != "ok" ]]; then
+    exit 2
+  fi
+}
+
+
 evidence_list() {
   find "$EVIDENCE" -type f 2>/dev/null | sort
 }
@@ -620,6 +984,7 @@ cmd_cleanup() {
   else
     "${DOCKER[@]}" compose -p "$PROJECT" down -v --remove-orphans >"$EVIDENCE/cleanup.log" 2>&1 || true
   fi
+  "${DOCKER[@]}" rm -f -v "$BK_MINIO" >>"$EVIDENCE/cleanup.log" 2>&1 || true
   redact_file "$EVIDENCE/cleanup.log"
   if "${DOCKER[@]}" network inspect traefik >/dev/null 2>&1; then
     local attached
@@ -653,6 +1018,8 @@ main() {
     drive-login) cmd_drive_login ;;
     psql) shift; cmd_psql "${1:-}" ;;
     check-sealed) shift; cmd_check_sealed "${1:-}" ;;
+    check-backup-sealed) cmd_check_backup_sealed ;;
+    drive-backup-settings) cmd_drive_backup_settings ;;
     cleanup) cmd_cleanup ;;
     *) usage ;;
   esac

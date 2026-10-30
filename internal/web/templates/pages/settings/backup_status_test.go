@@ -13,7 +13,7 @@ import (
 func render(t *testing.T, st *backup.Status) string {
 	t.Helper()
 	var b bytes.Buffer
-	if err := BackupCard(st).Render(context.Background(), &b); err != nil {
+	if err := BackupCard(st, nil, "").Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	return b.String()
