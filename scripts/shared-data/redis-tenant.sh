@@ -16,23 +16,29 @@
 # its SHA-256 reaches redis (on redis-cli's stdin, not its argv) and the ACL
 # file.
 #
-# The user is reset on every run, so it gets exactly: ~<app>:* &<app>:*
-# +@all -@admin -@dangerous +info -scan. That denies FLUSHALL, FLUSHDB, KEYS,
-# CONFIG, ACL, DEBUG, MONITOR, SWAPDB and the like; SCAN is denied too
-# because it lists every tenant's key names. Keyed commands and scripts
-# (EVAL, FCALL) are checked against the key pattern, so a tenant gets
-# NOPERM on another app's keys.
+# The user is reset on every run, so it gets exactly: ~<app>:* resetchannels
+# &<app>:* +@all -@admin -@dangerous +info -scan -randomkey -pubsub, plus
+# -function on redis 7 and later (6.2 has no FUNCTION). That denies
+# FLUSHALL, FLUSHDB, KEYS, CONFIG, ACL, DEBUG, MONITOR, SWAPDB and the like;
+# SCAN, RANDOMKEY, and PUBSUB (CHANNELS, NUMSUB, ...) are denied because they
+# show other tenants' key or channel names, and FUNCTION because function
+# libraries are shared by the whole instance (FUNCTION FLUSH would wipe
+# everyone's). Keyed commands and scripts (EVAL) are checked against the key
+# pattern, so a tenant gets NOPERM on another app's keys.
 #
 # Idempotent: a second run with the same password changes nothing visible; a
 # run with a new password rotates it (existing connections stay
 # authenticated until they reconnect). --revoke deletes the user and closes
 # its connections; its keys are left in place. Every change is written to
-# the instance's ACL file with ACL SAVE, so it survives a restart. An
-# instance started from a template without an ACL file (before #60) answers
-# ACL SAVE with an error and the script fails.
+# the instance's ACL file with ACL SAVE, so it survives a restart.
+#
+# Fails closed: on an instance started from a template without an ACL file
+# (before #60; CONFIG GET aclfile is empty) the script exits 1 before
+# creating, changing, or deleting any user. If ACL SAVE fails, ACL LOAD puts
+# the live users back to the saved file and the script exits 1.
 #
 # Runs redis-cli inside the container as the default user, with the
-# container's own REDIS_PASSWORD.
+# container's own REDIS_PASSWORD. Works on redis 6.2 and 7.x.
 #
 # Set DOCKER to override the docker command, for example DOCKER="sudo -n docker".
 set -eu
@@ -70,22 +76,65 @@ case "$app" in
 		;;
 esac
 
-if $revoke; then
-	# The container script prints the replies; anything other than the
-	# expected ones is a failure (redis-cli exits 0 on error replies).
-	# ACL DELUSER answers 0 for a user that does not exist, so revoking
-	# twice is fine.
-	out=$($docker_cmd exec -e "APP=$app" "$container" sh -c '
-		printf "ACL DELUSER %s\nACL SAVE\n" "$APP" |
-			REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning' 2>&1) || out="exec failed: $out"
-	case "$out" in
-		[01]"
-OK") ;;
-		*)
-			echo "redis-tenant: revoke $app failed on $container: $out" >&2
-			exit 1
-			;;
+# Runs inside the container as the instance's default user. It changes
+# nothing unless the instance loads an ACL file (CONFIG GET aclfile), so on
+# an instance from before #60 (requirepass, no ACL file) no user is created
+# or deleted, not even in memory. If ACL SAVE fails after the change, ACL
+# LOAD puts the in-memory users back to what the file holds. redis-cli exits
+# 0 on error replies, so every reply is checked. The app name is validated
+# above, so it is safe in the ACL rule text; the password hash (create only)
+# arrives on stdin and goes to redis-cli on its stdin.
+# shellcheck disable=SC2016 # expanded by the container's sh
+container_script='
+set -eu
+cli() { REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning "$@"; }
+fail() { echo "$*"; exit 1; }
+aclconf=$(cli config get aclfile | tr -d "\r")
+[ "$(printf "%s\n" "$aclconf" | sed -n 1p)" = aclfile ] || fail "CONFIG GET aclfile failed: $aclconf"
+if [ -z "$(printf "%s\n" "$aclconf" | sed -n 2p)" ]; then
+	fail "the instance has no ACL file (started before #60); recreate it with the current redis template first. Nothing was changed"
+fi
+major=$(cli info server | tr -d "\r" | sed -n "s/^redis_version:\([0-9][0-9]*\)\..*/\1/p")
+case "$major" in
+	"" | *[!0-9]*) fail "could not read the redis version" ;;
+esac
+if [ "$MODE" = revoke ]; then
+	cmd="ACL DELUSER $APP"
+	want1=deleted
+else
+	hash=$(sha256sum | cut -d" " -f1)
+	case "$hash" in
+		*[!0-9a-f]* | "") fail "could not hash the password" ;;
 	esac
+	[ "${#hash}" -eq 64 ] || fail "could not hash the password"
+	# resetchannels: on 6.2, reset keeps allchannels and &<app>:* is refused.
+	# FUNCTION (7.0+) libraries are global, so tenants may not list or change them.
+	rules="reset on #$hash ~$APP:* resetchannels &$APP:* +@all -@admin -@dangerous +info -scan -randomkey -pubsub"
+	if [ "$major" -ge 7 ]; then rules="$rules -function"; fi
+	cmd="ACL SETUSER $APP $rules"
+	want1=OK
+fi
+replies=$(printf "%s\nACL SAVE\n" "$cmd" | cli)
+first=$(printf "%s\n" "$replies" | sed -n 1p)
+second=$(printf "%s\n" "$replies" | sed -n 2p)
+# ACL DELUSER answers 1, or 0 for a user that does not exist (revoking
+# twice is fine); ACL SETUSER answers OK.
+case "$want1:$first" in
+	deleted:0 | deleted:1 | OK:OK) ;;
+	*) fail "$(echo "$cmd" | cut -d" " -f1-3) failed: $first" ;;
+esac
+if [ "$second" != OK ] || [ "$(printf "%s\n" "$replies" | wc -l)" -ne 2 ]; then
+	loaded=$(cli acl load | tr -d "\r")
+	fail "ACL SAVE failed: $second; ACL LOAD to restore the saved users: $loaded"
+fi
+echo "ok redis $major"
+'
+
+if $revoke; then
+	out=$($docker_cmd exec -e MODE=revoke -e "APP=$app" "$container" sh -c "$container_script" 2>&1) || {
+		echo "redis-tenant: revoke $app failed on $container: $out" >&2
+		exit 1
+	}
 	echo "redis-tenant: user $app revoked on $container"
 	exit 0
 fi
@@ -96,23 +145,9 @@ if [ -z "$password" ]; then
 	exit 2
 fi
 
-# The password is hashed inside the container (sha256sum is in the official
-# image) and only the hash is sent to redis-cli, on its stdin. The app name
-# is validated above, so it is safe in the ACL rule text.
-out=$(printf '%s' "$password" | $docker_cmd exec -i -e "APP=$app" "$container" sh -c '
-	set -eu
-	hash=$(sha256sum | cut -d" " -f1)
-	case "$hash" in
-		*[!0-9a-f]* | "") echo "could not hash the password"; exit 1 ;;
-	esac
-	[ "${#hash}" -eq 64 ] || { echo "could not hash the password"; exit 1; }
-	printf "ACL SETUSER %s reset on #%s ~%s:* &%s:* +@all -@admin -@dangerous +info -scan\nACL SAVE\n" \
-		"$APP" "$hash" "$APP" "$APP" |
-		REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning' 2>&1) || out="exec failed: $out"
-if [ "$out" != "OK
-OK" ]; then
+out=$(printf '%s' "$password" | $docker_cmd exec -i -e MODE=create -e "APP=$app" "$container" sh -c "$container_script" 2>&1) || {
 	echo "redis-tenant: failed for $app on $container: $out" >&2
 	exit 1
-fi
+}
 
-echo "redis-tenant: user $app ready on $container (keys and channels $app:*)"
+echo "redis-tenant: user $app ready on $container (keys and channels $app:*, $out)"

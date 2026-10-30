@@ -3,6 +3,7 @@ package services
 import (
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
 
@@ -124,6 +125,36 @@ func TestRedisTemplate_EnforcesAuth(t *testing.T) {
 	}
 	if strings.Contains(hc, password) {
 		t.Error("password rendered into the health check")
+	}
+}
+
+// TestRedisTenantScript_Rules: redis-tenant.sh refuses instances without an
+// ACL file before any change, resets channels (6.2 keeps allchannels
+// otherwise), denies name-listing commands, and denies FUNCTION only on 7+
+// (6.2 rejects the unknown command).
+func TestRedisTenantScript_Rules(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile("../../scripts/shared-data/redis-tenant.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(b)
+	for _, want := range []string{
+		`cli config get aclfile`,
+		`~$APP:* resetchannels &$APP:* +@all -@admin -@dangerous +info -scan -randomkey -pubsub"`,
+		`if [ "$major" -ge 7 ]; then rules="$rules -function"; fi`,
+		`cli acl load`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("redis-tenant.sh missing %q", want)
+		}
+	}
+	guard := strings.Index(script, "cli config get aclfile")
+	if set := strings.Index(script, "ACL SETUSER $APP"); guard < 0 || set < guard {
+		t.Error("ACL SETUSER comes before the aclfile guard")
+	}
+	if del := strings.Index(script, "ACL DELUSER $APP"); guard < 0 || del < guard {
+		t.Error("ACL DELUSER comes before the aclfile guard")
 	}
 }
 

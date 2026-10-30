@@ -254,7 +254,7 @@ Both files are rewritten on every container start (restart, stop/start, daemon r
 
 **Volume**: `data` -> `/data` (data, AOF files, and `users.acl`)
 
-**App users**: `scripts/shared-data/redis-tenant.sh <container> <app>` creates or updates one app's ACL user, confined to keys and Pub/Sub channels matching `<app>:*`, reading the password from stdin; `--revoke` deletes it. Changes are saved with `ACL SAVE`, so they survive restarts. See [Shared data services](../guides/services.md#shared-data-services).
+**App users**: `scripts/shared-data/redis-tenant.sh <container> <app>` creates or updates one app's ACL user, confined to keys and Pub/Sub channels matching `<app>:*` (`SCAN`, `RANDOMKEY`, `PUBSUB`, and on 7.x `FUNCTION` denied), reading the password from stdin; `--revoke` deletes it. Changes are saved with `ACL SAVE`, so they survive restarts. On an instance without an ACL file (before #60) it exits 1 and changes nothing. See [Shared data services](../guides/services.md#shared-data-services).
 
 ---
 
