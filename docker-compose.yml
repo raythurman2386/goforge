@@ -90,11 +90,14 @@ services:
     image: traefik:v3.6
     restart: unless-stopped
     command:
-      # API and dashboard: off by default. TRAEFIK_DASHBOARD_INSECURE=true turns on
+      # API and dashboard: off by default. With --api=false the api@internal
+      # service does not exist, so no router (including one added through
+      # container labels) can expose it. TRAEFIK_DASHBOARD_INSECURE=true turns on
       # the unauthenticated API and dashboard on Traefik's internal :8080
       # entrypoint, which is published on 127.0.0.1 only (local debugging, or an
-      # SSH tunnel). No router publishes api@internal on the web or websecure
-      # entrypoints.
+      # SSH tunnel). No router in this file publishes api@internal on the web or
+      # websecure entrypoints.
+      - "--api=${TRAEFIK_DASHBOARD_INSECURE:-false}"
       - "--api.dashboard=${TRAEFIK_DASHBOARD_INSECURE:-false}"
       - "--api.insecure=${TRAEFIK_DASHBOARD_INSECURE:-false}"
       # Docker provider

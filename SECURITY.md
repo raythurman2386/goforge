@@ -60,7 +60,7 @@ We take security vulnerabilities seriously. If you find a security issue:
 - Registration is closed after the first account unless `GOFORGE_ENABLE_REGISTRATION=true`.
 - `GOFORGE_DEV_MODE` defaults to `false`. Outside dev mode GoForge refuses to start without `DATABASE_URL`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET`.
 - Docker Compose publishes the app on `127.0.0.1` only. Postgres is not published on the host.
-- The Traefik API and dashboard are off. `TRAEFIK_DASHBOARD_INSECURE=true` turns them on for local debugging only, on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}`. No router publishes `api@internal` on the web or websecure entrypoints.
+- The Traefik API and dashboard are off: `--api`, `--api.dashboard`, and `--api.insecure` all follow `TRAEFIK_DASHBOARD_INSECURE` (default `false`), so the `api@internal` service does not exist and no router, including one added through container labels, can expose it. `TRAEFIK_DASHBOARD_INSECURE=true` turns them on for local debugging only, on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}`. No router in the repo compose file publishes `api@internal` on the web or websecure entrypoints.
 - Image tags are pinned: `cloudflare/cloudflared:2026.6.0` in Compose and `alpine:3.24` for the runtime and MCP images.
 - Traefik on 80 and 443 is published on all interfaces, for direct (LAN or public IP with Let's Encrypt) installs. With Cloudflare Tunnel those host ports are not needed; bind them to `127.0.0.1` or drop them in a `docker-compose.override.yml`.
 

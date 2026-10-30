@@ -172,10 +172,10 @@ The GoForge container mounts the Docker socket read-write and runs as root. Acce
 
 ### Traefik Dashboard
 
-The API and dashboard are off by default. `TRAEFIK_DASHBOARD_INSECURE=true` turns them on without authentication on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}` (reach it with an SSH tunnel). Leave it off in production:
+The API and dashboard are off by default: `--api`, `--api.dashboard`, and `--api.insecure` all follow `TRAEFIK_DASHBOARD_INSECURE`, so `api@internal` does not exist and no router can expose it. `TRAEFIK_DASHBOARD_INSECURE=true` turns them on without authentication on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}` (reach it with an SSH tunnel). Leave it off in production:
 
 ```bash
 TRAEFIK_DASHBOARD_INSECURE=false
 ```
 
-No router exposes `api@internal` on the web or websecure entrypoints. If you need the dashboard on a hostname, add your own router with an authentication middleware (for example `basicauth`) on `websecure`.
+No router in the repo compose file exposes `api@internal` on the web or websecure entrypoints. If you need the dashboard on a hostname, enable the API (`--api=true`, `--api.dashboard=true`) in an override and add your own router with an authentication middleware (for example `basicauth`) on `websecure`.
