@@ -860,6 +860,209 @@ async function appEnvMenuChecks(scheme, page, projectHref) {
   page.setDefaultTimeout(30000);
 }
 
+// PR6 checks on the gallery: in-page Tabs (roving tabindex, arrows wrap,
+// Home/End, automatic activation), Table scroll regions, and both Sheets
+// (static dialog on an edge: trap, Escape, focus return, aria-expanded).
+async function tabsTableSheetChecks(scheme, page) {
+  const resp = await page.goto(BASE + "/dev/ui", { waitUntil: "load" });
+  if (!resp || resp.status() !== 200) return;
+  page.setDefaultTimeout(8000);
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  const settle = () => page.waitForTimeout(300);
+  const state = () =>
+    page.evaluate(() => {
+      const root = document.getElementById("gallery-tabs");
+      const tabs = Array.from(root.querySelectorAll('[role="tab"]'));
+      const panels = Array.from(root.querySelectorAll('[role="tabpanel"]'));
+      return {
+        focus: document.activeElement.getAttribute("data-ui-tab") || document.activeElement.id,
+        selected: tabs.filter((x) => x.getAttribute("aria-selected") === "true").map((x) => x.dataset.uiTab).join(","),
+        zero: tabs.filter((x) => x.tabIndex === 0).map((x) => x.dataset.uiTab).join(","),
+        shown: panels.filter((p) => !p.hidden).map((p) => p.dataset.uiTabpanel).join(","),
+      };
+    });
+  await t("tabs-keyboard", async () => {
+    await page.focus("#gallery-tabs-tab-build");
+    const steps = [];
+    const want = [
+      ["ArrowRight", "runtime"],
+      ["ArrowRight", "events"],
+      ["ArrowRight", "build"],
+      ["ArrowLeft", "events"],
+      ["Home", "build"],
+      ["End", "events"],
+    ];
+    let ok = true;
+    for (const [key, exp] of want) {
+      await page.keyboard.press(key);
+      const s = await state();
+      const good = s.focus === exp && s.selected === exp && s.zero === exp && s.shown === exp;
+      if (!good) ok = false;
+      steps.push(`${key}->${s.focus}/${s.selected}/${s.shown}${good ? "" : "!"}`);
+    }
+    // Tab leaves the tablist for the active panel (roving tabindex).
+    await page.keyboard.press("Tab");
+    const out = await page.evaluate(() => document.activeElement.getAttribute("role") + ":" + (document.activeElement.dataset.uiTabpanel || ""));
+    if (out !== "tabpanel:events") ok = false;
+    check(scheme, "tabs-keyboard", ok, steps.join(" ") + ` Tab->${out}`);
+  });
+  await t("tabs-click", async () => {
+    await page.click("#gallery-tabs-tab-runtime");
+    const s = await state();
+    check(scheme, "tabs-click", s.selected === "runtime" && s.shown === "runtime", `selected=${s.selected} shown=${s.shown}`);
+  });
+  await t("table-scroll-regions", async () => {
+    const r = await page.$$eval("[data-ui-table]", (ws) =>
+      ws.map((w) => ({
+        role: w.getAttribute("role"),
+        tab: w.tabIndex,
+        name: (document.getElementById(w.getAttribute("aria-labelledby")) || {}).textContent || "",
+        caption: !!w.querySelector("table > caption"),
+      })),
+    );
+    const bad = r.filter((x) => x.role !== "region" || x.tab !== 0 || !x.name.trim() || !x.caption);
+    check(scheme, "table-scroll-regions", r.length >= 4 && bad.length === 0, `wrappers=${r.length} bad=${bad.length}`);
+  });
+  const active = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return { id: a.id, tag: a.tagName, text: (a.textContent || "").trim().slice(0, 30), dialog: (a.closest("dialog") || {}).id || "" };
+    });
+  for (const [side, opener, first] of [
+    ["left", "#gallery-sheet-left-open", "A"],
+    ["right", "#gallery-sheet-right-open", "INPUT"],
+  ]) {
+    const id = "gallery-sheet-" + side;
+    await t(`sheet-${side}`, async () => {
+      await page.focus(opener);
+      await page.keyboard.press("Enter");
+      await page.waitForSelector(`#${id}[open]`);
+      await settle();
+      const a = await active();
+      const geo = await page.$eval("#" + id, (d) => {
+        const r = d.getBoundingClientRect();
+        return { left: Math.round(r.left), right: Math.round(window.innerWidth - r.right), modal: d.matches(":modal") };
+      });
+      const expanded = await page.$eval(opener, (b) => b.getAttribute("aria-expanded"));
+      let escaped = 0;
+      for (let i = 0; i < 14; i++) {
+        await page.keyboard.press(i % 3 === 2 ? "Shift+Tab" : "Tab");
+        const x = await active();
+        if (x.dialog !== id && x.tag !== "BODY") escaped++;
+      }
+      await page.keyboard.press("Escape");
+      await settle();
+      const closed = await page.$eval("#" + id, (d) => !d.open);
+      const back = await active();
+      const after = await page.$eval(opener, (b) => b.getAttribute("aria-expanded"));
+      const edge = side === "left" ? geo.left === 0 : geo.right === 0;
+      check(
+        scheme,
+        `sheet-${side}`,
+        a.dialog === id && a.tag === first && geo.modal && edge && expanded === "true" && escaped === 0 && closed && "#" + back.id === opener && after === "false",
+        `focus=${a.tag}${a.id ? "#" + a.id : ""} modal=${geo.modal} edge(${side})=${edge} expanded=${expanded}->${after} trap-escapes=${escaped} esc-closed=${closed} focus-return=#${back.id}`,
+      );
+    });
+  }
+  page.setDefaultTimeout(30000);
+}
+
+// PR6 app checks: the mobile sidebar is a Sheet opened from the header
+// button at a 375px viewport; the desktop aside is hidden there.
+async function appSheetChecks(scheme, page) {
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  const before = page.viewportSize();
+  page.setDefaultTimeout(8000);
+  const settle = () => page.waitForTimeout(350);
+  const active = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return { id: a.id, tag: a.tagName, href: a.getAttribute("href") || "", dialog: (a.closest("dialog") || {}).id || "" };
+    });
+  try {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await t("app-mobile-sheet", async () => {
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      const pre = await page.evaluate(() => ({
+        aside: getComputedStyle(document.getElementById("sidebar")).display,
+        overlay: !!document.getElementById("sidebar-overlay"),
+        inline: Array.from(document.scripts).filter((s) => !s.src && !s.type.includes("json")).length,
+        btn: document.getElementById("mobile-menu-btn").getBoundingClientRect().width > 0,
+      }));
+      await page.focus("#mobile-menu-btn");
+      await page.keyboard.press("Enter");
+      await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      const a = await active();
+      const geo = await page.$eval("#mobile-nav", (d) => {
+        const r = d.getBoundingClientRect();
+        return { left: Math.round(r.left), width: Math.round(r.width), modal: d.matches(":modal"), links: d.querySelectorAll("a[data-nav]").length, current: d.querySelectorAll('a[data-nav][aria-current="page"]').length };
+      });
+      const expanded = await page.$eval("#mobile-menu-btn", (b) => b.getAttribute("aria-expanded"));
+      const shot = path.join(EVIDENCE, "ui-a11y", scheme, "mobile-nav-sheet.png");
+      await page.screenshot({ path: shot });
+      fs.chmodSync(shot, 0o644);
+      let escaped = 0;
+      for (let i = 0; i < 14; i++) {
+        await page.keyboard.press(i % 3 === 2 ? "Shift+Tab" : "Tab");
+        const x = await active();
+        if (x.dialog !== "mobile-nav" && x.tag !== "BODY") escaped++;
+      }
+      await page.keyboard.press("Escape");
+      await settle();
+      const closed = await page.$eval("#mobile-nav", (d) => !d.open);
+      const back = await active();
+      const after = await page.$eval("#mobile-menu-btn", (b) => b.getAttribute("aria-expanded"));
+      check(
+        scheme,
+        "app-mobile-sheet",
+        pre.aside === "none" && !pre.overlay && pre.btn && a.dialog === "mobile-nav" && a.tag === "A" && geo.modal && geo.left === 0 && geo.current === 1 &&
+          expanded === "true" && escaped === 0 && closed && back.id === "mobile-menu-btn" && after === "false",
+        `375px aside=${pre.aside} overlay=${pre.overlay} inline-scripts=${pre.inline} focus=${a.tag}[${a.href}] modal=${geo.modal} left=${geo.left} width=${geo.width} links=${geo.links} current=${geo.current} expanded=${expanded}->${after} trap-escapes=${escaped} esc-closed=${closed} focus-return=#${back.id}`,
+      );
+    });
+    await t("app-mobile-sheet-closes-at-md", async () => {
+      await page.click("#mobile-menu-btn");
+      await page.waitForSelector("#mobile-nav[open]");
+      await page.setViewportSize({ width: 1024, height: 800 });
+      await settle();
+      const s = await page.evaluate(() => ({ open: document.getElementById("mobile-nav").open, aside: getComputedStyle(document.getElementById("sidebar")).display }));
+      check(scheme, "app-mobile-sheet-closes-at-md", !s.open && s.aside === "flex", `open=${s.open} aside=${s.aside}`);
+    });
+  } finally {
+    if (before) await page.setViewportSize(before);
+    page.setDefaultTimeout(30000);
+  }
+}
+
+// PR6: project detail tabs are server-routed NavTabs with one
+// aria-current="page" per route.
+async function appNavTabsChecks(scheme, page, projectTabs) {
+  if (!projectTabs.length) {
+    check(scheme, "app-navtabs", false, "no project to drive");
+    return;
+  }
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  await t("app-navtabs", async () => {
+    const seen = [];
+    let ok = true;
+    for (const href of projectTabs) {
+      await page.goto(BASE + href, { waitUntil: "load" });
+      const r = await page.evaluate(() => {
+        const nav = document.querySelector("nav[data-ui-navtabs]");
+        if (!nav) return null;
+        const cur = Array.from(nav.querySelectorAll('a[aria-current="page"]'));
+        return { label: nav.getAttribute("aria-label"), n: cur.length, href: cur[0] ? cur[0].getAttribute("href") : "", roles: nav.querySelectorAll("[role=tab],[role=tablist]").length };
+      });
+      const path0 = href.split("?")[0];
+      const good = r && r.n === 1 && r.roles === 0 && r.href.split("?")[0] === path0;
+      if (!good) ok = false;
+      seen.push(`${path0.replace(/^\/projects\/[^/]+/, "") || "/"}:${r ? r.n + "@" + r.href.split("?")[0].replace(/^\/projects\/[^/]+/, "") : "none"}`);
+    }
+    check(scheme, "app-navtabs", ok, seen.join(" "));
+  });
+}
+
 // Sign in by posting the real login form from the browser context, so the
 // session cookie lands in the context's jar. drive-register stores the
 // password with a trailing newline (curl --data-urlencode @file sends it
@@ -903,12 +1106,15 @@ async function main() {
       await galleryChecks(browser, scheme, page);
       await dialogChecks(scheme, page);
       await overlayChecks(scheme, page);
+      await tabsTableSheetChecks(scheme, page);
       if (!custom) {
         if (canLogin && (await login(page))) {
           lines.push(`login ${scheme} pass`);
           await appDialogChecks(scheme, page);
           const projectTabs = await projectRoutes(page);
           await appEnvMenuChecks(scheme, page, projectTabs[0]);
+          await appNavTabsChecks(scheme, page, projectTabs);
+          await appSheetChecks(scheme, page);
           const routes = AUTH_ROUTES.concat(projectTabs);
           for (const route of routes) results.push(await scan(page, scheme, route));
         } else {

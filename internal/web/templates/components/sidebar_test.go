@@ -63,3 +63,39 @@ func TestSidebarUserFooter(t *testing.T) {
 		}
 	}
 }
+
+// The navigation renders twice from one templ: the static desktop aside
+// (hidden below md) and the mobile Sheet. Both carry every data-nav link
+// and Log out, and only the aside has id="sidebar".
+func TestSidebarAndMobileNavShareNav(t *testing.T) {
+	var a, s bytes.Buffer
+	if err := Sidebar("tok").Render(context.Background(), &a); err != nil {
+		t.Fatal(err)
+	}
+	if err := MobileNav("tok").Render(context.Background(), &s); err != nil {
+		t.Fatal(err)
+	}
+	aside, sheet := a.String(), s.String()
+	for _, want := range []string{`<aside id="sidebar"`, "hidden", "md:flex"} {
+		if !strings.Contains(aside, want) {
+			t.Errorf("aside missing %q", want)
+		}
+	}
+	if strings.Contains(aside, "-translate-x-full") {
+		t.Error("aside still carries the legacy slide-in transform")
+	}
+	for _, want := range []string{
+		`<dialog`, `id="` + MobileNavID + `"`, `data-ui-dialog="static"`, `data-ui-sheet="left"`,
+		`data-ui-sheet-close-at="(min-width: 768px)"`, `aria-labelledby="mobile-nav-title"`, "Log out",
+	} {
+		if !strings.Contains(sheet, want) {
+			t.Errorf("mobile nav sheet missing %q", want)
+		}
+	}
+	if strings.Contains(sheet, `id="sidebar"`) {
+		t.Error("mobile nav duplicates id=sidebar")
+	}
+	if na, ns := strings.Count(aside, "data-nav="), strings.Count(sheet, "data-nav="); na != 6 || ns != na {
+		t.Errorf("data-nav links: aside=%d sheet=%d, want 6 each", na, ns)
+	}
+}

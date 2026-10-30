@@ -1,6 +1,6 @@
 # UI kit foundation and accessibility
 
-The UI reads its colors, radius, and focus ring from CSS variable tokens. Light and dark values follow `prefers-color-scheme`. A keyboard user sees a focus ring on buttons, links, and controls, but a mouse click does not draw one. With reduced motion requested, transitions and animations stop, except the loading spinner. `static/js/ui.js` initializes `data-ui` components once per element, including inside content that htmx swaps in. With `GOFORGE_DEV_MODE=true`, `/dev/ui` shows a gallery of the tokens and the legacy classes (`.btn*`, `.input`, `.label`, `.card*`, `.table-th`). Without dev mode it returns `404`.
+The UI reads its colors, radius, and focus ring from CSS variable tokens. Light and dark values follow `prefers-color-scheme`. A keyboard user sees a focus ring on buttons, links, and controls, but a mouse click does not draw one. With reduced motion requested, transitions and animations stop, except the loading spinner. `static/js/ui.js` initializes `data-ui` components once per element, including inside content that htmx swaps in. With `GOFORGE_DEV_MODE=true`, `/dev/ui` shows a gallery of the tokens, the kit components, and the legacy classes (`.btn*`, `.input`, `.label`, `.card*`). Without dev mode it returns `404`.
 
 ## Sub-features
 
@@ -35,6 +35,12 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
   - `overlays-history`: `htmx:beforeHistorySave` closes every open overlay.
   - `overlays-axe`, `overlays-no-native-prompt`: inside the open overlays, axe finds nothing other than the palette's `color-contrast`, and no `window.confirm` appears.
   - With a password: `app-env-menu`, `app-env-new-dialog`, `app-env-link` drive the project's EnvironmentSwitcher. It has no `#menu-button` and no hardcoded `aria-expanded="true"`. The keys work as above, "New Environment" opens the kit dialog and focus returns to the trigger, and Enter on an environment navigates to `?env=…`.
+- Tabs, Table, and Sheet (PR6), on the gallery's NavTabs, Tabs, Table, and Sheet sections:
+  - `tabs-keyboard`: on the `role="tablist"`, ArrowRight and ArrowLeft wrap, and Home and End jump. Activation is automatic, so each key moves focus, `aria-selected`, the single `tabindex="0"` (roving tabindex), and the one visible `role="tabpanel"` together. Tab then leaves the tablist for the active panel.
+  - `tabs-click`: a click selects the tab and shows its panel.
+  - `table-scroll-regions`: every `data-ui-table` wrapper is a `role="region"` with `tabindex="0"`, named by the table's `<caption>` (visible or `sr-only`).
+  - `sheet-left`, `sheet-right`: Enter on the opener opens the static `<dialog data-ui-sheet>` modal and flush to its edge, sets `aria-expanded="true"`, and focuses the first link or field (never the close button). 14 Tab and Shift+Tab presses stay inside. Escape closes it, focus returns to the opener, and `aria-expanded` goes back to `false`.
+  - With a password: `app-navtabs` loads each project tab and expects one `aria-current="page"` link in the `Project sections` NavTabs, on that route, and no `role="tab"`. `app-mobile-sheet` sets a 375 px viewport on `/dashboard`: the desktop `#sidebar` aside is `display: none`, there is no `#sidebar-overlay`, and Enter on `#mobile-menu-btn` opens the `#mobile-nav` Sheet with the trap, Escape, and focus return as above, plus one current nav link. `app-mobile-sheet-closes-at-md` reopens it and widens the viewport to 1024 px: the Sheet closes (`data-ui-sheet-close-at`) and the aside shows. The drive restores the viewport afterwards and saves `ui-a11y/<scheme>/mobile-nav-sheet.png`.
 - `dev-ui-gated`: `/dev/ui` returns `200` with dev mode and `404` without it. The unit tests are `TestRouter_DevUIGalleryOnlyInDevMode` and `TestRouter_DevUIDialogDemoOnlyInDevMode`.
 - `axe`: axe-core scans each page for WCAG 2.0/2.1 A and AA and 2.2 AA (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), in light and dark. The public pages are `/login`, `/auth/register`, `/dev/ui`, and a missing page. With a password, it also scans `/dashboard`, `/projects`, `/projects/new`, `/services`, `/containers`, `/settings/profile`, `/settings/git`, and the first project's Overview, Deployments, Settings, and Services tabs. `axe-gate=pass` means zero serious or critical findings.
 
@@ -82,6 +88,7 @@ The drive writes `ui-a11y-verdict.txt`, `ui-a11y-report.json` (axe rule ids, imp
   - Clearing the gate needs a palette decision, for example `.btn-primary` on `primary-700`, and the label fixes in later PRs.
 - The `toggle` event of a popover fires after the key that closed it. That is why Tab in a menu focuses the trigger itself before it hides the menu, and why the drive waits a frame after each key before it reads focus.
 - After Escape hides a tooltip, it stays hidden until the pointer leaves the trigger or focus moves away. Each tooltip check starts by moving the pointer to the corner and blurring.
+- The sidebar nav renders twice from one templ (the desktop aside and the mobile Sheet). `app.js` marks the current link in both, and one of the two is always `display: none`, so there is one nav landmark at a time.
 - In host mode there is no Docker, so the containers list has no rows. Its tooltips are covered by `TestContainerRowTooltips`.
 - `GOFORGE_VERIFY_PSQL` needs `-tA`. Without it `drive-register` reads the `count` header as a user count and exits `2` with "users table is not empty".
 - The order of the `/services` catalog changes between runs, so screenshots of that page differ even when the CSS has not changed.

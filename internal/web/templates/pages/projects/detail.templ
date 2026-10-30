@@ -56,39 +56,25 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 			@DeploymentStatusBanner(project.ID, latestDeployment)
 		}
 
-	<div class="mb-8 border-b border-gray-200/60 dark:border-gray-800/60">
-		<nav class="-mb-px flex space-x-8" aria-label="Tabs">
-			<a href={ templ.URL("/projects/" + project.ID + "?env=" + envID(currentEnv)) } 
-				class={ "whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ", 
-					templ.KV("border-primary-600 text-primary-700 dark:text-primary-300", activeTab == "overview"),
-					templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-700", activeTab != "overview") }>
+		@ui.NavTabs(ui.NavTabsProps{Label: "Project sections", Class: "mb-8"}) {
+			@ui.NavTab(ui.NavTabProps{Href: templ.URL("/projects/" + project.ID + "?env=" + envID(currentEnv)), Current: activeTab == "overview"}) {
 				Overview
-			</a>
-			<a href={ templ.URL("/projects/" + project.ID + "/deployments?env=" + envID(currentEnv)) }
-				class={ "whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ",
-					templ.KV("border-primary-600 text-primary-700 dark:text-primary-300", activeTab == "deployments"),
-					templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-700", activeTab != "deployments") }>
+			}
+			@ui.NavTab(ui.NavTabProps{Href: templ.URL("/projects/" + project.ID + "/deployments?env=" + envID(currentEnv)), Current: activeTab == "deployments"}) {
 				Deployments
-			</a>
-			<a href={ templ.URL("/projects/" + project.ID + "/services") }
-				class={ "whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ",
-					templ.KV("border-primary-600 text-primary-700 dark:text-primary-300", activeTab == "services"),
-					templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-700", activeTab != "services") }>
+			}
+			@ui.NavTab(ui.NavTabProps{Href: templ.URL("/projects/" + project.ID + "/services"), Current: activeTab == "services"}) {
 				Services
 				if len(linkedServices) > 0 {
 					@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Variant: ui.BadgeSubtle, Class: "ml-2 px-1.5"}) {
 						{ fmt.Sprintf("%d", len(linkedServices)) }
 					}
 				}
-			</a>
-			<a href={ templ.URL("/projects/" + project.ID + "/settings?env=" + envID(currentEnv)) }
-				class={ "whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ",
-					templ.KV("border-primary-600 text-primary-700 dark:text-primary-300", activeTab == "settings"),
-					templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-700", activeTab != "settings") }>
+			}
+			@ui.NavTab(ui.NavTabProps{Href: templ.URL("/projects/" + project.ID + "/settings?env=" + envID(currentEnv)), Current: activeTab == "settings"}) {
 				Settings
-			</a>
-		</nav>
-	</div>
+			}
+		}
 
 		if activeTab == "overview" {
 			@Overview(project, latestDeployment, activeContainer, containerSummary)
@@ -258,63 +244,49 @@ templ Deployments(project *models.Project, deployments []*models.Deployment) {
 			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by triggering a new deployment.</p>
 		</div>
 	} else {
-		<div class="flex flex-col">
-			<div class="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-				<div class="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-					<div class="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg dark:border-gray-800">
-						<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-							<thead class="bg-gray-50 dark:bg-gray-800/50">
-								<tr>
-									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-										Status
-									</th>
-									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-										Branch / Commit
-									</th>
-									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-										Date
-									</th>
-									<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-										Duration
-									</th>
-									<th scope="col" class="relative px-6 py-3">
-										<span class="sr-only">View</span>
-									</th>
-								</tr>
-							</thead>
-							<tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-900 dark:divide-gray-800">
-								for _, d := range deployments {
-									<tr>
-										<td class="px-6 py-4 whitespace-nowrap">
-											@components.DeploymentStatusBadge(d.Status)
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap">
-											<div class="text-sm text-gray-900 dark:text-gray-100">{ d.Branch.String }</div>
-											<div class="text-sm text-gray-500 font-mono dark:text-gray-400">{ truncateCommit(d.CommitSHA.String) }</div>
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-											{ formatTime(d.CreatedAt) }
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-											if d.FinishedAt.Valid {
-												{ formatDuration(d.FinishedAt.Time.Sub(d.StartedAt.Time)) }
-											} else if isActiveDeployment(d.Status) {
-												<span class="animate-pulse">Running...</span>
-											} else {
-												-
-											}
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-											<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + d.ID) } class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200">View Logs</a>
-										</td>
-									</tr>
+		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
+			@ui.Table(ui.TableProps{Caption: "Deployments of " + project.Name})  {
+				@ui.THead(nil) {
+					@ui.TR(nil) {
+						@ui.TH(ui.CellProps{}) { Status }
+						@ui.TH(ui.CellProps{}) { Branch / Commit }
+						@ui.TH(ui.CellProps{}) { Date }
+						@ui.TH(ui.CellProps{}) { Duration }
+						@ui.TH(ui.CellProps{Align: ui.CellEnd}) {
+							<span class="sr-only">View</span>
+						}
+					}
+				}
+				@ui.TBody(nil) {
+					for _, d := range deployments {
+						@ui.TR(nil) {
+							@ui.TD(ui.CellProps{Class: "whitespace-nowrap"}) {
+								@components.DeploymentStatusBadge(d.Status)
+							}
+							@ui.TD(ui.CellProps{Class: "whitespace-nowrap"}) {
+								<div class="text-gray-900 dark:text-gray-100">{ d.Branch.String }</div>
+								<div class="text-gray-500 font-mono dark:text-gray-400">{ truncateCommit(d.CommitSHA.String) }</div>
+							}
+							@ui.TD(ui.CellProps{Class: "whitespace-nowrap text-gray-500 dark:text-gray-400"}) {
+								{ formatTime(d.CreatedAt) }
+							}
+							@ui.TD(ui.CellProps{Class: "whitespace-nowrap text-gray-500 dark:text-gray-400"}) {
+								if d.FinishedAt.Valid {
+									{ formatDuration(d.FinishedAt.Time.Sub(d.StartedAt.Time)) }
+								} else if isActiveDeployment(d.Status) {
+									<span class="animate-pulse">Running...</span>
+								} else {
+									-
 								}
-							</tbody>
-						</table>
-					</div>
-				</div>
-			</div>
-		</div>
+							}
+							@ui.TD(ui.CellProps{Align: ui.CellEnd, Class: "whitespace-nowrap font-medium"}) {
+								<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + d.ID) } class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200">View Logs</a>
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 }
 

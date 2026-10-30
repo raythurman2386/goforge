@@ -3,8 +3,9 @@
 //
 // PR 1 shipped the delegated listener pattern and the htmx:load init pass.
 // PR 2 added the dismissible Alert. PR 4 added Dialog and the hx-confirm
-// dialog. PR 5 adds Dropdown, Popover, and Tooltip on the popover
-// attribute. Later PRs register Tabs and Sheet. Rules, from the UI kit
+// dialog. PR 5 added Dropdown, Popover, and Tooltip on the popover
+// attribute. PR 6 adds in-page Tabs and the Sheet (an edge-pinned static
+// dialog on the same runtime). Rules, from the UI kit
 // brief (docs/development/frontend.md, "UI kit (Path A)"):
 //
 //  1. Delegated listeners only. click, keydown, focusin, pointerover, and
@@ -71,6 +72,7 @@
 		var root = evt.detail && evt.detail.elt ? evt.detail.elt : evt.target;
 		initTree(root);
 		initDialogs(root);
+		initSheets(root);
 	});
 
 	// Close open overlays before htmx stores the page in its history cache,
@@ -184,11 +186,20 @@
 		return t || el;
 	}
 
+	// A Sheet (data-ui-sheet) is mostly navigation: focus its first link or
+	// control, not the first non-close button (which may be Log out).
+	var SHEET_FOCUS_FIRST = "[autofocus], a[href], " + FOCUS_FIRST;
+
+	function setOpenerExpanded(el, value) {
+		if (el && el.hasAttribute && el.hasAttribute("aria-expanded")) el.setAttribute("aria-expanded", value);
+	}
+
 	function openDialog(d, opener) {
 		if (!d || d.open || !d.isConnected) return;
 		d._uiOpener = opener || document.activeElement;
 		d.showModal();
-		var first = d.querySelector(FOCUS_FIRST);
+		setOpenerExpanded(d._uiOpener, "true");
+		var first = d.querySelector(d.hasAttribute("data-ui-sheet") ? SHEET_FOCUS_FIRST : FOCUS_FIRST);
 		if (first) first.focus();
 	}
 
@@ -220,6 +231,7 @@
 			// Reopened before this queued event ran (a new confirm replaced
 			// a stale one): nothing to tear down.
 			if (d.open) return;
+			setOpenerExpanded(liveTwin(d._uiOpener), "false");
 			var back = visibleOpener(liveTwin(d._uiOpener));
 			d._uiOpener = null;
 			var confirmed = null;
@@ -391,6 +403,106 @@
 			err.textContent = GF && GF.errorMessage ? GF.errorMessage(evt.detail.xhr) : "Request failed.";
 			err.classList.remove("hidden");
 		}
+	});
+
+	// --- Sheet (components/ui Sheet) ---------------------------------------
+	//
+	// A Sheet is a data-ui-dialog="static" dialog, so everything above
+	// applies: [data-ui-dialog-open] opens it with showModal(), Escape and
+	// the backdrop close it, and focus returns to the opener. The slide is
+	// CSS. data-ui-sheet-close-at="<media query>" closes an open sheet when
+	// the query starts to match (the mobile nav sheet once the desktop
+	// sidebar shows at md).
+	var sheetQueries = {};
+
+	function watchSheet(d) {
+		var q = d.getAttribute("data-ui-sheet-close-at");
+		if (!q || sheetQueries[q] || !window.matchMedia) return;
+		var mql = window.matchMedia(q);
+		sheetQueries[q] = mql;
+		var onChange = function () {
+			if (!mql.matches) return;
+			document.querySelectorAll('dialog[data-ui-sheet][open][data-ui-sheet-close-at="' + CSS.escape(q) + '"]').forEach(function (s) {
+				closeDialog(s, "cancel");
+			});
+		};
+		if (mql.addEventListener) mql.addEventListener("change", onChange);
+		else if (mql.addListener) mql.addListener(onChange);
+	}
+
+	function initSheets(root) {
+		if (!root || !root.querySelectorAll) return;
+		var sel = "dialog[data-ui-sheet][data-ui-sheet-close-at]";
+		var list = Array.prototype.slice.call(root.querySelectorAll(sel));
+		if (root.matches && root.matches(sel)) list.unshift(root);
+		list.forEach(watchSheet);
+	}
+
+	// --- Tabs (components/ui Tabs, TabList, Tab, TabPanel) ------------------
+	//
+	// WAI-ARIA tabs with automatic activation. Only the selected tab is in
+	// the Tab order (roving tabindex). Left and Right move to the previous
+	// and next tab and wrap, Home and End jump to the first and last, and the
+	// tab that gets focus is selected and shows its panel. Nested Tabs only
+	// answer for their own tabs. NavTabs (links) need none of this.
+	function ownTabs(root) {
+		return Array.prototype.filter.call(root.querySelectorAll('[role="tab"][data-ui-tab]'), function (t) {
+			return t.closest('[data-ui="tabs"]') === root;
+		});
+	}
+
+	function selectTab(root, tab, focus) {
+		ownTabs(root).forEach(function (t) {
+			var on = t === tab;
+			t.setAttribute("aria-selected", on ? "true" : "false");
+			t.setAttribute("tabindex", on ? "0" : "-1");
+			var panel = document.getElementById(t.getAttribute("aria-controls"));
+			if (panel) panel.hidden = !on;
+		});
+		if (focus) tab.focus();
+	}
+
+	register("tabs", {
+		init: function (el) {
+			var tabs = ownTabs(el);
+			if (!tabs.length) return;
+			var selected = tabs.filter(function (t) {
+				return t.getAttribute("aria-selected") === "true";
+			})[0];
+			selectTab(el, selected || tabs[0], false);
+		},
+		events: {
+			click: function (evt, el) {
+				var tab = evt.target.closest('[role="tab"][data-ui-tab]');
+				if (!tab || tab.closest('[data-ui="tabs"]') !== el) return;
+				selectTab(el, tab, true);
+			},
+			keydown: function (evt, el) {
+				var tab = evt.target.closest('[role="tab"][data-ui-tab]');
+				if (!tab || tab.closest('[data-ui="tabs"]') !== el) return;
+				var tabs = ownTabs(el);
+				var i = tabs.indexOf(tab);
+				var next = -1;
+				switch (evt.key) {
+					case "ArrowRight":
+						next = (i + 1) % tabs.length;
+						break;
+					case "ArrowLeft":
+						next = (i - 1 + tabs.length) % tabs.length;
+						break;
+					case "Home":
+						next = 0;
+						break;
+					case "End":
+						next = tabs.length - 1;
+						break;
+					default:
+						return;
+				}
+				evt.preventDefault();
+				selectTab(el, tabs[next], true);
+			},
+		},
 	});
 
 	// --- Overlays: Dropdown, Popover, Tooltip (components/ui overlay.go) ---
@@ -797,6 +909,7 @@
 	function init() {
 		initTree(document);
 		initDialogs(document);
+		initSheets(document);
 	}
 
 	if (document.readyState === "loading") {

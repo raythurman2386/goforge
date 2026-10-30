@@ -14,51 +14,45 @@ templ List(csrfToken string) {
 	@layouts.AppLayout("Containers", csrfToken) {
 		@components.PageHeader("Containers", "Containers that GoForge runs for your projects and services.")
 		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
-			<div class="overflow-x-auto">
-				<table class="min-w-full table-fixed divide-y divide-gray-100 dark:divide-gray-800">
-					<colgroup>
-						<col class="w-[28%]"/>
-						<col class="w-[32%]"/>
-						<col class="w-28"/>
-						<col class="w-28"/>
-						<col class="w-32"/>
-					</colgroup>
-					<thead class="bg-gray-50/60 dark:bg-gray-800/50">
-						<tr>
-							<th scope="col" class="table-th pl-6">Name</th>
-							<th scope="col" class="table-th">Image</th>
-							<th scope="col" class="table-th">Status</th>
-							<th scope="col" class="table-th">Type</th>
-							<th scope="col" class="table-th pr-6 text-right">
-								<span class="sr-only">Actions</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900" id="container-list-body" hx-get="/containers/api" hx-trigger="load, containerStopped from:body, containerRestarted from:body" hx-swap="innerHTML">
-						<tr>
-							<td colspan="5">
-								@components.LoadingState("Loading containers...")
-							</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
+			@ui.Table(ui.TableProps{ID: "container-list", Caption: "Containers", Fixed: true}) {
+				<colgroup>
+					<col class="w-[28%]"/>
+					<col class="w-[32%]"/>
+					<col class="w-28"/>
+					<col class="w-28"/>
+					<col class="w-32"/>
+				</colgroup>
+				@ui.THead(nil) {
+					@ui.TR(nil) {
+						@ui.TH(ui.CellProps{Class: "pl-6"}) { Name }
+						@ui.TH(ui.CellProps{}) { Image }
+						@ui.TH(ui.CellProps{}) { Status }
+						@ui.TH(ui.CellProps{}) { Type }
+						@ui.TH(ui.CellProps{Align: ui.CellEnd, Class: "pr-6"}) {
+							<span class="sr-only">Actions</span>
+						}
+					}
+				}
+				@ui.TBody(templ.Attributes{"id": "container-list-body", "hx-get": "/containers/api", "hx-trigger": "load, containerStopped from:body, containerRestarted from:body", "hx-swap": "innerHTML"}) {
+					@ui.TableEmpty(5) {
+						@components.LoadingState("Loading containers...")
+					}
+				}
+			}
 		}
 	}
 }
 
 templ ListAPI(trackedContainers []*models.Container, dockerContainers []container.Summary) {
 	if len(dockerContainers) == 0 {
-		<tr>
-			<td colspan="5">
-				@components.EmptyState(components.EmptyStateProps{
-					Title:       "No containers yet",
-					Description: "Deploy a project or a service and its containers show up here.",
-					Icon:        "server",
-					Compact:     true,
-				})
-			</td>
-		</tr>
+		@ui.TableEmpty(5) {
+			@components.EmptyState(components.EmptyStateProps{
+				Title:       "No containers yet",
+				Description: "Deploy a project or a service and its containers show up here.",
+				Icon:        "server",
+				Compact:     true,
+			})
+		}
 	}
 	for _, dc := range dockerContainers {
 		@ContainerRow(dc, trackedContainers)
@@ -66,24 +60,24 @@ templ ListAPI(trackedContainers []*models.Container, dockerContainers []containe
 }
 
 templ ContainerRow(dc container.Summary, tracked []*models.Container) {
-	<tr class="hover:bg-gray-50/60 transition-colors dark:hover:bg-gray-800/50">
-		<td class="table-td pl-6 font-medium text-gray-900 dark:text-gray-100">
+	@ui.TR(templ.Attributes{"class": "hover:bg-gray-50/60 transition-colors dark:hover:bg-gray-800/50"}) {
+		@ui.TD(ui.CellProps{Class: "pl-6 font-medium text-gray-900 dark:text-gray-100"}) {
 			<a href={ templ.URL("/containers/" + dc.ID) } class="block truncate hover:text-primary-700 dark:hover:text-primary-300" { ui.TooltipAttrs(tipID(dc, "name"))... }>
 				{ containerName(dc) }
 			</a>
 			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "name"), Text: containerName(dc), Align: ui.AlignStart})
-		</td>
-		<td class="table-td">
+		}
+		@ui.TD(ui.CellProps{}) {
 			<span tabindex="0" class="block truncate rounded font-mono text-xs text-gray-600 dark:text-gray-400" { ui.TooltipAttrs(tipID(dc, "image"))... }>{ dc.Image }</span>
 			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "image"), Text: dc.Image, Align: ui.AlignStart, Class: "break-all font-mono"})
-		</td>
-		<td class="table-td">
+		}
+		@ui.TD(ui.CellProps{}) {
 			@components.StatusBadge("container", string(dc.State))
-		</td>
-		<td class="table-td text-gray-600 dark:text-gray-400">
+		}
+		@ui.TD(ui.CellProps{Class: "text-gray-600 dark:text-gray-400"}) {
 			{ containerType(dc, tracked) }
-		</td>
-		<td class="table-td pr-6">
+		}
+		@ui.TD(ui.CellProps{Class: "pr-6"}) {
 			<div class="flex items-center justify-end gap-1">
 				if dc.State == "running" {
 					@ui.Button(ui.ButtonProps{
@@ -134,8 +128,8 @@ templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 				}
 				@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "view"), Text: "View"})
 			</div>
-		</td>
-	</tr>
+		}
+	}
 }
 
 // tipID is the id of one row tooltip: unique per container and field.

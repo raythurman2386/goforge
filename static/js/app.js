@@ -115,21 +115,25 @@
 
 	// --- Sidebar active link ------------------------------------------------
 
-	// Mark the [data-nav] link with the longest prefix match for the current
-	// path, so /projects/123/deployments/456 highlights Projects.
+	// Mark the [data-nav] links with the longest prefix match for the current
+	// path, so /projects/123/deployments/456 highlights Projects. The nav is
+	// rendered twice (desktop sidebar and mobile Sheet), so every link with
+	// that prefix is marked.
 	function markActiveNav() {
 		var path = window.location.pathname;
 		var best = null;
-		var bestLen = -1;
-		document.querySelectorAll("[data-nav]").forEach(function (a) {
+		var links = document.querySelectorAll("[data-nav]");
+		links.forEach(function (a) {
 			a.removeAttribute("aria-current");
 			var prefix = a.getAttribute("data-nav");
-			if ((path === prefix || path.indexOf(prefix + "/") === 0) && prefix.length > bestLen) {
-				best = a;
-				bestLen = prefix.length;
+			if ((path === prefix || path.indexOf(prefix + "/") === 0) && (best === null || prefix.length > best.length)) {
+				best = prefix;
 			}
 		});
-		if (best) best.setAttribute("aria-current", "page");
+		if (best === null) return;
+		links.forEach(function (a) {
+			if (a.getAttribute("data-nav") === best) a.setAttribute("aria-current", "page");
+		});
 	}
 
 	function init() {

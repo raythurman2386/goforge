@@ -1,0 +1,31 @@
+package ui
+
+// Sheet is an edge-pinned modal panel on the Dialog runtime (see
+// SheetProps). The header holds the title and a close button; children
+// fill the rest of the height, so a nav plus a footer can lay out as a
+// flex column.
+//
+//	@ui.Button(ui.ButtonProps{Size: ui.ButtonIcon, Label: "Open menu", Attrs: ui.OpenSheetAttrs("mobile-nav")}) { ... }
+//	@ui.Sheet(ui.SheetProps{ID: "mobile-nav", Title: "Menu"}) { ... }
+templ Sheet(p SheetProps) {
+	<dialog { sheetAttrs(p)... }>
+		<div class="flex h-full flex-col">
+			<div class="flex flex-shrink-0 items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+				<div class="min-w-0">
+					<h2 id={ DialogTitleID(p.ID) } class="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100">{ p.Title }</h2>
+					if p.Description != "" {
+						<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-muted-foreground">{ p.Description }</p>
+					}
+				</div>
+				@Button(ButtonProps{Variant: ButtonGhost, Size: ButtonIcon, Label: "Close " + p.Title, Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+					</svg>
+				}
+			</div>
+			<div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+				{ children... }
+			</div>
+		</div>
+	</dialog>
+}

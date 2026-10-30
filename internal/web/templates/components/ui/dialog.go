@@ -45,13 +45,16 @@ func DialogDescriptionID(dialogID string) string { return dialogID + "-descripti
 func DialogErrorID(dialogID string) string { return dialogID + "-error" }
 
 // NewDialogID returns a fresh "dialog-" id with 8 random hex characters.
-func NewDialogID() string {
+func NewDialogID() string { return newID("dialog") }
+
+// newID returns prefix, a dash, and 8 random hex characters.
+func newID(prefix string) string {
 	var b [4]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		// crypto/rand does not fail on supported platforms; keep a usable id.
-		return "dialog-fallback"
+		return prefix + "-fallback"
 	}
-	return "dialog-" + hex.EncodeToString(b[:])
+	return prefix + "-" + hex.EncodeToString(b[:])
 }
 
 // resolveDialog fills in the generated id once per render, so the heading,

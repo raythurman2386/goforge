@@ -1,0 +1,64 @@
+package ui
+
+// NavTabs is a server-routed tab strip: a labelled <nav> of NavTab links.
+//
+//	@ui.NavTabs(ui.NavTabsProps{Label: "Project sections"}) {
+//		@ui.NavTab(ui.NavTabProps{Href: overviewURL, Current: tab == "overview"}) { Overview }
+//	}
+templ NavTabs(p NavTabsProps) {
+	<div class={ Class(navTabsWrapClass(), p.Class) }>
+		<nav { navTabsAttrs(p)... }>
+			<div class={ navTabsListClass() }>
+				{ children... }
+			</div>
+		</nav>
+	</div>
+}
+
+// NavTab is one link in NavTabs.
+templ NavTab(p NavTabProps) {
+	<a { navTabAttrs(p)... }>
+		{ children... }
+	</a>
+}
+
+// Tabs is the in-page tabs root (data-ui="tabs" for ui.js). Put one
+// TabList of Tab buttons first, then one TabPanel per Tab.
+//
+//	@ui.Tabs(ui.TabsProps{ID: "logs"}) {
+//		@ui.TabList(ui.TabsProps{ID: "logs", Label: "Log source"}) {
+//			@ui.Tab(ui.TabProps{TabsID: "logs", Key: "build", Selected: true}) { Build }
+//			@ui.Tab(ui.TabProps{TabsID: "logs", Key: "run"}) { Runtime }
+//		}
+//		@ui.TabPanel(ui.TabPanelProps{TabsID: "logs", Key: "build", Selected: true}) { ... }
+//		@ui.TabPanel(ui.TabPanelProps{TabsID: "logs", Key: "run"}) { ... }
+//	}
+templ Tabs(p TabsProps) {
+	<div { tabsAttrs(p)... }>
+		{ children... }
+	</div>
+}
+
+// TabList is the role="tablist" row.
+templ TabList(p TabsProps) {
+	<div { tabListAttrs(p)... }>
+		{ children... }
+	</div>
+}
+
+// Tab is one role="tab" button. Only the selected tab is in the Tab order
+// (roving tabindex).
+templ Tab(p TabProps) {
+	<button { tabAttrs(p)... }>
+		{ children... }
+	</button>
+}
+
+// TabPanel is the role="tabpanel" for the Tab with the same Key. It is
+// focusable (tabindex="0") so a panel without focusable content can still
+// be reached with Tab after the tablist.
+templ TabPanel(p TabPanelProps) {
+	<div { tabPanelAttrs(p)... }>
+		{ children... }
+	</div>
+}
