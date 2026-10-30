@@ -16,7 +16,7 @@
  * apply opacity: tailwind.config.js maps them as rgb(var(--gf-x) / <alpha-value>).
  * Light values first, dark values under prefers-color-scheme (dark mode stays
  * OS-only). The values reproduce the pre-token look: emerald primary, gray
- * neutrals. See docs/reference/ui-kit.md.
+ * neutrals. See docs/development/frontend.md (UI kit, Path A).
  */
 @layer base {
   :root {

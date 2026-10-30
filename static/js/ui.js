@@ -4,7 +4,7 @@
 // PR 1 ships the skeleton only: the delegated listener pattern and the
 // htmx:load init pass. Components register handlers here in later PRs
 // (Dialog, Dropdown, Popover, Tooltip, Tabs, Sheet). Rules, from the UI kit
-// brief (docs/reference/ui-kit.md):
+// brief (docs/development/frontend.md, "UI kit (Path A)"):
 //
 //  1. Delegated listeners only. click, keydown, focusin, pointerover, and
 //     toggle are attached to document once. Targets are found by data-ui-*
