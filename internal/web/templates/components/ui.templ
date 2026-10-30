@@ -20,13 +20,13 @@ templ pageHeader(title, subtitle string, badge templ.Component) {
 	<div class="md:flex md:items-center md:justify-between gap-4 mb-8">
 		<div class="flex-1 min-w-0">
 			<div class="flex flex-wrap items-center gap-3">
-				<h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl truncate">{ title }</h1>
+				<h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl truncate dark:text-gray-100">{ title }</h1>
 				if badge != nil {
 					@badge
 				}
 			</div>
 			if subtitle != "" {
-				<p class="mt-2 text-sm text-gray-500">{ subtitle }</p>
+				<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{ subtitle }</p>
 			}
 		</div>
 		<div class="mt-4 flex flex-wrap items-center gap-3 md:mt-0">
@@ -44,7 +44,7 @@ type Crumb struct {
 
 templ Breadcrumbs(items []Crumb) {
 	<nav class="mb-4" aria-label="Breadcrumb">
-		<ol class="flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
+		<ol class="flex flex-wrap items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
 			for i, c := range items {
 				<li class="flex items-center gap-1.5">
 					if i > 0 {
@@ -53,9 +53,9 @@ templ Breadcrumbs(items []Crumb) {
 						</svg>
 					}
 					if i == len(items)-1 {
-						<span class="font-medium text-gray-700" aria-current="page">{ c.Label }</span>
+						<span class="font-medium text-gray-700 dark:text-gray-300" aria-current="page">{ c.Label }</span>
 					} else {
-						<a href={ templ.SafeURL(c.Href) } class="font-medium hover:text-primary-700 transition-colors">{ c.Label }</a>
+						<a href={ templ.SafeURL(c.Href) } class="font-medium hover:text-primary-700 transition-colors dark:hover:text-primary-300">{ c.Label }</a>
 					}
 				</li>
 			}
@@ -100,13 +100,13 @@ templ AlertMessage(level, message string) {
 func alertClass(level string) string {
 	switch level {
 	case "error":
-		return "border-red-200 bg-red-50 text-red-800"
+		return "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
 	case "warning":
-		return "border-amber-200 bg-amber-50 text-amber-800"
+		return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
 	case "success":
-		return "border-primary-200 bg-primary-50 text-primary-800"
+		return "border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200"
 	default:
-		return "border-blue-200 bg-blue-50 text-blue-800"
+		return "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200"
 	}
 }
 

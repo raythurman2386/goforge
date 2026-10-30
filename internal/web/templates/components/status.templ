@@ -59,13 +59,13 @@ func statusInFlight(kind, status string) bool {
 func statusBadgeClass(tone string) string {
 	switch tone {
 	case toneSuccess:
-		return "bg-green-50 text-green-700 ring-green-600/20"
+		return "bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-950/40 dark:text-green-300"
 	case toneDanger:
-		return "bg-red-50 text-red-700 ring-red-600/20"
+		return "bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/40 dark:text-red-300"
 	case toneWarning:
-		return "bg-amber-50 text-amber-800 ring-amber-600/20"
+		return "bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-200"
 	default:
-		return "bg-gray-50 text-gray-700 ring-gray-500/20"
+		return "bg-gray-50 text-gray-700 ring-gray-500/20 dark:bg-gray-800/50 dark:text-gray-300"
 	}
 }
 

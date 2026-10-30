@@ -73,7 +73,7 @@ templ Detail(props DetailProps) {
 				<div class="card-header">
 					<h3 class="card-title">Deployment Information</h3>
 				</div>
-				<dl class="divide-y divide-gray-100">
+				<dl class="divide-y divide-gray-100 dark:divide-gray-800">
 					@infoRow("Status") {
 						@liveStatus(props.Deployment.Status)
 					}
@@ -82,7 +82,7 @@ templ Detail(props DetailProps) {
 					}
 					if props.Deployment.Branch.Valid {
 						@infoRow("Branch") {
-							<span class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700">
+							<span class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
 								<svg class="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
 								</svg>
@@ -92,7 +92,7 @@ templ Detail(props DetailProps) {
 					}
 					if props.Deployment.CommitSHA.Valid {
 						@infoRow("Commit") {
-							<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-xs">{ props.Deployment.CommitSHA.String }</code>
+							<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-xs dark:bg-gray-800 dark:text-gray-200">{ props.Deployment.CommitSHA.String }</code>
 						}
 					}
 					if props.Deployment.CommitMessage.Valid {
@@ -107,12 +107,12 @@ templ Detail(props DetailProps) {
 					}
 					if props.Deployment.ImageTag.Valid {
 						@infoRow("Image Tag") {
-							<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-xs break-all">{ props.Deployment.ImageTag.String }</code>
+							<code class="px-2 py-1 bg-gray-100 rounded text-gray-800 font-mono text-xs break-all dark:bg-gray-800 dark:text-gray-200">{ props.Deployment.ImageTag.String }</code>
 						}
 					}
 				</dl>
 				if props.Deployment.ErrorMessage.Valid {
-					<div class="card-body border-t border-gray-100">
+					<div class="card-body border-t border-gray-100 dark:border-gray-800">
 						@components.Alert("error") {
 							<p class="font-semibold">Error</p>
 							<p class="mt-1 break-words">{ props.Deployment.ErrorMessage.String }</p>
@@ -128,24 +128,24 @@ templ Detail(props DetailProps) {
 				</div>
 				<dl class="card-body space-y-4">
 					<div>
-						<dt class="text-sm font-medium text-gray-500">Created</dt>
-						<dd class="mt-1 text-sm text-gray-900">{ formatTimestamp(props.Deployment.CreatedAt) }</dd>
+						<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
+						<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.CreatedAt) }</dd>
 					</div>
 					if props.Deployment.StartedAt.Valid {
 						<div>
-							<dt class="text-sm font-medium text-gray-500">Started</dt>
-							<dd class="mt-1 text-sm text-gray-900">{ formatTimestamp(props.Deployment.StartedAt.Time) }</dd>
+							<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Started</dt>
+							<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.StartedAt.Time) }</dd>
 						</div>
 					}
 					if props.Deployment.FinishedAt.Valid {
 						<div>
-							<dt class="text-sm font-medium text-gray-500">Finished</dt>
-							<dd class="mt-1 text-sm text-gray-900">{ formatTimestamp(props.Deployment.FinishedAt.Time) }</dd>
+							<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Finished</dt>
+							<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.FinishedAt.Time) }</dd>
 						</div>
 					}
 					<div>
-						<dt class="text-sm font-medium text-gray-500">Duration</dt>
-						<dd class="mt-1 text-sm text-gray-900">{ formatDuration(props.Deployment.Duration()) }</dd>
+						<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Duration</dt>
+						<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatDuration(props.Deployment.Duration()) }</dd>
 					</div>
 				</dl>
 			</div>
@@ -156,16 +156,16 @@ templ Detail(props DetailProps) {
 			<div class="card-header">
 				<h3 class="card-title">Deployment Logs</h3>
 				if !props.Deployment.IsTerminal() {
-					<span class="inline-flex items-center gap-2 text-sm text-gray-500">
+					<span class="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
 						<span class="h-2 w-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true"></span>
 						Live
 					</span>
 				}
 			</div>
-			<div id="deployment-logs" class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto">
+			<div id="deployment-logs" class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto dark:bg-gray-950">
 				<div id="deployment-log-lines" sse-swap="snapshot" hx-swap="innerHTML">
 					if len(props.Logs) == 0 {
-						<p class="text-gray-500 italic">No logs available yet...</p>
+						<p class="text-gray-500 italic dark:text-gray-400">No logs available yet...</p>
 					} else {
 						for _, log := range props.Logs {
 							@LogLine(log)
@@ -188,8 +188,8 @@ templ liveStatus(status models.DeploymentStatus) {
 
 templ infoRow(label string) {
 	<div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-		<dt class="text-sm font-medium text-gray-500">{ label }</dt>
-		<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 dark:text-gray-100">
 			{ children... }
 		</dd>
 	</div>
@@ -197,7 +197,7 @@ templ infoRow(label string) {
 
 templ LogLine(log *models.DeploymentLog) {
 	<div class={ "py-0.5", logLevelClass(log.Level) }>
-		<span class="text-gray-500">{ formatLogTime(log.Timestamp) }</span>
+		<span class="text-gray-500 dark:text-gray-400">{ formatLogTime(log.Timestamp) }</span>
 		<span class={ logLevelBadgeClass(log.Level) }>{ string(log.Level) }</span>
 		if log.Source.Valid {
 			<span class="text-primary-300">[{ log.Source.String }]</span>
@@ -243,7 +243,7 @@ func logLevelClass(level models.DeploymentLogLevel) string {
 	case models.LogLevelWarn:
 		return "text-yellow-400"
 	case models.LogLevelDebug:
-		return "text-gray-500"
+		return "text-gray-500 dark:text-gray-400"
 	default:
 		return ""
 	}

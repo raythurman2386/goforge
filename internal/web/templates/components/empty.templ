@@ -19,11 +19,11 @@ type EmptyStateProps struct {
 templ EmptyState(p EmptyStateProps) {
 	<div
 		class={ "text-center",
-			templ.KV("py-16 card bg-gray-50/30 border-dashed border-2 border-gray-200 shadow-none", !p.Compact),
+			templ.KV("py-16 card bg-gray-50/30 border-dashed border-2 border-gray-200 shadow-none dark:bg-gray-800/50 dark:border-gray-800", !p.Compact),
 			templ.KV("py-8", p.Compact) }
 	>
 		<div
-			class={ "bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto",
+			class={ "bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto dark:bg-gray-900 dark:border-gray-800",
 				templ.KV("w-16 h-16 mb-5", !p.Compact),
 				templ.KV("w-12 h-12 mb-3", p.Compact) }
 		>
@@ -31,9 +31,9 @@ templ EmptyState(p EmptyStateProps) {
 				@emptyIcon(p.Icon)
 			</svg>
 		</div>
-		<h3 class={ "font-bold text-gray-900 tracking-tight", templ.KV("text-xl", !p.Compact), templ.KV("text-base", p.Compact) }>{ p.Title }</h3>
+		<h3 class={ "font-bold text-gray-900 tracking-tight dark:text-gray-100", templ.KV("text-xl", !p.Compact), templ.KV("text-base", p.Compact) }>{ p.Title }</h3>
 		if p.Description != "" {
-			<p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">{ p.Description }</p>
+			<p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed dark:text-gray-400">{ p.Description }</p>
 		}
 		if p.ButtonText != "" {
 			<div class={ templ.KV("mt-8", !p.Compact), templ.KV("mt-4", p.Compact) }>

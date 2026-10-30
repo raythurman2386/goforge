@@ -7,23 +7,23 @@ package components
 // app.js also handles requests made from inside the dialog: an error shows
 // its text in #modal-error, and a success closes the dialog.
 templ Modal(title string) {
-	<div id="modal" data-modal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300">
+	<div id="modal" data-modal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-all duration-300 dark:bg-black/60">
 		<div
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="modal-title"
 			tabindex="-1"
-			class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto transform transition-all border border-gray-200 focus:outline-none"
+			class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto transform transition-all border border-gray-200 focus:outline-none dark:bg-gray-900 dark:border-gray-800"
 		>
-			<div class="flex justify-between items-center px-6 py-4 border-b border-gray-100">
-				<h3 id="modal-title" class="text-xl font-bold text-gray-900 tracking-tight">{ title }</h3>
-				<button type="button" data-modal-close aria-label="Close dialog" class="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
+			<div class="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+				<h3 id="modal-title" class="text-xl font-bold text-gray-900 tracking-tight dark:text-gray-100">{ title }</h3>
+				<button type="button" data-modal-close aria-label="Close dialog" class="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors dark:hover:text-gray-400 dark:hover:bg-gray-800">
 					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
 					</svg>
 				</button>
 			</div>
-			<div id="modal-error" role="alert" class="hidden mx-6 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg"></div>
+			<div id="modal-error" role="alert" class="hidden mx-6 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg dark:text-red-300 dark:bg-red-950/40 dark:border-red-900"></div>
 			<div class="px-6 py-6">
 				{ children... }
 			</div>

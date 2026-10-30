@@ -1,4 +1,4 @@
-.PHONY: all build build-mcp docker-build-mcp dev test lint fmt vet clean css templ migrate help
+.PHONY: all build build-mcp docker-build-mcp dev test lint fmt vet clean css css-check templ migrate help
 
 # Go parameters
 GOCMD=go
@@ -90,6 +90,10 @@ css:
 	else \
 		echo "tailwindcss not installed, using placeholder CSS"; \
 	fi
+
+## css-check: Build CSS and fail on class tokens missing from output.css
+css-check: css
+	python3 scripts/class_check.py static/css/output.css
 
 ## css-watch: Watch and compile TailwindCSS
 css-watch:

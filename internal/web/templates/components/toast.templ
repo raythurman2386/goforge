@@ -12,9 +12,9 @@ templ Toast(message string, level string) {
 				role="alert"
 			}
 			class={ "flex items-center gap-3 rounded-lg border p-4 text-sm font-medium shadow-lg ",
-			templ.KV("border-primary-200 bg-primary-50 text-primary-800", level == "success"),
-			templ.KV("border-red-200 bg-red-50 text-red-800", level == "error"),
-			templ.KV("border-blue-200 bg-blue-50 text-blue-800", level != "success" && level != "error") }
+			templ.KV("border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200", level == "success"),
+			templ.KV("border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200", level == "error"),
+			templ.KV("border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200", level != "success" && level != "error") }
 		>
 			<span>{ message }</span>
 			<button type="button" aria-label="Dismiss" onclick="this.closest('[data-toast]').remove()" class="opacity-60 hover:opacity-100">

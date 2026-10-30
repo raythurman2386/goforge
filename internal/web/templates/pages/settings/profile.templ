@@ -31,15 +31,15 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 						<p class="label">Account Type</p>
 						<div class="mt-1">
 							if user.IsGitHubUser() {
-								<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-900 text-white">
+								<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-900 text-white dark:bg-gray-700">
 									<svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 24 24">
 										<path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
 									</svg>
 									GitHub Account
 								</span>
-								<p class="mt-1 text-sm text-gray-500">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
+								<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
 							} else {
-								<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-600/20">
+								<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-900/30 dark:text-primary-300">
 									<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
 									</svg>
@@ -105,13 +105,13 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 						Generate Token
 					</button>
 				</div>
-				<p class="text-sm text-gray-500 mb-4">API tokens allow programmatic access to your account. Keep them secure!</p>
+				<p class="text-sm text-gray-500 mb-4 dark:text-gray-400">API tokens allow programmatic access to your account. Keep them secure!</p>
 				
 				<div class="mb-4">
 					@components.AlertMessage("warning", "Work in progress: API token authentication is planned for future releases. Currently tokens can be created for future use.")
 				</div>
 
-				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-gray-100 animate-fade-in">
+				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-gray-100 animate-fade-in dark:divide-gray-800">
 					@components.LoadingState("Loading tokens...")
 				</div>
 			</div>
@@ -120,10 +120,10 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status) {
 }
 
 templ APITokenRow(token *models.APIToken) {
-	<div class="py-4 flex items-center justify-between hover:bg-gray-50 -mx-4 px-4" id={ "token-" + token.ID }>
+	<div class="py-4 flex items-center justify-between hover:bg-gray-50 -mx-4 px-4 dark:hover:bg-gray-800/50" id={ "token-" + token.ID }>
 		<div>
-			<p class="text-sm font-medium text-gray-900">{ token.Name }</p>
-			<p class="text-xs text-gray-500">
+			<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ token.Name }</p>
+			<p class="text-xs text-gray-500 dark:text-gray-400">
 				Created { formatDate(token.CreatedAt) }
 				if token.LastUsedAt.Valid {
 					• Last used { formatDate(token.LastUsedAt.Time) }
@@ -134,7 +134,7 @@ templ APITokenRow(token *models.APIToken) {
 			</p>
 			<p class="mt-1 flex flex-wrap gap-1">
 				for _, scope := range tokenScopes(token) {
-					<span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{ scope }</span>
+					<span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{ scope }</span>
 				}
 			</p>
 		</div>
@@ -161,14 +161,14 @@ templ EmptyTokenList() {
 templ TokenCreatedModal(rawToken string) {
 	@components.Modal("API Token Created") {
 		<div class="flex items-start gap-3 mb-6">
-			<div class="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center">
-				<svg class="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			<div class="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center dark:bg-primary-900/50">
+				<svg class="h-6 w-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 				</svg>
 			</div>
 			<div class="min-w-0 flex-1">
-				<p class="text-sm text-gray-500">Copy this token now. You won't be able to see it again!</p>
-				<code class="mt-3 block w-full rounded-lg bg-gray-100 p-3 text-sm font-mono break-all border border-gray-200">{ rawToken }</code>
+				<p class="text-sm text-gray-500 dark:text-gray-400">Copy this token now. You won't be able to see it again!</p>
+				<code class="mt-3 block w-full rounded-lg bg-gray-100 p-3 text-sm font-mono break-all border border-gray-200 dark:bg-gray-800 dark:border-gray-800">{ rawToken }</code>
 			</div>
 		</div>
 		<div class="flex justify-end gap-3">
@@ -196,7 +196,7 @@ templ AddAPITokenModal(csrfToken string) {
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			
 			@components.Input("Token Name", "name", "text", "", true)
-			<p class="text-xs text-gray-500 mb-4">Give your token a descriptive name to help you identify it later.</p>
+			<p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Give your token a descriptive name to help you identify it later.</p>
 
 			<div class="mb-4">
 				<label for="expires_in" class="label">Expires</label>
@@ -210,17 +210,17 @@ templ AddAPITokenModal(csrfToken string) {
 
 			<fieldset class="mb-4">
 				<legend class="label">Scopes</legend>
-				<p class="text-xs text-gray-500 mb-2">Leave all unchecked for a full token that also works on the web routes. A scoped token works only on <code>/api/v1</code>.</p>
-				<label class="flex items-center gap-2 text-sm text-gray-700">
-					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" name="scopes" value="read"/>
+				<p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Leave all unchecked for a full token that also works on the web routes. A scoped token works only on <code>/api/v1</code>.</p>
+				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700 dark:text-primary-400" name="scopes" value="read"/>
 					read: list and inspect projects, services, containers, logs
 				</label>
-				<label class="flex items-center gap-2 text-sm text-gray-700">
-					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" name="scopes" value="write"/>
+				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700 dark:text-primary-400" name="scopes" value="write"/>
 					write: gated deploys, restarts, env vars, service changes
 				</label>
-				<label class="flex items-center gap-2 text-sm text-gray-700">
-					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" name="scopes" value="protected"/>
+				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700 dark:text-primary-400" name="scopes" value="protected"/>
 					protected: stop, reconfigure, or re-image protected services
 				</label>
 			</fieldset>
@@ -253,7 +253,7 @@ templ BackupCard(st *backup.Status) {
 	<div class="card mb-8" id="backup-status">
 		<h3 class="card-title mb-2">Backups</h3>
 		if !st.Enabled {
-			<p class="text-sm text-gray-500">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
 				Backups are off. Set <code>BACKUP_S3_BUCKET</code> and the other <code>BACKUP_*</code> settings to turn on nightly backups.
 			</p>
 		} else {
@@ -261,9 +261,9 @@ templ BackupCard(st *backup.Status) {
 				{ backupLastLine(st) }
 			</p>
 			if st.LastRun != nil && st.LastRun.Status == statusFailed && st.LastRun.ErrorSummary != "" {
-				<p class="mt-1 text-xs text-red-700 break-words">{ st.LastRun.ErrorSummary }</p>
+				<p class="mt-1 text-xs text-red-700 break-words dark:text-red-300">{ st.LastRun.ErrorSummary }</p>
 			}
-			<p class="mt-2 text-xs text-gray-500">
+			<p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
 				{ backupScheduleLine(st) }
 			</p>
 		}

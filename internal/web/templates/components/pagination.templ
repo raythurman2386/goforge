@@ -10,9 +10,9 @@ import (
 // Pagination renders pagination controls.
 templ Pagination(p *pagination.Pagination) {
 	if p.ShowPagination() {
-		<nav class="flex items-center justify-between border-t border-gray-100 bg-white px-6 py-3" aria-label="Pagination">
+		<nav class="flex items-center justify-between border-t border-gray-100 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-900" aria-label="Pagination">
 			<div class="hidden sm:block">
-				<p class="text-sm text-gray-700">
+				<p class="text-sm text-gray-700 dark:text-gray-300">
 					Showing
 					<span class="font-medium">{ strconv.Itoa(p.StartItem()) }</span>
 					to
@@ -61,9 +61,9 @@ templ Pagination(p *pagination.Pagination) {
 // PaginationFull renders full pagination with page numbers.
 templ PaginationFull(p *pagination.Pagination) {
 	if p.ShowPagination() {
-		<nav class="flex items-center justify-between border-t border-gray-100 bg-white px-6 py-3" aria-label="Pagination">
+		<nav class="flex items-center justify-between border-t border-gray-100 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-900" aria-label="Pagination">
 			<div class="hidden sm:block">
-				<p class="text-sm text-gray-700">
+				<p class="text-sm text-gray-700 dark:text-gray-300">
 					Showing
 					<span class="font-medium">{ strconv.Itoa(p.StartItem()) }</span>
 					to
@@ -79,7 +79,7 @@ templ PaginationFull(p *pagination.Pagination) {
 					if p.Page > 2 {
 						<a
 							href={ templ.URL(p.FirstURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500"
+							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
 							hx-get={ p.FirstURL() }
 							hx-target="#content"
 							hx-push-url="true"
@@ -95,7 +95,7 @@ templ PaginationFull(p *pagination.Pagination) {
 					if p.HasPrevious() {
 						<a
 							href={ templ.URL(p.PreviousURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500"
+							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
 							hx-get={ p.PreviousURL() }
 							hx-target="#content"
 							hx-push-url="true"
@@ -131,7 +131,7 @@ templ PaginationFull(p *pagination.Pagination) {
 					if p.HasNext() {
 						<a
 							href={ templ.URL(p.NextURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500"
+							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
 							hx-get={ p.NextURL() }
 							hx-target="#content"
 							hx-push-url="true"
@@ -146,7 +146,7 @@ templ PaginationFull(p *pagination.Pagination) {
 					if p.Page < p.TotalPages-1 {
 						<a
 							href={ templ.URL(p.LastURL()) }
-							class="btn-secondary btn-sm !px-2 text-gray-500"
+							class="btn-secondary btn-sm !px-2 text-gray-500 dark:text-gray-400"
 							hx-get={ p.LastURL() }
 							hx-target="#content"
 							hx-push-url="true"
@@ -166,7 +166,7 @@ templ PaginationFull(p *pagination.Pagination) {
 
 // PaginationInfo renders just the item count info (e.g., "Showing 1 to 20 of 100 results").
 templ PaginationInfo(p *pagination.Pagination) {
-	<p class="text-sm text-gray-700">
+	<p class="text-sm text-gray-700 dark:text-gray-300">
 		if p.IsEmpty() {
 			No results found
 		} else {
@@ -184,7 +184,7 @@ templ PaginationInfo(p *pagination.Pagination) {
 // PerPageSelector renders a dropdown to select items per page.
 templ PerPageSelector(p *pagination.Pagination, options []int) {
 	<div class="flex items-center space-x-2">
-		<label for="per_page" class="text-sm text-gray-700">Show</label>
+		<label for="per_page" class="text-sm text-gray-700 dark:text-gray-300">Show</label>
 		<select
 			id="per_page"
 			name="per_page"

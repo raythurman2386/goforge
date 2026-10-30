@@ -64,10 +64,10 @@ templ Checkbox(label, name string, checked bool) {
 			if checked {
 				checked
 			}
-			class="h-4 w-4 rounded border-gray-300 text-primary-600"
+			class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-gray-700 dark:text-primary-400"
 		/>
 		<input type="hidden" name={ name } value="false"/>
-		<label for={ name } class="ml-2 block text-sm font-medium text-gray-700">
+		<label for={ name } class="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
 			{ label }
 		</label>
 	</div>
