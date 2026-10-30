@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/raythurman2386/goforge/internal/config"
@@ -53,5 +54,26 @@ func TestDatabaseType_String(t *testing.T) {
 				t.Errorf("DatabaseType = %q, want %q", string(tt.dbType), tt.expected)
 			}
 		})
+	}
+}
+
+func TestLatestMigrationVersion(t *testing.T) {
+	v, err := LatestMigrationVersion()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := postgresFS.ReadDir("migrations/postgres")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var newest uint
+	for _, e := range entries {
+		var n uint
+		if _, err := fmt.Sscanf(e.Name(), "%d_", &n); err == nil && n > newest {
+			newest = n
+		}
+	}
+	if v != newest || v < 21 {
+		t.Fatalf("LatestMigrationVersion = %d, want %d (>= 21)", v, newest)
 	}
 }

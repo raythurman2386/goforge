@@ -48,6 +48,9 @@ const (
 	AuditActionAPITokenCreate = "api_token.create"
 	AuditActionAPITokenRotate = "api_token.rotate"
 	AuditActionAPITokenRevoke = "api_token.revoke"
+	// AuditActionBackupRestore is written by `goforge backup restore` into
+	// the restored database. Details hold {"run_key": ...} only.
+	AuditActionBackupRestore = "backup.restore"
 )
 
 // Common resource types
@@ -60,4 +63,5 @@ const (
 	ResourceTypeGitSource       = "git_source"
 	ResourceTypeBackupSettings  = "backup_settings"
 	ResourceTypeAPIToken        = "api_token"
+	ResourceTypeBackupRun       = "backup_run"
 )

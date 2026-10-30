@@ -61,6 +61,16 @@ func (m *memStore) Delete(_ context.Context, keys []string) error {
 	return nil
 }
 
+func (m *memStore) Get(_ context.Context, key string) (io.ReadCloser, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	b, ok := m.objects[key]
+	if !ok {
+		return nil, ErrObjectNotFound
+	}
+	return io.NopCloser(bytes.NewReader(b)), nil
+}
+
 func (m *memStore) keys() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -129,7 +129,7 @@ docker run --rm -v goforge_postgres_data:/data -v $(pwd):/backup \
 
 ### Restore from Backup
 
-Restore is manual. For a built-in backup, follow [Backup & Restore](../deployment/backup.md#restore). For a one-off `pg_dump` from above:
+For a built-in backup, `goforge backup restore <run key>` restores the GoForge database; see [Backup & Restore](../deployment/backup.md#restore). For a one-off `pg_dump` from above:
 
 ```bash
 # Restore PostgreSQL

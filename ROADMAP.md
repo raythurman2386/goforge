@@ -153,7 +153,7 @@ The focus for the next release is hardening the platform and improving the devel
 - [x] **Deployment cancel status:** The `canceled` status matches the database check constraint
 
 ### 2. Enhanced Services
-- [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. Backup only; restore is manual. Not yet: other templates, restore tooling, run-now from the API
+- [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. `goforge backup list` / `goforge backup restore` restore the GoForge database (side database, then rename; previous one kept), with a read-only Restore points list on Settings → Profile. Service data restore is manual. Not yet: other templates, service restore tooling, web/API restore, run-now from the API
 - [x] **More Templates:** MySQL, MongoDB, MinIO *(shipped in `templates/`, alongside MariaDB, NocoDB, Uptime Kuma, Gitea, Vaultwarden, and SolidCraft)*
 - [ ] **More Templates (next):** Plausible, PocketBase.
 - [ ] **Service Networking:** Private internal networking between projects and services.
@@ -280,7 +280,8 @@ Before tagging V1.0, the following **must** be completed:
 Parked items need Raymond's OK before anyone starts them.
 
 - [ ] **#48 Service edit CAS** (parked): compare-and-swap on service config edits
-- [ ] **Backup restore** (parked): restore tooling or a run-now path; restore is manual today (`docs/deployment/backup.md`)
+- [x] **Backup restore (GoForge database)**: `goforge backup list` and `goforge backup restore <run key>` (CLI only), read-only Restore points on Settings → Profile; PostgreSQL 15 runbook fixed (`docs/deployment/backup.md`)
+- [ ] **Backup restore, follow-up** (parked): service data restore (Postgres services, Gitea, Vaultwarden), web/API/MCP restore, run-now from the API
 - [x] **Aesthetics Goal 3 nits** (#68 leftovers): `class_check.py` also checks `class={ ... }`, `*Class()` helpers, and `app.js` classes; `make css` fails unless it runs Tailwind v3.4.17 (standalone or `npx`); unused `.sidebar-link*` removed; dark `select` chevron; auth-aware error page (B17)
 - [ ] **Deadcode sweep** (parked): `deadcode ./...` reported 96 unreachable functions on 2026-10-29. Not removed in the cleanup goal; needs a reviewed pass
 - [ ] **Stale remote branches** (needs Raymond's OK): about 30 squash-merged branches remain on `origin` (for example `ui/shell-fixes`, `security/auth-edge-hardening`, `fix/4x-*`). Delete only with approval

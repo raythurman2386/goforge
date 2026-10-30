@@ -39,12 +39,12 @@ environment to a server.
 ## 3. How the code is laid out
 
 ```
-cmd/goforge/          # Server and CLI: serve, migrate, backup run
+cmd/goforge/          # Server and CLI: serve, migrate, backup run|list|restore
 cmd/goforge-mcp/      # MCP server over stdio; calls /api/v1 with a scoped token
 internal/
   apiv1/              # JSON API /api/v1: bearer tokens, scopes, gated writes
   auth/               # Sessions, local and GitHub login, CSRF
-  backup/             # Nightly S3 backups and `goforge backup run`
+  backup/             # Nightly S3 backups, `goforge backup run`, and GoForge DB restore
   config/             # Environment config and validation
   database/           # Connection, migrations, repositories
   deploy/             # Deployment pipeline and queue

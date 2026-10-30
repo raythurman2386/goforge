@@ -21,7 +21,7 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 - **Real-time Updates:** SSE-powered deployment logs and status updates.
 - **One-click Services:** PostgreSQL, Redis, Gitea, Vaultwarden, MinIO, and more from YAML templates in `templates/`, including shared Postgres and Redis for several apps. See [Services](docs/guides/services.md).
 - **API v1 and MCP:** a bearer-token JSON API at `/api/v1` with scoped tokens and gated, audited writes, and the same MCP tools at `/mcp` (streamable HTTP, scoped Profile tokens, set up from Settings → Profile → MCP), with `goforge-mcp` as a stdio fallback. See [API v1](docs/reference/api-v1.md) and [MCP server](docs/guides/mcp.md).
-- **Nightly Backups:** the GoForge database and Postgres, Gitea, and Vaultwarden services uploaded to S3-compatible storage (R2, B2, MinIO) every night, plus `goforge backup run` on demand. Restore is a manual runbook. See [Backup & Restore](docs/deployment/backup.md).
+- **Nightly Backups:** the GoForge database and Postgres, Gitea, and Vaultwarden services uploaded to S3-compatible storage (R2, B2, MinIO) every night, plus `goforge backup run` on demand. `goforge backup restore` puts the GoForge database back from a run; service data restore is a manual runbook. See [Backup & Restore](docs/deployment/backup.md).
 
 ## Getting Started
 
@@ -156,7 +156,7 @@ GoForge follows a clean architecture with:
    - Audit logs are partially implemented - complete before production use
 
 6. **Data Protection**
-   - Turn on the built-in nightly backups (`BACKUP_S3_BUCKET` and friends) or run your own. See [Backup & Restore](docs/deployment/backup.md). Restore is manual
+   - Turn on the built-in nightly backups (`BACKUP_S3_BUCKET` and friends) or run your own. See [Backup & Restore](docs/deployment/backup.md). `goforge backup restore` restores the GoForge database; service data restore is manual
    - `ENCRYPTION_KEY` encrypts these values at rest with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, and one-click service `config` and `connection_info`
    - Rows written in plaintext by an older version stay readable and are encrypted the next time they are updated
    - Non-secret project variables are stored in plaintext

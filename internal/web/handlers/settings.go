@@ -32,6 +32,7 @@ type SettingsHandler struct {
 	mcp             *settings.MCPCard
 	backups         BackupStatusReader
 	backupSettings  BackupSettings
+	restorePoints   RestorePointLister
 	audit           AuditRecorder
 	logger          *slog.Logger
 }
