@@ -2,13 +2,11 @@ package apiv1
 
 import (
 	"database/sql"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/network"
 
+	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
 )
@@ -258,118 +256,12 @@ func toTemplate(t *services.ServiceTemplate) templateDTO {
 	return out
 }
 
-// containerStateDTO is what Docker inspect says about a container, minus
-// anything that can hold a secret: the environment, command, and args are
-// never copied, and only traefik.enable and router rules are read from labels.
-type containerStateDTO struct {
-	DockerID      string            `json:"docker_id"`
-	Name          string            `json:"name"`
-	Image         string            `json:"image"`
-	State         string            `json:"state"`
-	Running       bool              `json:"running"`
-	Health        string            `json:"health,omitempty"`
-	RestartCount  int               `json:"restart_count"`
-	ExitCode      int               `json:"exit_code"`
-	OOMKilled     bool              `json:"oom_killed"`
-	StartedAt     string            `json:"started_at,omitempty"`
-	FinishedAt    string            `json:"finished_at,omitempty"`
-	Ports         []portBindingDTO  `json:"ports"`
-	TraefikEnable bool              `json:"traefik_enable"`
-	TraefikRules  map[string]string `json:"traefik_rules,omitempty"`
-	Volumes       []mountDTO        `json:"volumes"`
-	Limits        limitsDTO         `json:"limits"`
-	Networks      []string          `json:"networks"`
-}
-
-type portBindingDTO struct {
-	Container string `json:"container"`
-	HostIP    string `json:"host_ip,omitempty"`
-	HostPort  string `json:"host_port,omitempty"`
-}
-
-type mountDTO struct {
-	Type        string `json:"type"`
-	Name        string `json:"name,omitempty"`
-	Destination string `json:"destination"`
-	ReadWrite   bool   `json:"read_write"`
-}
-
-type limitsDTO struct {
-	MemoryBytes int64   `json:"memory_bytes"`
-	CPUs        float64 `json:"cpus"`
-}
-
-// appendPortBindings flattens a port map into DTO rows; an exposed port with
-// no host binding gets one row with only Container set.
-func appendPortBindings(out []portBindingDTO, ports network.PortMap) []portBindingDTO {
-	for port, bindings := range ports {
-		if len(bindings) == 0 {
-			out = append(out, portBindingDTO{Container: port.String()})
-		}
-		for _, b := range bindings {
-			hostIP := ""
-			if b.HostIP.IsValid() {
-				hostIP = b.HostIP.String()
-			}
-			out = append(out, portBindingDTO{Container: port.String(), HostIP: hostIP, HostPort: b.HostPort})
-		}
-	}
-	return out
-}
+// containerStateDTO is the shared secret-free inspect summary; see
+// docker.SummarizeInspect. The web UI renders the same struct.
+type containerStateDTO = docker.InspectSummary
 
 func toContainerState(info *container.InspectResponse) *containerStateDTO {
-	// An inspect response without an ID carries no container.
-	if info == nil || info.ID == "" {
-		return nil
-	}
-	out := &containerStateDTO{
-		DockerID:     info.ID,
-		Name:         strings.TrimPrefix(info.Name, "/"),
-		RestartCount: info.RestartCount,
-		Ports:        []portBindingDTO{},
-		Volumes:      []mountDTO{},
-		Networks:     []string{},
-	}
-	if info.Config != nil {
-		out.Image = info.Config.Image
-		out.TraefikEnable = info.Config.Labels["traefik.enable"] == "true"
-		for k, v := range info.Config.Labels {
-			if strings.HasPrefix(k, "traefik.http.routers.") && strings.HasSuffix(k, ".rule") {
-				if out.TraefikRules == nil {
-					out.TraefikRules = map[string]string{}
-				}
-				out.TraefikRules[k] = v
-			}
-		}
-	}
-	if s := info.State; s != nil {
-		out.State = string(s.Status)
-		out.Running = s.Running
-		out.ExitCode = s.ExitCode
-		out.OOMKilled = s.OOMKilled
-		out.StartedAt = s.StartedAt
-		out.FinishedAt = s.FinishedAt
-		if s.Health != nil {
-			out.Health = string(s.Health.Status)
-		}
-	}
-	if info.HostConfig != nil {
-		out.Limits = limitsDTO{MemoryBytes: info.HostConfig.Memory, CPUs: float64(info.HostConfig.NanoCPUs) / 1e9}
-	}
-	if info.NetworkSettings != nil {
-		out.Ports = appendPortBindings(out.Ports, info.NetworkSettings.Ports)
-		for name := range info.NetworkSettings.Networks {
-			out.Networks = append(out.Networks, name)
-		}
-	}
-	sort.Slice(out.Ports, func(i, j int) bool {
-		return out.Ports[i].Container+out.Ports[i].HostPort < out.Ports[j].Container+out.Ports[j].HostPort
-	})
-	sort.Strings(out.Networks)
-	for _, m := range info.Mounts {
-		out.Volumes = append(out.Volumes, mountDTO{Type: string(m.Type), Name: m.Name, Destination: m.Destination, ReadWrite: m.RW})
-	}
-	return out
+	return docker.SummarizeInspect(info)
 }
 
 type trackedContainerDTO struct {

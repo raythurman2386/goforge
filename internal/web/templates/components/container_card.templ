@@ -1,0 +1,77 @@
+package components
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/raythurman2386/goforge/internal/docker"
+)
+
+// ContainerCard summarizes one container from docker.SummarizeInspect, the
+// same secret-free mapping /api/v1 returns. summary is nil when inspect
+// failed; the card then says so and keeps the logs link.
+templ ContainerCard(dockerID string, summary *docker.InspectSummary, class string) {
+	<div class={ "card overflow-hidden !p-0", class } id="container-card" data-container-card>
+		<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/50">
+			<div>
+				<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Container</h3>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">What Docker reports for this container.</p>
+			</div>
+			<a href={ templ.SafeURL("/containers/" + dockerID) } class="text-sm text-primary-600 hover:text-primary-800 font-medium hover:underline dark:text-primary-400 dark:hover:text-primary-200">
+				View logs &rarr;
+			</a>
+		</div>
+		if summary == nil {
+			<p class="px-6 py-5 text-sm text-gray-500 dark:text-gray-400">Container details are not available: Docker did not answer for this container.</p>
+		} else {
+			<dl class="divide-y divide-gray-100 dark:divide-gray-800">
+				@containerRow("Image") {
+					<span class="font-mono break-all">{ summary.Image }</span>
+				}
+				@containerRow("State") {
+					@StatusBadge("container", summary.State)
+				}
+				@containerRow("Health") {
+					{ containerHealth(summary) }
+				}
+				@containerRow("Started") {
+					{ containerStarted(summary, time.Now()) }
+				}
+				@containerRow("Restarts") {
+					{ fmt.Sprint(summary.RestartCount) }
+					if summary.OOMKilled {
+						<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300">OOM killed</span>
+					}
+				}
+				@containerRow("Limits") {
+					{ containerLimits(summary) }
+				}
+				@containerRow("Ports") {
+					if ports := containerPorts(summary); len(ports) > 0 {
+						for _, p := range ports {
+							<div class="font-mono">{ p }</div>
+						}
+					} else {
+						None
+					}
+				}
+				if rules := summary.HostRules(); len(rules) > 0 {
+					@containerRow("Traefik host rule") {
+						for _, rule := range rules {
+							<div class="font-mono break-all">{ rule }</div>
+						}
+					}
+				}
+			</dl>
+		}
+	</div>
+}
+
+templ containerRow(label string) {
+	<div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+		<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 dark:text-gray-100">
+			{ children... }
+		</dd>
+	</div>
+}

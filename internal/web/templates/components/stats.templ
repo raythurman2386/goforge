@@ -6,7 +6,9 @@ import (
 )
 
 // Stats is the container resource panel streamed over SSE ("stats" event)
-// into #container-stats on the container detail page.
+// into #container-stats on the container detail page and the Resource Usage
+// cards on service and project detail. Network and block I/O are cumulative
+// totals since the container started.
 templ Stats(metrics *models.ContainerMetrics) {
 	<dl class="grid grid-cols-1 gap-5 sm:grid-cols-2">
 		<div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
@@ -30,5 +32,32 @@ templ Stats(metrics *models.ContainerMetrics) {
 				{ fmt.Sprintf("%.1f%%", metrics.MemoryPercent) } of { fmt.Sprintf("%.0f MB", float64(metrics.MemoryLimit)/1024/1024) }
 			</dd>
 		</div>
+		<div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
+			<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Network I/O</dt>
+			<dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100" data-stat="network">
+				{ HumanBytes(metrics.NetworkRx) } in / { HumanBytes(metrics.NetworkTx) } out
+			</dd>
+			<dd class="mt-1 text-xs text-gray-500 dark:text-gray-400">Total since start</dd>
+		</div>
+		<div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
+			<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Block I/O</dt>
+			<dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100" data-stat="block">
+				{ HumanBytes(metrics.BlockRead) } read / { HumanBytes(metrics.BlockWrite) } written
+			</dd>
+			<dd class="mt-1 text-xs text-gray-500 dark:text-gray-400">Total since start</dd>
+		</div>
 	</dl>
+}
+
+// StatsUnavailable is streamed as the "unavailable" SSE event when no sample
+// can be taken, so the card says why instead of spinning forever.
+templ StatsUnavailable(reason string) {
+	<div class="flex items-center justify-center py-12" data-stats-unavailable>
+		<div class="flex flex-col items-center text-center">
+			<svg class="h-8 w-8 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z"></path>
+			</svg>
+			<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{ reason }</p>
+		</div>
+	</div>
 }

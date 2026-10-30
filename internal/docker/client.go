@@ -105,8 +105,9 @@ func IsDigestReference(ref string) bool {
 	return strings.Contains(ref, "@")
 }
 
-// GetStats returns a one-shot statistics snapshot for a container. The caller
-// closes Body.
+// GetStats returns a one-shot statistics snapshot for a container. With
+// Stream false and no IncludePreviousSample the client sends one-shot=true,
+// so Docker answers at once and PreCPUStats is empty. The caller closes Body.
 func (c *Client) GetStats(ctx context.Context, id string) (client.ContainerStatsResult, error) {
 	return c.docker.ContainerStats(ctx, id, client.ContainerStatsOptions{Stream: false})
 }

@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/moby/moby/api/types/build"
 	"github.com/moby/moby/api/types/container"
@@ -49,5 +50,42 @@ func TestCalculateDiskUsage_ManagedOnly(t *testing.T) {
 	// Unused managed image plus the stopped managed container.
 	if info.ReclaimableSize != 14 {
 		t.Fatalf("reclaimable = %d, want 14", info.ReclaimableSize)
+	}
+}
+
+func TestMetricsFromSamples(t *testing.T) {
+	t.Parallel()
+
+	sample := func(total, system uint64) *container.StatsResponse {
+		return &container.StatsResponse{
+			CPUStats:    container.CPUStats{CPUUsage: container.CPUUsage{TotalUsage: total}, SystemUsage: system, OnlineCPUs: 2},
+			MemoryStats: container.MemoryStats{Usage: 50, Limit: 200},
+			Networks: map[string]container.NetworkStats{
+				"eth0": {RxBytes: 100, TxBytes: 10},
+				"eth1": {RxBytes: 5, TxBytes: 1},
+			},
+			BlkioStats: container.BlkioStats{IoServiceBytesRecursive: []container.BlkioStatEntry{
+				{Op: "read", Value: 7}, {Op: "write", Value: 3}, {Op: "Read", Value: 1}, {Op: "Write", Value: 2},
+			}},
+		}
+	}
+
+	m := MetricsFromSamples("abc", sample(1000, 10000), sample(2000, 14000))
+	// (1000 / 4000) * 2 CPUs * 100
+	if m.CPUPercent != 50 {
+		t.Fatalf("cpu = %v, want 50", m.CPUPercent)
+	}
+	if m.MemoryPercent != 25 {
+		t.Fatalf("mem = %v, want 25", m.MemoryPercent)
+	}
+	if m.NetworkRx != 105 || m.NetworkTx != 11 {
+		t.Fatalf("network rx/tx = %d/%d, want 105/11", m.NetworkRx, m.NetworkTx)
+	}
+	if m.BlockRead != 8 || m.BlockWrite != 5 {
+		t.Fatalf("block read/write = %d/%d, want 8/5", m.BlockRead, m.BlockWrite)
+	}
+
+	if !SampleNotRunning(&container.StatsResponse{}) || SampleNotRunning(&container.StatsResponse{Read: time.Now()}) {
+		t.Fatal("SampleNotRunning must key on the zero read time")
 	}
 }

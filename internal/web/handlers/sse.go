@@ -3,6 +3,7 @@ package handlers
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,8 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
@@ -28,12 +31,28 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/deployments"
 )
 
+// Stats stream timing. The first frame needs two samples for a CPU delta, so
+// the second sample follows the first after statsPrimeDelay; later frames
+// come every statsInterval.
+const (
+	statsPrimeDelay = 500 * time.Millisecond
+	statsInterval   = 2 * time.Second
+)
+
+// statsSampler takes one raw one-shot stats sample; *monitor.Collector
+// satisfies it.
+type statsSampler interface {
+	SampleStats(ctx context.Context, dockerID string) (*container.StatsResponse, error)
+}
+
 // SSEHandler handles Server-Sent Events for log streaming.
 type SSEHandler struct {
 	hub            *sse.Hub
 	dockerClient   *docker.Client
-	collector      *monitor.Collector
-	containerRepo  *repositories.ContainerRepository
+	stats          statsSampler
+	statsPrime     time.Duration
+	statsInterval  time.Duration
+	ownsContainer  func(ctx context.Context, dockerID, userID string) (bool, error)
 	deployService  *deploy.Service
 	projectService *project.Service
 	logger         *slog.Logger
@@ -44,15 +63,23 @@ func NewSSEHandler(hub *sse.Hub, dc *docker.Client, c *monitor.Collector,
 	cr *repositories.ContainerRepository, _ *repositories.ServiceInstanceRepository,
 	ds *deploy.Service, ps *project.Service, logger *slog.Logger,
 ) *SSEHandler {
-	return &SSEHandler{
+	h := &SSEHandler{
 		hub:            hub,
 		dockerClient:   dc,
-		collector:      c,
-		containerRepo:  cr,
+		statsPrime:     statsPrimeDelay,
+		statsInterval:  statsInterval,
 		deployService:  ds,
 		projectService: ps,
 		logger:         logger,
 	}
+	// Leave the interfaces nil, not typed-nil, when a dependency is missing.
+	if c != nil {
+		h.stats = c
+	}
+	if cr != nil {
+		h.ownsContainer = cr.OwnedByUser
+	}
+	return h
 }
 
 // setSSEHeaders sets the standard headers for SSE responses.
@@ -218,29 +245,75 @@ func (h *SSEHandler) ContainerStats(w http.ResponseWriter, r *http.Request) {
 		"id": containerID,
 	})
 
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+	h.streamStats(w, flusher, r, containerID)
+}
+
+// streamStats sends a "stats" frame from each pair of one-shot samples, the
+// first about statsPrime after connect. When the container is gone or not
+// running it sends one "unavailable" frame per distinct reason and keeps
+// sampling, so the card recovers if the container comes back.
+func (h *SSEHandler) streamStats(w http.ResponseWriter, flusher http.Flusher, r *http.Request, containerID string) {
+	ctx := r.Context()
+	var prev *container.StatsResponse
+	lastReason := ""
+	timer := time.NewTimer(0)
+	defer timer.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
-			stats, err := h.collector.CollectStats(r.Context(), containerID)
-			if err != nil {
-				h.logger.Debug("failed to collect container stats", "container_id", containerID, "error", err)
-				continue
-			}
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
 
-			var buf bytes.Buffer
-			if err := components.Stats(stats).Render(r.Context(), &buf); err != nil {
-				h.logger.Debug("failed to render stats component", "container_id", containerID, "error", err)
-				continue
-			}
-			writeRawEvent(w, flusher, "stats", buf.Bytes())
-
-		case <-r.Context().Done():
+		cur, reason := h.sampleStats(ctx, containerID)
+		if ctx.Err() != nil {
 			return
 		}
+		switch {
+		case reason != "":
+			prev = nil
+			if reason != lastReason {
+				writeStatsFragment(w, flusher, r, "unavailable", components.StatsUnavailable(reason))
+				lastReason = reason
+			}
+			timer.Reset(h.statsInterval)
+		case prev == nil:
+			// Keep the first good sample and take the next one soon, so the
+			// first frame carries a real CPU delta.
+			prev = cur
+			timer.Reset(h.statsPrime)
+		default:
+			writeStatsFragment(w, flusher, r, "stats", components.Stats(monitor.MetricsFromSamples(containerID, prev, cur)))
+			prev = cur
+			lastReason = ""
+			timer.Reset(h.statsInterval)
+		}
 	}
+}
+
+// sampleStats returns a sample, or a user-facing reason when there is none.
+func (h *SSEHandler) sampleStats(ctx context.Context, containerID string) (sample *container.StatsResponse, reason string) {
+	if h.stats == nil {
+		return nil, "Metrics are not available: Docker is not connected."
+	}
+	cur, err := h.stats.SampleStats(ctx, containerID)
+	if err != nil {
+		h.logger.Debug("failed to collect container stats", "container_id", containerID, "error", err)
+		return nil, "Metrics are not available: the container was not found or Docker did not answer."
+	}
+	if monitor.SampleNotRunning(cur) {
+		return nil, "Metrics are not available: the container is not running."
+	}
+	return cur, ""
+}
+
+func writeStatsFragment(w http.ResponseWriter, flusher http.Flusher, r *http.Request, event string, c templ.Component) {
+	var buf bytes.Buffer
+	if err := c.Render(r.Context(), &buf); err != nil {
+		return
+	}
+	writeRawEvent(w, flusher, event, buf.Bytes())
 }
 
 // BuildOutput streams build output via SSE.
@@ -312,12 +385,12 @@ func (h *SSEHandler) verifyContainerOwnership(w http.ResponseWriter, r *http.Req
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return false
 	}
-	if h.containerRepo == nil {
+	if h.ownsContainer == nil {
 		http.Error(w, "access denied", http.StatusForbidden)
 		return false
 	}
 
-	owned, err := h.containerRepo.OwnedByUser(r.Context(), dockerID, user.ID)
+	owned, err := h.ownsContainer(r.Context(), dockerID, user.ID)
 	if err != nil || !owned {
 		http.Error(w, "access denied", http.StatusForbidden)
 		return false

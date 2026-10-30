@@ -193,8 +193,20 @@ func managedDockerLabels(labels map[string]string) bool {
 	return labels[docker.ManagedLabelKey] == docker.ManagedLabelValue
 }
 
-// CollectStats collects stats for a container once.
+// CollectStats collects stats for a container once. CPU percent comes from
+// the sample's own PreCPUStats, which a one-shot sample leaves empty; streams
+// that need an accurate CPU figure use SampleStats and MetricsFromSamples.
 func (c *Collector) CollectStats(ctx context.Context, dockerID string) (*models.ContainerMetrics, error) {
+	v, err := c.SampleStats(ctx, dockerID)
+	if err != nil {
+		return nil, err
+	}
+	return c.calculateMetrics(dockerID, v), nil
+}
+
+// SampleStats returns one raw one-shot stats sample. Docker answers at once,
+// without waiting a second for a previous CPU sample.
+func (c *Collector) SampleStats(ctx context.Context, dockerID string) (*container.StatsResponse, error) {
 	stats, err := c.dockerClient.GetStats(ctx, dockerID)
 	if err != nil {
 		return nil, err
@@ -205,16 +217,36 @@ func (c *Collector) CollectStats(ctx context.Context, dockerID string) (*models.
 	if err := json.NewDecoder(stats.Body).Decode(&v); err != nil {
 		return nil, err
 	}
+	return &v, nil
+}
 
-	return c.calculateMetrics(dockerID, &v), nil
+// SampleNotRunning reports whether Docker answered with the empty sample it
+// returns for a container that is not running (no read time).
+func SampleNotRunning(v *container.StatsResponse) bool {
+	return v == nil || v.Read.IsZero()
+}
+
+// MetricsFromSamples computes metrics from two one-shot samples of the same
+// container. CPU percent is the delta between prev and cur; with no prev it
+// falls back to cur.PreCPUStats (empty for a one-shot sample, so 0%).
+func MetricsFromSamples(dockerID string, prev, cur *container.StatsResponse) *models.ContainerMetrics {
+	pre := cur.PreCPUStats
+	if prev != nil {
+		pre = prev.CPUStats
+	}
+	return metricsFrom(dockerID, pre, cur)
 }
 
 func (c *Collector) calculateMetrics(dockerID string, v *container.StatsResponse) *models.ContainerMetrics {
+	return metricsFrom(dockerID, v.PreCPUStats, v)
+}
+
+func metricsFrom(dockerID string, pre container.CPUStats, v *container.StatsResponse) *models.ContainerMetrics {
 	// Calculate CPU Percent
 	// Formula: (cpuDelta / systemDelta) * numCores * 100.0
 	cpuPercent := 0.0
-	cpuDelta := float64(v.CPUStats.CPUUsage.TotalUsage) - float64(v.PreCPUStats.CPUUsage.TotalUsage)
-	systemDelta := float64(v.CPUStats.SystemUsage) - float64(v.PreCPUStats.SystemUsage)
+	cpuDelta := float64(v.CPUStats.CPUUsage.TotalUsage) - float64(pre.CPUUsage.TotalUsage)
+	systemDelta := float64(v.CPUStats.SystemUsage) - float64(pre.SystemUsage)
 
 	if systemDelta > 0.0 && cpuDelta > 0.0 {
 		// On cgroups v2, PercpuUsage is empty; fall back to OnlineCPUs.
@@ -234,6 +266,21 @@ func (c *Collector) calculateMetrics(dockerID string, v *container.StatsResponse
 		memPercent = float64(memUsage) / float64(memLimit) * 100.0
 	}
 
+	var rx, tx uint64
+	for _, n := range v.Networks {
+		rx += n.RxBytes
+		tx += n.TxBytes
+	}
+	var blkRead, blkWrite uint64
+	for _, e := range v.BlkioStats.IoServiceBytesRecursive {
+		switch strings.ToLower(e.Op) {
+		case "read":
+			blkRead += e.Value
+		case "write":
+			blkWrite += e.Value
+		}
+	}
+
 	return &models.ContainerMetrics{
 		ContainerID:   dockerID,
 		Timestamp:     time.Now(),
@@ -241,5 +288,9 @@ func (c *Collector) calculateMetrics(dockerID string, v *container.StatsResponse
 		MemoryUsage:   memUsage,
 		MemoryLimit:   memLimit,
 		MemoryPercent: memPercent,
+		NetworkRx:     int64(rx),
+		NetworkTx:     int64(tx),
+		BlockRead:     int64(blkRead),
+		BlockWrite:    int64(blkWrite),
 	}
 }

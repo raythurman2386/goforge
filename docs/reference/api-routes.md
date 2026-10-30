@@ -230,7 +230,7 @@ Under `/api/v1` both answer JSON: `{"error":{"code":"not_found",...}}`.
 The following endpoints use Server-Sent Events for real-time streaming:
 
 - **`/projects/{id}/deployments/{deploymentID}/logs`** - Streams deployment build and runtime logs in real-time
-- **`/containers/{id}/stats`** - Streams CPU, memory, network I/O metrics
+- **`/containers/{id}/stats`** - Streams CPU, memory, network I/O, and block I/O (`stats` event, first frame about 0.5 s after connect, then every 2 s), or an `unavailable` event when the container is stopped or missing
 - **`/containers/{id}/logs`** - Streams container stdout/stderr output
 
 SSE connections are long-lived HTTP connections. Clients should handle reconnection on disconnect.
