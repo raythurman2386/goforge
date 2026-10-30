@@ -78,9 +78,10 @@ reviewer is the check.
 1. **`make check` is green before you push.** It runs `fmt-check`, `vet`,
    `lint` (golangci-lint via `go tool`, pinned in `go.mod`), and `test` with
    the race detector. CI (`.github/workflows/ci.yml`) runs the same checks on
-   every PR, but its lint step uses `golangci/golangci-lint-action@v6` with
-   `version: latest`, not the `go.mod` pin, so CI can flag lints a local
-   `make lint` does not.
+   every PR; its lint step (`golangci/golangci-lint-action@v6`) pins the same
+   golangci-lint version as `go.mod` (v1.64.8). CI also has a `css` job that
+   builds Tailwind v3.4.17 and runs `scripts/class_check.py`; run it locally
+   with `make css-check` when you touch templates, `static/js`, or CSS.
 2. **Follow the Go style in [AGENTS.md](AGENTS.md).** Wrapped errors,
    `context.Context` first, grouped imports, sentinel errors with
    `errors.Is`. Enforced by golangci-lint and review.

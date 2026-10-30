@@ -181,15 +181,15 @@ func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Perform the rollback
-	info, err := h.rollbackManager.Rollback(r.Context(), deployment.EnvironmentID, "manual rollback")
-	if err != nil {
+	// Perform the rollback. The returned rollback info is not shown in the UI:
+	// HX-Redirect reloads the deployment page, so a toast sent with this
+	// response would be lost. ROADMAP.md tracks surfacing it.
+	if _, err := h.rollbackManager.Rollback(r.Context(), deployment.EnvironmentID, "manual rollback"); err != nil {
 		http.Error(w, "rollback failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Redirect back to deployment detail page with rollback info
-	_ = info // TODO: Show rollback info in UI via toast
+	// Redirect back to the deployment detail page.
 	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID)
 	w.WriteHeader(http.StatusOK)
 }

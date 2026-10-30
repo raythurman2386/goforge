@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap tracks the development of GoForge.
+This roadmap tracks the development of GoForge. Last brought up to date through #71 (2026-10-30).
 
 ## 🚨 CRITICAL: User Flow & Experience Gaps (Immediate Priority)
 
@@ -55,16 +55,16 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 ### Phase 2: UX Polish & Edge Cases
 
 #### 5. Navigation & Wayfinding
-- [ ] **Breadcrumbs** (Add to all major pages)
+- [ ] **Breadcrumbs** (Add to all major pages) *(Partial: `components.Breadcrumbs` exists since #67 and is used on deployment and container detail; project and service detail still lack it)*
   - Project detail: Dashboard → Projects → {Project Name}
   - Service detail: Dashboard → Services → {Service Name}
   - Deployment detail: Already has breadcrumbs (reference implementation)
 - [ ] **Back Navigation**
   - Consistent back buttons on detail pages
   - Preserve filter/sort state when returning to lists
-- [ ] **Active Sidebar State**
-  - Highlight current page in sidebar
-  - Show project list in sidebar (currently static)
+- [x] **Active Sidebar State** *(#65)*
+  - Highlight current page in sidebar (`data-nav` links; `static/js/app.js` sets `aria-current="page"` on the longest prefix match)
+  - Show project list in sidebar: dropped. #65 removed the static "Recent projects" section instead of populating it
 
 #### 6. Form & Validation Improvements
 - [ ] **Client-Side Validation**
@@ -74,20 +74,20 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 - [ ] **Inline Error Messages**
   - Field-level error display (not just top-level)
   - Specific validation messages
-- [ ] **Loading States**
-  - Disable buttons during HTMX requests
-  - Show spinner on async actions
-  - Progress indicators for long operations
+- [ ] **Loading States** *(Partial, #65)*
+  - [x] Disable buttons during HTMX requests (`hx-disabled-elt` on Deploy Now, service Restart and Update image, Sync from repo, and the HTMX form submits)
+  - [x] Show spinner on async actions (`components.Spinner` via `hx-indicator`)
+  - [ ] Progress indicators for long operations
 
 #### 7. Mobile Responsiveness (High Priority)
 - [ ] **Table Views**
   - Horizontal scroll for deployment/service tables
   - Card view option for mobile
   - Collapsible columns
-- [ ] **Navigation**
-  - Hamburger menu for mobile sidebar
-  - Bottom tab bar for primary actions
-  - Touch-friendly button sizing (min 44px)
+- [ ] **Navigation** *(Partial)*
+  - [x] Hamburger menu for mobile sidebar (`#mobile-menu-btn` and overlay in `layouts/base.templ`)
+  - [ ] Bottom tab bar for primary actions
+  - [ ] Touch-friendly button sizing (min 44px), not verified
 - [ ] **Form Layouts**
   - Stack form fields on mobile
   - Full-width buttons on small screens
@@ -154,25 +154,29 @@ The focus for the next release is hardening the platform and improving the devel
 
 ### 2. Enhanced Services
 - [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. Backup only; restore is manual. Not yet: other templates, restore tooling, run-now from the API
-- [ ] **More Templates:** MySQL, MongoDB, MinIO, Plausible, PocketBase.
+- [x] **More Templates:** MySQL, MongoDB, MinIO *(shipped in `templates/`, alongside MariaDB, NocoDB, Uptime Kuma, Gitea, Vaultwarden, and SolidCraft)*
+- [ ] **More Templates (next):** Plausible, PocketBase.
 - [ ] **Service Networking:** Private internal networking between projects and services.
-- [ ] **Lifecycle Management:** Implement actual restart logic and proper container stopping in service instances.
+- [x] **Lifecycle Management:** Service instances stop, start, and restart their Docker container (`InstanceService.StopInstance` / `StartInstance` / `RestartInstance`; `POST /services/{id}/restart`), and delete removes the container.
 
 ### 3. Team & Security
 - [ ] **Team Management:** Invite users, Role-based Access Control (RBAC). *(Moved to Critical Phase. The `admin`/`user` role and `GOFORGE_ADMIN_EMAIL` grant shipped in #28; teams, invites, and per-project roles have not.)*
-- [ ] **Audit Logs:** Track who did what and when (13.4). *(Moved to Critical Phase - partially implemented)*
+- [ ] **Audit Logs:** Track who did what and when (13.4). *(Moved to Critical Phase - partially implemented. Every real `/api/v1` mutation writes an `api_v1.<action>` row first (#61); UI coverage is still partial)*
 - [ ] **2FA:** Two-factor authentication for local accounts.
 - [x] **Data Encryption:** Encrypt project variables marked as secret and OAuth access tokens at rest. *(AES-GCM with `ENCRYPTION_KEY`. Git source tokens and SSH keys and one-click service credentials are encrypted too. Legacy plaintext rows are encrypted on their next update.)*
 - [ ] **API Key Management:** Secure storage and rotation of service API keys
+- [x] **Security hardening (security queue Goals 1-3, #69-#71):** govulncheck at 0 reachable (#69); client IP from `TRUSTED_PROXIES` (rightmost untrusted hop, `CF-Connecting-IP` behind `CLOUDFLARE_PROXY_MODE`), login lockout, security headers, HMAC CSRF keyed by `CSRF_SECRET`, hourly expired-session purge (#70); repo Compose Traefik dashboard off and loopback-only, pinned `cloudflared` and `alpine`, Docker socket trust model in `SECURITY.md` (#71)
 
 ### 4. Developer Experience
 - [ ] **CLI Tool:** `goforge` CLI for deploying from terminal.
-- [ ] **API Tokens:** Personal Access Tokens for external integrations. *(Moved to Critical Phase)*
+- [x] **API Tokens:** Personal Access Tokens for external integrations, with `read` / `write` / `protected` scopes for `/api/v1` (#61).
+- [x] **JSON API and MCP:** `/api/v1` (bearer only, dry-run by default, audited mutations) and the `goforge-mcp` stdio server (#61).
 - [ ] **Build Caching:** S3/Local cache for faster Docker builds.
-- [x] **UX Polish:** Show rollback info via toast notifications and finalize login template rendering. *(Completed)*
+- [x] **UX Polish:** Finalize login template rendering.
+- [ ] **Rollback feedback:** Show the rollback result in the UI. `RollbackDeployment` discards it today because `HX-Redirect` reloads the page and would drop a toast (`internal/web/handlers/deployments.go`).
 
 ### 5. Mobile & Responsive Design
-- [ ] **Navigation:** Implement hamburger menu and mobile-optimized sidebar. *(Moved to Critical Phase)*
+- [x] **Navigation:** Hamburger menu and slide-over sidebar on small screens. *(Bottom tab bar is still open in the Critical Phase)*
 - [x] **Dashboard Cards:** Ensure stackable layouts for project/service stats on small screens.
 - [ ] **Tables:** Add horizontal scroll or card view for deployments/containers lists on mobile. *(Moved to Critical Phase)*
 - [ ] **Touch Targets:** Verify button and input sizes meet accessibility standards (min 44px). *(Moved to Critical Phase)*
@@ -206,17 +210,17 @@ The focus for the next release is hardening the platform and improving the devel
     - [x] Added container type detection (Deployment/Service/External)
     - [x] Integrated with existing SSE endpoints for real-time logs
 
-### Outstanding Issues
-- [ ] **Pipeline Robustness:**
+### Outstanding Issues (all items below are done)
+- [x] **Pipeline Robustness:**
     - [x] Implement a persistent deployment queue (PostgreSQL-backed) to survive restarts.
     - [x] Add graceful shutdown for deployment workers.
-- [ ] **Service Management:**
+- [x] **Service Management:**
     - [x] Implement `StopInstance` and `RestartInstance` functionality (currently missing).
     - [x] Fix orphaned containers: Ensure Docker containers are removed when a Service Instance is deleted.
-- [ ] **Security & Error Handling:**
+- [x] **Security & Error Handling:**
     - [x] **Information Leakage:** Fixed - replaced raw error strings with proper HTML error pages in auth.go
     - [x] **Structured Logging:** Replace `fmt.Printf` with the structural logger in critical paths (`deploy/queue.go`, `services/instance.go`).
-- [ ] **Configuration:**
+- [x] **Configuration:**
     - [x] Replace hardcoded `/tmp` paths in build pipeline with configured directories.
 
 ## 📊 V1.0 Release Readiness Checklist
@@ -238,7 +242,7 @@ Before tagging V1.0, the following **must** be completed:
 - [x] **User can add/manage API tokens (completed Mar 2026)**
 
 **Documentation:**
-- [ ] API documentation for all endpoints
+- [x] API documentation for all endpoints *(`docs/reference/api-routes.md` for UI routes, `docs/reference/api-v1.md` for the JSON API; #61, #64)*
 - [ ] User guide for first-time setup *(README now has a Compose quickstart)*
 - [ ] Deployment troubleshooting guide
 - [ ] Environment variable naming conventions doc
@@ -247,8 +251,40 @@ Before tagging V1.0, the following **must** be completed:
 - [ ] All critical user paths tested manually
 - [ ] Mobile responsiveness verified on actual devices
 - [ ] Accessibility audit (WCAG 2.1 AA)
-- [ ] Security review of auth flows
+- [ ] Security review of auth flows *(2026-10-29 audit findings on client IP, lockout, CSRF, and session purge fixed in #70; a dedicated auth-flow review is still open)*
 - [ ] Load testing for concurrent deployments
+
+---
+
+## 📦 Shipped since V1.0.x (#58-#71)
+
+- [x] **#58** Redis template enforces `requirepass`; services without a Domain get `traefik.enable=false`; Postgres health check and MinIO `command` fixed
+- [x] **#59** A1 shared data services: Postgres 17 (`pgadmin`), Redis 7.4 (AOF, `noeviction`), `scripts/shared-data/pg-tenant.sh`
+- [x] **#61** Scoped JSON API `/api/v1` and the `goforge-mcp` stdio server
+- [x] **#62** Nightly S3-compatible backups (default 02:00 America/Chicago, 7 daily kept); backup only
+- [x] **#63** `TestInstanceSource` flake fixed
+- [x] **#64** `CONTRIBUTING.md` rewrite and docs drift after #61 and #62
+- [x] **#65** UI shell: logout, toasts and HTMX error toasts, containers list target, active sidebar, button spinners (aesthetics Goal 1)
+- [x] **#66** `/containers/api` no longer shadowed by `/containers/{id}`
+- [x] **#67** Design system: `.card` / `.btn-*`, `StatusBadge`, `PageHeader`, `Breadcrumbs`, accessible `Modal`, self-hosted Inter and favicon (aesthetics Goal 2)
+- [x] **#68** System dark mode (`prefers-color-scheme`, no toggle), content-hashed `output.css`, CI `css` job with `scripts/class_check.py` (aesthetics Goal 3)
+- [x] **#69** Dependency and toolchain bump to 0 reachable govulncheck findings; Docker SDK moved to `github.com/moby/moby/client` + `api`; `golang:1.26.10` builder (security Goal 1)
+- [x] **#70** Client IP / XFF spoofing fix, login lockout, security headers, HMAC CSRF, expired-session purge (security Goal 2)
+- [x] **#71** Repo Compose hardening (Traefik dashboard off, loopback port, pinned images) and Docker socket trust model (security Goal 3)
+- [x] Cleanup and roadmap truth (security Goal 4): this ROADMAP and `CHANGELOG.md` through #71, `.env.example` gaps, Tailwind v3.4.17 pin in `make css`, `css-check` in `make ci`, golangci-lint pinned in CI, stale docs
+
+## 🅿️ Parked and follow-up
+
+Parked items need Raymond's OK before anyone starts them.
+
+- [ ] **#60 Redis ACL** (parked): per-app Redis users on shared-redis
+- [ ] **#48 Service edit CAS** (parked): compare-and-swap on service config edits
+- [ ] **Backup restore** (parked): restore tooling or a run-now path; restore is manual today (`docs/deployment/backup.md`)
+- [ ] **Aesthetics Goal 3 nits** (parked): `class_check.py` only sees literal `class="..."` strings; no repo-local Tailwind pin (the CLI comes from `PATH`, `make css` only warns on a version mismatch); unused sidebar dark tokens; `select` chevron in dark mode
+- [ ] **Deadcode sweep** (parked): `deadcode ./...` reported 96 unreachable functions on 2026-10-29. Not removed in the cleanup goal; needs a reviewed pass
+- [ ] **Stale remote branches** (needs Raymond's OK): about 30 squash-merged branches remain on `origin` (for example `ui/shell-fixes`, `security/auth-edge-hardening`, `fix/4x-*`). Delete only with approval
+- [ ] **Open audit findings** (2026-10-29), documented in `SECURITY.md`: `/health/ready` is public and returns error text (HEALTH-READY-PUBLIC); `BACKUP_S3_*` credentials in container env (ENV-CREDS); main image runs as root
+- [ ] **Rollback feedback** in the UI (see Developer Experience)
 
 ---
 

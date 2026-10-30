@@ -12,7 +12,11 @@ BINARY_PATH=bin/$(BINARY_NAME)
 
 # Tools
 TEMPL=go tool templ
-TAILWIND=tailwindcss
+# Tailwind CLI. Must be v$(TAILWIND_VERSION), the version the Dockerfile and the
+# CI css job use; v4 cannot read tailwind.config.js. Without a standalone
+# binary: make css-check TAILWIND="npx --yes tailwindcss@3.4.17"
+TAILWIND?=tailwindcss
+TAILWIND_VERSION=3.4.17
 AIR=air
 GOLINT=go tool golangci-lint
 
@@ -85,7 +89,9 @@ templ-watch:
 
 ## css: Compile TailwindCSS
 css:
-	@if command -v $(TAILWIND) >/dev/null 2>&1; then \
+	@if command -v $(firstword $(TAILWIND)) >/dev/null 2>&1; then \
+		$(TAILWIND) --help 2>&1 | grep -q "v$(TAILWIND_VERSION)" || \
+			echo "warning: $(TAILWIND) is not Tailwind v$(TAILWIND_VERSION) (Dockerfile and CI use v$(TAILWIND_VERSION))"; \
 		$(TAILWIND) -i ./static/css/input.css -o ./static/css/output.css --minify; \
 	else \
 		echo "tailwindcss not installed, using placeholder CSS"; \
@@ -138,8 +144,8 @@ install-tools:
 	@echo "Tools (templ, golangci-lint) are managed via go.mod and 'go tool'."
 	@echo "Run 'go mod download' to ensure they are available."
 	@echo ""
-	@echo "TailwindCSS must be installed manually:"
-	@echo "  curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64"
+	@echo "TailwindCSS v$(TAILWIND_VERSION) must be installed manually (not v4):"
+	@echo "  curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v$(TAILWIND_VERSION)/tailwindcss-linux-x64"
 	@echo "  chmod +x tailwindcss-linux-x64 && sudo mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss"
 
 ## docker-build: Build Docker image
@@ -158,6 +164,6 @@ docker-run:
 check: fmt-check vet lint test
 	@echo "All checks passed!"
 
-## ci: Run CI pipeline locally
-ci: deps templ css fmt-check vet lint test
+## ci: Run CI pipeline locally (needs Tailwind v3.4.17 for css-check)
+ci: deps templ css-check fmt-check vet lint test
 	@echo "CI pipeline passed!"

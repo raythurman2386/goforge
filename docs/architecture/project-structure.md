@@ -105,7 +105,7 @@ Authentication, session management, and security middleware.
 | `auth.go` | `Authenticator` interface, `LocalAuthenticator` for email/password login |
 | `session.go` | `SessionManager` -- create, validate, destroy sessions with SHA-256 token hashing |
 | `middleware.go` | Auth middleware (session loading) and `RequireAuth` middleware |
-| `csrf.go` | CSRF protection middleware using double-submit cookie pattern |
+| `csrf.go` | CSRF middleware: HMAC-SHA256 tokens keyed by `CSRF_SECRET`, session-bound when signed in |
 | `github.go` | `GitHubProvider` -- OAuth flow, user info retrieval |
 | `cookie.go` | Session and CSRF cookie helpers |
 | `password.go` | Argon2id password hashing and verification |
