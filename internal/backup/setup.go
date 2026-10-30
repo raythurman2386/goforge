@@ -12,8 +12,9 @@ import (
 	"github.com/raythurman2386/goforge/internal/docker"
 )
 
-// ErrDisabled is returned when BACKUP_S3_BUCKET is unset.
-var ErrDisabled = errors.New("backups are disabled: set BACKUP_S3_BUCKET (see docs/deployment/backup.md)")
+// ErrDisabled is returned when backups are off: no bucket in the effective
+// settings, or an admin turned them off in Settings.
+var ErrDisabled = errors.New("backups are disabled: turn them on in Settings → Profile or set BACKUP_S3_BUCKET (see docs/deployment/backup.md)")
 
 // Setup is everything serve and the CLI need to run backups.
 type Setup struct {
@@ -24,11 +25,16 @@ type Setup struct {
 	Scheduled bool
 }
 
-// RedactorFor builds a Redactor that knows every GoForge secret.
-func RedactorFor(cfg *config.Config) *Redactor {
+// RedactorFor builds a Redactor that knows every GoForge secret: the app
+// secrets, the BACKUP_* keys from the environment, and the keys of each extra
+// backup config (the Settings row, which can differ from the environment).
+func RedactorFor(cfg *config.Config, extra ...config.BackupConfig) *Redactor {
 	secrets := []string{
 		cfg.EncryptionKey, cfg.SessionSecret, cfg.CSRFSecret, cfg.WebhookSecret, cfg.GitHubClientSecret,
 		cfg.Backup.AccessKeyID, cfg.Backup.SecretAccessKey,
+	}
+	for i := range extra {
+		secrets = append(secrets, extra[i].AccessKeyID, extra[i].SecretAccessKey)
 	}
 	if u, err := url.Parse(cfg.DatabaseURL); err == nil && u.User != nil {
 		if p, ok := u.User.Password(); ok {
@@ -38,16 +44,24 @@ func RedactorFor(cfg *config.Config) *Redactor {
 	return NewRedactor(secrets...)
 }
 
-// New wires a Runner from config. It returns ErrDisabled when backups are off.
+// New wires a Runner from the environment backup config. It returns
+// ErrDisabled when backups are off.
 func New(cfg *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string) (*Setup, error) {
-	if !cfg.Backup.Enabled() {
+	return NewFor(cfg, cfg.Backup, db, dockerClient, log, version)
+}
+
+// NewFor wires a Runner for bc, the effective backup config (see
+// Effective). cfg supplies the app database URL and the secrets to redact.
+// It returns ErrDisabled when bc is off.
+func NewFor(cfg *config.Config, bc config.BackupConfig, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string) (*Setup, error) {
+	if !bc.Enabled() {
 		return nil, ErrDisabled
 	}
-	store, err := NewS3Store(cfg.Backup)
+	store, err := NewS3Store(bc)
 	if err != nil {
 		return nil, err
 	}
-	sched, scheduled, err := config.ParseDailySchedule(cfg.Backup.Schedule)
+	sched, scheduled, err := config.ParseDailySchedule(bc.Schedule)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +69,7 @@ func New(cfg *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.
 	if scheduled {
 		loc = sched.Location
 	}
-	red := RedactorFor(cfg)
+	red := RedactorFor(cfg, bc)
 	return &Setup{
 		Runner: &Runner{
 			Store: store,
@@ -68,10 +82,10 @@ func New(cfg *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.
 					Redactor:  red,
 				},
 			},
-			Prefix:    cfg.Backup.Prefix,
-			Retention: cfg.Backup.RetentionDaily,
+			Prefix:    bc.Prefix,
+			Retention: bc.RetentionDaily,
 			Location:  loc,
-			Timeout:   cfg.Backup.Timeout,
+			Timeout:   bc.Timeout,
 			Version:   version,
 			Redactor:  red,
 			Logger:    log,

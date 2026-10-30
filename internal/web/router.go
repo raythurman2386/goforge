@@ -207,6 +207,8 @@ func Router(
 						r.Put("/profile", settingsHandler.UpdateProfile)
 						r.Put("/password", settingsHandler.UpdatePassword)
 						r.Post("/prune", settingsHandler.PruneSystem)
+						r.Put("/backups", settingsHandler.UpdateBackupSettings)
+						r.Post("/backups/test", settingsHandler.TestBackupConnection)
 						r.Route("/tokens", func(r chi.Router) {
 							r.Get("/", settingsHandler.ListAPITokens)
 							r.Get("/new", settingsHandler.NewAPITokenModal)

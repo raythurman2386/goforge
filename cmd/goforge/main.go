@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -212,7 +211,16 @@ func runBackupOnce(ctx context.Context) error {
 	}
 	defer dockerClient.Close()
 
-	setup, err := backup.New(cfg, db.DB, dockerClient, logger.WithComponent(log, "backup"), version)
+	enc, err := secrets.NewEncryptorFromString(cfg.EncryptionKey)
+	if err != nil {
+		return fmt.Errorf("failed to create encryptor: %w", err)
+	}
+	// Same config serve uses: the Settings row when one exists, else BACKUP_*.
+	bc, _, err := backup.Effective(ctx, repositories.NewBackupSettingsRepository(db.DB, enc), cfg.Backup)
+	if err != nil {
+		return fmt.Errorf("read backup settings: %w", err)
+	}
+	setup, err := backup.NewFor(cfg, bc, db.DB, dockerClient, logger.WithComponent(log, "backup"), version)
 	if err != nil {
 		return err
 	}
@@ -223,7 +231,7 @@ func runBackupOnce(ctx context.Context) error {
 		return err
 	}
 	fmt.Printf("backup %s: status=%s key=%s%s objects=%d bytes=%d skipped=%d pruned=%d\n",
-		run.ID, run.Status, cfg.Backup.Prefix, run.RunKey, run.Objects, run.Bytes, run.Skipped, run.Pruned)
+		run.ID, run.Status, bc.Prefix, run.RunKey, run.Objects, run.Bytes, run.Skipped, run.Pruned)
 	if run.ErrorSummary.Valid {
 		fmt.Printf("note: %s\n", run.ErrorSummary.String)
 	}
@@ -325,18 +333,26 @@ func runServer() error {
 	// Nightly backups run inside serve. backgroundCtx is canceled on
 	// shutdown; an in-flight run then records itself as failed.
 	backgroundCtx, cancelBackground := context.WithCancel(context.Background())
-	backupDone := make(chan struct{})
+	backupLog := logger.WithComponent(log, "backup")
+	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version)
 	defer func() {
 		cancelBackground()
+		done := make(chan struct{})
+		go func() { backupManager.Wait(); close(done) }()
 		select {
-		case <-backupDone:
+		case <-done:
 		case <-time.After(15 * time.Second):
 			log.Warn("backup goroutine did not stop in time")
 		}
 	}()
 	backupRuns := repositories.NewBackupRunRepository(db.DB)
-	backupStatus := &backup.StatusReader{Config: cfg.Backup, Runs: backupRuns}
-	startBackups(backgroundCtx, backupDone, cfg, db.DB, dockerClient, logger.WithComponent(log, "backup"))
+	backupSettingsRepo := repositories.NewBackupSettingsRepository(db.DB, secretService)
+	startBackups(backgroundCtx, backupManager, backupSettingsRepo, cfg.Backup, backupLog)
+	backupStatus := &backup.StatusReader{Live: backupManager, Runs: backupRuns}
+	backupSettings := &backup.SettingsService{
+		Store: backupSettingsRepo, Env: cfg.Backup, Live: backupManager,
+		Redactor: func(extra ...config.BackupConfig) *backup.Redactor { return backup.RedactorFor(cfg, extra...) },
+	}
 
 	monitorCollector := monitor.NewCollector(dockerClient, containerRepo, projectRepo, instanceRepo)
 
@@ -395,7 +411,7 @@ func runServer() error {
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments"))
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services"))
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
-	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus)
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
@@ -510,27 +526,26 @@ func runServer() error {
 	return nil
 }
 
-// startBackups starts the nightly scheduler when backups are enabled and the
-// schedule is not "off". It closes done when the scheduler stops.
-func startBackups(ctx context.Context, done chan<- struct{}, cfg *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.Logger) {
-	setup, err := backup.New(cfg, db, dockerClient, log, version)
+// startBackups imports BACKUP_* into the Settings row on first start, then
+// starts the scheduler for the effective config (the row when one exists,
+// else BACKUP_*). Values are never logged.
+func startBackups(ctx context.Context, m *backup.Manager, store backup.SettingsStore, env config.BackupConfig, log *slog.Logger) {
+	imported, err := backup.AutoImport(ctx, store, env)
 	switch {
-	case errors.Is(err, backup.ErrDisabled):
-		log.Info("backups disabled (BACKUP_S3_BUCKET unset)")
-		close(done)
-		return
 	case err != nil:
-		// Config.validate already checked these settings, so this is unexpected.
-		log.Error("backups not started", "error", backup.RedactorFor(cfg).Redact(err.Error()))
-		close(done)
-		return
-	case !setup.Scheduled:
-		log.Info("backups enabled, nightly schedule off; use goforge backup run")
-		close(done)
-		return
+		log.Error("backup settings import failed; using BACKUP_* from the environment", "error", err)
+	case imported:
+		log.Info("imported BACKUP_* into backup settings; edit them in Settings → Profile from now on")
 	}
-	go func() {
-		defer close(done)
-		setup.Runner.Schedule(ctx, setup.Schedule)
-	}()
+	eff, source, err := backup.Effective(ctx, store, env)
+	if err != nil {
+		// Unreadable row (wrong ENCRYPTION_KEY?): stay off rather than fall
+		// back to env and back up somewhere the admin did not pick.
+		log.Error("backup settings unreadable; backups stay off until they are saved again in Settings → Profile", "error", err)
+		eff, source = config.BackupConfig{Disabled: true}, backup.SourceSettings
+	} else if source == backup.SourceSettings && env.Enabled() && len(backup.ChangedFields(env, eff)) > 0 {
+		log.Warn("BACKUP_* in the environment differ from the saved backup settings; the saved settings win",
+			"fields", backup.ChangedFields(env, eff))
+	}
+	m.Apply(eff, source) //nolint:contextcheck // the Manager runs on the serve lifetime context it was built with
 }

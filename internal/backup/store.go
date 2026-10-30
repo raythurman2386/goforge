@@ -85,6 +85,24 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]Object, error) {
 	return out, nil
 }
 
+// Probe lists at most one key under prefix. It proves the endpoint, the keys,
+// and the bucket work, without reading or writing an object. found reports
+// whether the prefix already holds a key.
+func (s *S3Store) Probe(ctx context.Context, prefix string) (found bool, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // stops minio-go's listing goroutine after the first key
+	o, ok := <-s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true, MaxKeys: 1})
+	switch {
+	case !ok:
+		// Channel closed with no key: empty prefix, or ctx ended.
+		return false, ctx.Err()
+	case o.Err != nil:
+		return false, fmt.Errorf("list %s: %w", prefix, o.Err)
+	default:
+		return true, nil
+	}
+}
+
 // Delete implements Store.
 func (s *S3Store) Delete(ctx context.Context, keys []string) error {
 	if len(keys) == 0 {

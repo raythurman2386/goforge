@@ -156,6 +156,21 @@ func TestIntegration_RunAgainstMinIO(t *testing.T) {
 	if storeErr != nil {
 		t.Fatal(storeErr)
 	}
+	// Test connection (Settings → Profile) lists one key under the prefix.
+	if found, err := store.Probe(ctx, itPrefix); err != nil || !found {
+		t.Fatalf("probe prefix = %v, %v; want true", found, err)
+	}
+	if found, err := store.Probe(ctx, "nothing-here/"); err != nil || found {
+		t.Fatalf("probe empty prefix = %v, %v; want false", found, err)
+	}
+	bad := cfg
+	bad.SecretAccessKey = "wrong-" + itSecretKey
+	if _, err := ProbeS3(ctx, bad); err == nil {
+		t.Fatal("probe with a wrong secret succeeded")
+	} else if msg := NewRedactor(bad.SecretAccessKey, bad.AccessKeyID).Redact(err.Error()); strings.Contains(msg, bad.SecretAccessKey) {
+		t.Fatalf("probe error leaks the secret: %s", msg)
+	}
+
 	red := NewRedactor(itEncKey, itSecretKey, itAccessKey)
 	chi, _ := time.LoadLocation("America/Chicago")
 	runs := &memRuns{}

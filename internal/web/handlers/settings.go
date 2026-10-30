@@ -31,6 +31,8 @@ type SettingsHandler struct {
 	userRepo        *repositories.UserRepository
 	apiTokenRepo    *repositories.APITokenRepository
 	backups         BackupStatusReader
+	backupSettings  BackupSettings
+	audit           AuditRecorder
 	logger          *slog.Logger
 }
 
@@ -226,7 +228,14 @@ func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := settings.Profile(currentUser, csrfToken, h.backupStatus(r, currentUser))
+	st := h.backupStatus(r, currentUser)
+	var form *backup.SettingsView
+	if st != nil {
+		form = h.backupForm(r)
+	}
+	// The page carries backup settings for admins; never cache it.
+	w.Header().Set("Cache-Control", "no-store")
+	component := settings.Profile(currentUser, csrfToken, st, form)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render profile page")
 	}

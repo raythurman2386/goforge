@@ -28,6 +28,9 @@ type Status struct {
 	LastRun        *RunView   `json:"last_run"`
 	LastSuccess    *RunView   `json:"last_success"`
 	Recent         []RunView  `json:"recent"`
+	// ConfiguredBy is "settings" (the row an admin saved) or "environment"
+	// (BACKUP_*, no row yet).
+	ConfiguredBy string `json:"configured_by,omitempty"`
 }
 
 // RunView is a backup_runs row as JSON.
@@ -62,24 +65,38 @@ func NewRunView(r *models.BackupRun) *RunView {
 	return v
 }
 
+// LiveConfig is the config in effect right now (the Manager).
+type LiveConfig interface {
+	Current() (config.BackupConfig, string)
+}
+
 // StatusReader builds Status.
 type StatusReader struct {
+	// Config is used when Live is nil.
 	Config config.BackupConfig
-	Runs   RunLister
-	Now    func() time.Time
+	// Live, when set, supplies the config in effect, so Settings saves show
+	// up without a restart.
+	Live LiveConfig
+	Runs RunLister
+	Now  func() time.Time
 }
 
 // Status reads the current backup status.
 func (s *StatusReader) Status(ctx context.Context) (*Status, error) {
+	cfg, source := s.Config, ""
+	if s.Live != nil {
+		cfg, source = s.Live.Current()
+	}
 	st := &Status{
-		Enabled:        s.Config.Enabled(),
+		Enabled:        cfg.Enabled(),
 		Schedule:       config.BackupScheduleOff,
-		RetentionDaily: s.Config.RetentionDaily,
+		RetentionDaily: cfg.RetentionDaily,
 		Recent:         []RunView{},
+		ConfiguredBy:   source,
 	}
 	if st.Enabled {
-		st.Bucket, st.Prefix = s.Config.Bucket, s.Config.Prefix
-		if sched, ok, err := config.ParseDailySchedule(s.Config.Schedule); err == nil && ok {
+		st.Bucket, st.Prefix = cfg.Bucket, cfg.Prefix
+		if sched, ok, err := config.ParseDailySchedule(cfg.Schedule); err == nil && ok {
 			st.Schedule = sched.String()
 			now := time.Now
 			if s.Now != nil {

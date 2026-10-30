@@ -27,7 +27,12 @@ const (
 
 // BackupConfig configures GoForge-managed backups to S3-compatible storage
 // (Cloudflare R2, MinIO, Backblaze B2). Backups are disabled when Bucket is
-// empty. The access key and secret are never logged or rendered.
+// empty or Disabled is set. The access key and secret are never logged or
+// rendered.
+//
+// It comes from the BACKUP_* environment, or from the backup_settings row an
+// admin saves in Settings → Profile. Once that row exists it wins over the
+// environment (see internal/backup.Effective).
 type BackupConfig struct {
 	// Endpoint is the S3 API endpoint, for example
 	// https://<account>.r2.cloudflarestorage.com or http://127.0.0.1:9000.
@@ -46,10 +51,13 @@ type BackupConfig struct {
 	RetentionDaily int
 	// Timeout bounds one whole run.
 	Timeout time.Duration
+	// Disabled pauses backups while keeping the destination stored. Only the
+	// Settings row sets it; the environment turns backups on with a bucket.
+	Disabled bool
 }
 
-// Enabled reports whether backups are configured.
-func (b BackupConfig) Enabled() bool { return strings.TrimSpace(b.Bucket) != "" }
+// Enabled reports whether backups are configured and not paused.
+func (b BackupConfig) Enabled() bool { return !b.Disabled && strings.TrimSpace(b.Bucket) != "" }
 
 // DailySchedule is a wall-clock time of day in a zone.
 type DailySchedule struct {
@@ -113,24 +121,37 @@ func ParseDailySchedule(raw string) (sched DailySchedule, ok bool, err error) {
 	return DailySchedule{Hour: hour, Minute: minute, Location: loc}, true, nil
 }
 
-// EndpointHost splits Endpoint into host[:port] and whether to use TLS.
-func (b BackupConfig) EndpointHost() (host string, secure bool, err error) {
-	raw := strings.TrimSpace(b.Endpoint)
+// Endpoint problems, shared by the env check (EndpointHost) and the Settings
+// form check (ValidateSettings) so both accept the same URLs.
+var (
+	errEndpointMissing  = errors.New("endpoint missing")
+	errEndpointURL      = errors.New("endpoint not a URL")
+	errEndpointUserinfo = errors.New("endpoint has userinfo")
+	errEndpointPath     = errors.New("endpoint has path")
+	errEndpointScheme   = errors.New("endpoint scheme")
+	errEndpointNoHost   = errors.New("endpoint has no host")
+)
+
+// parseEndpoint splits an endpoint URL into host[:port] and whether to use
+// TLS. A missing scheme means https. It returns one of the errEndpoint*
+// values and, for errEndpointScheme, the scheme it saw.
+func parseEndpoint(raw string) (host string, secure bool, scheme string, err error) {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", false, errors.New("BACKUP_S3_ENDPOINT is required when BACKUP_S3_BUCKET is set")
+		return "", false, "", errEndpointMissing
 	}
 	if !strings.Contains(raw, "://") {
 		raw = "https://" + raw
 	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "", false, errors.New("BACKUP_S3_ENDPOINT is not a valid URL")
+	u, perr := url.Parse(raw)
+	if perr != nil {
+		return "", false, "", errEndpointURL
 	}
 	if u.User != nil {
-		return "", false, errors.New("BACKUP_S3_ENDPOINT must not contain credentials; use BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY")
+		return "", false, "", errEndpointUserinfo
 	}
 	if u.Path != "" && u.Path != "/" {
-		return "", false, errors.New("BACKUP_S3_ENDPOINT must not contain a path; put the bucket in BACKUP_S3_BUCKET")
+		return "", false, "", errEndpointPath
 	}
 	switch u.Scheme {
 	case "https":
@@ -138,12 +159,33 @@ func (b BackupConfig) EndpointHost() (host string, secure bool, err error) {
 	case "http":
 		secure = false
 	default:
-		return "", false, fmt.Errorf("BACKUP_S3_ENDPOINT scheme must be http or https, got %q", u.Scheme)
+		return "", false, u.Scheme, errEndpointScheme
 	}
 	if u.Host == "" {
-		return "", false, errors.New("BACKUP_S3_ENDPOINT has no host")
+		return "", false, "", errEndpointNoHost
 	}
-	return u.Host, secure, nil
+	return u.Host, secure, "", nil
+}
+
+// EndpointHost splits Endpoint into host[:port] and whether to use TLS.
+func (b BackupConfig) EndpointHost() (host string, secure bool, err error) {
+	host, secure, scheme, err := parseEndpoint(b.Endpoint)
+	switch {
+	case err == nil:
+		return host, secure, nil
+	case errors.Is(err, errEndpointMissing):
+		return "", false, errors.New("BACKUP_S3_ENDPOINT is required when BACKUP_S3_BUCKET is set")
+	case errors.Is(err, errEndpointUserinfo):
+		return "", false, errors.New("BACKUP_S3_ENDPOINT must not contain credentials; use BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY")
+	case errors.Is(err, errEndpointPath):
+		return "", false, errors.New("BACKUP_S3_ENDPOINT must not contain a path; put the bucket in BACKUP_S3_BUCKET")
+	case errors.Is(err, errEndpointScheme):
+		return "", false, fmt.Errorf("BACKUP_S3_ENDPOINT scheme must be http or https, got %q", scheme)
+	case errors.Is(err, errEndpointNoHost):
+		return "", false, errors.New("BACKUP_S3_ENDPOINT has no host")
+	default:
+		return "", false, errors.New("BACKUP_S3_ENDPOINT is not a valid URL")
+	}
 }
 
 func loadBackupConfig() BackupConfig {
@@ -195,6 +237,75 @@ func (b BackupConfig) validate() error {
 	}
 	if _, _, err := ParseDailySchedule(b.Schedule); err != nil {
 		return err
+	}
+	return nil
+}
+
+// BackupFieldError is a Settings form validation error. Field is the form
+// field name (endpoint, bucket, secret_access_key, ...). Message never
+// contains a submitted value, so it is safe to show and log.
+type BackupFieldError struct {
+	Field   string
+	Message string
+}
+
+func (e *BackupFieldError) Error() string { return e.Field + ": " + e.Message }
+
+func fieldErr(field, msg string) error { return &BackupFieldError{Field: field, Message: msg} }
+
+// ValidateSettings checks settings saved from Settings → Profile with the
+// same rules validate applies to BACKUP_*: endpoint URL shape, both keys,
+// prefix, retention 1-366, a positive timeout, and the schedule. While
+// Disabled is set the destination fields may be empty, but anything entered
+// must still be well formed, so turning backups back on cannot surprise.
+// Errors are *BackupFieldError.
+func (b BackupConfig) ValidateSettings() error {
+	enabled := !b.Disabled
+	bucket := strings.TrimSpace(b.Bucket)
+	if enabled && bucket == "" {
+		return fieldErr("bucket", "is required when backups are enabled")
+	}
+	if strings.ContainsAny(bucket, "/\\ \t") {
+		return fieldErr("bucket", "must be a bucket name, without slashes or spaces; put folders in the prefix")
+	}
+	if enabled || strings.TrimSpace(b.Endpoint) != "" {
+		if _, _, scheme, err := parseEndpoint(b.Endpoint); err != nil {
+			switch {
+			case errors.Is(err, errEndpointMissing):
+				return fieldErr("endpoint", "is required when backups are enabled")
+			case errors.Is(err, errEndpointUserinfo):
+				return fieldErr("endpoint", "must not contain credentials; use the access key fields")
+			case errors.Is(err, errEndpointPath):
+				return fieldErr("endpoint", "must not contain a path; put the bucket in the bucket field")
+			case errors.Is(err, errEndpointScheme):
+				return fieldErr("endpoint", fmt.Sprintf("scheme must be http or https, got %q", scheme))
+			case errors.Is(err, errEndpointNoHost):
+				return fieldErr("endpoint", "has no host")
+			default:
+				return fieldErr("endpoint", "is not a valid URL")
+			}
+		}
+	}
+	if strings.TrimSpace(b.Region) == "" {
+		return fieldErr("region", "is required (use auto for Cloudflare R2)")
+	}
+	if enabled && b.AccessKeyID == "" {
+		return fieldErr("access_key_id", "is required when backups are enabled")
+	}
+	if enabled && b.SecretAccessKey == "" {
+		return fieldErr("secret_access_key", "is required when backups are enabled")
+	}
+	if strings.ContainsAny(b.Prefix, "\\") || strings.Contains(b.Prefix, "..") {
+		return fieldErr("prefix", `must not contain backslashes or ".." segments`)
+	}
+	if b.RetentionDaily < 1 || b.RetentionDaily > 366 {
+		return fieldErr("retention_daily", fmt.Sprintf("must be between 1 and 366, got %d", b.RetentionDaily))
+	}
+	if b.Timeout < time.Second {
+		return fieldErr("timeout", "must be at least 1s")
+	}
+	if _, _, err := ParseDailySchedule(b.Schedule); err != nil {
+		return fieldErr("schedule", strings.TrimPrefix(err.Error(), "BACKUP_SCHEDULE "))
 	}
 	return nil
 }

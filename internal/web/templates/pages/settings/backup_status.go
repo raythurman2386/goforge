@@ -74,3 +74,46 @@ func humanBytes(n int64) string {
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }
+
+func backupSourceLine(f *backup.SettingsView) string {
+	if f.Source == backup.SourceSettings {
+		s := "Saved in GoForge. These settings win over BACKUP_* in your env file (.env)."
+		if f.UpdatedAt != nil {
+			s += " Last changed " + f.UpdatedAt.UTC().Format(backupTimeLayout) + "."
+		}
+		return s
+	}
+	return "Read from BACKUP_* in your env file (.env). Saving here stores them in GoForge, and the saved settings win from then on."
+}
+
+func accessKeyState(f *backup.SettingsView) string {
+	switch {
+	case f.AccessKeyHint != "":
+		return "Set, ending in " + f.AccessKeyHint + ". Leave blank to keep it."
+	case f.AccessKeySet:
+		return "Set. Leave blank to keep it."
+	default:
+		return "Not set."
+	}
+}
+
+func accessKeyPlaceholder(f *backup.SettingsView) string {
+	if f.AccessKeySet {
+		return "Leave blank to keep the stored key"
+	}
+	return ""
+}
+
+func secretState(f *backup.SettingsView) string {
+	if f.SecretSet {
+		return "Set. Leave blank to keep it; type a new one to rotate it."
+	}
+	return "Not set."
+}
+
+func secretPlaceholder(f *backup.SettingsView) string {
+	if f.SecretSet {
+		return "••••••••"
+	}
+	return ""
+}
