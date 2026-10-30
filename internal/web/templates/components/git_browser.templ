@@ -1,51 +1,53 @@
 package components
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
 templ GitRepositoryBrowser(sources []*models.GitSource) {
-	<div class="mb-4">
-		<label class="label">Git Source</label>
-		<select name="git_source_id" 
-			class="select"
-			hx-get="/api/git/repos"
-			hx-target="#repository_url_select"
-			hx-trigger="change"
-			hx-include="[name='git_source_id']"
-			onchange="toggleRepoInput(this.value)"
-			>
-			<option value="">Manual / Public</option>
-			for _, s := range sources {
-				<option value={ s.ID }>{ s.Name } ({ string(s.Type) })</option>
-			}
-		</select>
-	</div>
+	@ui.Select(ui.SelectProps{
+		ID:         "project-git-source",
+		Name:       "git_source_id",
+		Label:      "Git Source",
+		Options:    gitSourceOptions(sources),
+		Blank:      true,
+		BlankLabel: "Manual / Public",
+		Class:      "mb-4",
+		Attrs: templ.Attributes{
+			"hx-get":     "/api/git/repos",
+			"hx-target":  "#project-repo-select",
+			"hx-trigger": "change",
+			"hx-include": "[name='git_source_id']",
+			"onchange":   "toggleRepoInput(this.value)",
+		},
+	})
 
 	<div id="manual-repo-input">
-		<label class="label">Repository URL</label>
-		<input type="text" name="repository_url_manual" id="repository_url_manual" class="input" />
+		@ui.Input(ui.InputProps{ID: "project-repo-manual", Name: "repository_url_manual", Label: "Repository URL", Autocomplete: "off"})
 	</div>
 
 	<div id="repo-select-container" style="display:none;" class="mb-4">
-		<label class="label">Repository</label>
-		<select id="repository_url_select"
-			name="repository_url"
-			class="select"
-			hx-get="/api/git/branches"
-			hx-target="#default_branch"
-			hx-trigger="change"
-			hx-include="[name='git_source_id']"
-			hx-vals="js:{repository_url: document.getElementById('repository_url_select').value}"
-			>
-			<option value="">Select Source first</option>
-		</select>
+		@ui.Select(ui.SelectProps{
+			ID:         "project-repo-select",
+			Name:       "repository_url",
+			Label:      "Repository",
+			Blank:      true,
+			BlankLabel: "Select Source first",
+			Attrs: templ.Attributes{
+				"hx-get":     "/api/git/branches",
+				"hx-target":  "#project-default-branch",
+				"hx-trigger": "change",
+				"hx-include": "[name='git_source_id']",
+				"hx-vals":    "js:{repository_url: document.getElementById('project-repo-select').value}",
+			},
+		})
 	</div>
 	
 	<script>
 		function toggleRepoInput(val) {
-			const manualInput = document.getElementById('repository_url_manual');
-			const repoSelect = document.getElementById('repository_url_select');
+			const manualInput = document.getElementById('project-repo-manual');
+			const repoSelect = document.getElementById('project-repo-select');
 			const manualContainer = document.getElementById('manual-repo-input');
 			const selectContainer = document.getElementById('repo-select-container');
 			
@@ -70,4 +72,13 @@ templ GitRepositoryBrowser(sources []*models.GitSource) {
 			toggleRepoInput("");
 		});
 	</script>
+}
+
+// gitSourceOptions lists the user's git sources as "name (type)".
+func gitSourceOptions(sources []*models.GitSource) []ui.SelectOption {
+	opts := make([]ui.SelectOption, 0, len(sources))
+	for _, s := range sources {
+		opts = append(opts, ui.SelectOption{Value: s.ID, Label: s.Name + " (" + string(s.Type) + ")"})
+	}
+	return opts
 }

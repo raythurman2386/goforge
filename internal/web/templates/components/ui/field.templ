@@ -1,0 +1,169 @@
+package ui
+
+// Label is a <label> for one control. Children are the text. Required adds
+// a visual "*" (aria-hidden) and "(required)" for screen readers.
+//
+//	@ui.Label(ui.LabelProps{For: "login-email", Required: true}) {
+//		Email address
+//	}
+templ Label(p LabelProps) {
+	<label
+		if p.For != "" {
+			for={ p.For }
+		}
+		{ Attrs(templ.Attributes{"class": labelClass(p.Class)}, p.Attrs)... }
+	>
+		{ children... }
+		@requiredMark(p.Required)
+	</label>
+}
+
+templ requiredMark(required bool) {
+	if required {
+		<span class="ml-0.5 text-red-600 dark:text-red-400" aria-hidden="true">*</span>
+		<span class="sr-only">(required)</span>
+	}
+}
+
+// Field wraps one control (the children) with its Label, help, and error.
+// The control must point aria-describedby at HelpID and ErrorID; Input,
+// Textarea, and Select do that for you.
+templ Field(p FieldProps) {
+	<div
+		if p.Class != "" {
+			class={ p.Class }
+		}
+	>
+		if p.Label != "" {
+			@Label(LabelProps{For: p.ID, Required: p.Required}) {
+				{ p.Label }
+			}
+		}
+		{ children... }
+		@fieldMessages(p.ID, p.Help, p.Error)
+	</div>
+}
+
+templ fieldMessages(id, help, errMsg string) {
+	if help != "" {
+		<p id={ HelpID(id) } class="mt-1.5 text-xs text-muted-foreground">{ help }</p>
+	}
+	if errMsg != "" {
+		<p id={ ErrorID(id) } class="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">{ errMsg }</p>
+	}
+}
+
+// Input is a text-style <input> (text, email, password, number, url, time)
+// in a Field. Without Label it renders the bare control; the page must then
+// label it (ui.Label with For, or aria-label in Attrs).
+//
+//	@ui.Input(ui.InputProps{ID: "login-email", Name: "email", Type: "email",
+//		Label: "Email address", Autocomplete: "email", Required: true})
+templ Input(p InputProps) {
+	if p.Label != "" {
+		@Field(p.field()) {
+			@inputControl(p)
+		}
+	} else {
+		@inputControl(p)
+		@fieldMessages(p.id(), p.Help, p.Error)
+	}
+}
+
+templ inputControl(p InputProps) {
+	<input
+		id={ p.id() }
+		name={ p.Name }
+		type={ inputType(p.Type) }
+		value={ p.Value }
+		if p.Placeholder != "" {
+			placeholder={ p.Placeholder }
+		}
+		if p.Autocomplete != "" {
+			autocomplete={ p.Autocomplete }
+		}
+		required?={ p.Required }
+		disabled?={ p.Disabled }
+		if p.describedBy() != "" {
+			aria-describedby={ p.describedBy() }
+		}
+		if p.Error != "" {
+			aria-invalid="true"
+		}
+		class={ inputClass(p.ControlClass) }
+		{ p.Attrs... }
+	/>
+}
+
+// Textarea is a multi-line Input with the same Field wiring.
+templ Textarea(p TextareaProps) {
+	if p.Label != "" {
+		@Field(p.field()) {
+			@textareaControl(p)
+		}
+	} else {
+		@textareaControl(p)
+		@fieldMessages(p.id(), p.Help, p.Error)
+	}
+}
+
+templ textareaControl(p TextareaProps) {
+	<textarea
+		id={ p.id() }
+		name={ p.Name }
+		rows={ p.rows() }
+		if p.Placeholder != "" {
+			placeholder={ p.Placeholder }
+		}
+		required?={ p.Required }
+		disabled?={ p.Disabled }
+		if p.describedBy() != "" {
+			aria-describedby={ p.describedBy() }
+		}
+		if p.Error != "" {
+			aria-invalid="true"
+		}
+		class={ inputClass(p.ControlClass) }
+		{ p.Attrs... }
+	>{ p.Value }</textarea>
+}
+
+// Select is a native <select> in a Field. Keep it native: no custom
+// listbox. Blank adds an empty first choice for optional fields.
+//
+//	@ui.Select(ui.SelectProps{ID: "svc-log_level", Name: "log_level", Label: "Log level",
+//		Options: ui.StringOptions(levels), Selected: "info"})
+templ Select(p SelectProps) {
+	if p.Label != "" {
+		@Field(p.field()) {
+			@selectControl(p)
+		}
+	} else {
+		@selectControl(p)
+		@fieldMessages(p.id(), p.Help, p.Error)
+	}
+}
+
+templ selectControl(p SelectProps) {
+	<select
+		id={ p.id() }
+		name={ p.Name }
+		required?={ p.Required }
+		disabled?={ p.Disabled }
+		if p.describedBy() != "" {
+			aria-describedby={ p.describedBy() }
+		}
+		if p.Error != "" {
+			aria-invalid="true"
+		}
+		class={ selectClass(p.ControlClass) }
+		{ p.Attrs... }
+	>
+		if p.Blank {
+			<option value="" selected?={ p.Selected == "" }>{ p.BlankLabel }</option>
+		}
+		for _, o := range p.Options {
+			<option value={ o.Value } selected?={ o.Value == p.Selected } disabled?={ o.Disabled }>{ optionLabel(o) }</option>
+		}
+	</select>
+}

@@ -18,6 +18,7 @@ func TestGalleryRenders(t *testing.T) {
 		`aria-labelledby="tokens-title"`, "--gf-background", "bg-primary-500",
 		`class="btn-primary"`, `aria-label="Refresh"`,
 		`aria-describedby="gallery-name-help"`, `class="sr-only"`,
+		`role="switch"`, `aria-invalid="true"`, `<fieldset`, `<legend class="label">`, `<textarea`, `id="checkboxes"`,
 		`<th scope="col" class="table-th">`,
 		`src="/static/js/ui.js"`,
 		`aria-labelledby="badges-title"`, `aria-labelledby="alerts-title"`,

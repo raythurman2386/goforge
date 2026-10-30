@@ -27,18 +27,9 @@ templ Login(csrfToken, errorMessage string, enableRegistration bool) {
 
 			<form class="space-y-5" action="/auth/login" method="POST">
 				<input type="hidden" name="csrf_token" value={ csrfToken }/>
-				<div>
-					<label for="email-address" class="label">Email address</label>
-					<input id="email-address" name="email" type="email" autocomplete="email" required class="input" placeholder="you@example.com"/>
-				</div>
-				<div>
-					<label for="password" class="label">Password</label>
-					<input id="password" name="password" type="password" autocomplete="current-password" required class="input"/>
-				</div>
-				<div class="flex items-center">
-					<input id="remember-me" name="remember_me" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700 dark:text-primary-400"/>
-					<label for="remember-me" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">Remember me</label>
-				</div>
+				@ui.Input(ui.InputProps{ID: "login-email", Name: "email", Type: "email", Label: "Email address", Autocomplete: "email", Placeholder: "you@example.com", Required: true})
+				@ui.Input(ui.InputProps{ID: "login-password", Name: "password", Type: "password", Label: "Password", Autocomplete: "current-password", Required: true})
+				@ui.Checkbox(ui.CheckboxProps{ID: "login-remember", Name: "remember_me", Label: "Remember me"})
 				if errorMessage != "" {
 					@ui.AlertMessage(ui.AlertError, errorMessage)
 				}

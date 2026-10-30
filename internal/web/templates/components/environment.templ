@@ -55,7 +55,7 @@ templ CreateEnvironmentModal(projectID string, csrfToken string) {
 	@Modal("Create New Environment") {
 		<form hx-post={ "/projects/" + projectID + "/envs" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
-			@Input("Environment Name", "name", "text", "", true)
+			@ui.Input(ui.InputProps{ID: "environment-name", Name: "name", Label: "Environment Name", Autocomplete: "off", Required: true, Class: "mb-4"})
 			<p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Examples: staging, qa, feature-x</p>
 			
 			<div class="mt-8 flex justify-end space-x-3">

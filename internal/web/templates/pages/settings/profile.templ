@@ -34,10 +34,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 				<form hx-put="/settings/profile" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 					<input type="hidden" name="csrf_token" value={ csrfToken } />
 					
-					<div class="mb-4">
-						<label for="profile-email" class="label">Email Address</label>
-						<input id="profile-email" type="email" name="email" value={ user.Email } class="input" required />
-					</div>
+					@ui.Input(ui.InputProps{ID: "profile-email", Name: "email", Type: "email", Label: "Email Address", Value: user.Email, Autocomplete: "email", Required: true, Class: "mb-4"})
 
 					<div class="mb-4">
 						<p class="label">Account Type</p>
@@ -79,20 +76,9 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 					<form hx-put="/settings/password" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 						<input type="hidden" name="csrf_token" value={ csrfToken } />
 						
-						<div class="mb-4">
-							<label for="current_password" class="label">Current Password</label>
-							<input id="current_password" type="password" name="current_password" class="input" required />
-						</div>
-
-						<div class="mb-4">
-							<label for="new_password" class="label">New Password</label>
-							<input id="new_password" type="password" name="new_password" class="input" required minlength="8" />
-						</div>
-
-						<div class="mb-4">
-							<label for="confirm_password" class="label">Confirm New Password</label>
-							<input id="confirm_password" type="password" name="confirm_password" class="input" required minlength="8" />
-						</div>
+						@ui.Input(ui.InputProps{ID: "password-current", Name: "current_password", Type: "password", Label: "Current Password", Autocomplete: "current-password", Required: true, Class: "mb-4"})
+						@ui.Input(ui.InputProps{ID: "password-new", Name: "new_password", Type: "password", Label: "New Password", Autocomplete: "new-password", Required: true, Help: "At least 8 characters.", Class: "mb-4", Attrs: templ.Attributes{"minlength": "8"}})
+						@ui.Input(ui.InputProps{ID: "password-confirm", Name: "confirm_password", Type: "password", Label: "Confirm New Password", Autocomplete: "new-password", Required: true, Class: "mb-4", Attrs: templ.Attributes{"minlength": "8"}})
 
 						<div class="flex justify-end">
 							@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
@@ -292,44 +278,19 @@ templ AddAPITokenModal(csrfToken string, mcp bool) {
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			if mcp {
 				<input type="hidden" name="preset" value="mcp" />
-				@components.Input("Token Name", "name", "text", "MCP", true)
-			} else {
-				@components.Input("Token Name", "name", "text", "", true)
 			}
-			<p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Give your token a descriptive name to help you identify it later.</p>
-
-			<div class="mb-4">
-				<label for="expires_in" class="label">Expires</label>
-				<select id="expires_in" name="expires_in" class="select">
-					<option value="30">30 days</option>
-					<option value="90" selected?={ mcp }>90 days</option>
-					<option value="365" selected?={ !mcp }>1 year</option>
-					if !mcp {
-						<option value="0">Never</option>
-					}
-				</select>
-			</div>
-
-			<fieldset class="mb-4">
-				<legend class="label">Scopes</legend>
+			@ui.Input(ui.InputProps{ID: "token-name", Name: "name", Label: "Token Name", Value: tokenNameDefault(mcp), Autocomplete: "off", Required: true, Help: "Give your token a descriptive name to help you identify it later.", Class: "mb-4"})
+			@ui.Select(ui.SelectProps{ID: "token-expires", Name: "expires_in", Label: "Expires", Options: tokenExpiryOptions(mcp), Selected: tokenExpiryDefault(mcp), Class: "mb-4"})
+			@ui.CheckboxGroup(ui.CheckboxGroupProps{Legend: "Scopes", DescribedBy: "token-scopes-help", Class: "mb-4"}) {
 				if mcp {
-					<p class="text-xs text-gray-500 mb-2 dark:text-gray-400">An MCP token needs read. Add write for the gated mutation tools; add protected only if the agent may stop, reconfigure, or re-image protected services.</p>
+					<p id="token-scopes-help" class="text-xs text-gray-500 dark:text-gray-400">An MCP token needs read. Add write for the gated mutation tools; add protected only if the agent may stop, reconfigure, or re-image protected services.</p>
 				} else {
-					<p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Leave all unchecked for a full token that also works on the web routes. A scoped token works only on <code>/api/v1</code> and <code>/mcp</code>.</p>
+					<p id="token-scopes-help" class="text-xs text-gray-500 dark:text-gray-400">Leave all unchecked for a full token that also works on the web routes. A scoped token works only on <code>/api/v1</code> and <code>/mcp</code>.</p>
 				}
-				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700 dark:text-primary-400" name="scopes" value="read" checked?={ mcp }/>
-					read: list and inspect projects, services, containers, logs
-				</label>
-				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700 dark:text-primary-400" name="scopes" value="write" checked?={ mcp }/>
-					write: gated deploys, restarts, env vars, service changes
-				</label>
-				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-					<input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-700 dark:text-primary-400" name="scopes" value="protected"/>
-					protected: stop, reconfigure, or re-image protected services
-				</label>
-			</fieldset>
+				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-read", Name: "scopes", Value: "read", Label: "read: list and inspect projects, services, containers, logs", Checked: mcp})
+				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-write", Name: "scopes", Value: "write", Label: "write: gated deploys, restarts, env vars, service changes", Checked: mcp})
+				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-protected", Name: "scopes", Value: "protected", Label: "protected: stop, reconfigure, or re-image protected services"})
+			}
 
 			<div class="mt-8 flex justify-end space-x-3">
 				@ui.Button(ui.ButtonProps{
@@ -354,6 +315,36 @@ func addTokenTitle(mcp bool) string {
 		return "Generate MCP Token"
 	}
 	return "Generate API Token"
+}
+
+// tokenNameDefault prefills the MCP preset's token name.
+func tokenNameDefault(mcp bool) string {
+	if mcp {
+		return "MCP"
+	}
+	return ""
+}
+
+// tokenExpiryOptions lists token lifetimes in days; the MCP preset has no
+// never-expiring choice.
+func tokenExpiryOptions(mcp bool) []ui.SelectOption {
+	opts := []ui.SelectOption{
+		{Value: "30", Label: "30 days"},
+		{Value: "90", Label: "90 days"},
+		{Value: "365", Label: "1 year"},
+	}
+	if !mcp {
+		opts = append(opts, ui.SelectOption{Value: "0", Label: "Never"})
+	}
+	return opts
+}
+
+// tokenExpiryDefault is 90 days for MCP tokens and 1 year otherwise.
+func tokenExpiryDefault(mcp bool) string {
+	if mcp {
+		return "90"
+	}
+	return "365"
 }
 
 // tokenScopes returns the scopes shown on a token row.
@@ -462,68 +453,31 @@ templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
 	<form class="mt-6 border-t border-gray-100 pt-4 dark:border-gray-800" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
 		<input type="hidden" name="csrf_token" value={ csrfToken }/>
 		<p class="mb-4 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-source">{ backupSourceLine(f) }</p>
-		<div class="mb-4 flex items-center gap-2">
-			<input id="backup-enabled" type="checkbox" name="enabled" value="true" checked?={ f.Enabled }/>
-			<label for="backup-enabled" class="text-sm font-medium text-gray-700 dark:text-gray-300">Enabled</label>
-			<span class="text-xs text-gray-500 dark:text-gray-400">Turning this off stops the schedule and keeps the settings.</span>
-		</div>
+		@ui.Switch(ui.CheckboxProps{ID: "backup-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops the schedule and keeps the settings.", Checked: f.Enabled, Class: "mb-4"})
 		<div class="grid gap-4 sm:grid-cols-2">
-			<div class="sm:col-span-2">
-				<label for="backup-endpoint" class="label">Endpoint</label>
-				<input id="backup-endpoint" name="endpoint" type="url" class="input" value={ f.Endpoint } placeholder="https://<account>.r2.cloudflarestorage.com"/>
+			@ui.Input(ui.InputProps{ID: "backup-endpoint", Name: "endpoint", Type: "url", Label: "Endpoint", Value: f.Endpoint, Placeholder: "https://<account>.r2.cloudflarestorage.com", Class: "sm:col-span-2"})
+			@ui.Input(ui.InputProps{ID: "backup-bucket", Name: "bucket", Label: "Bucket", Value: f.Bucket})
+			@ui.Input(ui.InputProps{ID: "backup-prefix", Name: "prefix", Label: "Prefix", Value: f.Prefix, Placeholder: "goforge/"})
+			@ui.Input(ui.InputProps{ID: "backup-region", Name: "region", Label: "Region", Value: f.Region, Placeholder: "auto"})
+			@ui.Checkbox(ui.CheckboxProps{ID: "backup-path-style", Name: "force_path_style", Value: "true", Label: "Path-style URLs (MinIO, Garage)", Checked: f.ForcePathStyle, Class: "self-end pb-2"})
+			<div>
+				@ui.Input(ui.InputProps{ID: "backup-access-key", Name: "access_key_id", Label: "Access key ID", Autocomplete: "off", Placeholder: accessKeyPlaceholder(f), DescribedBy: "backup-access-key-state", Attrs: templ.Attributes{"spellcheck": "false"}})
+				<p id="backup-access-key-state" class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-access-key-state">{ accessKeyState(f) }</p>
 			</div>
 			<div>
-				<label for="backup-bucket" class="label">Bucket</label>
-				<input id="backup-bucket" name="bucket" class="input" value={ f.Bucket }/>
-			</div>
-			<div>
-				<label for="backup-prefix" class="label">Prefix</label>
-				<input id="backup-prefix" name="prefix" class="input" value={ f.Prefix } placeholder="goforge/"/>
-			</div>
-			<div>
-				<label for="backup-region" class="label">Region</label>
-				<input id="backup-region" name="region" class="input" value={ f.Region } placeholder="auto"/>
-			</div>
-			<div class="flex items-end gap-2 pb-2">
-				<input id="backup-path-style" type="checkbox" name="force_path_style" value="true" checked?={ f.ForcePathStyle }/>
-				<label for="backup-path-style" class="text-sm text-gray-700 dark:text-gray-300">Path-style URLs (MinIO, Garage)</label>
-			</div>
-			<div>
-				<label for="backup-access-key" class="label">Access key ID</label>
-				<input id="backup-access-key" name="access_key_id" class="input" value="" autocomplete="off" spellcheck="false" placeholder={ accessKeyPlaceholder(f) }/>
-				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-access-key-state">{ accessKeyState(f) }</p>
-			</div>
-			<div>
-				<label for="backup-secret" class="label">Secret access key</label>
-				<input id="backup-secret" name="secret_access_key" type="password" class="input" value="" autocomplete="new-password" placeholder={ secretPlaceholder(f) }/>
-				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-secret-state">{ secretState(f) }</p>
+				@ui.Input(ui.InputProps{ID: "backup-secret", Name: "secret_access_key", Type: "password", Label: "Secret access key", Autocomplete: "new-password", Placeholder: secretPlaceholder(f), DescribedBy: "backup-secret-state"})
+				<p id="backup-secret-state" class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-secret-state">{ secretState(f) }</p>
 			</div>
 			if f.AccessKeySet || f.SecretSet {
-				<div class="sm:col-span-2 flex items-center gap-2">
-					<input id="backup-clear-creds" type="checkbox" name="clear_credentials" value="true"/>
-					<label for="backup-clear-creds" class="text-sm text-gray-700 dark:text-gray-300">Remove the stored keys (backups must be off)</label>
-				</div>
+				@ui.Checkbox(ui.CheckboxProps{ID: "backup-clear-creds", Name: "clear_credentials", Value: "true", Label: "Remove the stored keys (backups must be off)", Class: "sm:col-span-2"})
 			}
-			<div>
-				<label for="backup-schedule-time" class="label">Nightly at</label>
-				<input id="backup-schedule-time" name="schedule_time" type="time" class="input" value={ f.ScheduleTime }/>
-			</div>
-			<div>
-				<label for="backup-schedule-zone" class="label">Time zone</label>
-				<input id="backup-schedule-zone" name="schedule_zone" class="input" value={ f.ScheduleZone } placeholder="America/Chicago"/>
-			</div>
-			<div class="sm:col-span-2 flex items-center gap-2">
-				<input id="backup-schedule-off" type="checkbox" name="schedule_off" value="true" checked?={ f.ScheduleOff }/>
-				<label for="backup-schedule-off" class="text-sm text-gray-700 dark:text-gray-300">No nightly schedule (run with <code>goforge backup run</code>)</label>
-			</div>
-			<div>
-				<label for="backup-retention" class="label">Keep daily backups (days)</label>
-				<input id="backup-retention" name="retention_daily" type="number" min="1" max="366" class="input" value={ fmt.Sprint(f.RetentionDaily) }/>
-			</div>
-			<div>
-				<label for="backup-timeout" class="label">Run timeout</label>
-				<input id="backup-timeout" name="timeout" class="input" value={ f.Timeout } placeholder="2h"/>
-			</div>
+			@ui.Input(ui.InputProps{ID: "backup-schedule-time", Name: "schedule_time", Type: "time", Label: "Nightly at", Value: f.ScheduleTime})
+			@ui.Input(ui.InputProps{ID: "backup-schedule-zone", Name: "schedule_zone", Label: "Time zone", Value: f.ScheduleZone, Placeholder: "America/Chicago"})
+			@ui.Switch(ui.CheckboxProps{ID: "backup-schedule-off", Name: "schedule_off", Value: "true", Checked: f.ScheduleOff, Class: "sm:col-span-2"}) {
+				No nightly schedule (run with <code>goforge backup run</code>)
+			}
+			@ui.Input(ui.InputProps{ID: "backup-retention", Name: "retention_daily", Type: "number", Label: "Keep daily backups (days)", Value: fmt.Sprint(f.RetentionDaily), Attrs: templ.Attributes{"min": "1", "max": "366"}})
+			@ui.Input(ui.InputProps{ID: "backup-timeout", Name: "timeout", Label: "Run timeout", Value: f.Timeout, Placeholder: "2h"})
 		</div>
 		<div class="mt-4 flex justify-end gap-2">
 			@ui.Button(ui.ButtonProps{

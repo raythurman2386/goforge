@@ -261,16 +261,16 @@ func TestServiceHandler_EditConfig_RendersBoolAndSelect(t *testing.T) {
 	}
 	body := rr.Body.String()
 	for _, want := range []string{
-		`id="signups_allowed" name="signups_allowed" type="checkbox" value="true" class=`,
+		`<input type="checkbox" id="svc-signups_allowed" name="signups_allowed" value="true" class="checkbox">`,
 		`<input type="hidden" name="signups_allowed" value="false">`,
-		`<select id="log_level" name="log_level"`,
+		`<select id="svc-log_level" name="log_level"`,
 		`<option value="debug" selected>debug</option>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("edit page missing %q", want)
 		}
 	}
-	if strings.Contains(body, `type="checkbox" value="true" checked`) {
+	if strings.Contains(body, `name="signups_allowed" value="true" checked`) {
 		t.Error("stored false rendered as checked")
 	}
 }

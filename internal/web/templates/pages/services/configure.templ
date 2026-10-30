@@ -43,49 +43,43 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 				<form class="space-y-8" action={ templ.SafeURL("/services/" + tmpl.Name) } method="POST">
 				<input type="hidden" name="csrf_token" value={ csrfToken } />
 					
-				@components.Input("Service Name", "name", "text", tmpl.Name, true)
+				@ui.Input(ui.InputProps{ID: "svc-name", Name: "name", Label: "Service Name", Value: tmpl.Name, Required: true, Class: "mb-4"})
 
 				if tmpl.Web {
-					<div class="mb-4">
-						<label for="domain" class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
-							Domain
-							<span class="text-red-500">*</span>
-						</label>
-						<input
-							id="domain"
-							name="domain"
-							type="text"
-							value={ services.DefaultServiceDomain(tmpl.Name, cloudflareProxyMode) }
-							placeholder={ domainPlaceholder(tmpl.Name, cloudflareProxyMode) }
-							required
-							class="input"
-						/>
-					</div>
+					@ui.Input(ui.InputProps{
+						ID:          "svc-domain",
+						Name:        "domain",
+						Label:       "Domain",
+						Value:       services.DefaultServiceDomain(tmpl.Name, cloudflareProxyMode),
+						Placeholder: domainPlaceholder(tmpl.Name, cloudflareProxyMode),
+						Required:    true,
+						DescribedBy: "svc-domain-help",
+						Class:       "mb-2",
+					})
 					if cloudflareProxyMode {
-						<div class="mt-[-1rem] mb-4 text-xs text-gray-500 space-y-1 dark:text-gray-400">
+						<div id="svc-domain-help" class="mb-4 text-xs text-gray-500 space-y-1 dark:text-gray-400">
 							<p>Required. Cloudflare Tunnel mode: use a public first-level host such as <code>{ tmpl.Name }-app.example.com</code>. Cloudflare Universal SSL covers <code>*.example.com</code> but not <code>*.apps.example.com</code>, so a deeper name fails the TLS handshake.</p>
 							<p>Before you deploy, create a proxied CNAME for the host that points at <code>&lt;tunnel-id&gt;.cfargotunnel.com</code>, unless a proxied wildcard already does. <code>.localhost</code> hosts cannot be reached through the tunnel.</p>
 							<p><a href={ templ.SafeURL(cloudflareDomainsDocURL) } target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline dark:text-primary-400">Cloudflare service domains guide</a></p>
 						</div>
 					} else {
-						<div class="mt-[-1rem] mb-4 text-xs text-gray-500 dark:text-gray-400">
+						<p id="svc-domain-help" class="mb-4 text-xs text-gray-500 dark:text-gray-400">
 							Required. Assign a custom domain (e.g., <code>gitea.localhost</code> or <code>gitea.example.com</code>) to access this service via the browser.
-						</div>
+						</p>
 					}
 				}
 
 					for _, field := range tmpl.Config {
 						if field.Type == "password" && field.Generate {
-							@components.Input(field.Label, field.Name, "password", "", false)
-							<p class="mt-[-1rem] mb-4 text-xs text-gray-500 dark:text-gray-400">Leave blank and GoForge generates a password. It is stored encrypted.</p>
+							@ui.Input(ui.InputProps{ID: "svc-" + field.Name, Name: field.Name, Type: "password", Label: field.Label, Autocomplete: "new-password", Help: "Leave blank and GoForge generates a password. It is stored encrypted.", Class: "mb-4"})
 						} else if field.Type == services.FieldTypeBool {
-							@components.Checkbox(field.Label, field.Name, field.BoolDefault())
+							@ui.Checkbox(ui.CheckboxProps{ID: "svc-" + field.Name, Name: field.Name, Value: "true", Label: field.Label, Checked: field.BoolDefault(), HiddenFalse: true, Class: "mb-4"})
 						} else if field.Type == services.FieldTypeSelect {
-							@components.ConfigSelect(field.Label, field.Name, field.Options, defaultValue(field.Default), field.Required)
+							@ui.Select(ui.SelectProps{ID: "svc-" + field.Name, Name: field.Name, Label: field.Label, Options: ui.StringOptions(field.Options), Selected: defaultValue(field.Default), Blank: !field.Required, Required: field.Required, Class: "mb-4"})
 						} else if field.Type == "number" {
-							@components.Input(field.Label, field.Name, "number", fmt.Sprintf("%v", field.Default), field.Required)
+							@ui.Input(ui.InputProps{ID: "svc-" + field.Name, Name: field.Name, Type: "number", Label: field.Label, Value: fmt.Sprintf("%v", field.Default), Required: field.Required, Class: "mb-4"})
 						} else {
-							@components.Input(field.Label, field.Name, "text", fmt.Sprintf("%v", field.Default), field.Required)
+							@ui.Input(ui.InputProps{ID: "svc-" + field.Name, Name: field.Name, Label: field.Label, Value: fmt.Sprintf("%v", field.Default), Required: field.Required, Class: "mb-4"})
 						}
 					}
 

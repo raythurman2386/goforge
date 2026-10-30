@@ -232,6 +232,43 @@
     @apply block text-sm font-semibold text-label mb-1.5;
   }
 
+  /* components/ui Field error: the control turns red with aria-invalid="true". */
+  .input[aria-invalid="true"] {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-500/20;
+    @apply dark:border-red-400 dark:focus:border-red-400;
+  }
+
+  /*
+   * components/ui Checkbox: the native box in the primary accent with the
+   * kit focus ring. 16px box; the label next to it is the larger target.
+   */
+  .checkbox {
+    @apply h-4 w-4 shrink-0 cursor-pointer rounded border-field-border accent-primary-600 ui-focus-ring disabled:cursor-not-allowed disabled:opacity-50;
+    @apply dark:accent-primary-500;
+  }
+
+  /*
+   * components/ui Switch: a native checkbox (role="switch") drawn as a track
+   * with the thumb as ::before. The unchecked track is gray-500, at least 3:1
+   * against the card in light and dark (WCAG 1.4.11).
+   */
+  .switch {
+    @apply relative inline-flex h-6 w-11 shrink-0 cursor-pointer appearance-none items-center rounded-full border-2 border-transparent bg-gray-500 transition-colors duration-200 ui-focus-ring disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .switch::before {
+    content: "";
+    @apply pointer-events-none inline-block h-5 w-5 translate-x-0 rounded-full bg-white shadow transition-transform duration-200;
+  }
+
+  .switch:checked {
+    @apply bg-primary-600;
+  }
+
+  .switch:checked::before {
+    @apply translate-x-5;
+  }
+
   .card {
     @apply bg-card rounded-ui-lg shadow-sm border border-card-border p-6;
     @apply dark:shadow-none;

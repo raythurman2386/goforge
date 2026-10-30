@@ -78,10 +78,10 @@ templ AddGitSourceModal(csrfToken string) {
 		<form hx-post="/settings/git" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			
-			@components.Input("Source Name", "name", "text", "", true)
+			@ui.Input(ui.InputProps{ID: "git-source-name", Name: "name", Label: "Source Name", Autocomplete: "off", Required: true, Class: "mb-4"})
 			
-			<div class="mb-6">
-				<label class="label">Source Type</label>
+			<fieldset class="mb-6">
+				<legend class="label">Source Type</legend>
 				<div class="grid grid-cols-3 gap-4">
 					<label class="relative flex flex-col p-4 border border-gray-100 rounded-xl cursor-pointer hover:bg-gray-50 transition-all focus-within:ring-2 focus-within:ring-primary-500/20 shadow-sm dark:border-gray-800 dark:hover:bg-gray-800/50">
 						<div class="flex items-center justify-between mb-2">
@@ -102,10 +102,10 @@ templ AddGitSourceModal(csrfToken string) {
 						</div>
 					</label>
 				</div>
-			</div>
+			</fieldset>
 
-			@components.Input("API URL (optional)", "api_url", "text", "", false)
-			@components.Input("Access Token", "access_token", "password", "", true)
+			@ui.Input(ui.InputProps{ID: "git-source-api-url", Name: "api_url", Label: "API URL (optional)", Class: "mb-4"})
+			@ui.Input(ui.InputProps{ID: "git-source-token", Name: "access_token", Type: "password", Label: "Access Token", Autocomplete: "off", Required: true, Class: "mb-4"})
 
 			<div class="mt-8 flex justify-end space-x-3">
 				@ui.Button(ui.ButtonProps{
