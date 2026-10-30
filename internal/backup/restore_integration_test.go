@@ -341,6 +341,31 @@ func testRestoreAgainst(t *testing.T, image, pgName string, bc config.BackupConf
 		sideGone()
 	})
 
+	t.Run("refuse-schema-dirty", func(t *testing.T) {
+		// A backup taken while schema_migrations was dirty (mid-migration):
+		// the restore must refuse it after loading the side database. Its
+		// own prefix, so retention never prunes the run the later restore uses.
+		dirtyRunner := *runner
+		dirtyRunner.Prefix = strings.TrimSuffix(bc.Prefix, "/") + "-dirty/"
+		dirtyRunner.Runs = &memRuns{}
+		exec1(`UPDATE schema_migrations SET dirty = true`)
+		dirtyRun, rerr := dirtyRunner.Run(ctx, models.BackupTriggerManual)
+		exec1(`UPDATE schema_migrations SET dirty = false`)
+		if rerr != nil || dirtyRun.Status != models.BackupRunSucceeded {
+			t.Fatalf("dirty backup: %v %+v", rerr, dirtyRun)
+		}
+		r := newRestorer()
+		r.Prefix = dirtyRunner.Prefix
+		p, perr := r.Plan(ctx, dirtyRun.RunKey)
+		if perr != nil {
+			t.Fatal(perr)
+		}
+		if _, xerr := r.Restore(ctx, p); xerr == nil || !strings.Contains(xerr.Error(), "schema_migrations is dirty") {
+			t.Fatalf("got %v", xerr)
+		}
+		sideGone()
+	})
+
 	// The real restore.
 	rec.mu.Lock()
 	rec.gets = nil
