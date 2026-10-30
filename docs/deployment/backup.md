@@ -12,13 +12,29 @@ An admin sets backups up in the web UI: **Settings → Profile → Backups**. Th
 - A run that is already going when you save finishes with the settings it started with. The next run uses the new ones.
 - Each save is written to the audit log as `backup.settings.update`, with the names of the changed fields only, never their values.
 
-### From your env file (`.env`)
+### From the environment (host runs or an override)
 
-The `BACKUP_*` variables in your env file (`.env`) still work. They are the starting point and the fallback:
+With Docker Compose, use the form above. The repo `docker-compose.yml` does not pass any `BACKUP_*` variable into the `goforge` container, so `BACKUP_*` lines in your env file (`.env`) do nothing there, and the container's environment has no backup keys for `docker inspect` to show.
 
-1. With no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies the `BACKUP_*` values into the saved settings on its first start after the upgrade and logs `imported BACKUP_* into backup settings`. From then on, edit them in Settings → Profile.
-2. Once saved settings exist, they win. Changing `BACKUP_*` afterwards has no effect, and GoForge logs a warning that names the fields that differ. After the import, remove **every** `BACKUP_*` line from your env file (`.env`), not only the two keys, then recreate the container (`docker compose up -d goforge`) so they leave its environment.
+GoForge still reads `BACKUP_*` from its process environment. That matters in two cases: you run the `goforge` binary on the host (export the variables, or put them in the unit or script that starts it), or you want a one-time import on a compose install. For the import, add the variables to your own `docker-compose.override.yml` next to `docker-compose.yml`:
+
+```yaml
+services:
+  goforge:
+    environment:
+      - BACKUP_S3_ENDPOINT=https://<account id>.r2.cloudflarestorage.com
+      - BACKUP_S3_BUCKET=goforge-backups
+      - BACKUP_S3_ACCESS_KEY_ID=...
+      - BACKUP_S3_SECRET_ACCESS_KEY=...
+```
+
+Start GoForge (`docker compose up -d goforge`), check the log, then delete those lines from the override and recreate the container (`docker compose up -d goforge`) so the keys leave its environment. How GoForge treats the variables:
+
+1. With no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies the `BACKUP_*` values into the saved settings on its first start and logs `imported BACKUP_* into backup settings`. From then on, edit them in Settings → Profile.
+2. Once saved settings exist, they win. Changing `BACKUP_*` afterwards has no effect, and GoForge logs a warning that names the fields that differ. After the import, remove **every** `BACKUP_*` variable, not only the two keys.
 3. With no saved settings and no bucket, backups are off.
+
+All the variables, with their defaults (the same defaults apply when a variable is unset):
 
 ```bash
 BACKUP_S3_ENDPOINT=https://<account id>.r2.cloudflarestorage.com
@@ -34,7 +50,7 @@ BACKUP_RETENTION_DAILY=7
 BACKUP_TIMEOUT=2h
 ```
 
-While no saved settings exist, a bucket in your env file (`.env`) with a missing endpoint or key, or another bad `BACKUP_*` value, stops GoForge at startup with a message naming the variable. See [Environment Variables](../configuration/index.md#backups). Once saved settings exist, the same mistake no longer stops GoForge: `BACKUP_*` is ignored and GoForge logs `BACKUP_* in the environment is invalid and ignored because saved backup settings exist`. So a half-removed env file (keys gone, bucket still there) still starts. An older GoForge would refuse it, which is one more reason to remove every `BACKUP_*` line. The form checks the same rules and names the field that is wrong.
+While no saved settings exist, a bucket in the environment with a missing endpoint or key, or another bad `BACKUP_*` value, stops GoForge at startup with a message naming the variable. See [Environment Variables](../configuration/index.md#backups). Once saved settings exist, the same mistake no longer stops GoForge: `BACKUP_*` is ignored and GoForge logs `BACKUP_* in the environment is invalid and ignored because saved backup settings exist`. So a half-removed set (keys gone, bucket still there) still starts. An older GoForge would refuse it, which is one more reason to remove every `BACKUP_*` variable. The form checks the same rules and names the field that is wrong.
 
 ### If ENCRYPTION_KEY changes
 

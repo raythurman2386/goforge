@@ -63,5 +63,5 @@ Run the CLI with the PostgreSQL 17 client (the runtime image, or the runner imag
 - `docker compose exec -T db pg_restore` (the old runbook) fails: the `db` image is PostgreSQL 15 and cannot read a pg_dump 17 archive (`unsupported version (1.16) in file header`).
 - Stop serve by the PID of the `goforge serve` process itself. A subshell's `$!` can be a wrapper, and the restore then rightly refuses with "other clients are connected".
 - `/dev/null` is a character device; the TTY check uses `isatty`, so `docker run` without `-t` needs `--confirm`.
-- Serve copies `BACKUP_*` into `backup_settings` on first start, so `backup list` says `settings: settings` even in an env-only setup.
+- Serve copies `BACKUP_*` into `backup_settings` on first start, so `backup list` says `settings: settings` even in an env-only setup. Env-only means host mode or a compose override: the repo `docker-compose.yml` passes no `BACKUP_*`.
 - The `<db>_pre_restore_*` databases pile up; drop them by hand.

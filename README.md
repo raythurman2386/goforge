@@ -156,7 +156,7 @@ GoForge follows a clean architecture with:
    - Audit logs are partially implemented - complete before production use
 
 6. **Data Protection**
-   - Turn on the built-in nightly backups (`BACKUP_S3_BUCKET` and friends) or run your own. See [Backup & Restore](docs/deployment/backup.md). `goforge backup restore` restores the GoForge database; service data restore is manual
+   - Turn on the built-in nightly backups (Settings → Profile → Backups) or run your own. See [Backup & Restore](docs/deployment/backup.md). `goforge backup restore` restores the GoForge database; service data restore is manual
    - `ENCRYPTION_KEY` encrypts these values at rest with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, and one-click service `config` and `connection_info`
    - Rows written in plaintext by an older version stay readable and are encrypted the next time they are updated
    - Non-secret project variables are stored in plaintext

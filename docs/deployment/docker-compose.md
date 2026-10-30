@@ -111,11 +111,13 @@ docker compose up -d goforge
 
 ### Built-in nightly backups
 
-Use the built-in backups for production. Once an admin sets them up in **Settings → Profile → Backups** (or with the `BACKUP_*` variables in your env file (`.env`) before the first start), `goforge serve` uploads the GoForge database and running Postgres, Gitea, and Vaultwarden services to S3-compatible storage every night (default `02:00 America/Chicago`) and prunes old runs. Run one now with:
+Use the built-in backups for production. Once an admin sets them up in **Settings → Profile → Backups**, `goforge serve` uploads the GoForge database and running Postgres, Gitea, and Vaultwarden services to S3-compatible storage every night (default `02:00 America/Chicago`) and prunes old runs. Run one now with:
 
 ```bash
 docker compose exec goforge ./goforge backup run
 ```
+
+`docker-compose.yml` does not pass `BACKUP_*` into the `goforge` container, so `BACKUP_*` in your env file (`.env`) has no effect. To import them once, put them in your own `docker-compose.override.yml` and remove them after the first start; see [Backup & Restore](backup.md#from-the-environment-host-runs-or-an-override).
 
 Settings → Profile shows admins the last run. Restore is a manual runbook. See [Backup & Restore](backup.md). Keep a copy of `.env`, including `ENCRYPTION_KEY`, off the server; backups never include it.
 

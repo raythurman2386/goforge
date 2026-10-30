@@ -55,7 +55,7 @@ We take security vulnerabilities seriously. If you find a security issue:
 - [ ] Container escape prevention measures
 - [ ] Resource quota enforcement per project
 - [ ] `/health/ready` is unauthenticated and its JSON includes database and Docker error text
-- [ ] `BACKUP_S3_*` credentials set in your env file (`.env`) are plain environment variables in the `goforge` container, so anyone who can run `docker inspect` (the `docker` group) can read them. Backup keys saved in Settings → Profile are stored in the database encrypted with `ENCRYPTION_KEY` and never sent back to the browser; after the first-start import, remove every `BACKUP_*` line from your env file (not only the two keys) and recreate the `goforge` container to close this
+- [ ] `BACKUP_S3_*` credentials passed into the `goforge` container's environment are plain environment variables, so anyone who can run `docker inspect` (the `docker` group) can read them. The repo `docker-compose.yml` no longer passes any `BACKUP_*` variable, so a compose install only has them if an operator adds them in an override for a one-time import. Backup keys saved in Settings → Profile are stored in the database encrypted with `ENCRYPTION_KEY` and never sent back to the browser; after an import, remove every `BACKUP_*` variable from the override (not only the two keys) and recreate the `goforge` container. Open until a deployed `goforge` container is checked with `docker inspect` and shows no `BACKUP_*` names
 - [ ] The main `goforge` image runs as root (the `mcp` image runs as uid 10001)
 
 ### Defaults that reduce exposure
