@@ -27,14 +27,48 @@ func formatBytes(bytes int64) string {
 	}
 }
 
+// statCardSkeleton mirrors a loaded stat card: a .card with a text-sm label
+// line (h-5) and a value line matching the dd's line height (h-9 for
+// text-3xl, h-8 for text-2xl), so the swap does not change card height.
+templ statCardSkeleton(valueHeight string) {
+	<div class="card">
+		@components.Skeleton("h-5 w-28")
+		@components.Skeleton("mt-1 w-20 " + valueHeight)
+	</div>
+}
+
+// DashboardStatsLoader is swapped for DashboardStats once /dashboard/stats
+// answers. It mirrors that layout section by section (Resource Usage, Memory
+// Usage, Docker Disk Usage) with matching line heights so the page does not
+// jump when the real stats land.
 templ DashboardStatsLoader() {
 	<div id="dashboard-stats" hx-get="/dashboard/stats" hx-trigger="load">
-		<div class="mt-8">
-			<div role="status" aria-label="Loading stats">
-				@components.Skeleton("h-6 w-48 mb-4")
-				<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+		<div role="status" aria-label="Loading stats">
+			<div class="mt-8">
+				@components.Skeleton("h-7 w-40")
+				<div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 					for range 4 {
-						@components.Skeleton("h-24 !rounded-xl")
+						@statCardSkeleton("h-9")
+					}
+				</div>
+			</div>
+			<div class="mt-6">
+				@components.Skeleton("h-7 w-36")
+				<div class="mt-4 card">
+					<div class="flex items-center justify-between mb-2">
+						@components.Skeleton("h-5 w-40")
+						@components.Skeleton("h-5 w-12")
+					</div>
+					@components.Skeleton("h-2.5 w-full !rounded-full")
+				</div>
+			</div>
+			<div class="mt-6">
+				<div class="flex min-h-10 items-center justify-between">
+					@components.Skeleton("h-7 w-48")
+				</div>
+				<div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+					for range 4 {
+						@statCardSkeleton("h-8")
 					}
 				</div>
 			</div>
@@ -90,7 +124,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 			<!-- Disk Usage Section -->
 			if stats.DiskUsage != nil {
 				<div class="mt-6">
-					<div class="flex items-center justify-between">
+					<div class="flex min-h-10 items-center justify-between">
 						<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Docker Disk Usage</h2>
 						if admin {
 						<form method="POST" action="/dashboard/prune" class="inline">
