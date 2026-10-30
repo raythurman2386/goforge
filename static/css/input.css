@@ -117,7 +117,7 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:cursor-not-allowed active:scale-[0.98];
   }
 
   .btn-primary {
@@ -139,9 +139,67 @@
     @apply dark:bg-amber-600 dark:hover:bg-amber-500;
   }
 
-  /* Size modifier: combine with a variant, e.g. class="btn-primary btn-sm". */
+  /*
+   * Ghost variants (components/ui ButtonGhost*): no fill at rest, a tint on
+   * hover. Used with btn-icon for row and toolbar actions.
+   */
+  .btn-ghost {
+    @apply btn bg-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:ring-ring;
+    @apply dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300;
+  }
+
+  .btn-ghost-primary {
+    @apply btn bg-transparent text-gray-400 hover:bg-primary-50 hover:text-primary-700 focus-visible:ring-ring;
+    @apply dark:text-gray-500 dark:hover:bg-primary-900/30 dark:hover:text-primary-300;
+  }
+
+  .btn-ghost-warning {
+    @apply btn bg-transparent text-gray-400 hover:bg-amber-50 hover:text-amber-700 focus-visible:ring-ring;
+    @apply dark:text-gray-500 dark:hover:bg-amber-950/40 dark:hover:text-amber-300;
+  }
+
+  .btn-ghost-danger {
+    @apply btn bg-transparent text-gray-400 hover:bg-red-50 hover:text-red-600 focus-visible:ring-ring;
+    @apply dark:text-gray-500 dark:hover:bg-red-950/40 dark:hover:text-red-400;
+  }
+
+  /* Text-style button (components/ui ButtonLink). Pair with btn-inline in prose. */
+  .btn-link {
+    @apply btn bg-transparent text-primary-700 underline-offset-4 hover:text-primary-900 hover:underline focus-visible:ring-ring;
+    @apply dark:text-primary-300 dark:hover:text-primary-100;
+  }
+
+  /*
+   * Size modifiers come after every variant so they win on padding:
+   * class="btn-primary btn-sm". btn-icon is a square icon-only target, 44px
+   * below md (touch, ROADMAP item 5) and 32px from md up.
+   */
   .btn-sm {
     @apply px-3 py-1.5 text-sm;
+  }
+
+  .btn-icon {
+    @apply h-11 w-11 shrink-0 p-0 md:h-8 md:w-8;
+  }
+
+  .btn-inline {
+    @apply p-0;
+  }
+
+  /*
+   * Skeleton shapes (components/ui Skeleton). Component layer, so a caller's
+   * h-*, w-*, or rounded-* utility overrides the default size.
+   */
+  .skeleton-line {
+    @apply h-4 w-full rounded-ui;
+  }
+
+  .skeleton-circle {
+    @apply h-10 w-10 rounded-full;
+  }
+
+  .skeleton-block {
+    @apply h-24 w-full rounded-ui-lg;
   }
 
   /* Square icon-only button for table rows and toolbars. Needs an aria-label. */

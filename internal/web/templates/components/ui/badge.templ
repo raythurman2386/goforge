@@ -1,0 +1,10 @@
+package ui
+
+// Badge is a small label: a status, a trigger type, an account kind.
+// Children are the content; a leading dot or icon should be aria-hidden.
+// A badge is text, not a control, so it has no role.
+templ Badge(p BadgeProps) {
+	<span { badgeAttrs(p)... }>
+		{ children... }
+	</span>
+}

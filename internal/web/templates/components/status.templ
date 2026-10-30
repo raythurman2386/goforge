@@ -1,13 +1,17 @@
 package components
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
 
 // StatusBadge is the one status pill for deployments, service instances, and
 // containers. kind is "deployment", "service", or "container"; status is the
-// raw status string. The tone classes below are literal strings on purpose:
-// Tailwind only keeps classes it can find verbatim in scanned files.
+// raw status string. It is a soft ui.Badge with a dot (or a spinner while
+// the status is in flight).
 templ StatusBadge(kind, status string) {
-	<span class={ "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset whitespace-nowrap", statusBadgeClass(statusTone(kind, status)) } data-status={ status }>
+	@ui.Badge(ui.BadgeProps{Tone: statusBadgeTone(statusTone(kind, status)), Attrs: templ.Attributes{"data-status": status}}) {
 		if statusInFlight(kind, status) {
 			<svg class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
 				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -17,7 +21,7 @@ templ StatusBadge(kind, status string) {
 			<span class={ "h-1.5 w-1.5 rounded-full", statusDotClass(statusTone(kind, status)) } aria-hidden="true"></span>
 		}
 		{ statusLabel(status) }
-	</span>
+	}
 }
 
 // Status tones.
@@ -56,16 +60,16 @@ func statusInFlight(kind, status string) bool {
 	return false
 }
 
-func statusBadgeClass(tone string) string {
+func statusBadgeTone(tone string) ui.BadgeTone {
 	switch tone {
 	case toneSuccess:
-		return "bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-950/40 dark:text-green-300"
+		return ui.BadgeSuccess
 	case toneDanger:
-		return "bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/40 dark:text-red-300"
+		return ui.BadgeDanger
 	case toneWarning:
-		return "bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-200"
+		return ui.BadgeWarning
 	default:
-		return "bg-gray-50 text-gray-700 ring-gray-500/20 dark:bg-gray-800/50 dark:text-gray-300"
+		return ui.BadgeNeutral
 	}
 }
 

@@ -1,6 +1,7 @@
 package containers
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"strings"
 
 	"github.com/moby/moby/api/types/container"
@@ -12,7 +13,7 @@ import (
 templ List(csrfToken string) {
 	@layouts.AppLayout("Containers", csrfToken) {
 		@components.PageHeader("Containers", "Containers that GoForge runs for your projects and services.")
-		<div class="card !p-0 overflow-hidden">
+		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
 			<div class="overflow-x-auto">
 				<table class="min-w-full table-fixed divide-y divide-gray-100 dark:divide-gray-800">
 					<colgroup>
@@ -42,7 +43,7 @@ templ List(csrfToken string) {
 					</tbody>
 				</table>
 			</div>
-		</div>
+		}
 	}
 }
 
@@ -83,39 +84,51 @@ templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 		<td class="table-td pr-6">
 			<div class="flex items-center justify-end gap-1">
 				if dc.State == "running" {
-					<button
-						type="button"
-						hx-post={ "/containers/" + dc.ID + "/stop" }
-						hx-confirm="Are you sure you want to stop this container?"
-						hx-disabled-elt="this"
-						class="icon-btn hover:text-amber-700 hover:bg-amber-50 dark:hover:text-amber-300 dark:hover:bg-amber-950/40"
-						title="Stop"
-						aria-label={ "Stop " + containerName(dc) }
-					>
+					@ui.Button(ui.ButtonProps{
+						Variant: ui.ButtonGhostWarning,
+						Size: ui.ButtonIcon,
+						Label: "Stop " + containerName(dc),
+						Attrs: templ.Attributes{
+							"hx-post": "/containers/" + dc.ID + "/stop",
+							"hx-confirm": "Are you sure you want to stop this container?",
+							"hx-disabled-elt": "this",
+							"title": "Stop",
+						},
+					}) {
 						<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 							<rect x="6" y="6" width="12" height="12" rx="1.5" stroke-width="2"></rect>
 						</svg>
-					</button>
-					<button
-						type="button"
-						hx-post={ "/containers/" + dc.ID + "/restart" }
-						hx-confirm="Are you sure you want to restart this container?"
-						hx-disabled-elt="this"
-						class="icon-btn hover:text-primary-700 hover:bg-primary-50 dark:hover:text-primary-300 dark:hover:bg-primary-900/30"
-						title="Restart"
-						aria-label={ "Restart " + containerName(dc) }
-					>
+					}
+					@ui.Button(ui.ButtonProps{
+						Variant: ui.ButtonGhostPrimary,
+						Size: ui.ButtonIcon,
+						Label: "Restart " + containerName(dc),
+						Attrs: templ.Attributes{
+							"hx-post": "/containers/" + dc.ID + "/restart",
+							"hx-confirm": "Are you sure you want to restart this container?",
+							"hx-disabled-elt": "this",
+							"title": "Restart",
+						},
+					}) {
 						<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
 						</svg>
-					</button>
+					}
 				}
-				<a href={ templ.URL("/containers/" + dc.ID) } class="icon-btn hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-800" title="View" aria-label={ "View " + containerName(dc) }>
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonGhost,
+					Size: ui.ButtonIcon,
+					Href: templ.URL("/containers/" + dc.ID),
+					Label: "View " + containerName(dc),
+					Attrs: templ.Attributes{
+						"title": "View",
+					},
+				}) {
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
 					</svg>
-				</a>
+				}
 			</div>
 		</td>
 	</tr>

@@ -1,13 +1,23 @@
 package components
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
 templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentEnvID string) {
 	<div class="relative inline-block text-left" onclick="event.stopPropagation()">
 		<div>
-			<button type="button" class="btn-secondary !py-1.5 !px-3 font-bold flex items-center shadow-sm" id="menu-button" aria-expanded="true" aria-haspopup="true" onclick="var dd = this.nextElementSibling; dd.classList.toggle('hidden'); if (!dd.classList.contains('hidden')) { var close = function(e) { if (!dd.contains(e.target) && e.target !== this) { dd.classList.add('hidden'); document.removeEventListener('click', close); } }.bind(this); document.addEventListener('click', close); }">
+			@ui.Button(ui.ButtonProps{
+				Variant: ui.ButtonSecondary,
+				Class: "!py-1.5 !px-3 font-bold flex items-center shadow-sm",
+				Attrs: templ.Attributes{
+					"id": "menu-button",
+					"aria-expanded": "true",
+					"aria-haspopup": "true",
+					"onclick": "var dd = this.nextElementSibling; dd.classList.toggle('hidden'); if (!dd.classList.contains('hidden')) { var close = function(e) { if (!dd.contains(e.target) && e.target !== this) { dd.classList.add('hidden'); document.removeEventListener('click', close); } }.bind(this); document.addEventListener('click', close); }",
+				},
+			}) {
 				<div class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></div>
 				for _, e := range envs {
 					if e.ID == currentEnvID {
@@ -22,7 +32,7 @@ templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentE
 				<svg class="-mr-1 ml-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
 					<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
 				</svg>
-			</button>
+			}
 		</div>
 
 		<div class="hidden origin-top-right absolute left-0 mt-2 w-56 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10 border border-gray-100 p-1.5 dark:bg-gray-900 dark:border-gray-800" role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
@@ -49,10 +59,18 @@ templ CreateEnvironmentModal(projectID string, csrfToken string) {
 			<p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Examples: staging, qa, feature-x</p>
 			
 			<div class="mt-8 flex justify-end space-x-3">
-				<button type="button" data-modal-close class="btn-secondary">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonSecondary,
+					Attrs: templ.Attributes{
+						"data-modal-close": true,
+					},
+				}) {
 					Cancel
-				</button>
-				@Button("Create", "primary")
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+					Create
+					@Spinner()
+				}
 			</div>
 		</form>
 	}

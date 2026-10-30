@@ -1,0 +1,63 @@
+package ui
+
+// Card is the surface for a group of content: a <div>, or an <a> when Href
+// is set. Compose it with CardHeader, CardTitle, CardDescription,
+// CardContent, and CardFooter, or put content straight in a padded card.
+templ Card(p CardProps) {
+	if p.Href != "" {
+		<a href={ p.Href } { cardAttrs(p)... }>
+			{ children... }
+		</a>
+	} else {
+		<div { cardAttrs(p)... }>
+			{ children... }
+		</div>
+	}
+}
+
+// CardHeader is the top row of a Flush card: title block on the left,
+// actions on the right, a divider below.
+templ CardHeader(attrs templ.Attributes) {
+	<div { Attrs(templ.Attributes{"class": "card-header"}, attrs)... }>
+		{ children... }
+	</div>
+}
+
+// CardTitle is the card heading at the given level (default h3).
+templ CardTitle(level CardTitleLevel, attrs templ.Attributes) {
+	switch level {
+		case 2:
+			<h2 { Attrs(templ.Attributes{"class": "card-title"}, attrs)... }>
+				{ children... }
+			</h2>
+		case 4:
+			<h4 { Attrs(templ.Attributes{"class": "card-title"}, attrs)... }>
+				{ children... }
+			</h4>
+		default:
+			<h3 { Attrs(templ.Attributes{"class": "card-title"}, attrs)... }>
+				{ children... }
+			</h3>
+	}
+}
+
+// CardDescription is the muted line under a CardTitle.
+templ CardDescription(attrs templ.Attributes) {
+	<p { Attrs(templ.Attributes{"class": "mt-1 text-sm text-muted-foreground"}, attrs)... }>
+		{ children... }
+	</p>
+}
+
+// CardContent is the padded body of a Flush card.
+templ CardContent(attrs templ.Attributes) {
+	<div { Attrs(templ.Attributes{"class": "card-body"}, attrs)... }>
+		{ children... }
+	</div>
+}
+
+// CardFooter is the bottom action row of a Flush card.
+templ CardFooter(attrs templ.Attributes) {
+	<div { Attrs(templ.Attributes{"class": "flex flex-wrap items-center justify-end gap-3 border-t border-divider px-6 py-4"}, attrs)... }>
+		{ children... }
+	</div>
+}

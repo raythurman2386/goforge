@@ -14,10 +14,11 @@ Checked sources:
      every `return "..."` inside a func whose name ends in Class, such as
      statusBadgeClass, alertClass, logLevelBadgeClass, backupLineClass.
   4. Literal string arguments to the Skeleton components
-     (components.Skeleton("h-5 w-28"), statCardSkeleton("h-9")).
+     (ui.Skeleton(ui.SkeletonLine, "h-5 w-28"), statCardSkeleton("h-9")).
   5. components/ui merge inputs in .templ and non-test .go files under
      internal/web/templates: string literals passed to Class(...) or
-     ui.Class(...), and "class": "..." entries in templ.Attributes literals.
+     ui.Class(...), "class": "..." entries in templ.Attributes literals, and
+     Class: "..." fields in props literals (ui.ButtonProps{Class: "w-full"}).
   6. static/js/app.js and static/js/ui.js: the string values of the
      LEVEL_CLASSES object, string literals assigned to .className, and
      classList.add/remove/toggle args.
@@ -125,6 +126,9 @@ def ui_merge_args(text):
     # templ.Attributes{"class": "..."} defaults handed to ui.Attrs.
     for m in re.finditer(r'"class"\s*:\s*"((?:[^"\\\n]|\\.)*)"', text):
         yield '"class":', m.group(1)
+    # ui.ButtonProps{Class: "..."} and the other props structs.
+    for m in re.finditer(r'\bClass:\s*"((?:[^"\\\n]|\\.)*)"', text):
+        yield 'Class:', m.group(1)
 
 
 def js_classes(text):

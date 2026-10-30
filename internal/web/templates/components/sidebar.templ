@@ -1,5 +1,11 @@
 package components
 
+import (
+	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
 // Sidebar renders the app navigation. app.js marks the link whose data-nav
 // prefix best matches the current path with aria-current="page"; the
 // aria-[current=page] variants below style it.
@@ -7,6 +13,8 @@ package components
 // On md+ the aside is sticky and viewport-tall (md:h-screen) instead of
 // stretching with <main>, so the settings footer (Log out) stays on screen
 // however tall the page grows; the middle nav scrolls if the viewport is short.
+// The footer names the signed-in user (from the request context) with an
+// initials Avatar; it is omitted when there is no user.
 templ Sidebar(csrfToken string) {
 	<aside id="sidebar" aria-label="Sidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-white/95 backdrop-blur-xl border-r border-gray-200/50 shadow-2xl md:shadow-none transform -translate-x-full transition-all duration-300 ease-in-out md:translate-x-0 md:sticky md:inset-0 h-full md:h-screen md:flex-shrink-0 flex flex-col dark:bg-gray-900/95 dark:border-gray-800/50">
 		<div class="flex-1 flex flex-col min-h-0">
@@ -54,6 +62,17 @@ templ Sidebar(csrfToken string) {
 
 			<!-- Bottom settings navigation -->
 			<div class="flex-shrink-0 p-4 border-t border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-800/50">
+				if user := auth.GetUserFromContext(ctx); user != nil {
+					<div class="mb-3 flex items-center gap-3 px-3" data-sidebar-user>
+						@ui.Avatar(ui.AvatarProps{Name: UserDisplayName(user), Size: ui.AvatarSM})
+						<div class="min-w-0">
+							<p class="truncate text-sm font-medium text-foreground">{ UserDisplayName(user) }</p>
+							if UserDisplayName(user) != user.Email {
+								<p class="truncate text-xs text-muted-foreground">{ user.Email }</p>
+							}
+						</div>
+					</div>
+				}
 				<nav class="space-y-1" aria-label="Settings navigation">
 					<a href="/settings/profile" data-nav="/settings/profile" class="flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-gray-700 hover:text-primary-700 hover:bg-primary-50 aria-[current=page]:bg-primary-50 aria-[current=page]:text-primary-700 dark:aria-[current=page]:bg-primary-900/30 dark:aria-[current=page]:text-primary-300 transition-all duration-200 group dark:text-gray-300 dark:hover:text-primary-300 dark:hover:bg-primary-900/30">
 						<svg class="w-5 h-5 mr-3 text-gray-500 group-hover:text-primary-500 group-aria-[current=page]:text-primary-500 dark:group-aria-[current=page]:text-primary-400 transition-colors dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -83,3 +102,12 @@ templ Sidebar(csrfToken string) {
 	</aside>
 }
 
+
+// UserDisplayName is the name shown for a user: the GitHub username when
+// linked, otherwise the email address.
+func UserDisplayName(u *models.User) string {
+	if u.GitHubUsername.Valid && u.GitHubUsername.String != "" {
+		return u.GitHubUsername.String
+	}
+	return u.Email
+}

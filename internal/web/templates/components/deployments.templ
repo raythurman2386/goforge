@@ -1,6 +1,7 @@
 package components
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/pagination"
@@ -16,28 +17,32 @@ type DeploymentListProps struct {
 }
 
 templ DeploymentList(props DeploymentListProps) {
-	<div class="card !p-0 overflow-hidden">
-		<div class="card-header">
+	@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
+		@ui.CardHeader(nil) {
 			<div>
-				<h3 class="card-title">Deployment History</h3>
+				@ui.CardTitle(3, nil) {
+					Deployment History
+				}
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Recent deployments for this environment.</p>
 			</div>
 			if props.EnvID != "" {
-				<button
-					type="button"
-					hx-post={ fmt.Sprintf("/projects/%s/deployments?env_id=%s", props.ProjectID, props.EnvID) }
-					hx-disabled-elt="this"
-					hx-indicator="find .htmx-indicator"
-					class="btn-primary btn-sm"
-				>
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonPrimary,
+					Size: ui.ButtonSM,
+					Attrs: templ.Attributes{
+						"hx-post": fmt.Sprintf("/projects/%s/deployments?env_id=%s", props.ProjectID, props.EnvID),
+						"hx-disabled-elt": "this",
+						"hx-indicator": "find .htmx-indicator",
+					},
+				}) {
 					<svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
 					</svg>
 					Deploy Now
 					@Spinner()
-				</button>
+				}
 			}
-		</div>
+		}
 		if len(props.Deployments) == 0 {
 			@EmptyState(EmptyStateProps{
 				Title:       "No deployments yet",
@@ -55,7 +60,7 @@ templ DeploymentList(props DeploymentListProps) {
 				@Pagination(props.Pagination)
 			}
 		}
-	</div>
+	}
 }
 
 templ DeploymentRow(d *models.Deployment, projectID string) {
@@ -114,20 +119,22 @@ templ DeploymentStatusBadge(status models.DeploymentStatus) {
 	@StatusBadge("deployment", string(status))
 }
 
+// TriggerTypeBadge labels how a deployment started: a square subtle badge,
+// neutral for manual, primary for webhook, warning for rollback.
 templ TriggerTypeBadge(trigger models.TriggerType) {
 	switch trigger {
 		case models.TriggerTypeManual:
-			<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+			@ui.Badge(ui.BadgeProps{Tone: ui.BadgeNeutral, Variant: ui.BadgeSubtle, Square: true}) {
 				Manual
-			</span>
+			}
 		case models.TriggerTypeWebhook:
-			<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
+			@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Variant: ui.BadgeSubtle, Square: true}) {
 				Webhook
-			</span>
+			}
 		case models.TriggerTypeRollback:
-			<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+			@ui.Badge(ui.BadgeProps{Tone: ui.BadgeWarning, Variant: ui.BadgeSubtle, Square: true}) {
 				Rollback
-			</span>
+			}
 	}
 }
 

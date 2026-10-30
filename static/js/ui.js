@@ -1,9 +1,9 @@
 // GoForge UI kit runtime (components/ui). Loaded from layouts.Base after
 // app.js. No build step; plain ES2017 like app.js.
 //
-// PR 1 ships the skeleton only: the delegated listener pattern and the
-// htmx:load init pass. Components register handlers here in later PRs
-// (Dialog, Dropdown, Popover, Tooltip, Tabs, Sheet). Rules, from the UI kit
+// PR 1 shipped the delegated listener pattern and the htmx:load init pass.
+// PR 2 adds the dismissible Alert. Later PRs register Dialog, Dropdown,
+// Popover, Tooltip, Tabs, and Sheet. Rules, from the UI kit
 // brief (docs/development/frontend.md, "UI kit (Path A)"):
 //
 //  1. Delegated listeners only. click, keydown, focusin, pointerover, and
@@ -85,6 +85,19 @@
 		});
 	}
 	document.addEventListener("htmx:beforeHistorySave", closeOverlays);
+
+	// Alert (components/ui Alert with Dismissible): the close button
+	// ([data-ui-dismiss]) removes the alert from the page.
+	register("alert", {
+		events: {
+			click: function (evt, el) {
+				var btn = evt.target.closest("[data-ui-dismiss]");
+				if (!btn || !el.contains(btn)) return;
+				evt.preventDefault();
+				el.remove();
+			},
+		},
+	});
 
 	function init() {
 		initTree(document);

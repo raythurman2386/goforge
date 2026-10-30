@@ -1,0 +1,32 @@
+package ui
+
+// SkeletonShape is the default size and corner of a Skeleton.
+type SkeletonShape string
+
+// Skeleton shapes: a text line (h-4, full width), a circle (h-10 w-10, for
+// an avatar), and a block (h-24, full width, for a card or chart).
+const (
+	SkeletonLine   SkeletonShape = "line"
+	SkeletonCircle SkeletonShape = "circle"
+	SkeletonBlock  SkeletonShape = "block"
+)
+
+// Skeleton is a placeholder shape that pulses only when the user allows
+// motion. It is aria-hidden: put aria-busy="true" and a label (for example
+// role="status" aria-label="Loading stats") on the region it fills, and let
+// the swap replace that region. class overrides the shape's size, for
+// example "h-5 w-28" (the shape classes are in the components layer).
+templ Skeleton(shape SkeletonShape, class string) {
+	<div class={ Class("motion-safe:animate-pulse bg-gray-200 dark:bg-gray-700", skeletonShapeClass(shape), class) } aria-hidden="true"></div>
+}
+
+func skeletonShapeClass(shape SkeletonShape) string {
+	switch shape {
+	case SkeletonCircle:
+		return "skeleton-circle"
+	case SkeletonBlock:
+		return "skeleton-block"
+	default:
+		return "skeleton-line"
+	}
+}

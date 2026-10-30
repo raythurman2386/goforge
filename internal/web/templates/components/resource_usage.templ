@@ -1,5 +1,7 @@
 package components
 
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
 // MetricsStreamID is the id of the element that owns a container's stats
 // EventSource. It is keyed by Docker ID so hx-preserve keeps the same stream
 // across a poll swap while the container is unchanged, and a recreate (new
@@ -11,7 +13,7 @@ func MetricsStreamID(dockerID string) string {
 // ResourceUsageCard streams live stats for one container. The stream swaps
 // in a "stats" frame or an "unavailable" frame that says why there is none.
 templ ResourceUsageCard(dockerID string, class string) {
-	<div class={ "card overflow-hidden !p-0", class } data-resource-usage>
+	@ui.Card(ui.CardProps{Flush: true, Class: ui.Class("overflow-hidden", class), Attrs: templ.Attributes{"data-resource-usage": true}}) {
 		<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
 			<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Resource Usage</h3>
 			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Real-time container performance metrics.</p>
@@ -24,16 +26,16 @@ templ ResourceUsageCard(dockerID string, class string) {
 				</div>
 			</div>
 		</div>
-	</div>
+	}
 }
 
 // NoRunningContainer is the Resource Usage empty state when there is no
 // running container to stream.
 templ NoRunningContainer(class string) {
-	<div class={ "card overflow-hidden !p-0", class } data-resource-usage-empty>
+	@ui.Card(ui.CardProps{Flush: true, Class: ui.Class("overflow-hidden", class), Attrs: templ.Attributes{"data-resource-usage-empty": true}}) {
 		<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
 			<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Resource Usage</h3>
 		</div>
 		<p class="px-6 py-8 text-sm text-center text-gray-500 dark:text-gray-400">No running container for this environment.</p>
-	</div>
+	}
 }

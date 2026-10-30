@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 	"strconv"
 )
@@ -26,7 +27,7 @@ templ ErrorPage(code int, title, message, csrfToken string, signedIn bool) {
 }
 
 templ errorCard(code int, title, message string, signedIn bool) {
-	<div class="card max-w-md w-full !p-8 text-center">
+	@ui.Card(ui.CardProps{Class: "max-w-md w-full !p-8 text-center"}) {
 		<div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-50 ring-8 ring-red-50/50 dark:bg-red-950/40 dark:ring-red-950/20">
 			<svg class="h-8 w-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
@@ -41,19 +42,19 @@ templ errorCard(code int, title, message string, signedIn bool) {
 		}
 		<div class="mt-8">
 			if signedIn {
-				<a href="/dashboard" class="btn-primary">
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/dashboard"}) {
 					<svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
 					</svg>
 					Back to dashboard
-				</a>
+				}
 			} else {
-				<a href="/login" class="btn-primary">
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/login"}) {
 					Sign in
-				</a>
+				}
 			}
 		</div>
-	</div>
+	}
 }
 
 templ NotFound(csrfToken string, signedIn bool) {

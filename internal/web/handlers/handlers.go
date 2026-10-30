@@ -12,7 +12,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/web/httputil"
-	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/errors"
 )
 
@@ -47,7 +47,7 @@ func RenderError(w http.ResponseWriter, r *http.Request, status int, message str
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(status)
 		// templ escapes the message; app.js reads the fragment's text for the toast.
-		if err := components.AlertMessage("error", message).Render(r.Context(), w); err != nil {
+		if err := ui.AlertMessage(ui.AlertError, message).Render(r.Context(), w); err != nil {
 			fmt.Fprint(w, html.EscapeString(message))
 		}
 		return

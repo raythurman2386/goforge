@@ -12,7 +12,8 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-var cardRe = regexp.MustCompile(`class="(?:mt-4 )?card"`)
+// ui.Card renders "card" first, then any caller class.
+var cardRe = regexp.MustCompile(`class="card(?: mt-4)?"`)
 
 func render(t *testing.T, c templ.Component) string {
 	t.Helper()
@@ -23,7 +24,7 @@ func render(t *testing.T, c templ.Component) string {
 	return buf.String()
 }
 
-// The loader must keep the HTMX swap contract and accessible status, and
+// The loader must keep the HTMX swap contract and accessible busy status, and
 // reserve one card per card the loaded stats render (4 resource + 1 memory +
 // 4 disk) so the swap does not jump.
 func TestDashboardStatsLoaderMirrorsStats(t *testing.T) {
@@ -34,6 +35,8 @@ func TestDashboardStatsLoaderMirrorsStats(t *testing.T) {
 		`hx-trigger="load"`,
 		`role="status"`,
 		`aria-label="Loading stats"`,
+		`aria-busy="true"`,
+		`motion-safe:animate-pulse`,
 	} {
 		if !strings.Contains(loader, want) {
 			t.Errorf("loader missing %s", want)

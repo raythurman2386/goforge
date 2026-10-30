@@ -21,19 +21,6 @@ templ Input(label, name, inputType, value string, required bool) {
 	</div>
 }
 
-templ Button(text string, variant string) {
-	<button
-		type="submit"
-		class={ "btn ",
-			templ.KV("btn-primary", variant == "primary"),
-			templ.KV("btn-secondary", variant == "secondary"),
-			templ.KV("btn-danger", variant == "danger") }
-	>
-		{ text }
-		@Spinner()
-	</button>
-}
-
 templ Select(label, name string, options []string, selected string) {
 	<div class="mb-4">
 		<label for={ name } class="label">

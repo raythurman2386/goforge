@@ -1,9 +1,9 @@
 package pages
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"github.com/raythurman2386/goforge/internal/models"
-	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
@@ -31,10 +31,10 @@ func formatBytes(bytes int64) string {
 // line (h-5) and a value line matching the dd's line height (h-9 for
 // text-3xl, h-8 for text-2xl), so the swap does not change card height.
 templ statCardSkeleton(valueHeight string) {
-	<div class="card">
-		@components.Skeleton("h-5 w-28")
-		@components.Skeleton("mt-1 w-20 " + valueHeight)
-	</div>
+	@ui.Card(ui.CardProps{}) {
+		@ui.Skeleton(ui.SkeletonLine, "h-5 w-28")
+		@ui.Skeleton(ui.SkeletonLine, "mt-1 w-20 "+valueHeight)
+	}
 }
 
 // DashboardStatsLoader is swapped for DashboardStats once /dashboard/stats
@@ -43,9 +43,9 @@ templ statCardSkeleton(valueHeight string) {
 // jump when the real stats land.
 templ DashboardStatsLoader() {
 	<div id="dashboard-stats" hx-get="/dashboard/stats" hx-trigger="load">
-		<div role="status" aria-label="Loading stats">
+		<div role="status" aria-label="Loading stats" aria-busy="true">
 			<div class="mt-8">
-				@components.Skeleton("h-7 w-40")
+				@ui.Skeleton(ui.SkeletonLine, "h-7 w-40")
 				<div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 					for range 4 {
 						@statCardSkeleton("h-9")
@@ -53,18 +53,18 @@ templ DashboardStatsLoader() {
 				</div>
 			</div>
 			<div class="mt-6">
-				@components.Skeleton("h-7 w-36")
-				<div class="mt-4 card">
+				@ui.Skeleton(ui.SkeletonLine, "h-7 w-36")
+				@ui.Card(ui.CardProps{Class: "mt-4"}) {
 					<div class="flex items-center justify-between mb-2">
-						@components.Skeleton("h-5 w-40")
-						@components.Skeleton("h-5 w-12")
+						@ui.Skeleton(ui.SkeletonLine, "h-5 w-40")
+						@ui.Skeleton(ui.SkeletonLine, "h-5 w-12")
 					</div>
-					@components.Skeleton("h-2.5 w-full !rounded-full")
-				</div>
+					@ui.Skeleton(ui.SkeletonLine, "h-2.5 w-full rounded-full")
+				}
 			</div>
 			<div class="mt-6">
 				<div class="flex min-h-10 items-center justify-between">
-					@components.Skeleton("h-7 w-48")
+					@ui.Skeleton(ui.SkeletonLine, "h-7 w-48")
 				</div>
 				<div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 					for range 4 {
@@ -83,29 +83,29 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 			<div class="mt-8">
 				<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Resource Usage</h2>
 				<dl class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-					<div class="card">
+					@ui.Card(ui.CardProps{}) {
 						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Total Projects</dt>
 						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%d", stats.TotalProjects) }</dd>
-					</div>
-					<div class="card">
+					}
+					@ui.Card(ui.CardProps{}) {
 						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Active Services</dt>
 						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%d", stats.TotalServices) }</dd>
-					</div>
-					<div class="card">
+					}
+					@ui.Card(ui.CardProps{}) {
 						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Running Containers</dt>
 						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%d / %d", stats.RunningContainers, stats.TotalContainers) }</dd>
-					</div>
-					<div class="card">
+					}
+					@ui.Card(ui.CardProps{}) {
 						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">CPU Usage</dt>
 						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%.1f%%", stats.TotalCPUUsage) }</dd>
-					</div>
+					}
 				</dl>
 			</div>
 
 			<!-- Memory Usage Section -->
 			<div class="mt-6">
 				<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Memory Usage</h2>
-				<div class="mt-4 card">
+				@ui.Card(ui.CardProps{Class: "mt-4"}) {
 					<div class="flex items-center justify-between mb-2">
 						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">
 							{ formatBytes(stats.TotalMemoryUsage) } / { formatBytes(stats.TotalMemoryLimit) }
@@ -118,7 +118,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 							style={ fmt.Sprintf("width: %.0f%%", min(stats.MemoryUsagePercent, 100)) }
 						></div>
 					</div>
-				</div>
+				}
 			</div>
 
 			<!-- Disk Usage Section -->
@@ -130,47 +130,52 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 						<form method="POST" action="/dashboard/prune" class="inline">
 							<input type="hidden" name="csrf_token" value={ csrfToken } />
 							if stats.DiskUsage.ReclaimableSize > 0 {
-								<button
-									type="submit"
-									class="btn-secondary text-sm"
-									onclick="return confirm('This will remove all stopped containers and unused images. Continue?')"
-								>
+								@ui.Button(ui.ButtonProps{
+									Variant: ui.ButtonSecondary,
+									Type: "submit",
+									Class: "text-sm",
+									Attrs: templ.Attributes{
+										"onclick": "return confirm('This will remove all stopped containers and unused images. Continue?')",
+									},
+								}) {
 									Prune System
-								</button>
+								}
 							} else {
-								<button
-									type="button"
-									class="btn-secondary text-sm opacity-50 cursor-not-allowed"
-									disabled
-									title="Nothing to prune"
-								>
+								@ui.Button(ui.ButtonProps{
+									Variant: ui.ButtonSecondary,
+									Disabled: true,
+									Class: "text-sm opacity-50 cursor-not-allowed",
+									Attrs: templ.Attributes{
+										"title": "Nothing to prune",
+									},
+								}) {
 									Prune System
-								</button>
+								}
 							}
 						</form>
 						}
 					</div>
 					<dl class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-						<div class="card">
+						@ui.Card(ui.CardProps{}) {
 							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Images</dt>
 							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.ImagesSize) }</dd>
-						</div>
-						<div class="card">
+						}
+						@ui.Card(ui.CardProps{}) {
 							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Containers</dt>
 							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.ContainersSize) }</dd>
-						</div>
-						<div class="card">
+						}
+						@ui.Card(ui.CardProps{}) {
 							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Volumes</dt>
 							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.VolumesSize) }</dd>
-						</div>
-						<div class="card">
+						}
+						@ui.Card(ui.CardProps{}) {
 							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Build Cache</dt>
 							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.BuildCacheSize) }</dd>
-						</div>
+						}
 					</dl>
 					if stats.DiskUsage.ReclaimableSize > 0 {
 						<div class="mt-4">
-							@components.Alert("warning") {
+							@ui.Alert(ui.AlertProps{Tone: ui.AlertWarning}) {
 								<p><strong>Reclaimable Space:</strong> { formatBytes(stats.DiskUsage.ReclaimableSize) } can be freed by pruning.</p>
 							}
 						</div>
@@ -190,7 +195,9 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 			if !hasProjects && !hasGitSources {
 				<!-- First-Time Onboarding Flow -->
 				<div class="mt-8">
-					<div class="card bg-white border-2 border-primary-200 dark:bg-gray-900 dark:border-primary-800">
+					@ui.Card(ui.CardProps{
+						Class: "bg-white border-2 border-primary-200 dark:bg-gray-900 dark:border-primary-800",
+					}) {
 						<div class="px-4 py-5 sm:p-6 text-center">
 							<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/50">
 								<svg class="h-6 w-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -219,7 +226,13 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 														<br/>Link your GitHub, GitLab, or Gitea account to access your repositories.
 													</p>
 													<div class="mt-3">
-														<a href="/settings/git" class="btn-primary inline-flex">Add Git Source</a>
+														@ui.Button(ui.ButtonProps{
+															Variant: ui.ButtonPrimary,
+															Href: "/settings/git",
+															Class: "inline-flex",
+														}) {
+															Add Git Source
+														}
 													</div>
 												</div>
 											</div>
@@ -265,12 +278,14 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 								</ol>
 							</div>
 						</div>
-					</div>
+					}
 				</div>
 			} else if !hasProjects {
 				<!-- State: Has Git Source but no projects yet -->
 				<div class="mt-8">
-					<div class="card bg-white border-2 border-primary-200 dark:bg-gray-900 dark:border-primary-800">
+					@ui.Card(ui.CardProps{
+						Class: "bg-white border-2 border-primary-200 dark:bg-gray-900 dark:border-primary-800",
+					}) {
 						<div class="px-4 py-5 sm:p-6 text-center">
 							<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/50">
 								<svg class="h-6 w-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -282,20 +297,22 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 								<p>You've connected a Git source. Next, create a project to deploy your first application.</p>
 							</div>
 							<div class="mt-5 sm:mt-6 flex justify-center space-x-3">
-								<a href="/projects/new" class="btn-primary">
+								@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/projects/new"}) {
 									Create Project
-								</a>
-								<a href="/services" class="btn-secondary">
+								}
+								@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Href: "/services"}) {
 									Deploy Service Instead
-								</a>
+								}
 							</div>
 						</div>
-					</div>
+					}
 				</div>
 			} else {
 				<!-- Standard Welcome & Quick Actions -->
 				<div class="mt-8">
-					<div class="card bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-900/50">
+					@ui.Card(ui.CardProps{
+						Class: "bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-900/50",
+					}) {
 						<div class="sm:flex sm:items-start sm:justify-between">
 							<div>
 								<h3 class="text-xl font-bold text-gray-900 tracking-tight dark:text-gray-100">Welcome to GoForge</h3>
@@ -304,15 +321,15 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 								</div>
 							</div>
 							<div class="mt-5 sm:mt-0 sm:ml-6 sm:flex-shrink-0 flex space-x-3">
-								<a href="/projects/new" class="btn-primary">
+								@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/projects/new"}) {
 									Create Project
-								</a>
-								<a href="/services" class="btn-secondary">
+								}
+								@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Href: "/services"}) {
 									Deploy Service
-								</a>
+								}
 							</div>
 						</div>
-					</div>
+					}
 				</div>
 			}
 			

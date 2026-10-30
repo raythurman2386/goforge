@@ -1,6 +1,7 @@
 package projects
 
 import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"fmt"
 	"time"
 
@@ -12,6 +13,10 @@ import (
 
 templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, containerSummary *docker.InspectSummary, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, maskedConn map[string]map[string]string, activeTab string, csrfToken string) {
 	@layouts.AppLayout(project.Name, csrfToken) {
+		@ui.Breadcrumb([]ui.Crumb{
+			{Label: "Projects", Href: "/projects"},
+			{Label: project.Name},
+		})
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center space-x-4">
@@ -27,13 +32,21 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 			</div>
 			<div class="mt-4 flex md:mt-0 md:ml-4">
 				if currentEnv != nil {
-					<button hx-post={ "/projects/" + project.ID + "/deployments?env_id=" + currentEnv.ID } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-disabled-elt="this" hx-indicator="find .htmx-indicator" class="btn-primary">
+					@ui.Button(ui.ButtonProps{
+						Variant: ui.ButtonPrimary,
+						Attrs: templ.Attributes{
+							"hx-post": "/projects/" + project.ID + "/deployments?env_id=" + currentEnv.ID,
+							"hx-headers": `{"X-CSRF-Token":"` + csrfToken + `"}`,
+							"hx-disabled-elt": "this",
+							"hx-indicator": "find .htmx-indicator",
+						},
+					}) {
 						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
 						</svg>
 						Deploy Now
 						@components.Spinner()
-					</button>
+					}
 				}
 			</div>
 		</div>
@@ -63,7 +76,9 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 					templ.KV("border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-700", activeTab != "services") }>
 				Services
 				if len(linkedServices) > 0 {
-					<span class="ml-2 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">{ fmt.Sprintf("%d", len(linkedServices)) }</span>
+					@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Variant: ui.BadgeSubtle, Class: "ml-2 px-1.5"}) {
+						{ fmt.Sprintf("%d", len(linkedServices)) }
+					}
 				}
 			</a>
 			<a href={ templ.URL("/projects/" + project.ID + "/settings?env=" + envID(currentEnv)) }
@@ -135,7 +150,7 @@ templ DeploymentStatusBanner(projectID string, deployment *models.Deployment) {
 templ Overview(project *models.Project, latestDeployment *models.Deployment, activeContainer *models.Container, containerSummary *docker.InspectSummary) {
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 		// Main info card
-		<div class="lg:col-span-2 card overflow-hidden !p-0">
+		@ui.Card(ui.CardProps{Flush: true, Class: "lg:col-span-2 overflow-hidden"}) {
 			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
 				<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Project Overview</h3>
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Details and configuration for the current environment.</p>
@@ -158,10 +173,10 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono dark:text-gray-100">{ project.BuildContext }</dd>
 				</div>
 			</div>
-		</div>
+		}
 
 		// Latest deployment card
-		<div class="card overflow-hidden !p-0">
+		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
 			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
 				<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Latest Deployment</h3>
 			</div>
@@ -190,7 +205,7 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 						</div>
 						if latestDeployment.ErrorMessage.Valid && latestDeployment.ErrorMessage.String != "" {
 							<div class="mt-4">
-								@components.AlertMessage("error", latestDeployment.ErrorMessage.String)
+								@ui.AlertMessage(ui.AlertError, latestDeployment.ErrorMessage.String)
 							</div>
 						}
 						<div class="mt-4 pt-4 border-t border-gray-100 flex justify-end dark:border-gray-800">
@@ -209,7 +224,7 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 					</div>
 				}
 			</div>
-		</div>
+		}
 
 		// activeContainer is only ever a running container (see
 		// handlers.activeContainer); otherwise the card shows an empty state.
@@ -320,7 +335,7 @@ func formatDuration(d time.Duration) string {
 templ Services(project *models.Project, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, maskedConn map[string]map[string]string, csrfToken string) {
 	<div class="space-y-6">
 		// Linked services
-		<div class="card overflow-hidden !p-0">
+		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
 			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/50">
 				<div>
 					<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Linked Services</h3>
@@ -350,9 +365,9 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 								<div class="min-w-0">
 									<p class="text-sm font-semibold text-gray-900 truncate dark:text-gray-100">{ svc.Name }</p>
 									<div class="flex items-center space-x-2 mt-1">
-										<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-800">
+										@ui.Badge(ui.BadgeProps{Square: true, Class: "px-2"}) {
 											{ svc.TemplateName }
-										</span>
+										}
 										@components.StatusBadge("service", string(svc.Status))
 									</div>
 									if connInfo := maskedConn[svc.ID]; len(connInfo) > 0 {
@@ -367,26 +382,30 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 									}
 								</div>
 							</div>
-							<button
-								hx-delete={ "/projects/" + project.ID + "/services/" + svc.ID }
-								hx-confirm="Detach this service? The connection string will no longer be injected on next deploy."
-								hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` }
-								class="flex-shrink-0 ml-4 inline-flex items-center px-3 py-1.5 border border-red-200 text-xs font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 transition-colors dark:border-red-900 dark:text-red-300 dark:bg-red-950/40 dark:hover:bg-red-900/40"
-							>
-								<svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							@ui.Button(ui.ButtonProps{
+								Variant: ui.ButtonGhostDanger,
+								Size:    ui.ButtonSM,
+								Class:   "ml-4 shrink-0 text-red-700 dark:text-red-300",
+								Attrs: templ.Attributes{
+									"hx-delete":  "/projects/" + project.ID + "/services/" + svc.ID,
+									"hx-confirm": "Detach this service? The connection string will no longer be injected on next deploy.",
+									"hx-headers": `{"X-CSRF-Token":"` + csrfToken + `"}`,
+								},
+							}) {
+								<svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9.27-3.11-11-7.5a11.72 11.72 0 013.168-4.477M6.343 6.343l11.314 11.314"></path>
 								</svg>
 								Detach
-							</button>
+							}
 						</div>
 					}
 				}
 			</div>
-		</div>
+		}
 
 		// Attach new service
 		if len(availableServices) > 0 {
-			<div class="card overflow-hidden !p-0">
+			@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
 				<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
 					<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Attach Service</h3>
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Link a running service instance to this project.</p>
@@ -402,31 +421,31 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 								}
 							</select>
 						</div>
-						<button type="submit" class="btn-primary">
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
 							<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"></path>
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101"></path>
 							</svg>
 							Attach
 							@components.Spinner()
-						</button>
+						}
 					</form>
 				</div>
-			</div>
+			}
 		} else if len(linkedServices) == 0 {
-			<div class="card text-center py-8">
+			@ui.Card(ui.CardProps{Class: "text-center py-8"}) {
 				<p class="text-sm text-gray-500 dark:text-gray-400">No running service instances available to attach.</p>
 				<a href="/services" class="mt-2 inline-block text-sm text-primary-600 hover:text-primary-800 font-medium dark:text-primary-400 dark:hover:text-primary-200">
 					Deploy a service &rarr;
 				</a>
-			</div>
+			}
 		}
 	</div>
 }
 
 templ ProjectSettings(project *models.Project, currentEnv *models.Environment, csrfToken string) {
 	if currentEnv != nil {
-		<div class="card mb-8">
+		@ui.Card(ui.CardProps{Class: "mb-8"}) {
 			<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6 dark:text-gray-100">Configuration</h3>
 			
 			<form hx-put={ "/projects/" + project.ID + "/settings" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
@@ -509,18 +528,18 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 								</svg>
 								Changes to port require redeployment.
 							</p>
-							<button type="submit" class="btn-primary">
+							@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
 								Save Changes
 								@components.Spinner()
-							</button>
+							}
 						</div>
 					</div>
 				</div>
 			</form>
-		</div>
+		}
 	}
 
-	<div class="card border-red-100 bg-red-50/30 dark:border-red-900/60 dark:bg-red-950/40">
+	@ui.Card(ui.CardProps{Class: "border-red-100 bg-red-50/30 dark:border-red-900/60 dark:bg-red-950/40"}) {
 		<div class="sm:flex sm:items-start sm:justify-between">
 			<div>
 				<h3 class="text-lg font-bold text-red-900 tracking-tight dark:text-red-200">Delete Project</h3>
@@ -529,15 +548,22 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 				</div>
 			</div>
 			<div class="mt-5 sm:mt-0 sm:ml-6 flex-shrink-0">
-				<button type="button" hx-delete={ "/projects/" + project.ID } hx-confirm="Are you sure you want to delete this project?" hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="btn-danger">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonDanger,
+					Attrs: templ.Attributes{
+						"hx-delete": "/projects/" + project.ID,
+						"hx-confirm": "Are you sure you want to delete this project?",
+						"hx-headers": `{"X-CSRF-Token":"` + csrfToken + `"}`,
+					},
+				}) {
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
 					</svg>
 					Delete Project
-				</button>
+				}
 			</div>
 		</div>
-	</div>
+	}
 }
 
 
