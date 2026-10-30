@@ -2,8 +2,9 @@
 // app.js. No build step; plain ES2017 like app.js.
 //
 // PR 1 shipped the delegated listener pattern and the htmx:load init pass.
-// PR 2 added the dismissible Alert. PR 4 adds Dialog and the hx-confirm
-// dialog. Later PRs register Dropdown, Popover, Tooltip, Tabs, and Sheet. Rules, from the UI kit
+// PR 2 added the dismissible Alert. PR 4 added Dialog and the hx-confirm
+// dialog. PR 5 adds Dropdown, Popover, and Tooltip on the popover
+// attribute. Later PRs register Tabs and Sheet. Rules, from the UI kit
 // brief (docs/development/frontend.md, "UI kit (Path A)"):
 //
 //  1. Delegated listeners only. click, keydown, focusin, pointerover, and
@@ -75,6 +76,7 @@
 	// Close open overlays before htmx stores the page in its history cache,
 	// so Back never restores a half-open dialog or menu.
 	function closeOverlays() {
+		hideTip(false);
 		document.querySelectorAll("dialog[open]").forEach(function (d) {
 			d.close();
 		});
@@ -166,6 +168,22 @@
 		return t || document.activeElement;
 	}
 
+	// A menu item that opened a dialog is hidden with its closed menu by the
+	// time the dialog closes; focus goes to the menu's trigger instead.
+	function visibleOpener(el) {
+		var p = el && el.closest && el.closest("[popover]");
+		if (!p) return el;
+		var open = false;
+		try {
+			open = p.matches(":popover-open");
+		} catch (e) {
+			/* no popover support */
+		}
+		if (open) return el;
+		var t = p.id && document.querySelector('[popovertarget="' + CSS.escape(p.id) + '"]');
+		return t || el;
+	}
+
 	function openDialog(d, opener) {
 		if (!d || d.open || !d.isConnected) return;
 		d._uiOpener = opener || document.activeElement;
@@ -202,7 +220,7 @@
 			// Reopened before this queued event ran (a new confirm replaced
 			// a stale one): nothing to tear down.
 			if (d.open) return;
-			var back = liveTwin(d._uiOpener);
+			var back = visibleOpener(liveTwin(d._uiOpener));
 			d._uiOpener = null;
 			var confirmed = null;
 			if (d.hasAttribute("data-ui-confirm")) {
@@ -375,6 +393,407 @@
 		}
 	});
 
+	// --- Overlays: Dropdown, Popover, Tooltip (components/ui overlay.go) ---
+	//
+	// Each panel carries the popover attribute, so the browser renders it in
+	// the top layer and light-dismisses popover="auto" (menu, popover) on an
+	// outside click or Escape. A trigger with popovertarget opens it without
+	// JS. This runtime adds placement under or over the trigger with a
+	// viewport flip, the menu key model, focus moves and focus return, and
+	// aria-expanded sync on toggle. Tooltips (popover="manual") show on hover
+	// and keyboard focus after a delay, stay open while hovered (WCAG
+	// 1.4.13), and hide on Escape without moving focus.
+	var OVERLAY = "[data-ui-overlay]";
+	var GAP = 6;
+	var EDGE = 8;
+	var TIP_SHOW_MS = 300;
+	var TIP_HIDE_MS = 150;
+
+	function isOpen(p) {
+		try {
+			return p.matches(":popover-open");
+		} catch (e) {
+			return false;
+		}
+	}
+
+	function invokers(p) {
+		if (!p.id) return [];
+		return Array.prototype.slice.call(document.querySelectorAll('[popovertarget="' + CSS.escape(p.id) + '"]:not([popovertargetaction="hide"])'));
+	}
+
+	// The element the overlay is placed against and focus returns to.
+	function anchorOf(p) {
+		if (p._uiAnchor && p._uiAnchor.isConnected) return p._uiAnchor;
+		var list = invokers(p);
+		return list.length ? list[0] : null;
+	}
+
+	// place positions an open overlay next to its anchor: the preferred side
+	// (data-ui-side) unless the other side has more room, aligned by
+	// data-ui-align, clamped inside the viewport.
+	function place(p) {
+		var a = anchorOf(p);
+		if (!a || !isOpen(p)) return;
+		var r = a.getBoundingClientRect();
+		var w = p.offsetWidth;
+		var h = p.offsetHeight;
+		var vw = document.documentElement.clientWidth;
+		var vh = document.documentElement.clientHeight;
+		var below = vh - r.bottom - GAP - EDGE;
+		var above = r.top - GAP - EDGE;
+		var side = p.getAttribute("data-ui-side") || "bottom";
+		if (side === "top" && above < h && below > above) side = "bottom";
+		else if (side === "bottom" && below < h && above > below) side = "top";
+		var top = side === "top" ? r.top - GAP - h : r.bottom + GAP;
+		var align = p.getAttribute("data-ui-align") || "start";
+		var left = align === "end" ? r.right - w : align === "center" ? r.left + (r.width - w) / 2 : r.left;
+		left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
+		top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
+		p.style.top = Math.round(top) + "px";
+		p.style.left = Math.round(left) + "px";
+		p.setAttribute("data-ui-placed", side);
+	}
+
+	function placeOpen() {
+		document.querySelectorAll(OVERLAY).forEach(function (p) {
+			if (isOpen(p)) place(p);
+		});
+	}
+	var placeQueued = false;
+	function queuePlace() {
+		if (placeQueued) return;
+		placeQueued = true;
+		requestAnimationFrame(function () {
+			placeQueued = false;
+			placeOpen();
+		});
+	}
+	window.addEventListener("resize", queuePlace);
+	window.addEventListener("scroll", queuePlace, true);
+
+	function items(menu) {
+		return Array.prototype.slice.call(menu.querySelectorAll("[data-ui-menuitem]")).filter(function (it) {
+			return !it.disabled && it.getAttribute("aria-disabled") !== "true";
+		});
+	}
+
+	function focusItem(menu, which) {
+		var list = items(menu);
+		if (!list.length) {
+			menu.focus();
+			return;
+		}
+		var i = list.indexOf(document.activeElement);
+		var next;
+		if (which === "first") next = 0;
+		else if (which === "last") next = list.length - 1;
+		else if (which === "next") next = i < 0 ? 0 : (i + 1) % list.length;
+		else next = i < 0 ? list.length - 1 : (i - 1 + list.length) % list.length;
+		list[next].focus();
+	}
+
+	var FOCUSABLE = "a[href], button:not([disabled]):not([data-ui-popover-close]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+
+	function setExpanded(p, open) {
+		invokers(p).forEach(function (t) {
+			t.setAttribute("aria-expanded", open ? "true" : "false");
+		});
+	}
+
+	function showOverlay(p, anchor, focusWhich) {
+		if (!p || !p.isConnected) return;
+		if (anchor) p._uiAnchor = anchor;
+		p._uiFocus = focusWhich || "first";
+		if (!isOpen(p)) p.showPopover();
+		else place(p);
+	}
+
+	function hideOverlay(p, refocus) {
+		if (!p || !isOpen(p)) return;
+		p._uiRefocus = !!refocus;
+		p.hidePopover();
+	}
+
+	// beforetoggle (open): the panel is not laid out yet, so start it right
+	// under the anchor; toggle refines it once it has a size. Both events do
+	// not bubble, so listen in the capture phase.
+	document.addEventListener(
+		"beforetoggle",
+		function (evt) {
+			var p = evt.target;
+			if (!p || !p.matches || !p.matches(OVERLAY)) return;
+			if (evt.newState === "open") {
+				var a = anchorOf(p);
+				if (a && p.getAttribute("data-ui-overlay") !== "tooltip") {
+					var r = a.getBoundingClientRect();
+					p.style.top = Math.round(r.bottom + GAP) + "px";
+					p.style.left = Math.round(r.left) + "px";
+					p.setAttribute("data-ui-placed", "bottom");
+				}
+			}
+		},
+		true,
+	);
+
+	document.addEventListener(
+		"toggle",
+		function (evt) {
+			var p = evt.target;
+			if (!p || !p.matches || !p.matches(OVERLAY)) return;
+			var kind = p.getAttribute("data-ui-overlay");
+			var open = evt.newState === "open";
+			if (kind === "tooltip") {
+				if (open) place(p);
+				return;
+			}
+			setExpanded(p, open);
+			if (open) {
+				place(p);
+				var which = p._uiFocus || "first";
+				p._uiFocus = null;
+				if (kind === "menu") focusItem(p, which);
+				else {
+					var first = p.querySelector(FOCUSABLE);
+					(first || p).focus();
+				}
+				return;
+			}
+			// Focus goes back to the trigger after Escape, Tab, or a chosen
+			// item, and whenever it was inside the panel or fell to <body>.
+			// A light-dismiss click on another control keeps focus there.
+			var refocus = p._uiRefocus;
+			p._uiRefocus = false;
+			var a = anchorOf(p);
+			p._uiAnchor = null;
+			var act = document.activeElement;
+			if (a && a.focus && (refocus || !act || act === document.body || p.contains(act))) a.focus();
+		},
+		true,
+	);
+
+	// A click on a trigger records it as the anchor before the browser's
+	// popovertarget behavior opens the panel.
+	document.addEventListener(
+		"click",
+		function (evt) {
+			var t = evt.target && evt.target.closest && evt.target.closest("[popovertarget]");
+			if (t && t.getAttribute("popovertargetaction") !== "hide") {
+				var p = document.getElementById(t.getAttribute("popovertarget"));
+				if (p && p.matches(OVERLAY)) {
+					p._uiAnchor = t;
+					p._uiFocus = "first";
+				}
+			}
+		},
+		true,
+	);
+
+	// Choosing a menu item closes the menu (bubble phase, after htmx saw the
+	// click). Links navigate and htmx buttons send their request as usual;
+	// an item that opens a dialog leaves focus to the dialog.
+	document.addEventListener("click", function (evt) {
+		var item = evt.target && evt.target.closest && evt.target.closest("[data-ui-menuitem]");
+		if (!item) return;
+		var menu = item.closest("[data-ui-menu]");
+		if (menu) hideOverlay(menu, item.getAttribute("aria-haspopup") !== "dialog");
+	});
+
+	var typeahead = "";
+	var typeaheadTimer = 0;
+
+	function menuKeydown(evt, menu) {
+		var k = evt.key;
+		if (k === "ArrowDown") focusItem(menu, "next");
+		else if (k === "ArrowUp") focusItem(menu, "prev");
+		else if (k === "Home" || k === "PageUp") focusItem(menu, "first");
+		else if (k === "End" || k === "PageDown") focusItem(menu, "last");
+		else if (k === "Escape") hideOverlay(menu, true);
+		else if (k === "Tab") {
+			// Close and move on from the trigger: focus it now (toggle fires
+			// too late) and skip preventDefault, so the browser's Tab runs
+			// from the trigger.
+			var a = anchorOf(menu);
+			if (a && a.isConnected) a.focus();
+			hideOverlay(menu, !a);
+			return;
+		} else if (k === " " || k === "Spacebar") {
+			var cur = document.activeElement;
+			if (cur && cur.matches("[data-ui-menuitem]")) cur.click();
+		} else if (k.length === 1 && !evt.ctrlKey && !evt.metaKey && !evt.altKey) {
+			clearTimeout(typeaheadTimer);
+			typeahead += k.toLowerCase();
+			typeaheadTimer = setTimeout(function () {
+				typeahead = "";
+			}, 500);
+			var list = items(menu);
+			var start = Math.max(0, list.indexOf(document.activeElement));
+			for (var n = 1; n <= list.length; n++) {
+				// A single repeated key cycles through matches; a longer
+				// prefix searches from the current item.
+				var off = typeahead.length === 1 ? n : n - 1;
+				var it = list[(start + off) % list.length];
+				if (it.textContent.trim().toLowerCase().indexOf(typeahead) === 0) {
+					it.focus();
+					break;
+				}
+			}
+		} else return;
+		evt.preventDefault();
+	}
+
+	document.addEventListener("keydown", function (evt) {
+		var t = evt.target;
+		if (!t || !t.closest) return;
+		// Escape hides an open tooltip first, without moving focus or
+		// closing the dialog or menu around it.
+		if (evt.key === "Escape" && openTip) {
+			hideTip(true);
+			evt.preventDefault();
+			evt.stopPropagation();
+			return;
+		}
+		var menu = t.closest("[data-ui-menu]");
+		if (menu && isOpen(menu)) {
+			menuKeydown(evt, menu);
+			return;
+		}
+		var trigger = t.closest("[data-ui-menu-trigger]");
+		if (trigger && (evt.key === "ArrowDown" || evt.key === "ArrowUp")) {
+			var m = document.getElementById(trigger.getAttribute("popovertarget"));
+			if (!m) return;
+			evt.preventDefault();
+			var which = evt.key === "ArrowUp" ? "last" : "first";
+			if (isOpen(m)) focusItem(m, which);
+			else showOverlay(m, trigger, which);
+			return;
+		}
+		var pop = t.closest('[data-ui-overlay="popover"]');
+		if (pop && evt.key === "Escape" && isOpen(pop)) {
+			evt.preventDefault();
+			hideOverlay(pop, true);
+		}
+	});
+
+	// Pointer focus follows the mouse inside an open menu, like a native menu.
+	document.addEventListener("pointermove", function (evt) {
+		if (evt.pointerType === "touch") return;
+		var item = evt.target && evt.target.closest && evt.target.closest("[data-ui-menuitem]");
+		if (item && item !== document.activeElement && isOpen(item.closest("[data-ui-menu]"))) item.focus({ preventScroll: true });
+	});
+
+	// Tooltips. One is open at a time.
+	var openTip = null;
+	var tipShowTimer = 0;
+	var tipHideTimer = 0;
+	var tipSuppressed = null;
+
+	function tipFor(trigger) {
+		var id = trigger.getAttribute("data-ui-tooltip");
+		var tip = id && document.getElementById(id);
+		return tip && tip.matches('[data-ui-overlay="tooltip"]') ? tip : null;
+	}
+
+	function showTip(trigger) {
+		var tip = tipFor(trigger);
+		if (!tip || !trigger.isConnected) return;
+		if (openTip && openTip !== tip) hideTip(false);
+		clearTimeout(tipHideTimer);
+		tip._uiAnchor = trigger;
+		if (!isOpen(tip)) tip.showPopover();
+		place(tip);
+		openTip = tip;
+	}
+
+	function hideTip(suppress) {
+		clearTimeout(tipShowTimer);
+		clearTimeout(tipHideTimer);
+		var tip = openTip;
+		openTip = null;
+		if (!tip) return;
+		if (suppress) tipSuppressed = tip._uiAnchor;
+		if (isOpen(tip)) tip.hidePopover();
+	}
+
+	function scheduleTip(trigger) {
+		if (trigger === tipSuppressed) return;
+		clearTimeout(tipHideTimer);
+		clearTimeout(tipShowTimer);
+		var tip = tipFor(trigger);
+		if (tip && tip === openTip) return;
+		tipShowTimer = setTimeout(function () {
+			showTip(trigger);
+		}, TIP_SHOW_MS);
+	}
+
+	function scheduleHide() {
+		clearTimeout(tipShowTimer);
+		clearTimeout(tipHideTimer);
+		tipHideTimer = setTimeout(function () {
+			hideTip(false);
+		}, TIP_HIDE_MS);
+	}
+
+	// Hovering the trigger or the open tooltip keeps it; leaving both hides it.
+	function overTip(node) {
+		return !!(openTip && node && (openTip.contains(node) || (openTip._uiAnchor && openTip._uiAnchor.contains(node))));
+	}
+
+	document.addEventListener("pointerover", function (evt) {
+		if (evt.pointerType === "touch") return;
+		var t = evt.target;
+		if (!t || !t.closest) return;
+		if (overTip(t)) {
+			clearTimeout(tipHideTimer);
+			return;
+		}
+		var trigger = t.closest("[data-ui-tooltip]");
+		if (trigger) scheduleTip(trigger);
+	});
+
+	document.addEventListener("pointerout", function (evt) {
+		var t = evt.target;
+		if (!t || !t.closest) return;
+		var trigger = t.closest("[data-ui-tooltip]");
+		if (trigger && !trigger.contains(evt.relatedTarget) && trigger === tipSuppressed) tipSuppressed = null;
+		if (overTip(evt.relatedTarget)) return;
+		if (trigger || (openTip && openTip.contains(t))) scheduleHide();
+	});
+
+	document.addEventListener("focusin", function (evt) {
+		var t = evt.target;
+		var trigger = t && t.closest && t.closest("[data-ui-tooltip]");
+		if (trigger) {
+			tipSuppressed = null;
+			scheduleTip(trigger);
+		}
+	});
+
+	document.addEventListener("focusout", function (evt) {
+		var t = evt.target;
+		var trigger = t && t.closest && t.closest("[data-ui-tooltip]");
+		if (!trigger) return;
+		// Leaving focus ends an Escape dismissal, like leaving hover does.
+		if (trigger === tipSuppressed && !trigger.matches(":hover")) tipSuppressed = null;
+		if (openTip && openTip._uiAnchor === trigger && trigger.matches(":hover")) return;
+		hideTip(false);
+	});
+
+	// An htmx swap that replaces an open overlay's anchor or the overlay
+	// itself closes it first, so focus returns while the trigger exists.
+	document.addEventListener("htmx:beforeSwap", function (evt) {
+		var target = evt.detail && evt.detail.target;
+		if (!target || !target.contains) return;
+		document.querySelectorAll(OVERLAY).forEach(function (p) {
+			if (!isOpen(p)) return;
+			var a = anchorOf(p);
+			if (target.contains(p) || (a && target.contains(a))) {
+				if (p === openTip) hideTip(false);
+				else hideOverlay(p, false);
+			}
+		});
+	});
+
 	function init() {
 		initTree(document);
 		initDialogs(document);
@@ -390,6 +809,7 @@
 		register: register,
 		init: initTree,
 		closeOverlays: closeOverlays,
+		place: place,
 		openDialog: openDialog,
 		confirm: askConfirm,
 	};

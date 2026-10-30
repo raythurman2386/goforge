@@ -84,8 +84,10 @@ func TestMigratedDialogs(t *testing.T) {
 		}
 	}
 	env := renderComp(t, EnvironmentSwitcher("p1", nil, ""))
-	if !strings.Contains(env, `hx-get="/projects/p1/envs/new" hx-target="body" hx-swap="beforeend" aria-haspopup="dialog"`) {
-		t.Errorf("environment switcher trigger: %s", env)
+	for _, want := range []string{`hx-get="/projects/p1/envs/new"`, `hx-target="body"`, `hx-swap="beforeend"`, `aria-haspopup="dialog"`} {
+		if !strings.Contains(env, want) {
+			t.Errorf("environment switcher New Environment item lacks %q: %s", want, env)
+		}
 	}
 }
 

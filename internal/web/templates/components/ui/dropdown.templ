@@ -1,0 +1,40 @@
+package ui
+
+// DropdownTrigger is the menu button: popovertarget opens the menu without
+// JS, aria-haspopup="menu", aria-controls, and aria-expanded (ui.js keeps
+// it in sync on toggle). Enter, Space, and ArrowDown open the menu on the
+// first item; ArrowUp opens it on the last.
+templ DropdownTrigger(p DropdownProps) {
+	@Button(dropdownTriggerProps(p)) {
+		{ children... }
+	}
+}
+
+// DropdownMenu is the role="menu" panel on popover="auto" (top layer,
+// light dismiss). Its children are DropdownItem and DropdownSeparator.
+// ui.js: ArrowUp/ArrowDown (wrapping), Home, End, and typeahead move focus
+// between items; Escape closes and focuses the trigger; Tab closes and
+// moves on; choosing an item closes the menu.
+templ DropdownMenu(p DropdownProps) {
+	<div { dropdownMenuAttrs(p)... }>
+		{ children... }
+	</div>
+}
+
+// DropdownItem is one role="menuitem": a link with Href, else a button.
+templ DropdownItem(p DropdownItemProps) {
+	if p.Href != "" {
+		<a href={ p.Href } { dropdownItemAttrs(p)... }>
+			{ children... }
+		</a>
+	} else {
+		<button type="button" { dropdownItemAttrs(p)... }>
+			{ children... }
+		</button>
+	}
+}
+
+// DropdownSeparator is a role="separator" rule between groups of items.
+templ DropdownSeparator() {
+	<div role="separator" class="my-1.5 border-t border-gray-100 dark:border-gray-800"></div>
+}

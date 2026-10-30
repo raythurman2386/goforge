@@ -32,6 +32,11 @@ func TestGalleryRenders(t *testing.T) {
 		`id="gallery-static-dialog"`, `data-ui-dialog="static"`,
 		`<dialog `, `id="ui-confirm"`, `role="alertdialog"`,
 		`id="gallery-confirm"`, `data-ui-confirm-tone="danger"`, `id="gallery-confirm-form"`,
+		`aria-labelledby="overlays-title"`,
+		`id="gallery-menu-trigger"`, `aria-haspopup="menu"`, `popovertarget="gallery-menu"`, `role="menu"`, `role="menuitem"`, `role="separator"`,
+		`id="gallery-menu-icon-trigger"`, `aria-label="More actions"`, `aria-describedby="gallery-tip-more"`,
+		`id="gallery-popover-trigger"`, `id="gallery-popover"`, `popover="auto"`, `aria-labelledby="gallery-popover-title"`,
+		`role="tooltip"`, `popover="manual"`, `id="gallery-tip-restart"`, `aria-label="Restart web"`, `aria-describedby="gallery-tip-image"`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("gallery missing %q", want)

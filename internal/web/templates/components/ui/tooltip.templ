@@ -1,0 +1,13 @@
+package ui
+
+// Tooltip is the role="tooltip" text for the trigger that carries
+// TooltipAttrs(p.ID). It sits next to the trigger in the markup and opens
+// in the top layer (popover="manual"), so ui.js decides when it shows:
+// after a short delay on hover or keyboard focus, staying open while the
+// pointer moves onto it, hidden on Escape, blur, or pointer leave.
+//
+//	@ui.Button(ui.ButtonProps{Size: ui.ButtonIcon, Label: "Stop web", Attrs: ui.TooltipAttrs("tip-stop")}) { ... }
+//	@ui.Tooltip(ui.TooltipProps{ID: "tip-stop", Text: "Stop"})
+templ Tooltip(p TooltipProps) {
+	<span { tooltipAttrs(p)... }>{ p.Text }</span>
+}

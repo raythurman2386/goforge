@@ -1,0 +1,88 @@
+package devui
+
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
+// overlaySection shows Dropdown, Popover, and Tooltip for the gallery and
+// the ui-a11y keyboard drive. Menu actions go only to the dev-only
+// DemoDialogPath route. Popover has no app call site yet (gallery first).
+templ overlaySection() {
+	<h3 class="text-sm font-semibold text-foreground">Dropdown</h3>
+	<div class="mt-3 flex flex-wrap items-center gap-3">
+		@ui.DropdownTrigger(ui.DropdownProps{ID: "gallery-menu"}) {
+			Actions
+			<svg class="-mr-1 ml-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+			</svg>
+		}
+		@ui.DropdownMenu(ui.DropdownProps{ID: "gallery-menu"}) {
+			@ui.DropdownItem(ui.DropdownItemProps{Href: "#overlays", Attrs: templ.Attributes{"data-testid": "menu-link"}}) {
+				Overview
+			}
+			@ui.DropdownItem(ui.DropdownItemProps{Attrs: templ.Attributes{"hx-get": DemoDialogPath + "?ok=1", "hx-swap": "none", "data-testid": "menu-duplicate"}}) {
+				Duplicate
+			}
+			@ui.DropdownItem(ui.DropdownItemProps{Attrs: templ.Attributes{"hx-get": DemoDialogPath + "?ok=1", "hx-swap": "none", "data-testid": "menu-deploy"}}) {
+				Deploy
+			}
+			@ui.DropdownItem(ui.DropdownItemProps{Attrs: ui.Attrs(ui.OpenDialogAttrs(demoDialogURL(1)), templ.Attributes{"data-testid": "menu-dialog"})}) {
+				Open dialog…
+			}
+			@ui.DropdownSeparator()
+			@ui.DropdownItem(ui.DropdownItemProps{Tone: ui.ItemDanger, Attrs: ui.Attrs(templ.Attributes{"hx-get": DemoDialogPath + "?ok=1", "hx-swap": "none", "data-testid": "menu-delete"}, ui.ConfirmAttrs("Delete the demo thing?", ui.ConfirmDanger, "Delete"))}) {
+				Delete
+			}
+		}
+		@ui.DropdownTrigger(ui.DropdownProps{
+			ID:      "gallery-menu-icon",
+			Variant: ui.ButtonGhost,
+			Size:    ui.ButtonIcon,
+			Label:   "More actions",
+			Align:   ui.AlignEnd,
+			Attrs:   ui.TooltipAttrs("gallery-tip-more"),
+		}) {
+			<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
+			</svg>
+		}
+		@ui.Tooltip(ui.TooltipProps{ID: "gallery-tip-more", Text: "More actions"})
+		@ui.DropdownMenu(ui.DropdownProps{ID: "gallery-menu-icon", Align: ui.AlignEnd}) {
+			@ui.DropdownItem(ui.DropdownItemProps{Href: "#overlays"}) {
+				Copy link
+			}
+			@ui.DropdownItem(ui.DropdownItemProps{Href: "#overlays"}) {
+				Settings
+			}
+		}
+	</div>
+	<p class="mt-3 text-sm text-muted-foreground">
+		Enter, Space, or ArrowDown opens on the first item; ArrowUp opens on the last. Arrows wrap, Home and End jump, typing a letter jumps to the item that starts with it. Escape closes and focuses the trigger; Tab closes and moves on.
+	</p>
+	<h3 class="mt-6 text-sm font-semibold text-foreground">Popover</h3>
+	<div class="mt-3 flex flex-wrap items-center gap-3">
+		@ui.PopoverTrigger(ui.PopoverProps{ID: "gallery-popover", Title: "About overlays"}) {
+			About overlays
+		}
+		@ui.Popover(ui.PopoverProps{ID: "gallery-popover", Title: "About overlays"}) {
+			<p class="text-muted-foreground">Menus, popovers, and tooltips open in the browser top layer with the popover attribute. A click outside or Escape closes this panel and focus returns to its button.</p>
+			<div class="mt-3 flex justify-end">
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Attrs: templ.Attributes{"popovertarget": "gallery-popover", "popovertargetaction": "hide", "data-testid": "popover-done"}}) {
+					Got it
+				}
+			</div>
+		}
+	</div>
+	<h3 class="mt-6 text-sm font-semibold text-foreground">Tooltip</h3>
+	<div class="mt-3 flex flex-wrap items-center gap-3">
+		@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhostPrimary, Size: ui.ButtonIcon, Label: "Restart web", Attrs: ui.Attrs(ui.TooltipAttrs("gallery-tip-restart"), templ.Attributes{"id": "gallery-tip-trigger"})}) {
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+			</svg>
+		}
+		@ui.Tooltip(ui.TooltipProps{ID: "gallery-tip-restart", Text: "Restart"})
+		<span tabindex="0" class="block w-40 truncate rounded font-mono text-xs text-muted-foreground" { ui.TooltipAttrs("gallery-tip-image")... }>registry.example.com/team/web-frontend:2026.10.30</span>
+		@ui.Tooltip(ui.TooltipProps{ID: "gallery-tip-image", Text: "registry.example.com/team/web-frontend:2026.10.30", Align: ui.AlignStart, Class: "break-all font-mono"})
+	</div>
+	<p class="mt-3 text-sm text-muted-foreground">
+		Tooltips show after a short delay on hover or keyboard focus, stay open while the pointer is over them, and hide on Escape without moving focus. They describe (aria-describedby); icon buttons keep their own aria-label.
+	</p>
+}
