@@ -130,7 +130,9 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 ## Backups
 
-Nightly backups to S3-compatible storage. An admin edits these in **Settings → Profile → Backups**, and a save applies without a restart. The variables below are the starting point: with no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies them into the saved settings on its first start. Once saved settings exist they win, and later changes to these variables are ignored with a warning in the log; an incomplete or invalid `BACKUP_*` set no longer stops startup then. With no saved settings, an invalid set stops GoForge at startup. After the import, remove every `BACKUP_*` line from your env file (`.env`). With neither, backups are off. `goforge backup run` uses the same settings. See [Backup & Restore](../deployment/backup.md#turn-it-on).
+Nightly backups to S3-compatible storage. An admin sets them up in **Settings → Profile → Backups**, and a save applies without a restart. With Docker Compose this is the way to set them up: `docker-compose.yml` does not pass any `BACKUP_*` variable into the `goforge` container, so `BACKUP_*` in your env file (`.env`) has no effect there.
+
+The variables below are read from the process environment. Use them when you run the binary on the host, or for a one-time import on a compose install by adding them under `services.goforge.environment` in your own `docker-compose.override.yml` (see [Backup & Restore](../deployment/backup.md#from-the-environment-host-runs-or-an-override)). With no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies them into the saved settings on its first start. Once saved settings exist they win, and later changes to these variables are ignored with a warning in the log; an incomplete or invalid `BACKUP_*` set no longer stops startup then. With no saved settings, an invalid set stops GoForge at startup. After the import, remove every `BACKUP_*` variable again. With neither, backups are off. `goforge backup run` uses the same settings. See [Backup & Restore](../deployment/backup.md#turn-it-on).
 
 | Variable | Default | Description |
 |----------|---------|-------------|

@@ -26,7 +26,7 @@ Configuration lives in the `backup_settings` row (migration 020) that an admin e
 ## How to get to it (user POV)
 
 - As the admin, open Settings → Profile → Backups, fill in the destination and keys (path-style on for MinIO), turn Enabled on, press Test connection, then Save. No restart.
-- Or set `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` in your env file (`.env`) before the first start; serve copies them into the settings row. After that, env changes are ignored with a warning.
+- Or, in host mode (or a compose override), set `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` in the process environment before the first start; serve copies them into the settings row. After that, env changes are ignored with a warning. The repo `docker-compose.yml` passes no `BACKUP_*`, so `BACKUP_*` in the compose `.env` never reaches the container.
 - Run `goforge backup run` in the app container, or wait for the schedule.
 - Open Settings → Profile as the admin, or call `GET /api/v1/backups` with a read token.
 

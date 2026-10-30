@@ -112,7 +112,7 @@ Docker Compose creates named volumes for persistent data:
 
 ### Backups
 
-GoForge has built-in nightly backups to S3-compatible storage (R2, B2, MinIO, AWS S3). They cover the GoForge database and running Postgres, Gitea, and Vaultwarden services. An admin turns them on in **Settings → Profile → Backups**; a save applies without a restart. Setting `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, and the key pair in your env file (`.env`) still works: GoForge copies them into those settings on its first start. After that, remove every `BACKUP_*` line from your env file. `docker compose exec goforge ./goforge backup run` runs one backup now. Setup, what is covered, and the restore runbook: [Backup & Restore](../deployment/backup.md).
+GoForge has built-in nightly backups to S3-compatible storage (R2, B2, MinIO, AWS S3). They cover the GoForge database and running Postgres, Gitea, and Vaultwarden services. An admin turns them on in **Settings → Profile → Backups**; a save applies without a restart. `docker-compose.yml` does not pass `BACKUP_*` into the container, so `BACKUP_*` lines in your env file (`.env`) have no effect; for a one-time import, use your own `docker-compose.override.yml` as described in [Backup & Restore](../deployment/backup.md#from-the-environment-host-runs-or-an-override). `docker compose exec goforge ./goforge backup run` runs one backup now. Setup, what is covered, and the restore runbook: [Backup & Restore](../deployment/backup.md).
 
 Back up your env file (`.env`), and `ENCRYPTION_KEY` in particular, somewhere off the server. Backups never include it.
 
