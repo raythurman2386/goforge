@@ -9,7 +9,7 @@ types, migration and template rules, and the PR format. Agents follow it too.
 
 GoForge is a lightweight, self-hosted PaaS built in Go with HTMX + templ. It provides
 git-to-deploy workflows, one-click services, automatic SSL via Traefik, and real-time
-monitoring. Tech stack: Go 1.25+, PostgreSQL, Docker, HTMX 2, templ, TailwindCSS.
+monitoring. Tech stack: Go 1.26+, PostgreSQL, Docker, HTMX 2, templ, TailwindCSS.
 
 ## Build, Lint, and Test Commands
 
@@ -290,7 +290,7 @@ When making code changes, consider these security implications:
 - Encrypt sensitive data at rest where applicable
 - Sanitize log output for PII
 
-* Go version must NEVER be dropped below the official latest release (currently 1.25).
+* Go version must NEVER be dropped below the official latest release (currently 1.26).
 
 ## Cursor Cloud specific instructions
 
@@ -300,5 +300,5 @@ The Cloud Agent VM has no systemd. PostgreSQL 16, Docker, and the dev server are
 - Database: `postgres://goforge:password@localhost:5432/goforge?sslmode=disable` (the dev default). `make test` uses this database when `DATABASE_URL` is unset. Postgres is started with `pg_ctlcluster`, not `service`.
 - Docker uses `fuse-overlayfs` and legacy iptables (`/etc/docker/daemon.json`). One-click services join the `traefik` network; create it with `docker network create traefik` if it is missing.
 - `internal/web/templates/**/*_templ.go` and `static/css/output.css` are gitignored. Regenerate with `make templ` and `make css`. The Tailwind CLI on `PATH` is v3.4.17; the v4 binary does not read `tailwind.config.js`.
-- Use `/usr/local/go/bin/go` (Go 1.25.14). `/usr/bin/go` is Ubuntu's Go 1.22 and cannot read the `tool` directive in `go.mod`. `make test` needs the full 1.25 toolchain; the auto-downloaded toolchain module is missing `covdata`.
+- Use `/usr/local/go/bin/go`, and it must be Go 1.26.x: `go.mod` says `go 1.26.0`. `/usr/bin/go` is Ubuntu's Go 1.22 and cannot read the `tool` directive in `go.mod`. `make test` needs the full 1.26 toolchain; an older Go auto-downloads a toolchain module that is missing `covdata`.
 - `air` is `/usr/local/bin/air` (v1.67.0). `templ` and `golangci-lint` run through `go tool`. Local registration works without GitHub OAuth secrets.

@@ -28,7 +28,7 @@ GoForge provides git-to-deploy workflows, one-click services, automatic SSL via 
 
 | Component | Technology |
 |-----------|-----------|
-| Backend | Go 1.25+ |
+| Backend | Go 1.26+ |
 | Database | PostgreSQL |
 | Containerization | Docker |
 | Reverse Proxy | Traefik |

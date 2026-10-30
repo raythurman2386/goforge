@@ -4,7 +4,7 @@ Set up a local GoForge development environment.
 
 ## Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - Docker Engine
 - PostgreSQL (local or Docker)
 - templ (managed via `go tool templ`)

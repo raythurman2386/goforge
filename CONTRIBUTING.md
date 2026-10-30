@@ -29,7 +29,7 @@ make migrate             # applies migrations to DATABASE_URL
 make dev                 # http://localhost:8080 with GOFORGE_DEV_MODE=true
 ```
 
-You need Go 1.25 or newer, Docker Engine, a PostgreSQL you can reach (CI uses
+You need Go 1.26 or newer, Docker Engine, a PostgreSQL you can reach (CI uses
 16, the Compose stack uses 15), and the Tailwind CSS v3 standalone CLI for
 `make css`. Full setup: [docs/development/setup.md](docs/development/setup.md).
 
@@ -84,7 +84,7 @@ reviewer is the check.
 2. **Follow the Go style in [AGENTS.md](AGENTS.md).** Wrapped errors,
    `context.Context` first, grouped imports, sentinel errors with
    `errors.Is`. Enforced by golangci-lint and review.
-3. **Go never drops below the latest release.** `go.mod` says `go 1.25.0`
+3. **Go never drops below the latest release.** `go.mod` says `go 1.26.0`
    today. Enforced by review.
 4. **Secrets stay secret.** Never log a secret, token, or password. Never
    render one into a service template's `docker.command`. Never commit

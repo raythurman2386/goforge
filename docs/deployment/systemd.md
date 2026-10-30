@@ -4,7 +4,7 @@ Deploy GoForge as a systemd service on a bare metal server or VM.
 
 ## Prerequisites
 
-- Go 1.25+ (for building)
+- Go 1.26+ (for building)
 - Docker Engine
 - PostgreSQL (external or local)
 - Traefik (installed separately)

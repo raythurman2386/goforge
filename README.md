@@ -64,7 +64,7 @@ This is the supported way to run GoForge. You need Docker Engine with the Compos
 
 ### Developing from source
 
-Prerequisites: Go 1.25+, Docker Engine, a PostgreSQL you can reach with `DATABASE_URL`, and `air` for hot reload (`make install-tools`). `templ` and `golangci-lint` run through `go tool`.
+Prerequisites: Go 1.26+, Docker Engine, a PostgreSQL you can reach with `DATABASE_URL`, and `air` for hot reload (`make install-tools`). `templ` and `golangci-lint` run through `go tool`.
 
 ```bash
 go mod download

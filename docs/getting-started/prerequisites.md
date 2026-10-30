@@ -4,14 +4,14 @@ Before installing GoForge, ensure your system meets the following requirements.
 
 ## Required Software
 
-### Go 1.25+
+### Go 1.26+
 
-GoForge requires Go 1.25 or later. Download from [go.dev](https://go.dev/dl/).
+GoForge requires Go 1.26 or later. Download from [go.dev](https://go.dev/dl/).
 
 ```bash
 # Verify installation
 go version
-# Expected: go version go1.25.x linux/amd64
+# Expected: go version go1.26.x linux/amd64
 ```
 
 ### Docker Engine

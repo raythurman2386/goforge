@@ -1126,7 +1126,7 @@ Metrics (optional):
 
 ```bash
 # Required
-- Go 1.25+
+- Go 1.26+
 - Docker Engine
 - PostgreSQL 15+
 - templ CLI
