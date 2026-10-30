@@ -120,10 +120,10 @@ GoForge is designed to work with **Cloudflare Tunnel** for secure public access:
 - **Automatic TLS** - All connections encrypted end-to-end
 - **DDoS protection** - Cloudflare handles attack mitigation
 
-### Traefik (Internal Routing Only)
+### Traefik
 
-- Traefik handles **internal container routing** only (not exposed publicly)
-- All external traffic routes through Cloudflare Tunnel first
+- With Cloudflare Tunnel, cloudflared reaches Traefik over the `traefik` Docker network, so Traefik needs no public host port. The repo `docker-compose.yml` still publishes 80 and 443 on all interfaces for direct (LAN or public IP) installs; tunnel deployments should bind them to `127.0.0.1` or drop them in a `docker-compose.override.yml`
+- The Traefik API and dashboard are off by default. `TRAEFIK_DASHBOARD_INSECURE=true` serves them without authentication on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}` only; no router publishes `api@internal` on the web or websecure entrypoints
 - Automatic SSL/TLS via Let's Encrypt (ACME) for custom domains
 - Containers are not directly exposed to the internet
 - Internal communication happens over the Docker network
@@ -236,6 +236,7 @@ Webhooks receive push events from git providers to trigger deployments.
 - [ ] Remove PostgreSQL host port mapping in Docker Compose
 - [ ] Run GoForge as a non-root user
 - [ ] Turn on nightly backups (see [Backup & Restore](deployment/backup.md)) and keep `ENCRYPTION_KEY` off the server
-- [ ] Review and restrict Docker socket access
+- [ ] Review and restrict Docker socket access. The read-write socket in the `goforge` container, Traefik's `:ro` socket, and `docker` group membership are all root-equivalent on the host (see `SECURITY.md`, "Docker socket trust model")
+- [ ] Keep the Traefik dashboard off (`TRAEFIK_DASHBOARD_INSECURE=false`, the default)
 - [ ] Configure firewall rules to limit access (allow outbound to Cloudflare only)
 - [ ] Set up log monitoring and alerting for security events

@@ -38,15 +38,16 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /app/bin/goforge-mcp ./cmd/goforg
 # MCP server image: `docker build --target mcp -t goforge-mcp .`
 # Speaks MCP over stdin/stdout and calls GoForge over HTTP. It needs no
 # Docker socket, no database, and no published port.
-FROM alpine:latest AS mcp
+FROM alpine:3.24 AS mcp
 RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 mcp
 COPY --from=mcp-builder /app/bin/goforge-mcp /usr/local/bin/goforge-mcp
 USER mcp
 ENV GOFORGE_MCP_URL=http://goforge:8080
 ENTRYPOINT ["/usr/local/bin/goforge-mcp"]
 
-# Final stage
-FROM alpine:latest
+# Final stage. Alpine is pinned to a minor release (patch updates only);
+# bump it deliberately and keep it in step with the mcp stage above.
+FROM alpine:3.24
 
 # Install runtime dependencies. postgresql17-client provides pg_dump for the
 # nightly app DB backup (it reads servers up to PostgreSQL 17).

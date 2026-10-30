@@ -36,7 +36,7 @@ Do not print `stack.env`.
 
 `cmd/goforge/main.go` runs migrations before `server listening`. Ready is `GET http://127.0.0.1:8080/health/ready` with `"database":"ok"`. The helper waits up to 10 minutes after `docker compose up -d --build` returns. A cold build on minis takes a few minutes.
 
-`docker-compose.yml` publishes the app on `127.0.0.1:8080` only, and Traefik on `80`, `443`, and `8081`. Postgres is not published. It also creates a network named `traefik`. Two stacks cannot run side by side. Launch exits `1` when `80`, `443`, `8080`, or `8081` is listening, when the `traefik` network already exists, or when project `goforge-verify` already has containers. Do not drive an instance this run did not start.
+`docker-compose.yml` publishes the app on `127.0.0.1:8080` only, Traefik on `80` and `443`, and the Traefik dashboard port on `127.0.0.1:8081` (the dashboard is off; `TRAEFIK_DASHBOARD_INSECURE=false`). Postgres is not published. It also creates a network named `traefik`. Two stacks cannot run side by side. Launch exits `1` when `80`, `443`, `8080`, or `8081` is listening, when the `traefik` network already exists, or when project `goforge-verify` already has containers. Do not drive an instance this run did not start.
 
 A fresh volume has zero users. The first registration is always allowed. After that, registration is closed and `/auth/register` returns `403`. Every account is created as `user`. The account whose email matches `GOFORGE_ADMIN_EMAIL`, ignoring case, is created as `admin`, and startup promotes an existing match.
 

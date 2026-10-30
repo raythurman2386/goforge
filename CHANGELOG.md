@@ -88,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `goforge serve` deletes expired session rows at startup and hourly (SESSION-PURGE)
 - Dependency and toolchain bump to clear every reachable `govulncheck` finding: builder image `golang:1.26.10` and `go 1.26.0` in `go.mod` (CI `GO_VERSION` 1.26); go-git v5.19.3, go-billy v5.9.2, golang.org/x/crypto v0.58.0, golang.org/x/net v0.62.0, OpenTelemetry v1.47.0, cloudflare/circl v1.6.5, go-chi/chi v5.3.0. The Docker SDK moves from `github.com/docker/docker` v27.3.1 (GO-2026-4887, GO-2026-4883: no fixed version of that module) to `github.com/moby/moby/client` v0.6.2 and `github.com/moby/moby/api` v1.56.1
 - Added trusted proxy validation for `X-Forwarded-For` / `X-Real-IP` headers (configurable via `TRUSTED_PROXIES` env var)
+- Repo `docker-compose.yml`: the Traefik API and dashboard are off by default (`--api.dashboard` and `--api.insecure` follow `TRAEFIK_DASHBOARD_INSECURE`, default `false`); the unauthenticated `traefik-dashboard` router (`Host(traefik.${GOFORGE_DOMAIN})`, `web` entrypoint, `api@internal`) is removed; the dashboard port is published on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}` instead of `0.0.0.0`. Traefik 80/443 are unchanged (all interfaces, for direct installs); tunnel deployments should bind them to loopback in an override (REPO-COMPOSE-TRAEFIK)
+- Pinned images: `cloudflare/cloudflared:2026.6.0` (was `latest`) in Compose, and `alpine:3.24` (was `latest`) for the runtime and `mcp` Dockerfile stages (UNPINNED, partial)
+- `SECURITY.md` documents the Docker socket trust model: the read-write socket in the `goforge` container, Traefik's `:ro` socket (which does not limit API calls), and `docker` group membership are root-equivalent on the host; mitigations and the Cloudflare Tunnel + loopback exposure model (DOCKER-SOCK)
 
 ---
 
