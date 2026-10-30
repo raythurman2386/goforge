@@ -152,7 +152,8 @@ func (c *Collector) calculateDiskUsage(diskUsage *client.DiskUsageResult) *model
 		return info
 	}
 
-	for _, img := range diskUsage.Images.Items {
+	for i := range diskUsage.Images.Items {
+		img := &diskUsage.Images.Items[i]
 		if !managedDockerLabels(img.Labels) {
 			continue
 		}
@@ -162,7 +163,8 @@ func (c *Collector) calculateDiskUsage(diskUsage *client.DiskUsageResult) *model
 		}
 	}
 
-	for _, ctr := range diskUsage.Containers.Items {
+	for i := range diskUsage.Containers.Items {
+		ctr := &diskUsage.Containers.Items[i]
 		if !managedDockerLabels(ctr.Labels) || ctr.SizeRw <= 0 {
 			continue
 		}
@@ -172,15 +174,16 @@ func (c *Collector) calculateDiskUsage(diskUsage *client.DiskUsageResult) *model
 		}
 	}
 
-	for _, vol := range diskUsage.Volumes.Items {
+	for i := range diskUsage.Volumes.Items {
+		vol := &diskUsage.Volumes.Items[i]
 		if vol.UsageData == nil || !strings.Contains(vol.Name, "goforge") {
 			continue
 		}
 		info.VolumesSize += vol.UsageData.Size
 	}
 
-	for _, cache := range diskUsage.BuildCache.Items {
-		info.BuildCacheSize += cache.Size
+	for i := range diskUsage.BuildCache.Items {
+		info.BuildCacheSize += diskUsage.BuildCache.Items[i].Size
 	}
 
 	return info

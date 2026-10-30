@@ -41,7 +41,7 @@ func TestGiteaSSHPublish(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
 
-	api, err := client.New(client.FromEnv, client.WithAPIVersionNegotiation())
+	api, err := client.New(client.FromEnv)
 	if err != nil {
 		t.Skipf("docker client: %v", err)
 	}

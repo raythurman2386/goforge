@@ -49,7 +49,6 @@ func NewClient(host string) (*Client, error) {
 	if host != "" {
 		opts = append(opts, client.WithHost(host))
 	}
-	opts = append(opts, client.WithAPIVersionNegotiation())
 
 	cli, err := client.New(opts...)
 	if err != nil {

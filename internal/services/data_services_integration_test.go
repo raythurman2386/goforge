@@ -42,7 +42,7 @@ func TestDataServices_AuthAndLabels(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	api, err := client.New(client.FromEnv, client.WithAPIVersionNegotiation())
+	api, err := client.New(client.FromEnv)
 	if err != nil {
 		t.Skipf("docker client: %v", err)
 	}

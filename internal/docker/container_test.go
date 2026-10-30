@@ -172,7 +172,7 @@ func TestCreateContainer_Cmd(t *testing.T) {
 			if got == nil {
 				t.Fatal("ContainerCreate was not called")
 			}
-			if !slices.Equal([]string(got.Cmd), tt.cmd) {
+			if !slices.Equal(got.Cmd, tt.cmd) {
 				t.Errorf("Config.Cmd = %q, want %q", got.Cmd, tt.cmd)
 			}
 		})

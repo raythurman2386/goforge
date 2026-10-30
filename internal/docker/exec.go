@@ -131,6 +131,8 @@ func healthReady(st *container.State) (bool, error) {
 		return true, nil
 	case container.Unhealthy:
 		return false, errors.New("container health check reports unhealthy")
+	case container.Starting, container.NoHealthcheck:
+		return false, nil
 	default:
 		return false, nil
 	}

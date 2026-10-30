@@ -57,12 +57,12 @@ type PortBinding struct {
 }
 
 // portBindings converts bindings into Docker's exposed-port set and port map.
-func portBindings(bindings []PortBinding) (network.PortSet, network.PortMap, error) {
+func portBindings(bindings []PortBinding) (exposed network.PortSet, pm network.PortMap, err error) {
 	if len(bindings) == 0 {
 		return nil, network.PortMap{}, nil
 	}
-	exposed := make(network.PortSet, len(bindings))
-	pm := make(network.PortMap, len(bindings))
+	exposed = make(network.PortSet, len(bindings))
+	pm = make(network.PortMap, len(bindings))
 	for _, b := range bindings {
 		proto := b.Protocol
 		if proto == "" {
