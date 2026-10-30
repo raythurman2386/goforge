@@ -33,7 +33,7 @@ case "$EVIDENCE" in
 esac
 
 usage() {
-  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-backup-settings|drive-mcp-http|check-backup-sealed|psql|check-sealed|cleanup" >&2
+  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-backup-settings|drive-mcp-http|drive-ui-a11y|check-backup-sealed|psql|check-sealed|cleanup" >&2
   exit 1
 }
 
@@ -1297,6 +1297,49 @@ cmd_drive_mcp_http() {
 }
 
 
+# --- drive-ui-a11y -----------------------------------------------------------
+# axe plus keyboard checks in headless Chromium (features/ui-a11y.md). The
+# pinned axe-core and playwright-core (ui-a11y/package-lock.json) install with
+# npm ci into $UI_A11Y_NODE, outside the repo, and are reused while the lock
+# file is unchanged. Runs on minis only; not part of CI.
+UI_A11Y_NODE="$VERIFY_DIR/ui-a11y-node"
+
+cmd_drive_ui_a11y() {
+  need_cmd node
+  need_cmd npm
+  install -d -m 755 "$EVIDENCE"
+  # Without GOFORGE_VERIFY_BASE the default base is 127.0.0.1:8080. Only drive
+  # it when this run launched the goforge-verify stack (on minis the live
+  # GoForge holds 8080).
+  if [[ -z "${GOFORGE_VERIFY_BASE:-}" && ! -f "$STATE_DIR/stack.env" ]]; then
+    echo "refusing: no $STATE_DIR/stack.env (run launch) and GOFORGE_VERIFY_BASE is unset; will not drive $BASE" >&2
+    exit 1
+  fi
+  local src="$ROOT/.cursor/skills/verify-goforge/ui-a11y"
+  install -d -m 755 "$UI_A11Y_NODE"
+  if ! cmp -s "$src/package-lock.json" "$UI_A11Y_NODE/package-lock.json" \
+    || [[ ! -f "$UI_A11Y_NODE/node_modules/axe-core/axe.min.js" || ! -d "$UI_A11Y_NODE/node_modules/playwright-core" ]]; then
+    cp "$src/package.json" "$src/package-lock.json" "$UI_A11Y_NODE/"
+    if ! (cd "$UI_A11Y_NODE" && npm ci --ignore-scripts --no-audit --no-fund) >"$EVIDENCE/ui-a11y-npm.log" 2>&1; then
+      chmod 644 "$EVIDENCE/ui-a11y-npm.log"
+      echo "npm ci failed for the pinned ui-a11y deps; see $EVIDENCE/ui-a11y-npm.log" >&2
+      exit 2
+    fi
+    chmod 644 "$EVIDENCE/ui-a11y-npm.log"
+  fi
+  cp "$src/drive.mjs" "$UI_A11Y_NODE/drive.mjs"
+  local pwfile=""
+  [[ -f "$STATE_DIR/register.password" ]] && pwfile="$STATE_DIR/register.password"
+  local email
+  email=$(printf '%s' "$ADMIN_EMAIL" | tr '[:upper:]' '[:lower:]')
+  local rc=0
+  GOFORGE_UI_BASE="$BASE" GOFORGE_UI_EVIDENCE="$EVIDENCE" GOFORGE_UI_EMAIL="$email" \
+    GOFORGE_UI_PASSWORD_FILE="$pwfile" node "$UI_A11Y_NODE/drive.mjs" || rc=$?
+  redact_file "$EVIDENCE/ui-a11y-verdict.txt"
+  redact_file "$EVIDENCE/ui-a11y-report.json"
+  return "$rc"
+}
+
 evidence_list() {
   find "$EVIDENCE" -type f 2>/dev/null | sort
 }
@@ -1348,6 +1391,7 @@ main() {
     check-backup-sealed) cmd_check_backup_sealed ;;
     drive-backup-settings) cmd_drive_backup_settings ;;
     drive-mcp-http) cmd_drive_mcp_http ;;
+    drive-ui-a11y) cmd_drive_ui_a11y ;;
     cleanup) cmd_cleanup ;;
     *) usage ;;
   esac

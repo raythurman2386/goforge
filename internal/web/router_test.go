@@ -408,3 +408,26 @@ func TestRouter_FaviconAndFont(t *testing.T) {
 		}
 	}
 }
+
+func TestRouter_DevUIGalleryOnlyInDevMode(t *testing.T) {
+	for _, tt := range []struct {
+		devMode bool
+		want    int
+	}{
+		{true, http.StatusOK},
+		{false, http.StatusNotFound},
+	} {
+		cfg := &config.Config{DevMode: tt.devMode, Port: 8080, LogLevel: "info", CSRFSecret: "test-csrf-secret"}
+		db := setupTestRouterDB(t)
+		router := setupTestRouter(t, db, cfg)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/dev/ui", nil))
+		db.Close()
+		if rec.Code != tt.want {
+			t.Errorf("DevMode=%v: GET /dev/ui = %d, want %d", tt.devMode, rec.Code, tt.want)
+		}
+		if tt.devMode && !strings.Contains(rec.Body.String(), "UI kit gallery") {
+			t.Errorf("DevMode=true: gallery heading missing")
+		}
+	}
+}

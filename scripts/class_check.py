@@ -15,8 +15,12 @@ Checked sources:
      statusBadgeClass, alertClass, logLevelBadgeClass, backupLineClass.
   4. Literal string arguments to the Skeleton components
      (components.Skeleton("h-5 w-28"), statCardSkeleton("h-9")).
-  5. static/js/app.js: the string values of the LEVEL_CLASSES object, string
-     literals assigned to .className, and classList.add/remove/toggle args.
+  5. components/ui merge inputs in .templ and non-test .go files under
+     internal/web/templates: string literals passed to Class(...) or
+     ui.Class(...), and "class": "..." entries in templ.Attributes literals.
+  6. static/js/app.js and static/js/ui.js: the string values of the
+     LEVEL_CLASSES object, string literals assigned to .className, and
+     classList.add/remove/toggle args.
 
 Known gap (intentional): a class built from a runtime value that never appears
 as a literal (for example "w-" + width) cannot be checked statically. Keep such
@@ -94,6 +98,35 @@ def skeleton_args(text):
             yield 'Skeleton()', s.group(1)
 
 
+def paren_block(text, start):
+    """Return text[start:end] where text[start-1] is '(' and end is its match."""
+    depth = 1
+    i = start
+    while i < len(text) and depth:
+        c = text[i]
+        if c == '"':
+            m = STRING.match(text, i)
+            if m:
+                i = m.end()
+                continue
+        if c == '(':
+            depth += 1
+        elif c == ')':
+            depth -= 1
+        i += 1
+    return text[start:i - 1]
+
+
+def ui_merge_args(text):
+    # Class("a b", fooClass(x)) and ui.Class(...): every literal argument.
+    for m in re.finditer(r'(?<![\w.])(?:ui\.)?Class\(', text):
+        for s in STRING.finditer(paren_block(text, m.end())):
+            yield 'ui.Class()', s.group(1)
+    # templ.Attributes{"class": "..."} defaults handed to ui.Attrs.
+    for m in re.finditer(r'"class"\s*:\s*"((?:[^"\\\n]|\\.)*)"', text):
+        yield '"class":', m.group(1)
+
+
 def js_classes(text):
     m = re.search(r'LEVEL_CLASSES\s*=\s*\{', text)
     if m:
@@ -120,13 +153,13 @@ def main():
     tmpl_go = [f for f in glob.glob('internal/web/templates/**/*.go', recursive=True)
                if not f.endswith(('_test.go', '_templ.go'))]
     handler_go = [f for f in glob.glob('internal/web/handlers/*.go') if not f.endswith('_test.go')]
-    js_files = ['static/js/app.js']
+    js_files = ['static/js/app.js', 'static/js/ui.js']
 
     scanners = {}
     for f in templ_files:
-        scanners[f] = (literal_attrs, templ_class_exprs, class_helpers, skeleton_args)
+        scanners[f] = (literal_attrs, templ_class_exprs, class_helpers, skeleton_args, ui_merge_args)
     for f in tmpl_go:
-        scanners[f] = (class_helpers,)
+        scanners[f] = (class_helpers, ui_merge_args)
     for f in handler_go:
         scanners[f] = (literal_attrs,)
     for f in js_files:

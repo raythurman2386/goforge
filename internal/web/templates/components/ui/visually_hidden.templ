@@ -1,0 +1,10 @@
+package ui
+
+// VisuallyHidden renders text for screen readers only (Tailwind sr-only),
+// for example the "required" word next to a visual asterisk. attrs pass
+// through to the span; a caller "class" is appended.
+templ VisuallyHidden(attrs templ.Attributes) {
+	<span { Attrs(templ.Attributes{"class": "sr-only"}, attrs)... }>
+		{ children... }
+	</span>
+}

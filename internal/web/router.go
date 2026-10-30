@@ -127,6 +127,10 @@ func Router(
 				r.Get("/auth/github", authHandler.GitHubLogin)
 				r.Get("/auth/github/callback", authHandler.GitHubCallback)
 				r.Post("/auth/logout", authHandler.Logout)
+				// UI kit gallery: development only, never routed in production.
+				if cfg.DevMode {
+					r.Get("/dev/ui", handlers.UIGallery)
+				}
 			})
 
 			// Authenticated routes

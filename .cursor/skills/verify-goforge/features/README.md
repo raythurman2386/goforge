@@ -16,7 +16,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 ## Driving conventions
 
 - Start from the baseline state unless the feature file adds a precondition.
-- The UI is HTMX. Drive it with curl against the form routes and headings named in the feature file. There is no Playwright suite in this repo.
+- The UI is HTMX. Drive it with curl against the form routes and headings named in the feature file. The one browser drive is `verify.sh drive-ui-a11y` (Playwright plus axe, pinned, minis only, not in CI).
 - Treat every command as literal. Keep paths, field names, and status values unchanged.
 - Session and CSRF values stay in `/tmp/goforge-verify/state`. Do not print them and do not copy jars into the evidence directory.
 - A second view of a mutation is SQL through `verify.sh psql`, or a later GET with the same cookie.
@@ -56,3 +56,4 @@ Last driven live on minis after #28: register-admin and login-projects. The othe
 - [GoForge MCP tools (stdio fallback)](./mcp-tools.md) covers `cmd/goforge-mcp`, the stdio server that calls `/api/v1` over HTTPS: tool inventory, a read call, a dry run, and protected refusal. Written from source; not driven live yet.
 - [Restore the GoForge database](./backup-restore.md) covers `goforge backup list`, `goforge backup restore` (dry run, confirm, every refusal, side database and rename, kept previous database, sessions cleared, audit row, PostgreSQL 15 target), and the read-only Restore points list on Settings → Profile. Integration test on PG15 and PG17 plus a host-mode drive on minis.
 - [Nightly S3 backups](./backups.md) covers a run to S3-compatible storage, skips, retention, secret redaction, and the admin-only status on Settings, the API, and MCP. Smoke is the integration test against throwaway MinIO; no verify.sh drive yet.
+- [UI kit foundation and accessibility](./ui-a11y.md) covers the CSS variable tokens in light and dark, focus-visible rings, reduced motion, `static/js/ui.js` delegation across htmx swaps, the dev-mode `/dev/ui` gallery, and the axe WCAG AA scan. `verify.sh drive-ui-a11y`, driven in host mode on minis.

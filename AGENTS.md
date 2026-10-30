@@ -56,7 +56,8 @@ make css                            # Compile TailwindCSS v3.4.17 (standalone CL
                                     # v3.4.17, else npx tailwindcss@3.4.17); fails otherwise
 make css-check                      # Rebuild output.css, then scripts/class_check.py: fails on
                                     # class tokens (class="...", class={ ... }, *Class() helpers,
-                                    # app.js LEVEL_CLASSES/className) missing from output.css
+                                    # ui.Class()/"class" attrs, app.js and ui.js class
+                                    # literals) missing from output.css
                                     # (CI css job)
 
 # Database
