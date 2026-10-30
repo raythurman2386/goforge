@@ -26,6 +26,10 @@ type InstanceRepository interface {
 	GetByID(ctx context.Context, id string) (*models.ServiceInstance, error)
 	ListByUserID(ctx context.Context, userID string) ([]*models.ServiceInstance, error)
 	Update(ctx context.Context, s *models.ServiceInstance) error
+	// UpdateIfStatus writes s only if the stored status still equals
+	// expected, as one atomic update. It returns false, writing nothing,
+	// when the status has changed since the caller read it.
+	UpdateIfStatus(ctx context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -213,8 +217,9 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	return instance, nil
 }
 
-// ErrInstanceBusy is returned when a config edit is requested while the
-// instance is still deploying or being recreated.
+// ErrInstanceBusy is returned when a config edit or image update is
+// requested while the instance is still deploying or being recreated,
+// including when another edit claimed the instance first (#48).
 var ErrInstanceBusy = errors.New("service instance is still deploying; wait for it to finish")
 
 // VolumeName returns the Docker named volume for one template volume of an
@@ -642,8 +647,8 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 
 	prevStatus := instance.Status
 	instance.Status = models.ServiceStatusPending
-	if err = s.instanceRepo.Update(ctx, instance); err != nil {
-		return nil, fmt.Errorf("failed to save instance config: %w", err)
+	if claimErr := s.claimForRecreate(ctx, instance, prevStatus); claimErr != nil {
+		return nil, claimErr
 	}
 
 	//nolint:contextcheck // Intentional use of background context for async work
@@ -689,8 +694,8 @@ func (s *InstanceService) UpdateInstanceImage(ctx context.Context, id string) (*
 
 	prevStatus := instance.Status
 	instance.Status = models.ServiceStatusPending
-	if err = s.instanceRepo.Update(ctx, instance); err != nil {
-		return nil, fmt.Errorf("failed to save instance status: %w", err)
+	if claimErr := s.claimForRecreate(ctx, instance, prevStatus); claimErr != nil {
+		return nil, claimErr
 	}
 	s.logger.Info("service image update requested", "instance_id", instance.ID, "template", tmpl.Name, "image", spec.opts.Image)
 
@@ -702,6 +707,22 @@ func (s *InstanceService) UpdateInstanceImage(ctx context.Context, id string) (*
 	}()
 
 	return instance, nil
+}
+
+// claimForRecreate saves instance (already set to pending) only if its
+// stored status is still prevStatus, the status the caller checked. Two
+// edits or image updates that both passed the busy check race here; the
+// database lets one swap the status, and the other gets ErrInstanceBusy
+// before it starts a second recreate (#48).
+func (s *InstanceService) claimForRecreate(ctx context.Context, instance *models.ServiceInstance, prevStatus models.ServiceInstanceStatus) error {
+	swapped, err := s.instanceRepo.UpdateIfStatus(ctx, instance, prevStatus)
+	if err != nil {
+		return fmt.Errorf("failed to save instance: %w", err)
+	}
+	if !swapped {
+		return ErrInstanceBusy
+	}
+	return nil
 }
 
 // recreateContainer gets the image for spec, then stops and removes the

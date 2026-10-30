@@ -102,6 +102,8 @@ type fakeInstances struct {
 	restarted []string
 	updated   []string
 	imaged    []string
+	// updateErr, when set, is what UpdateInstanceConfig returns.
+	updateErr error
 }
 
 func (f *fakeInstances) GetInstance(_ context.Context, id string) (*models.ServiceInstance, error) {
@@ -127,6 +129,9 @@ func (f *fakeInstances) RestartInstance(_ context.Context, id string) error {
 }
 
 func (f *fakeInstances) UpdateInstanceConfig(_ context.Context, id string, _ map[string]interface{}) (*models.ServiceInstance, error) {
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
 	f.updated = append(f.updated, id)
 	return &models.ServiceInstance{ID: id}, nil
 }
@@ -564,6 +569,21 @@ func TestUpdateConfigDiff(t *testing.T) {
 	}
 	if len(h.instances.updated) != 0 {
 		t.Fatal("dry runs updated config")
+	}
+}
+
+// The instance reads as running, so the handler's own busy check passes, but
+// another edit wins the status compare-and-swap first (#48). The loser is a 409.
+func TestUpdateConfigLostRaceIsConflict(t *testing.T) {
+	h := newHarness(t)
+	h.instances.updateErr = services.ErrInstanceBusy
+	rec, out := h.do(t, http.MethodPatch, "/services/"+svcID+"/config", "tok-write",
+		`{"config":{"size":"large"},"dry_run":false,"approval_ref":"t1250u"}`)
+	if rec.Code != http.StatusConflict || errCode(out) != codeConflict {
+		t.Fatalf("got %d %v, want 409 %s", rec.Code, out, codeConflict)
+	}
+	if len(h.instances.updated) != 0 {
+		t.Fatal("losing edit recorded as applied")
 	}
 }
 

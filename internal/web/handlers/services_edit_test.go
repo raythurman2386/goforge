@@ -30,6 +30,8 @@ type fakeInstanceRepo struct {
 	mu   sync.Mutex
 	inst models.ServiceInstance
 	saw  []models.ServiceInstance
+	// loseCAS makes UpdateIfStatus act as if another edit swapped the status first.
+	loseCAS bool
 }
 
 func (f *fakeInstanceRepo) Create(context.Context, *models.ServiceInstance) error { return nil }
@@ -48,6 +50,16 @@ func (f *fakeInstanceRepo) Update(_ context.Context, s *models.ServiceInstance) 
 	f.inst = *s
 	f.saw = append(f.saw, *s)
 	return nil
+}
+func (f *fakeInstanceRepo) UpdateIfStatus(_ context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.loseCAS || f.inst.Status != expected {
+		return false, nil
+	}
+	f.inst = *s
+	f.saw = append(f.saw, *s)
+	return true, nil
 }
 func (f *fakeInstanceRepo) Delete(context.Context, string) error { return nil }
 
@@ -178,16 +190,20 @@ func TestServiceHandler_UpdateConfig(t *testing.T) {
 		name       string
 		user       string
 		status     models.ServiceInstanceStatus
+		loseCAS    bool
 		wantCode   int
 		wantUpdate bool
 	}{
-		{"owner saves", "owner", models.ServiceStatusRunning, http.StatusSeeOther, true},
-		{"other user forbidden", "intruder", models.ServiceStatusRunning, http.StatusForbidden, false},
-		{"busy instance conflicts", "owner", models.ServiceStatusPending, http.StatusConflict, false},
+		{"owner saves", "owner", models.ServiceStatusRunning, false, http.StatusSeeOther, true},
+		{"other user forbidden", "intruder", models.ServiceStatusRunning, false, http.StatusForbidden, false},
+		{"busy instance conflicts", "owner", models.ServiceStatusPending, false, http.StatusConflict, false},
+		// Read as running, but a concurrent edit swapped the status first (#48).
+		{"lost status swap conflicts", "owner", models.ServiceStatusRunning, true, http.StatusConflict, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h, repo := newEditHandler(t, tt.status)
+			repo.loseCAS = tt.loseCAS
 			form := url.Values{
 				"csrf_token":      {"tok"},
 				"name":            {"vw"},

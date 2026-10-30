@@ -30,8 +30,16 @@ type editHarness struct {
 	pulled     []string
 	pullErr    error
 	events     []string // docker calls in order: pull, stop, remove, create
-	done       chan struct{}
-	svc        *InstanceService
+	// afterRead, when set, runs after GetByID returns, without the lock held.
+	afterRead func()
+	// beforeCAS, when set, runs at the start of UpdateIfStatus without the lock held.
+	beforeCAS func()
+	casLost   int
+	// pullGate, when set, holds every image pull (the first step of a
+	// recreate) until it is closed, the way a real pull takes a while.
+	pullGate chan struct{}
+	done     chan struct{}
+	svc      *InstanceService
 }
 
 func editTestTemplate() *ServiceTemplate {
@@ -81,8 +89,12 @@ func newEditHarness(t *testing.T) *editHarness {
 		},
 		getByIDFunc: func(_ context.Context, _ string) (*models.ServiceInstance, error) {
 			h.mu.Lock()
-			defer h.mu.Unlock()
 			cp := *h.instance
+			hook := h.afterRead
+			h.mu.Unlock()
+			if hook != nil {
+				hook()
+			}
 			return &cp, nil
 		},
 		updateFunc: func(_ context.Context, s *models.ServiceInstance) error {
@@ -94,6 +106,24 @@ func newEditHarness(t *testing.T) *editHarness {
 				h.done <- struct{}{}
 			}
 			return nil
+		},
+		// Like the SQL UPDATE ... WHERE status = expected: check and write under one lock.
+		updateIfStatusFunc: func(_ context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error) {
+			h.mu.Lock()
+			hook := h.beforeCAS
+			h.mu.Unlock()
+			if hook != nil {
+				hook()
+			}
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			if h.instance == nil || h.instance.Status != expected {
+				h.casLost++
+				return false, nil
+			}
+			cp := *s
+			h.instance = &cp
+			return true, nil
 		},
 	}
 	cr := &mockContainerRepository{
@@ -147,6 +177,12 @@ func newEditHarness(t *testing.T) *editHarness {
 			return nil
 		},
 		pullImageFunc: func(_ context.Context, image string) error {
+			h.mu.Lock()
+			gate := h.pullGate
+			h.mu.Unlock()
+			if gate != nil {
+				<-gate
+			}
 			h.mu.Lock()
 			defer h.mu.Unlock()
 			h.events = append(h.events, "pull")
@@ -338,6 +374,205 @@ func TestUpdateInstanceConfig_RejectsWhileDeploying(t *testing.T) {
 	defer h.mu.Unlock()
 	if len(h.created)+len(h.stopped)+len(h.removed) != 0 {
 		t.Errorf("docker touched while busy: created=%d stopped=%v removed=%v", len(h.created), h.stopped, h.removed)
+	}
+}
+
+// holdReads makes the next n GetByID calls wait until all n have returned
+// their copy. Every racing caller has then read the instance and passed the
+// busy check before any of them saves it: the race from #48. It also holds
+// the winner's recreate at its image pull until the returned release is
+// called, so the winner is still pending while the losers try to claim.
+func (h *editHarness) holdReads(n int) (release func()) {
+	var arrived sync.WaitGroup
+	arrived.Add(n)
+	readsDone := make(chan struct{})
+	go func() {
+		arrived.Wait()
+		close(readsDone)
+	}()
+	var seen int
+	gate := make(chan struct{})
+	h.mu.Lock()
+	h.pullGate = gate
+	h.afterRead = func() {
+		h.mu.Lock()
+		seen++
+		mine := seen <= n
+		h.mu.Unlock()
+		if mine {
+			arrived.Done()
+			<-readsDone
+		}
+	}
+	h.mu.Unlock()
+	return func() { close(gate) }
+}
+
+// raceResults runs fns at once and returns their errors in order.
+func raceResults(fns ...func() error) []error {
+	errs := make([]error, len(fns))
+	var wg sync.WaitGroup
+	for i, fn := range fns {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = fn()
+		}()
+	}
+	wg.Wait()
+	return errs
+}
+
+// oneWinner checks that exactly one of errs is nil and the rest are exactly
+// ErrInstanceBusy (unwrapped, so handlers show its message), and returns the winner.
+func oneWinner(t *testing.T, errs []error) int {
+	t.Helper()
+	winner := -1
+	for i, err := range errs {
+		switch {
+		case err == nil:
+			if winner != -1 {
+				t.Fatalf("calls %d and %d both won: errs = %v", winner, i, errs)
+			}
+			winner = i
+		case err != ErrInstanceBusy:
+			t.Fatalf("call %d: err = %v, want ErrInstanceBusy", i, err)
+		}
+	}
+	if winner == -1 {
+		t.Fatalf("no call won: errs = %v", errs)
+	}
+	return winner
+}
+
+func TestUpdateInstanceConfig_ConcurrentEditsOneWins(t *testing.T) {
+	t.Parallel()
+	h := newEditHarness(t)
+	inst := h.deploy(t)
+	release := h.holdReads(2)
+
+	tokens := []string{"edit-a", "edit-b"}
+	edit := func(tok string) func() error {
+		return func() error {
+			_, err := h.svc.UpdateInstanceConfig(context.Background(), inst.ID, map[string]interface{}{"admin_token": tok})
+			return err
+		}
+	}
+	winner := oneWinner(t, raceResults(edit(tokens[0]), edit(tokens[1])))
+	release()
+	h.wait(t)
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.casLost != 1 {
+		t.Errorf("CAS losses = %d, want 1", h.casLost)
+	}
+	// Deploy plus exactly one recreate; the loser never touched Docker.
+	if len(h.created) != 2 || len(h.stopped) != 1 || len(h.removed) != 1 {
+		t.Fatalf("created=%d stopped=%v removed=%v, want one recreate", len(h.created), h.stopped, h.removed)
+	}
+	if got := envMap(h.created[1])["ADMIN_TOKEN"]; got != tokens[winner] {
+		t.Errorf("recreated with ADMIN_TOKEN %q, want winner's %q", got, tokens[winner])
+	}
+	var stored map[string]interface{}
+	if err := json.Unmarshal(h.instance.Config, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored["admin_token"] != tokens[winner] {
+		t.Errorf("stored admin_token = %v, want winner's %q", stored["admin_token"], tokens[winner])
+	}
+	if h.instance.Status != models.ServiceStatusRunning {
+		t.Errorf("status = %s, want running", h.instance.Status)
+	}
+}
+
+// A config edit and an image update share the claim, so they cannot both recreate.
+func TestUpdateInstanceConfig_ConcurrentWithImageUpdateOneWins(t *testing.T) {
+	t.Parallel()
+	h := newEditHarness(t)
+	inst := h.deploy(t)
+	release := h.holdReads(2)
+
+	oneWinner(t, raceResults(
+		func() error {
+			_, err := h.svc.UpdateInstanceConfig(context.Background(), inst.ID, map[string]interface{}{"signups_allowed": "false"})
+			return err
+		},
+		func() error {
+			_, err := h.svc.UpdateInstanceImage(context.Background(), inst.ID)
+			return err
+		},
+	))
+	release()
+	h.wait(t)
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.created) != 2 || len(h.stopped) != 1 || len(h.removed) != 1 {
+		t.Fatalf("created=%d stopped=%v removed=%v, want one recreate", len(h.created), h.stopped, h.removed)
+	}
+}
+
+// The status the edit checked changed before the swap (here a stop); the
+// edit must not overwrite it or touch Docker.
+func TestUpdateInstanceConfig_StatusChangedBeforeSwapIsBusy(t *testing.T) {
+	t.Parallel()
+	h := newEditHarness(t)
+	inst := h.deploy(t)
+
+	h.mu.Lock()
+	h.events = nil
+	h.beforeCAS = func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.instance.Status = models.ServiceStatusStopped
+	}
+	h.mu.Unlock()
+
+	_, err := h.svc.UpdateInstanceConfig(context.Background(), inst.ID, map[string]interface{}{"signups_allowed": "false"})
+	if err != ErrInstanceBusy {
+		t.Fatalf("err = %v, want ErrInstanceBusy", err)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.instance.Status != models.ServiceStatusStopped {
+		t.Errorf("status = %s, want stopped left alone", h.instance.Status)
+	}
+	if len(h.events) != 0 {
+		t.Errorf("docker touched after lost swap: %v", h.events)
+	}
+	var stored map[string]interface{}
+	if err := json.Unmarshal(h.instance.Config, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored["signups_allowed"] != "true" {
+		t.Errorf("stored signups_allowed = %v, want the losing edit discarded", stored["signups_allowed"])
+	}
+}
+
+// A failed instance can still be edited: the swap expects failed, not running.
+func TestUpdateInstanceConfig_FromFailedSwapsToPending(t *testing.T) {
+	t.Parallel()
+	h := newEditHarness(t)
+	inst := h.deploy(t)
+
+	h.mu.Lock()
+	h.instance.Status = models.ServiceStatusFailed
+	h.mu.Unlock()
+
+	got, err := h.svc.UpdateInstanceConfig(context.Background(), inst.ID, map[string]interface{}{"signups_allowed": "false"})
+	if err != nil {
+		t.Fatalf("UpdateInstanceConfig: %v", err)
+	}
+	if got.Status != models.ServiceStatusPending {
+		t.Errorf("returned status = %s, want pending", got.Status)
+	}
+	h.wait(t)
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.created) != 2 || h.instance.Status != models.ServiceStatusRunning {
+		t.Errorf("created=%d status=%s, want recreate and running", len(h.created), h.instance.Status)
 	}
 }
 

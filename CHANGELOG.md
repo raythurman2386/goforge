@@ -74,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed orphaned `CustomDomain` model and `internal/domain` logic that had no database repository
 
 ### Fixed
+- Two config edits (or an edit and an image update) sent at the same moment could both pass the "still deploying" check and both recreate the container, racing stop, remove, and create. The edit now claims the instance by switching its status to `pending` in one `UPDATE ... WHERE status = <status it read>`; the request that loses gets `409 Conflict` and touches nothing. Volumes were never at risk (#48)
 - `GET /containers/api` matched `/containers/{id}` (chi ranks a subrouter catch-all below params), returned 403, and the containers list never loaded; the two routes are flat now (#66)
 - Containers list rows were swapped into a `div` inside a `td`; the `tbody` is the target and refreshes after stop and restart (#65)
 - Containers Type column was always empty (templ discarded a Go statement); container detail Resource Usage never subscribed to the stats SSE; a successful modal request left its backdrop behind, and a failed one showed raw HTML (#67)
