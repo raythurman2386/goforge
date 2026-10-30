@@ -286,14 +286,6 @@
   .card-title {
     @apply text-base font-semibold leading-6 text-foreground;
   }
-
-  .table-th {
-    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground;
-  }
-
-  .table-td {
-    @apply px-4 py-3 text-sm;
-  }
 }
 
 /* HTMX loading indicator */
@@ -358,6 +350,49 @@ dialog[data-ui-dialog][open]::backdrop {
 @media (prefers-color-scheme: dark) {
   dialog[data-ui-dialog]::backdrop {
     background-color: rgb(0 0 0 / 0.6);
+  }
+}
+
+/*
+ * Sheet (components/ui Sheet): a Dialog pinned to one edge at full height
+ * that slides in. The UA centers a modal <dialog> with margin: auto and
+ * caps its size, so position and size are reset here. Reduced motion drops
+ * the slide with the other dialog transitions below.
+ */
+dialog[data-ui-sheet] {
+  position: fixed;
+  inset: 0 auto 0 0;
+  margin: 0;
+  width: 20rem;
+  max-width: calc(100% - 3rem);
+  height: 100%;
+  max-height: 100%;
+  opacity: 1;
+  transform: translateX(-100%);
+  transition:
+    transform 200ms ease-out,
+    overlay 200ms ease-out allow-discrete,
+    display 200ms ease-out allow-discrete;
+}
+
+dialog[data-ui-sheet="right"] {
+  inset: 0 0 0 auto;
+  transform: translateX(100%);
+}
+
+dialog[data-ui-sheet][open] {
+  opacity: 1;
+  transform: none;
+}
+
+@starting-style {
+  dialog[data-ui-sheet][open] {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+
+  dialog[data-ui-sheet="right"][open] {
+    transform: translateX(100%);
   }
 }
 

@@ -1,6 +1,6 @@
 // Package devui is the UI kit gallery, served at /dev/ui only when
 // GOFORGE_DEV_MODE=true (see web.Router). It shows the design tokens, the
-// legacy table classes restated on them, and each components/ui
+// legacy component classes restated on them, and each components/ui
 // primitive with its variants. verify.sh drive-ui-a11y scans it with axe in
 // light and dark.
 package devui
@@ -207,7 +207,19 @@ templ Gallery(csrfToken string) {
 			@section("overlays", "Dropdown, Popover, Tooltip") {
 				@overlaySection()
 			}
-			@section("cards", "Card (table on legacy classes)") {
+			@section("navtabs", "NavTabs") {
+				@navTabsSection()
+			}
+			@section("tabs", "Tabs") {
+				@tabsSection()
+			}
+			@section("tables", "Table") {
+				@tablesSection()
+			}
+			@section("sheets", "Sheet") {
+				@sheetsSection()
+			}
+			@section("cards", "Card (with a Table)") {
 				@ui.Card(ui.CardProps{Flush: true}) {
 					@ui.CardHeader(nil) {
 						<div>
@@ -223,27 +235,24 @@ templ Gallery(csrfToken string) {
 						}
 					}
 					@ui.CardContent(nil) {
-						<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Example table">
-							<table class="min-w-full">
-								<caption class="sr-only">Example deployments</caption>
-								<thead>
-									<tr>
-										<th scope="col" class="table-th">Name</th>
-										<th scope="col" class="table-th">Status</th>
-									</tr>
-								</thead>
-								<tbody class="divide-y divide-divider">
-									<tr>
-										<td class="table-td">web</td>
-										<td class="table-td">Running</td>
-									</tr>
-									<tr>
-										<td class="table-td">worker</td>
-										<td class="table-td">Stopped</td>
-									</tr>
-								</tbody>
-							</table>
-						</div>
+						@ui.Table(ui.TableProps{ID: "gallery-card-table", Caption: "Example deployments"}) {
+							@ui.THead(nil) {
+								@ui.TR(nil) {
+									@ui.TH(ui.CellProps{}) { Name }
+									@ui.TH(ui.CellProps{}) { Status }
+								}
+							}
+							@ui.TBody(nil) {
+								@ui.TR(nil) {
+									@ui.TD(ui.CellProps{}) { web }
+									@ui.TD(ui.CellProps{}) { Running }
+								}
+								@ui.TR(nil) {
+									@ui.TD(ui.CellProps{}) { worker }
+									@ui.TD(ui.CellProps{}) { Stopped }
+								}
+							}
+						}
 					}
 					@ui.CardFooter(nil) {
 						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary}) {
@@ -260,7 +269,7 @@ templ Gallery(csrfToken string) {
 			}
 			@section("components", "Components") {
 				<p class="text-sm text-muted-foreground">
-					Primitives above: Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb, Label, Field, Input, Textarea, Select, Checkbox, Switch, Dialog, the confirm dialog, Dropdown, Popover, and Tooltip. Tabs, Table, and Sheet land here with their variants as their PRs merge.
+					Primitives above: Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb, Label, Field, Input, Textarea, Select, Checkbox, Switch, Dialog, the confirm dialog, Dropdown, Popover, Tooltip, NavTabs, Tabs, Table, and Sheet.
 				</p>
 			}
 		</main>

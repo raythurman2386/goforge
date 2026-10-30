@@ -860,6 +860,442 @@ async function appEnvMenuChecks(scheme, page, projectHref) {
   page.setDefaultTimeout(30000);
 }
 
+// PR6 checks on the gallery: in-page Tabs (roving tabindex, arrows wrap,
+// Home/End, automatic activation), Table scroll regions, and both Sheets
+// (static dialog on an edge: trap, Escape, focus return, aria-expanded).
+async function tabsTableSheetChecks(scheme, page) {
+  const resp = await page.goto(BASE + "/dev/ui", { waitUntil: "load" });
+  if (!resp || resp.status() !== 200) return;
+  page.setDefaultTimeout(8000);
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  const settle = () => page.waitForTimeout(300);
+  const state = () =>
+    page.evaluate(() => {
+      const root = document.getElementById("gallery-tabs");
+      const tabs = Array.from(root.querySelectorAll('[role="tab"]'));
+      const panels = Array.from(root.querySelectorAll('[role="tabpanel"]'));
+      return {
+        focus: document.activeElement.getAttribute("data-ui-tab") || document.activeElement.id,
+        selected: tabs.filter((x) => x.getAttribute("aria-selected") === "true").map((x) => x.dataset.uiTab).join(","),
+        zero: tabs.filter((x) => x.tabIndex === 0).map((x) => x.dataset.uiTab).join(","),
+        shown: panels.filter((p) => !p.hidden).map((p) => p.dataset.uiTabpanel).join(","),
+      };
+    });
+  await t("tabs-keyboard", async () => {
+    await page.focus("#gallery-tabs-tab-build");
+    const steps = [];
+    const want = [
+      ["ArrowRight", "runtime"],
+      ["ArrowRight", "events"],
+      ["ArrowRight", "build"],
+      ["ArrowLeft", "events"],
+      ["Home", "build"],
+      ["End", "events"],
+    ];
+    let ok = true;
+    for (const [key, exp] of want) {
+      await page.keyboard.press(key);
+      const s = await state();
+      const good = s.focus === exp && s.selected === exp && s.zero === exp && s.shown === exp;
+      if (!good) ok = false;
+      steps.push(`${key}->${s.focus}/${s.selected}/${s.shown}${good ? "" : "!"}`);
+    }
+    // Tab leaves the tablist for the active panel (roving tabindex).
+    await page.keyboard.press("Tab");
+    const out = await page.evaluate(() => document.activeElement.getAttribute("role") + ":" + (document.activeElement.dataset.uiTabpanel || ""));
+    if (out !== "tabpanel:events") ok = false;
+    check(scheme, "tabs-keyboard", ok, steps.join(" ") + ` Tab->${out}`);
+  });
+  await t("tabs-click", async () => {
+    await page.click("#gallery-tabs-tab-runtime");
+    const s = await state();
+    check(scheme, "tabs-click", s.selected === "runtime" && s.shown === "runtime", `selected=${s.selected} shown=${s.shown}`);
+  });
+  await t("table-scroll-regions", async () => {
+    const r = await page.$$eval("[data-ui-table]", (ws) =>
+      ws.map((w) => ({
+        role: w.getAttribute("role"),
+        tab: w.tabIndex,
+        name: (document.getElementById(w.getAttribute("aria-labelledby")) || {}).textContent || "",
+        caption: !!w.querySelector("table > caption"),
+      })),
+    );
+    const bad = r.filter((x) => x.role !== "region" || x.tab !== 0 || !x.name.trim() || !x.caption);
+    check(scheme, "table-scroll-regions", r.length >= 4 && bad.length === 0, `wrappers=${r.length} bad=${bad.length}`);
+  });
+  const active = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return { id: a.id, tag: a.tagName, text: (a.textContent || "").trim().slice(0, 30), dialog: (a.closest("dialog") || {}).id || "" };
+    });
+  for (const [side, opener, first] of [
+    ["left", "#gallery-sheet-left-open", "A"],
+    ["right", "#gallery-sheet-right-open", "INPUT"],
+  ]) {
+    const id = "gallery-sheet-" + side;
+    await t(`sheet-${side}`, async () => {
+      await page.focus(opener);
+      await page.keyboard.press("Enter");
+      await page.waitForSelector(`#${id}[open]`);
+      await settle();
+      const a = await active();
+      const geo = await page.$eval("#" + id, (d) => {
+        const r = d.getBoundingClientRect();
+        return { left: Math.round(r.left), right: Math.round(window.innerWidth - r.right), modal: d.matches(":modal") };
+      });
+      const expanded = await page.$eval(opener, (b) => b.getAttribute("aria-expanded"));
+      let escaped = 0;
+      for (let i = 0; i < 14; i++) {
+        await page.keyboard.press(i % 3 === 2 ? "Shift+Tab" : "Tab");
+        const x = await active();
+        if (x.dialog !== id && x.tag !== "BODY") escaped++;
+      }
+      await page.keyboard.press("Escape");
+      await settle();
+      const closed = await page.$eval("#" + id, (d) => !d.open);
+      const back = await active();
+      const after = await page.$eval(opener, (b) => b.getAttribute("aria-expanded"));
+      const edge = side === "left" ? geo.left === 0 : geo.right === 0;
+      check(
+        scheme,
+        `sheet-${side}`,
+        a.dialog === id && a.tag === first && geo.modal && edge && expanded === "true" && escaped === 0 && closed && "#" + back.id === opener && after === "false",
+        `focus=${a.tag}${a.id ? "#" + a.id : ""} modal=${geo.modal} edge(${side})=${edge} expanded=${expanded}->${after} trap-escapes=${escaped} esc-closed=${closed} focus-return=#${back.id}`,
+      );
+    });
+  }
+  page.setDefaultTimeout(30000);
+}
+
+// Record whether each page load was a bfcache restore (pageshow.persisted),
+// so the into/away/back checks can say which kind of Back they drove.
+const PAGESHOW_PROBE = () => {
+  window.__gfPageshow = [];
+  window.addEventListener("pageshow", (e) => window.__gfPageshow.push(e.persisted ? "bfcache" : "load"));
+};
+
+async function waitPath(page, want) {
+  await page.waitForFunction((p) => location.pathname === p, want, { timeout: 8000 });
+  await page.waitForLoadState("load");
+}
+
+// PR6 app checks: the mobile sidebar is a Sheet opened from the header
+// button at a 375px viewport; the desktop aside is hidden there.
+async function appSheetChecks(scheme, page) {
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  const before = page.viewportSize();
+  page.setDefaultTimeout(8000);
+  const settle = () => page.waitForTimeout(350);
+  const active = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return { id: a.id, tag: a.tagName, href: a.getAttribute("href") || "", dialog: (a.closest("dialog") || {}).id || "" };
+    });
+  const sheetState = () =>
+    page.evaluate(() => {
+      const d = document.getElementById("mobile-nav");
+      const cur = Array.from(d.querySelectorAll('a[data-nav][aria-current="page"]'));
+      return {
+        path: location.pathname,
+        open: d.open,
+        expanded: document.getElementById("mobile-menu-btn").getAttribute("aria-expanded"),
+        current: cur.length,
+        currentHref: cur[0] ? cur[0].getAttribute("href") : "",
+        shows: (window.__gfPageshow || []).join(","),
+      };
+    });
+  // Open from #mobile-menu-btn with Enter, then trap, Escape, focus return.
+  const roundTrip = async () => {
+    await page.focus("#mobile-menu-btn");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector("#mobile-nav[open]");
+    await settle();
+    const a = await active();
+    const modal = await page.$eval("#mobile-nav", (d) => d.matches(":modal"));
+    const expanded = await page.$eval("#mobile-menu-btn", (b) => b.getAttribute("aria-expanded"));
+    let escaped = 0;
+    for (let i = 0; i < 14; i++) {
+      await page.keyboard.press(i % 3 === 2 ? "Shift+Tab" : "Tab");
+      const x = await active();
+      if (x.dialog !== "mobile-nav" && x.tag !== "BODY") escaped++;
+    }
+    await page.keyboard.press("Escape");
+    await settle();
+    const closed = await page.$eval("#mobile-nav", (d) => !d.open);
+    const back = await active();
+    const after = await page.$eval("#mobile-menu-btn", (b) => b.getAttribute("aria-expanded"));
+    const ok = a.dialog === "mobile-nav" && a.tag === "A" && modal && expanded === "true" && escaped === 0 && closed && back.id === "mobile-menu-btn" && after === "false";
+    return { ok, detail: `open(focus=${a.tag} modal=${modal} expanded=${expanded}->${after} trap-escapes=${escaped} esc-closed=${closed} focus-return=#${back.id})` };
+  };
+  try {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await t("app-mobile-sheet", async () => {
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      const pre = await page.evaluate(() => ({
+        aside: getComputedStyle(document.getElementById("sidebar")).display,
+        overlay: !!document.getElementById("sidebar-overlay"),
+        inline: Array.from(document.scripts).filter((s) => !s.src && !s.type.includes("json")).length,
+        btn: document.getElementById("mobile-menu-btn").getBoundingClientRect().width > 0,
+      }));
+      await page.focus("#mobile-menu-btn");
+      await page.keyboard.press("Enter");
+      await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      const a = await active();
+      const geo = await page.$eval("#mobile-nav", (d) => {
+        const r = d.getBoundingClientRect();
+        return { left: Math.round(r.left), width: Math.round(r.width), modal: d.matches(":modal"), links: d.querySelectorAll("a[data-nav]").length, current: d.querySelectorAll('a[data-nav][aria-current="page"]').length };
+      });
+      const expanded = await page.$eval("#mobile-menu-btn", (b) => b.getAttribute("aria-expanded"));
+      const shot = path.join(EVIDENCE, "ui-a11y", scheme, "mobile-nav-sheet.png");
+      await page.screenshot({ path: shot });
+      fs.chmodSync(shot, 0o644);
+      let escaped = 0;
+      for (let i = 0; i < 14; i++) {
+        await page.keyboard.press(i % 3 === 2 ? "Shift+Tab" : "Tab");
+        const x = await active();
+        if (x.dialog !== "mobile-nav" && x.tag !== "BODY") escaped++;
+      }
+      await page.keyboard.press("Escape");
+      await settle();
+      const closed = await page.$eval("#mobile-nav", (d) => !d.open);
+      const back = await active();
+      const after = await page.$eval("#mobile-menu-btn", (b) => b.getAttribute("aria-expanded"));
+      check(
+        scheme,
+        "app-mobile-sheet",
+        pre.aside === "none" && !pre.overlay && pre.btn && a.dialog === "mobile-nav" && a.tag === "A" && geo.modal && geo.left === 0 && geo.current === 1 &&
+          expanded === "true" && escaped === 0 && closed && back.id === "mobile-menu-btn" && after === "false",
+        `375px aside=${pre.aside} overlay=${pre.overlay} inline-scripts=${pre.inline} focus=${a.tag}[${a.href}] modal=${geo.modal} left=${geo.left} width=${geo.width} links=${geo.links} current=${geo.current} expanded=${expanded}->${after} trap-escapes=${escaped} esc-closed=${closed} focus-return=#${back.id}`,
+      );
+    });
+    // Into/away/back (Oct 9 bar): open the Sheet (into), follow a link
+    // inside it with Enter (away), then Back, Forward, and Back again. The
+    // Sheet must never come back open (bfcache included), aria-expanded must
+    // read false, the current link must follow the route, and the Sheet must
+    // still open with its trap, Escape, and focus return on each page.
+    await t("app-mobile-sheet-link-away-back", async () => {
+      await page.addInitScript(PAGESHOW_PROBE);
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      const steps = [];
+      let ok = true;
+      const expect = (label, s, want) => {
+        const good = s.path === want && !s.open && s.expanded === "false" && s.current === 1 && s.currentHref === want;
+        if (!good) ok = false;
+        steps.push(`${label}:${s.path} open=${s.open} expanded=${s.expanded} current=${s.current}@${s.currentHref}${good ? "" : "!"}`);
+      };
+      // into
+      await page.focus("#mobile-menu-btn");
+      await page.keyboard.press("Enter");
+      await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      // away: Enter on the Projects link inside the Sheet
+      await page.focus('#mobile-nav a[data-nav][href="/projects"]');
+      await Promise.all([waitPath(page, "/projects"), page.keyboard.press("Enter")]);
+      await settle();
+      expect("away", await sheetState(), "/projects");
+      let rt = await roundTrip();
+      if (!rt.ok) ok = false;
+      steps.push(`away-reopen ${rt.detail}${rt.ok ? "" : "!"}`);
+      // back to the page the Sheet was open on
+      await page.goBack({ waitUntil: "load" });
+      await waitPath(page, "/dashboard");
+      await settle();
+      const sb = await sheetState();
+      expect("back", sb, "/dashboard");
+      steps.push(`back-pageshow=${sb.shows}`);
+      rt = await roundTrip();
+      if (!rt.ok) ok = false;
+      steps.push(`back-reopen ${rt.detail}${rt.ok ? "" : "!"}`);
+      // forward, then back once more
+      await page.goForward({ waitUntil: "load" });
+      await waitPath(page, "/projects");
+      await settle();
+      expect("forward", await sheetState(), "/projects");
+      await page.goBack({ waitUntil: "load" });
+      await waitPath(page, "/dashboard");
+      await settle();
+      expect("back2", await sheetState(), "/dashboard");
+      rt = await roundTrip();
+      if (!rt.ok) ok = false;
+      steps.push(`back2-reopen ${rt.detail}${rt.ok ? "" : "!"}`);
+      check(scheme, "app-mobile-sheet-link-away-back", ok, "375px " + steps.join(" "));
+    });
+    // Open, Escape, then leave for another route and come back, both by
+    // Back and by a fresh link from the Sheet, and open again.
+    await t("app-mobile-sheet-escape-away-back", async () => {
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      const steps = [];
+      let ok = true;
+      let rt = await roundTrip();
+      if (!rt.ok) ok = false;
+      steps.push(`dashboard ${rt.detail}${rt.ok ? "" : "!"}`);
+      // away: Containers through the Sheet
+      await page.click("#mobile-menu-btn");
+      await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      await Promise.all([waitPath(page, "/containers"), page.click('#mobile-nav a[data-nav][href="/containers"]')]);
+      await settle();
+      let s = await sheetState();
+      let good = !s.open && s.expanded === "false" && s.currentHref === "/containers" && s.current === 1;
+      if (!good) ok = false;
+      steps.push(`away:${s.path} open=${s.open} current=${s.current}@${s.currentHref}${good ? "" : "!"}`);
+      // back by history
+      await page.goBack({ waitUntil: "load" });
+      await waitPath(page, "/dashboard");
+      await settle();
+      s = await sheetState();
+      good = !s.open && s.expanded === "false" && s.currentHref === "/dashboard" && s.current === 1;
+      if (!good) ok = false;
+      steps.push(`back:${s.path} open=${s.open} current=${s.current}@${s.currentHref} pageshow=${s.shows}${good ? "" : "!"}`);
+      rt = await roundTrip();
+      if (!rt.ok) ok = false;
+      steps.push(`back-reopen ${rt.detail}${rt.ok ? "" : "!"}`);
+      // back by link: Dashboard from the Sheet on another page
+      await page.goto(BASE + "/services", { waitUntil: "load" });
+      await page.click("#mobile-menu-btn");
+      await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      await Promise.all([waitPath(page, "/dashboard"), page.click('#mobile-nav a[data-nav][href="/dashboard"]')]);
+      await settle();
+      s = await sheetState();
+      good = !s.open && s.expanded === "false" && s.currentHref === "/dashboard" && s.current === 1;
+      if (!good) ok = false;
+      steps.push(`link-back:${s.path} open=${s.open} current=${s.current}@${s.currentHref}${good ? "" : "!"}`);
+      rt = await roundTrip();
+      if (!rt.ok) ok = false;
+      steps.push(`link-back-reopen ${rt.detail}${rt.ok ? "" : "!"}`);
+      check(scheme, "app-mobile-sheet-escape-away-back", ok, "375px " + steps.join(" "));
+    });
+    await t("app-mobile-sheet-closes-at-md", async () => {
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      await page.click("#mobile-menu-btn");
+      await page.waitForSelector("#mobile-nav[open]");
+      await page.setViewportSize({ width: 1024, height: 800 });
+      await settle();
+      const s = await page.evaluate(() => ({ open: document.getElementById("mobile-nav").open, aside: getComputedStyle(document.getElementById("sidebar")).display }));
+      check(scheme, "app-mobile-sheet-closes-at-md", !s.open && s.aside === "flex", `open=${s.open} aside=${s.aside}`);
+    });
+  } finally {
+    if (before) await page.setViewportSize(before);
+    page.setDefaultTimeout(30000);
+  }
+}
+
+// One aria-current="page" link in the project NavTabs, on the given path.
+function navTabsState(page) {
+  return page.evaluate(() => {
+    const nav = document.querySelector("nav[data-ui-navtabs]");
+    if (!nav) return null;
+    const links = Array.from(nav.querySelectorAll("a[href]"));
+    const cur = links.filter((a) => a.getAttribute("aria-current") === "page");
+    return {
+      path: location.pathname,
+      label: nav.getAttribute("aria-label"),
+      n: cur.length,
+      href: cur[0] ? cur[0].getAttribute("href").split("?")[0] : "",
+      hrefs: links.map((a) => a.getAttribute("href").split("?")[0]),
+      roles: nav.querySelectorAll("[role=tab],[role=tablist]").length,
+      tabbable: links.filter((a) => a.tabIndex === 0).length,
+      shows: (window.__gfPageshow || []).join(","),
+    };
+  });
+}
+
+// PR6: project detail tabs are server-routed NavTabs with one
+// aria-current="page" per route.
+async function appNavTabsChecks(scheme, page, projectTabs) {
+  if (!projectTabs.length) {
+    check(scheme, "app-navtabs", false, "no project to drive");
+    return;
+  }
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  const short = (p) => p.replace(/^\/projects\/[^/]+/, "") || "/";
+  await t("app-navtabs", async () => {
+    const seen = [];
+    let ok = true;
+    for (const href of projectTabs) {
+      await page.goto(BASE + href, { waitUntil: "load" });
+      const r = await navTabsState(page);
+      const path0 = href.split("?")[0];
+      const good = r && r.n === 1 && r.roles === 0 && r.href === path0;
+      if (!good) ok = false;
+      seen.push(`${short(path0)}:${r ? r.n + "@" + short(r.href) : "none"}`);
+    }
+    check(scheme, "app-navtabs", ok, seen.join(" "));
+  });
+  // Into/away/back (Oct 9 bar). From Overview, move into each other tab
+  // through the NavTabs links (click, then keyboard Enter on a focused
+  // link), leave the project for the sidebar's Projects and Dashboard, and
+  // come back by Back, by Forward, and by the project's link in the list.
+  // Every stop needs exactly one aria-current on the route's own link, all
+  // links still tabbable, and no tab roles.
+  const overview = projectTabs[0].split("?")[0];
+  const steps = [];
+  let ok = true;
+  const expect = async (label, want) => {
+    const r = await navTabsState(page);
+    const good = r && r.path === want && r.n === 1 && r.href === want && r.roles === 0 && r.tabbable === r.hrefs.length && r.hrefs.length === projectTabs.length;
+    if (!good) ok = false;
+    steps.push(`${label}:${r ? short(r.path) + " " + r.n + "@" + short(r.href) + " tabbable=" + r.tabbable + "/" + r.hrefs.length : "none"}${good ? "" : "!"}`);
+    return r;
+  };
+  const tabLink = (p) => `nav[data-ui-navtabs] :is(a[href="${p}"], a[href^="${p}?"])`;
+  await t("app-navtabs-into-away-back", async () => {
+    page.setDefaultTimeout(8000);
+    await page.addInitScript(PAGESHOW_PROBE);
+    await page.goto(BASE + overview, { waitUntil: "load" });
+    await expect("start", overview);
+    // into each tab by click, then back to Overview by keyboard
+    for (const href of projectTabs.slice(1)) {
+      const p = href.split("?")[0];
+      await Promise.all([waitPath(page, p), page.click(tabLink(p))]);
+      await expect("click", p);
+    }
+    await page.focus(tabLink(overview));
+    await Promise.all([waitPath(page, overview), page.keyboard.press("Enter")]);
+    const k = await expect("enter", overview);
+    // keyboard: Tab from the current tab link reaches the next tab link
+    await page.focus(`nav[data-ui-navtabs] a[aria-current="page"]`);
+    await page.keyboard.press("Tab");
+    const next = await page.evaluate(() => (document.activeElement.closest("nav[data-ui-navtabs]") ? document.activeElement.getAttribute("href").split("?")[0] : "out"));
+    const wantNext = k ? k.hrefs[1] : "";
+    if (next !== wantNext) ok = false;
+    steps.push(`tab-key->${short(next)}${next === wantNext ? "" : "!"}`);
+    // last tab, then away through the sidebar
+    const last = projectTabs[projectTabs.length - 1].split("?")[0];
+    await Promise.all([waitPath(page, last), page.click(tabLink(last))]);
+    await expect("into-last", last);
+    await Promise.all([waitPath(page, "/projects"), page.click('#sidebar a[data-nav][href="/projects"]')]);
+    steps.push("away:/projects");
+    // back by history lands on the last tab, not a stale Overview
+    await page.goBack({ waitUntil: "load" });
+    await waitPath(page, last);
+    const b = await expect("back", last);
+    if (b) steps.push(`back-pageshow=${b.shows}`);
+    await page.goForward({ waitUntil: "load" });
+    await waitPath(page, "/projects");
+    steps.push("forward:/projects");
+    // back by link: the project's entry in the list opens Overview
+    await Promise.all([waitPath(page, overview), page.locator(`main :is(a[href="${overview}"], a[href^="${overview}?"])`).first().click()]);
+    await expect("link-back", overview);
+    // switch tabs, leave for Dashboard, Back twice through the history
+    const mid = projectTabs[1].split("?")[0];
+    await Promise.all([waitPath(page, mid), page.click(tabLink(mid))]);
+    await expect("into-mid", mid);
+    await Promise.all([waitPath(page, "/dashboard"), page.click('#sidebar a[data-nav][href="/dashboard"]')]);
+    steps.push("away:/dashboard");
+    await page.goBack({ waitUntil: "load" });
+    await waitPath(page, mid);
+    await expect("back", mid);
+    await page.goBack({ waitUntil: "load" });
+    await waitPath(page, overview);
+    await expect("back2", overview);
+    check(scheme, "app-navtabs-into-away-back", ok, steps.join(" "));
+  });
+  page.setDefaultTimeout(30000);
+}
+
 // Sign in by posting the real login form from the browser context, so the
 // session cookie lands in the context's jar. drive-register stores the
 // password with a trailing newline (curl --data-urlencode @file sends it
@@ -903,12 +1339,15 @@ async function main() {
       await galleryChecks(browser, scheme, page);
       await dialogChecks(scheme, page);
       await overlayChecks(scheme, page);
+      await tabsTableSheetChecks(scheme, page);
       if (!custom) {
         if (canLogin && (await login(page))) {
           lines.push(`login ${scheme} pass`);
           await appDialogChecks(scheme, page);
           const projectTabs = await projectRoutes(page);
           await appEnvMenuChecks(scheme, page, projectTabs[0]);
+          await appNavTabsChecks(scheme, page, projectTabs);
+          await appSheetChecks(scheme, page);
           const routes = AUTH_ROUTES.concat(projectTabs);
           for (const route of routes) results.push(await scan(page, scheme, route));
         } else {

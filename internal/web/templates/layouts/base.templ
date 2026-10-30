@@ -53,20 +53,15 @@ templ AuthLayout(title, csrfToken string) {
 templ AppLayout(title, csrfToken string) {
 	@Base(title, csrfToken) {
 		<div class="min-h-screen flex flex-col md:flex-row bg-gray-50/50 relative dark:bg-gray-950">
-			<!-- Mobile Header -->
+			<!-- Mobile header: the menu button opens the navigation Sheet (components.MobileNav). -->
 			<div class="md:hidden flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-gray-200/60 px-4 py-3 shadow-sm z-30 sticky top-0 dark:bg-gray-900/95 dark:border-gray-800/60">
-				<button id="mobile-menu-btn" aria-label="Open sidebar menu" aria-expanded="false" class="text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg focus:outline-none p-2 transition-colors duration-200 -ml-2 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800">
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonIcon, Label: "Open navigation menu", Class: "-ml-2", Attrs: ui.Attrs(ui.OpenSheetAttrs(components.MobileNavID), templ.Attributes{"id": "mobile-menu-btn"})}) {
 					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-				</button>
+				}
 				<span class="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100">GoForge</span>
 				<div class="w-10"></div> <!-- Placeholder to balance flex (width matches button) -->
 			</div>
-
-			<!-- Overlay -->
-			<div id="sidebar-overlay" aria-hidden="true" class="fixed inset-0 bg-gray-900/40 dark:bg-black/60 backdrop-blur-sm z-30 hidden transition-opacity duration-300 opacity-0 md:hidden"></div>
-
 			@components.Sidebar(csrfToken)
-
 			<!-- Main content -->
 			<main class="flex-1 overflow-auto">
 				<div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -74,35 +69,6 @@ templ AppLayout(title, csrfToken string) {
 				</div>
 			</main>
 		</div>
-
-		<script>
-			document.addEventListener("DOMContentLoaded", function() {
-				const sidebar = document.getElementById('sidebar');
-				const menuBtn = document.getElementById('mobile-menu-btn');
-				const overlay = document.getElementById('sidebar-overlay');
-
-				function toggleSidebar() {
-					if (sidebar.classList.contains('-translate-x-full')) {
-						// Open
-						sidebar.classList.remove('-translate-x-full');
-						overlay.classList.remove('hidden');
-						menuBtn.setAttribute('aria-expanded', 'true');
-						// small delay to allow display:block to apply before opacity transition
-						setTimeout(() => overlay.classList.remove('opacity-0'), 10);
-					} else {
-						// Close
-						sidebar.classList.add('-translate-x-full');
-						overlay.classList.add('opacity-0');
-						menuBtn.setAttribute('aria-expanded', 'false');
-						setTimeout(() => overlay.classList.add('hidden'), 300);
-					}
-				}
-
-				if (menuBtn && sidebar && overlay) {
-					menuBtn.addEventListener('click', toggleSidebar);
-					overlay.addEventListener('click', toggleSidebar);
-				}
-			});
-		</script>
+		@components.MobileNav(csrfToken)
 	}
 }

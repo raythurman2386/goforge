@@ -1,0 +1,144 @@
+package devui
+
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
+// Path A PR6 gallery entries: NavTabs, Tabs, Table, and Sheet. The
+// ui-a11y drive uses the ids here for the Tabs keys and the Sheet trap.
+
+var demoTableRows = []struct{ name, image, status string }{
+	{"web", "ghcr.io/example/web:2026.10.30-a1b2c3d", "Running"},
+	{"worker", "ghcr.io/example/worker:2026.10.30-a1b2c3d", "Stopped"},
+}
+
+templ navTabsSection() {
+	<p class="text-sm text-muted-foreground">Server-routed: each tab is a link to its own URL and the current one has aria-current="page". No tablist role, no JS. Project detail uses it.</p>
+	@ui.NavTabs(ui.NavTabsProps{Label: "Gallery sections", Class: "mt-4", Attrs: templ.Attributes{"id": "gallery-navtabs"}}) {
+		@ui.NavTab(ui.NavTabProps{Href: "#navtabs", Current: true}) {
+			Overview
+		}
+		@ui.NavTab(ui.NavTabProps{Href: "#tabs"}) {
+			Deployments
+		}
+		@ui.NavTab(ui.NavTabProps{Href: "#tables"}) {
+			Services
+			@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Variant: ui.BadgeSubtle, Class: "ml-2 px-1.5"}) {
+				2
+			}
+		}
+		@ui.NavTab(ui.NavTabProps{Href: "#sheets"}) {
+			Settings
+		}
+	}
+}
+
+templ tabsSection() {
+	<p class="text-sm text-muted-foreground">In-page tabs: Left and Right move and wrap, Home and End jump, and focus selects (automatic activation). Only the selected tab is in the Tab order.</p>
+	@ui.Tabs(ui.TabsProps{ID: "gallery-tabs", Class: "mt-4"}) {
+		@ui.TabList(ui.TabsProps{ID: "gallery-tabs", Label: "Log source"}) {
+			@ui.Tab(ui.TabProps{TabsID: "gallery-tabs", Key: "build", Selected: true}) {
+				Build
+			}
+			@ui.Tab(ui.TabProps{TabsID: "gallery-tabs", Key: "runtime"}) {
+				Runtime
+			}
+			@ui.Tab(ui.TabProps{TabsID: "gallery-tabs", Key: "events"}) {
+				Events
+			}
+		}
+		@ui.TabPanel(ui.TabPanelProps{TabsID: "gallery-tabs", Key: "build", Selected: true}) {
+			<p class="text-sm">Build log panel.</p>
+		}
+		@ui.TabPanel(ui.TabPanelProps{TabsID: "gallery-tabs", Key: "runtime"}) {
+			<p class="text-sm">Runtime log panel.</p>
+		}
+		@ui.TabPanel(ui.TabPanelProps{TabsID: "gallery-tabs", Key: "events"}) {
+			<p class="text-sm">Events panel with a <a href="#tabs" class="ui-focus-ring rounded-ui font-medium text-primary-700 underline dark:text-primary-300">link</a>.</p>
+		}
+	}
+}
+
+templ tablesSection() {
+	<p class="text-sm text-muted-foreground">Table, THead, TBody, TR, TH (scope), TD, a caption (sr-only by default, visible here), and a focusable, labelled horizontal scroll region.</p>
+	@ui.Table(ui.TableProps{ID: "gallery-table", Caption: "Example containers", CaptionVisible: true, WrapperClass: "mt-4"}) {
+		@ui.THead(nil) {
+			@ui.TR(nil) {
+				@ui.TH(ui.CellProps{}) { Name }
+				@ui.TH(ui.CellProps{}) { Image }
+				@ui.TH(ui.CellProps{}) { Status }
+				@ui.TH(ui.CellProps{Align: ui.CellEnd}) {
+					@ui.VisuallyHidden(nil) {
+						Actions
+					}
+				}
+			}
+		}
+		@ui.TBody(nil) {
+			for _, r := range demoTableRows {
+				@ui.TR(nil) {
+					@ui.TH(ui.CellProps{Scope: "row"}) { { r.name } }
+					@ui.TD(ui.CellProps{Class: "whitespace-nowrap font-mono text-xs"}) { { r.image } }
+					@ui.TD(ui.CellProps{}) { { r.status } }
+					@ui.TD(ui.CellProps{Align: ui.CellEnd}) {
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonLink, Size: ui.ButtonInline, Href: "#tables", Attrs: templ.Attributes{"aria-label": "View " + r.name}}) {
+							View
+						}
+					}
+				}
+			}
+		}
+	}
+	@ui.Table(ui.TableProps{ID: "gallery-table-empty", Caption: "Empty table", CaptionVisible: true, WrapperClass: "mt-6"}) {
+		@ui.THead(nil) {
+			@ui.TR(nil) {
+				@ui.TH(ui.CellProps{}) { Name }
+				@ui.TH(ui.CellProps{}) { Status }
+			}
+		}
+		@ui.TBody(nil) {
+			@ui.TableEmpty(2) {
+				<p class="py-4 text-center text-sm text-muted-foreground">No rows yet.</p>
+			}
+		}
+	}
+	@ui.Table(ui.TableProps{ID: "gallery-table-compact", Caption: "Compact table", CaptionVisible: true, Compact: true, WrapperClass: "mt-6"}) {
+		<thead>
+			@ui.TR(nil) {
+				@ui.TH(ui.CellProps{Compact: true}) { Run key }
+				@ui.TH(ui.CellProps{Compact: true}) { Size }
+			}
+		</thead>
+		<tbody>
+			@ui.TR(templ.Attributes{"class": "border-t border-gray-100 dark:border-gray-800"}) {
+				@ui.TD(ui.CellProps{Compact: true, Class: "font-mono"}) { 20261030T120000Z }
+				@ui.TD(ui.CellProps{Compact: true}) { 12.4 MB }
+			}
+		</tbody>
+	}
+}
+
+templ sheetsSection() {
+	<p class="text-sm text-muted-foreground">A Sheet is a static Dialog pinned to an edge: the focus trap, Escape, backdrop click, and focus return come from the same runtime. It slides in unless reduced motion is on. The app's mobile navigation is a left Sheet.</p>
+	<div class="mt-4 flex flex-wrap gap-3">
+		@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: ui.Attrs(ui.OpenSheetAttrs("gallery-sheet-left"), templ.Attributes{"id": "gallery-sheet-left-open"})}) {
+			Open left sheet
+		}
+		@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: ui.Attrs(ui.OpenSheetAttrs("gallery-sheet-right"), templ.Attributes{"id": "gallery-sheet-right-open"})}) {
+			Open right sheet
+		}
+	</div>
+	@ui.Sheet(ui.SheetProps{ID: "gallery-sheet-left", Title: "Navigation", Side: ui.SheetLeft}) {
+		<nav aria-label="Sheet demo" class="space-y-1 p-4">
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">First link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">Second link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">Third link</a>
+		</nav>
+	}
+	@ui.Sheet(ui.SheetProps{ID: "gallery-sheet-right", Title: "Filters", Description: "A right sheet with a form field.", Side: ui.SheetRight}) {
+		<div class="space-y-4 p-6">
+			@ui.Input(ui.InputProps{ID: "gallery-sheet-query", Name: "q", Label: "Search"})
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
+				Apply
+			}
+		</div>
+	}
+}

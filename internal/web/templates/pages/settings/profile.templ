@@ -407,34 +407,32 @@ templ BackupRestorePoints(v *backup.RestorePointsView) {
 			{ fmt.Sprintf("No complete backups in %s/%s yet.", v.Bucket, v.Prefix) }
 		</p>
 	} else {
-		<div class="mt-2 overflow-x-auto">
-			<table class="min-w-full text-xs" data-testid="restore-points">
-				<thead>
-					<tr class="text-left text-gray-500 dark:text-gray-400">
-						<th class="py-1 pr-3 font-medium">Run key</th>
-						<th class="py-1 pr-3 font-medium">Taken</th>
-						<th class="py-1 pr-3 font-medium">Trigger</th>
-						<th class="py-1 pr-3 font-medium">Size</th>
-						<th class="py-1 font-medium">Skipped</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, p := range v.Points {
-						<tr class="border-t border-gray-100 text-gray-700 dark:border-gray-800 dark:text-gray-300" data-testid="restore-point">
-							<td class="py-1 pr-3 font-mono">{ p.RunKey }</td>
-							if p.Manifest == nil {
-								<td class="py-1 text-red-700 dark:text-red-300" colspan="4">{ p.Problem }</td>
-							} else {
-								<td class="py-1 pr-3">{ restorePointTime(v, p.Manifest.StartedAt) }</td>
-								<td class="py-1 pr-3">{ p.Manifest.Trigger }</td>
-								<td class="py-1 pr-3">{ humanBytes(p.Manifest.TotalBytes()) }</td>
-								<td class="py-1">{ fmt.Sprint(len(p.Manifest.Skipped)) }</td>
-							}
-						</tr>
+		@ui.Table(ui.TableProps{Caption: "Restore points", Compact: true, WrapperClass: "mt-2", Attrs: templ.Attributes{"data-testid": "restore-points"}}) {
+			<thead>
+				@ui.TR(templ.Attributes{"class": "text-gray-500 dark:text-gray-400"}) {
+					@ui.TH(ui.CellProps{Compact: true}) { Run key }
+					@ui.TH(ui.CellProps{Compact: true}) { Taken }
+					@ui.TH(ui.CellProps{Compact: true}) { Trigger }
+					@ui.TH(ui.CellProps{Compact: true}) { Size }
+					@ui.TH(ui.CellProps{Compact: true}) { Skipped }
+				}
+			</thead>
+			<tbody>
+				for _, p := range v.Points {
+					@ui.TR(templ.Attributes{"class": "border-t border-gray-100 text-gray-700 dark:border-gray-800 dark:text-gray-300", "data-testid": "restore-point"}) {
+						@ui.TD(ui.CellProps{Compact: true, Class: "font-mono"}) { { p.RunKey } }
+						if p.Manifest == nil {
+							@ui.TD(ui.CellProps{Compact: true, Colspan: 4, Class: "text-red-700 dark:text-red-300"}) { { p.Problem } }
+						} else {
+							@ui.TD(ui.CellProps{Compact: true}) { { restorePointTime(v, p.Manifest.StartedAt) } }
+							@ui.TD(ui.CellProps{Compact: true}) { { p.Manifest.Trigger } }
+							@ui.TD(ui.CellProps{Compact: true}) { { humanBytes(p.Manifest.TotalBytes()) } }
+							@ui.TD(ui.CellProps{Compact: true}) { { fmt.Sprint(len(p.Manifest.Skipped)) } }
+						}
 					}
-				</tbody>
-			</table>
-		</div>
+				}
+			</tbody>
+		}
 		if v.Incomplete > 0 {
 			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d incomplete run(s) without a manifest are not listed.", v.Incomplete) }</p>
 		}

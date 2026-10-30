@@ -1,0 +1,67 @@
+package ui
+
+// Table is a <table> with its caption inside a focusable horizontal scroll
+// region (see TableProps). Compose it with THead, TBody, TR, TH, TD, and
+// TableEmpty. A <colgroup> may go first in the children.
+templ Table(p TableProps) {
+	@table(resolveTable(p)) {
+		{ children... }
+	}
+}
+
+templ table(p TableProps) {
+	<div { wrapAttrs(p)... }>
+		<table { tableAttrs(p)... }>
+			<caption id={ TableCaptionID(p.ID) } class={ tableCaptionClass(p.CaptionVisible) }>{ p.Caption }</caption>
+			{ children... }
+		</table>
+	</div>
+}
+
+// THead is the header row group.
+templ THead(attrs templ.Attributes) {
+	<thead { Attrs(templ.Attributes{"class": theadClass()}, attrs)... }>
+		{ children... }
+	</thead>
+}
+
+// TBody is the body row group. Pass hx-* attrs to load or swap rows; a row
+// fragment the server returns renders TR and TD (or TableEmpty) on its own.
+templ TBody(attrs templ.Attributes) {
+	<tbody { Attrs(templ.Attributes{"class": tbodyClass()}, attrs)... }>
+		{ children... }
+	</tbody>
+}
+
+// TR is a table row.
+templ TR(attrs templ.Attributes) {
+	<tr { Attrs(attrs)... }>
+		{ children... }
+	</tr>
+}
+
+// TH is a header cell with a scope (default "col"). A column without
+// visible text (actions) still needs a name: put VisuallyHidden text in it.
+templ TH(p CellProps) {
+	<th { thAttrs(p)... }>
+		{ children... }
+	</th>
+}
+
+// TD is a data cell.
+templ TD(p CellProps) {
+	<td { tdAttrs(p)... }>
+		{ children... }
+	</td>
+}
+
+// TableEmpty is the one row a body shows when it has no data rows (or
+// while it loads): a single cell spanning colspan columns, holding an
+// EmptyState or LoadingState.
+templ TableEmpty(colspan int) {
+	<tr data-ui-table-empty>
+		<td { tableEmptyAttrs(colspan)... }>
+			{ children... }
+		</td>
+	</tr>
+}
