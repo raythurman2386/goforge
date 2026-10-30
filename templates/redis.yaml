@@ -29,19 +29,26 @@ docker:
     - container: 6379
       protocol: tcp
   # The official redis image ignores REDIS_PASSWORD, so the command writes
-  # it into a config file and starts redis-server with that file. The
-  # password stays out of the command line (docker inspect, ps on the host);
-  # it is read from the environment inside the container. The file is
-  # mode 600 under /tmp in the container, not in the data volume.
-  # The file is recreated on every start (restart, stop/start, daemon
-  # reboot). Keep the rm -f: /tmp is sticky and fs.protected_regular=1 makes
+  # the password into the ACL file /data/users.acl as the default user's
+  # SHA-256 hash (no requirepass) and starts redis-server with a conf file
+  # that loads it. The password stays out of the command line (docker
+  # inspect, ps on the host) and is never written in plain text; it is read
+  # from the environment inside the container.
+  # Both files are recreated on every start (restart, stop/start, daemon
+  # reboot). The default user line is always rewritten from REDIS_PASSWORD;
+  # every other line (per-app users from scripts/shared-data/redis-tenant.sh,
+  # saved with ACL SAVE) is kept. On redis 7.4, loading an ACL file resets
+  # requirepass, so the default user's password must live in the ACL file.
+  # The conf file is mode 600 under /tmp in the container, not in the data
+  # volume. Keep the rm -f: /tmp is sticky and fs.protected_regular=1 makes
   # root's ">" into the old redis-owned file fail with Permission denied.
+  # The ACL file is written to /data/.users.acl.next (/data is not sticky)
+  # and renamed into place, so a failed write never leaves a half-written
+  # users.acl.
   # docker-entrypoint.sh still drops to the redis user.
   # Redis here is for sessions and queues, not a cache: AOF is on
   # (appendfsync everysec, files under /data/appendonlydir) and a full
   # instance refuses writes (noeviction) instead of dropping keys.
-  # Do not add aclfile next to requirepass: loading an ACL file resets the
-  # default user to nopass (checked on redis 7.4), which turns auth off.
   command:
     - sh
     - -c
@@ -52,15 +59,27 @@ docker:
         exit 1
       fi
       umask 077
+      hash=$(printf '%s' "$REDIS_PASSWORD" | sha256sum | cut -d' ' -f1)
+      case "$hash" in
+        *[!0-9a-f]* | '') hash= ;;
+      esac
+      if [ "${#hash}" -ne 64 ]; then
+        echo "goforge: could not hash REDIS_PASSWORD, refusing to start" >&2
+        exit 1
+      fi
+      acl=/data/users.acl
+      next=/data/.users.acl.next
+      rm -f "$next"
+      {
+        printf 'user default on #%s ~* &* +@all\n' "$hash"
+        if [ -f "$acl" ]; then grep -v '^user default ' "$acl" || [ $? -eq 1 ]; fi
+      } > "$next"
       conf=/tmp/goforge-redis.conf
       rm -f "$conf"
-      escaped=$(printf '%s' "$REDIS_PASSWORD" | sed 's/[\\"]/\\&/g')
-      {
-        printf 'requirepass "%s"\n' "$escaped"
-        printf '%s\n' 'dir /data' 'appendonly yes' 'appendfsync everysec' \
-          'maxmemory 256mb' 'maxmemory-policy noeviction'
-      } > "$conf"
-      if [ "$(id -u)" = 0 ]; then chown redis "$conf"; fi
+      printf '%s\n' "aclfile $acl" 'dir /data' 'appendonly yes' 'appendfsync everysec' \
+        'maxmemory 256mb' 'maxmemory-policy noeviction' > "$conf"
+      if [ "$(id -u)" = 0 ]; then chown redis "$next" "$conf"; fi
+      mv -f "$next" "$acl"
       exec docker-entrypoint.sh redis-server "$conf"
   environment:
     REDIS_PASSWORD: "{{ .Config.password }}"

@@ -120,7 +120,7 @@ Tests that need a real Docker daemon or external binaries carry the `//go:build 
 |------|---------|-------|
 | `TestGiteaPostStartBootstrap` | `internal/services` | Docker |
 | `TestGiteaSSHPublish` | `internal/services` | Docker, `ss` |
-| `TestDataServices_AuthAndLabels` | `internal/services` | Docker (set `GOFORGE_IT_DOCKER` to change the `docker` command the `pg-tenant.sh` subtest uses) |
+| `TestDataServices_AuthAndLabels` | `internal/services` | Docker (set `GOFORGE_IT_DOCKER` to change the `docker` command the `pg-tenant.sh` and `redis-tenant.sh` subtests use) |
 | `TestIntegration_RunAgainstMinIO` | `internal/backup` | Docker, `pg_restore`, `sqlite3`, and a GoForge test database in `DATABASE_URL` |
 
 ```bash
