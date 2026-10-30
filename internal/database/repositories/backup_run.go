@@ -17,6 +17,10 @@ import (
 // works as long as nothing else in GoForge uses it.
 const backupLockKey int64 = 0x60f02eb4c0
 
+// BackupLockKey is backupLockKey for `goforge backup restore`, which takes
+// the same lock on its own connection so a backup cannot start mid-restore.
+const BackupLockKey = backupLockKey
+
 // BackupRunRepository stores backup_runs rows.
 type BackupRunRepository struct {
 	db *sql.DB

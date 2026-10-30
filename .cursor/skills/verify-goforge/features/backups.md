@@ -56,7 +56,7 @@ verify.sh drive-register && verify.sh drive-login && verify.sh drive-backup-sett
 
 With registration open, `register-closed`, `register-closed-post`, and `register-admin-role` in `register-verdict.txt` read `fail`. That is expected there.
 
-The run smoke is the integration test, which starts its own throwaway containers (names `gfbk-it-*`): MinIO (`cgr.dev/chainguard/minio`), `postgres:17-alpine`, `gitea/gitea:1.25.5`, `vaultwarden/server:latest`, and volumes for each. It removes them when it ends.
+The run smoke is the integration test, which starts its own throwaway containers (names `gfbk-it-*`): MinIO (`cgr.dev/chainguard/minio`), `postgres:17-alpine`, `gitea/gitea:1.25.5`, `vaultwarden/server:latest`, and volumes for each. It removes them when it ends. The restore test (`TestIntegration_Restore`, names `gfrs-it-*`) also uses `postgres:15-alpine`; see [backup-restore](./backup-restore.md).
 
 Preconditions:
 

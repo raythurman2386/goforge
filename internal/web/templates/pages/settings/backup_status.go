@@ -149,3 +149,20 @@ func secretPlaceholder(f *backup.SettingsView) string {
 	}
 	return ""
 }
+
+// restorePointTime shows a run's start in the schedule's zone, like the
+// rest of the card.
+func restorePointTime(v *backup.RestorePointsView, t time.Time) string {
+	return backupTime(&backup.Status{Schedule: v.Schedule}, t)
+}
+
+// restoreCommand is the CLI restore runbook for the newest point.
+func restoreCommand(v *backup.RestorePointsView) string {
+	key := "<run key>"
+	if len(v.Points) > 0 {
+		key = v.Points[0].RunKey
+	}
+	return "docker compose stop goforge\n" +
+		"docker compose run --rm --no-deps goforge ./goforge backup restore " + key + "\n" +
+		"docker compose start goforge"
+}

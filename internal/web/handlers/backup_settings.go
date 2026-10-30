@@ -181,3 +181,37 @@ func (h *SettingsHandler) TestBackupConnection(w http.ResponseWriter, r *http.Re
 		h.logger.Error("failed to render toast", "error", err)
 	}
 }
+
+// RestorePointLister lists restore points (backup.RestorePointLister).
+type RestorePointLister interface {
+	List(ctx context.Context) *backup.RestorePointsView
+}
+
+// WithRestorePoints enables GET /settings/backups/restore-points, the
+// read-only Restore points list on the Backups card.
+func (h *SettingsHandler) WithRestorePoints(l RestorePointLister) *SettingsHandler {
+	h.restorePoints = l
+	return h
+}
+
+// RestorePoints renders the read-only Restore points list (admin only). The
+// card loads it after the page so a slow bucket never delays the page.
+// Restoring is CLI-only; the list shows the command to run.
+func (h *SettingsHandler) RestorePoints(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	if h.restorePoints == nil {
+		RenderError(w, r, http.StatusNotFound, "Restore points are not available")
+		return
+	}
+	v := h.restorePoints.List(r.Context())
+	if v.Error != "" {
+		h.logger.Warn("failed to list restore points", "error", v.Error)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := settings.BackupRestorePoints(v).Render(r.Context(), w); err != nil {
+		h.logger.Error("failed to render restore points", "error", err)
+	}
+}

@@ -220,6 +220,7 @@ func Router(
 						r.Post("/prune", settingsHandler.PruneSystem)
 						r.Put("/backups", settingsHandler.UpdateBackupSettings)
 						r.Post("/backups/test", settingsHandler.TestBackupConnection)
+						r.Get("/backups/restore-points", settingsHandler.RestorePoints)
 						r.Route("/tokens", func(r chi.Router) {
 							r.Get("/", settingsHandler.ListAPITokens)
 							r.Get("/new", settingsHandler.NewAPITokenModal)

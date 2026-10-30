@@ -7,7 +7,7 @@ This page documents the complete directory layout of the GoForge codebase.
 ```
 goforge/
 ├── cmd/goforge/           # Application entry point
-│   └── main.go            # CLI setup (serve, migrate, backup run)
+│   └── main.go            # CLI setup (serve, migrate, backup run|list|restore)
 ├── cmd/goforge-mcp/       # MCP stdio fallback (the server also serves /mcp)
 │   └── main.go            # Calls /api/v1 over HTTPS with a scoped token
 ├── internal/              # Private application packages
@@ -51,7 +51,7 @@ The application entry point using Cobra for CLI structure.
 
 | File | Purpose |
 |------|---------|
-| `main.go` | Root command, `serve` subcommand (HTTP server and nightly backup scheduler), `migrate` subcommands (up, down, status, create), `backup run` (one backup now, `trigger=manual`) |
+| `main.go` | Root command, `serve` subcommand (HTTP server and nightly backup scheduler), `migrate` subcommands (up, down, status, create), `backup run` (one backup now, `trigger=manual`); `backup list` and `backup restore` are in `backup_restore.go` |
 
 ### `cmd/goforge-mcp/`
 

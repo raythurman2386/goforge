@@ -1,6 +1,6 @@
 # Backup & Restore
 
-GoForge can upload a backup every night to S3-compatible storage: Cloudflare R2, Backblaze B2, MinIO, or AWS S3. It is backup only. Restoring is a manual runbook, below.
+GoForge can upload a backup every night to S3-compatible storage: Cloudflare R2, Backblaze B2, MinIO, or AWS S3. `goforge backup restore` puts the GoForge database back from a run. Service data (Postgres services, Gitea, Vaultwarden) is still restored by hand, below.
 
 ## Turn it on
 
@@ -113,23 +113,64 @@ It prints the result and exits non-zero when the run failed. It does not run mig
 
 ## Restore
 
-GoForge has no restore command. These are manual steps. Check each object's SHA-256 against `manifest.json` first.
-
-### Download a run
+### List restore points
 
 ```bash
-# Any S3 client works. With the AWS CLI against R2:
-aws s3 cp --recursive --endpoint-url "$BACKUP_S3_ENDPOINT" \
-  "s3://$BACKUP_S3_BUCKET/goforge/2026-10-29/20261029T070000Z/" ./restore/
+docker compose exec goforge ./goforge backup list
 ```
+
+It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run. There is no restore button in the web UI, the API, or MCP.
 
 ### GoForge database
 
+`goforge backup restore <run key>` restores `app/goforge-db.dump` and nothing else. It never reads a run's `services/...` objects and never touches a service container.
+
 ```bash
 docker compose stop goforge
-docker compose exec -T db pg_restore -U goforge -d goforge --clean --if-exists < restore/app/goforge-db.dump
-# Put the original ENCRYPTION_KEY in .env before starting.
+# Dry run: prints the plan and the preflight checks, changes nothing
+docker compose run --rm --no-deps goforge ./goforge backup restore 2026-10-29/20261029T070000Z
+# Restore: type the run key when asked (or pass --confirm=<run key> with no TTY)
+docker compose run --rm --no-deps goforge ./goforge backup restore 2026-10-29/20261029T070000Z --yes
 docker compose start goforge
+```
+
+It uses the same bucket settings as `goforge backup run` (the saved settings, else `BACKUP_*`), and the same `DATABASE_URL`. The steps:
+
+1. Read `manifest.json`. It refuses a run with no manifest, a manifest newer than this binary understands, or one with no `app/goforge-db.dump`.
+2. Take the backup advisory lock (refuses while a backup runs) and check that nothing else is connected to the GoForge database. If something is, it refuses with `stop GoForge first: docker compose stop goforge`.
+3. Download the dump to a private temp file and check its size and SHA-256 against the manifest. A mismatch refuses.
+4. Create a side database `<db>_restore_<run id>` and load the dump into it: `pg_restore -f -` (PostgreSQL 17 client) piped into `psql` with `ON_ERROR_STOP` in one transaction. The `SET transaction_timeout` line that pg_dump 17 writes is dropped so the load also works on the PostgreSQL 15 server the compose file ships. A broken dump fails here and the live database is untouched.
+5. Check the side database: its `schema_migrations` must not be newer or dirty for this binary (a newer schema refuses: upgrade GoForge first). Delete every session (everyone signs in again; API tokens stay as they were in the backup) and write an audit row `backup.restore` with the run key only.
+6. In one transaction, rename the current database to `<db>_pre_restore_<UTC time>` and the side database to `<db>`. The previous database is **kept** and never dropped automatically.
+
+On the next start, `goforge serve` runs any newer migrations. The restored database keeps the backup settings row from the dump; if its bucket or prefix differ from the ones you restored from, the restore prints a warning.
+
+No password, key, or `DATABASE_URL` goes on a command line or into the output: the clients get the connection from the environment.
+
+After a restore:
+
+- `ENCRYPTION_KEY` must be the one in use when the backup was taken, or saved env vars, service secrets, and backup keys do not decrypt.
+- Service records match the backup. Services created later are not listed; removed ones show as missing. Their containers and data were not touched.
+- To undo, with GoForge stopped, rename the databases back. The command prints the exact SQL, for example:
+
+```sql
+ALTER DATABASE goforge RENAME TO goforge_undone;
+ALTER DATABASE goforge_pre_restore_20261030t172858z RENAME TO goforge;
+```
+
+- When you no longer need it: `DROP DATABASE goforge_pre_restore_...;`
+
+!!! warning "Do not use `pg_restore` from the db container"
+    Older versions of this page said `docker compose exec -T db pg_restore ...`. That fails: the `db` container is PostgreSQL 15, and its `pg_restore` cannot read a dump made by the PostgreSQL 17 `pg_dump` in the GoForge image (`unsupported version (1.16) in file header`). It also restored over the live database in place. Use `goforge backup restore`.
+
+### Download a run by hand
+
+For service data, download the run with any S3 client and check each object's SHA-256 against `manifest.json` first:
+
+```bash
+# With the AWS CLI against R2:
+aws s3 cp --recursive --endpoint-url "$BACKUP_S3_ENDPOINT" \
+  "s3://$BACKUP_S3_BUCKET/goforge/2026-10-29/20261029T070000Z/services/" ./restore/services/
 ```
 
 ### A Postgres service
@@ -161,11 +202,11 @@ docker run --rm --volumes-from "$ctr" -v "$PWD/restore/services/<id>:/r" alpine 
 
 Start the service and check it. For Gitea, run `git fsck` in the restored repositories and, if search looks wrong, rebuild the indexes from the admin panel (they are not backed up).
 
-These restore steps were written from the formats, not drilled against a live instance yet.
+The service restore steps above were written from the formats, not drilled against a live instance yet. `goforge backup restore` is covered by an integration test against PostgreSQL 15 and 17.
 
 ## Smoke test with throwaway MinIO
 
-The integration test in `internal/backup` starts MinIO, Postgres, Gitea, and Vaultwarden in throwaway containers, runs a real backup, and checks every object. See `.cursor/skills/verify-goforge/features/backups.md`. `docker.io/minio/minio` did not pull on our host in October 2026, so the test uses `cgr.dev/chainguard/minio`.
+The integration test in `internal/backup` starts MinIO, Postgres, Gitea, and Vaultwarden in throwaway containers, runs a real backup, and checks every object. A second test (`TestIntegration_Restore`) backs up into MinIO and restores into throwaway `postgres:15-alpine` and `postgres:17-alpine` servers, including every refusal. See `.cursor/skills/verify-goforge/features/backups.md`. `docker.io/minio/minio` did not pull on our host in October 2026, so the test uses `cgr.dev/chainguard/minio`.
 
 To try `goforge backup run` against a local MinIO:
 

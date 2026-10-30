@@ -128,6 +128,29 @@ func MigrateUp(db *DB, cfg *config.Config) error {
 	return migrator.Up()
 }
 
+// LatestMigrationVersion is the newest migration this binary ships. A
+// database whose schema_migrations version is above it was written by a
+// newer GoForge.
+func LatestMigrationVersion() (uint, error) {
+	src, err := iofs.New(postgresFS, "migrations/postgres")
+	if err != nil {
+		return 0, fmt.Errorf("failed to read migrations: %w", err)
+	}
+	defer src.Close()
+	v, err := src.First()
+	if err != nil {
+		return 0, fmt.Errorf("failed to read migrations: %w", err)
+	}
+	for {
+		next, err := src.Next(v)
+		if err != nil {
+			// fs.ErrNotExist (wrapped as *fs.PathError) marks the last one.
+			return v, nil
+		}
+		v = next
+	}
+}
+
 // Close closes the migration resources.
 func (m *Migrator) Close() error {
 	sourceErr, dbErr := m.migrate.Close()

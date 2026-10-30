@@ -423,7 +423,11 @@ func runServer() error {
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments"))
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services"))
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
-	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithAudit(auditService).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).
+		WithRestorePoints(&backup.RestorePointLister{
+			Current:  backupManager.Current,
+			Redactor: func(extra ...config.BackupConfig) *backup.Redactor { return backup.RedactorFor(cfg, extra...) },
+		}).WithAudit(auditService).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))

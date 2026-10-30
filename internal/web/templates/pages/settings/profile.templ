@@ -341,10 +341,70 @@ templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string)
 				{ backupScheduleLine(st) }
 			</p>
 		}
+		<div
+			id="backup-restore-points"
+			class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700"
+			data-testid="backup-restore-points"
+			hx-get="/settings/backups/restore-points"
+			hx-trigger="load"
+			hx-swap="innerHTML"
+		>
+			<h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Restore points</h4>
+			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Loading restore points…</p>
+		</div>
 		if form != nil {
 			@backupSettingsForm(form, csrfToken)
 		}
 	</div>
+}
+
+// BackupRestorePoints is the read-only Restore points list, loaded into the
+// Backups card. There is no restore button: restoring is CLI-only.
+templ BackupRestorePoints(v *backup.RestorePointsView) {
+	<h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Restore points</h4>
+	if v.Error != "" {
+		<p class="mt-1 text-xs text-red-700 break-words dark:text-red-300" data-testid="restore-points-error">{ v.Error }</p>
+	} else if len(v.Points) == 0 {
+		<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="restore-points-empty">
+			{ fmt.Sprintf("No complete backups in %s/%s yet.", v.Bucket, v.Prefix) }
+		</p>
+	} else {
+		<div class="mt-2 overflow-x-auto">
+			<table class="min-w-full text-xs" data-testid="restore-points">
+				<thead>
+					<tr class="text-left text-gray-500 dark:text-gray-400">
+						<th class="py-1 pr-3 font-medium">Run key</th>
+						<th class="py-1 pr-3 font-medium">Taken</th>
+						<th class="py-1 pr-3 font-medium">Trigger</th>
+						<th class="py-1 pr-3 font-medium">Size</th>
+						<th class="py-1 font-medium">Skipped</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, p := range v.Points {
+						<tr class="border-t border-gray-100 text-gray-700 dark:border-gray-800 dark:text-gray-300" data-testid="restore-point">
+							<td class="py-1 pr-3 font-mono">{ p.RunKey }</td>
+							if p.Manifest == nil {
+								<td class="py-1 text-red-700 dark:text-red-300" colspan="4">{ p.Problem }</td>
+							} else {
+								<td class="py-1 pr-3">{ restorePointTime(v, p.Manifest.StartedAt) }</td>
+								<td class="py-1 pr-3">{ p.Manifest.Trigger }</td>
+								<td class="py-1 pr-3">{ humanBytes(p.Manifest.TotalBytes()) }</td>
+								<td class="py-1">{ fmt.Sprint(len(p.Manifest.Skipped)) }</td>
+							}
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		if v.Incomplete > 0 {
+			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d incomplete run(s) without a manifest are not listed.", v.Incomplete) }</p>
+		}
+		<p class="mt-2 text-xs text-gray-500 dark:text-gray-400" data-testid="restore-points-howto">
+			Restoring replaces the GoForge database (not service data) and is done from the command line. Stop GoForge, preview with a dry run, then add <code class="font-mono">--yes</code>:
+		</p>
+		<pre class="mt-1 overflow-x-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800"><code>{ restoreCommand(v) }</code></pre>
+	}
 }
 
 templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {

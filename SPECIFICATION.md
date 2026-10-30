@@ -1096,7 +1096,7 @@ labels := map[string]string{
 2. **Backup Strategy**
    - Nightly backups to S3-compatible storage when `BACKUP_S3_BUCKET` is set: GoForge database, Postgres service instances (per database plus roles), Gitea and Vaultwarden data
    - Encryption is the storage provider's at-rest encryption. `ENCRYPTION_KEY` is never in a backup and must be kept separately
-   - Restore is manual (documented). Other service volumes are the operator's responsibility
+   - `goforge backup restore` restores the GoForge database (CLI only); service restore is manual (documented). Other service volumes are the operator's responsibility
 
 ### Monitoring
 

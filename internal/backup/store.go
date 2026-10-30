@@ -26,7 +26,12 @@ type Store interface {
 	List(ctx context.Context, prefix string) ([]Object, error)
 	// Delete removes keys.
 	Delete(ctx context.Context, keys []string) error
+	// Get opens key for reading. A missing key is ErrObjectNotFound.
+	Get(ctx context.Context, key string) (io.ReadCloser, error)
 }
+
+// ErrObjectNotFound is returned by Store.Get for a key that does not exist.
+var ErrObjectNotFound = errors.New("object not found")
 
 // partSize bounds memory per upload (one part is buffered at a time) and
 // caps one object at 10,000 parts, about 320 GiB.
@@ -83,6 +88,23 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]Object, error) {
 		out = append(out, Object{Key: o.Key, Size: o.Size})
 	}
 	return out, nil
+}
+
+// Get implements Store. It stats the object first, so a missing key fails
+// here as ErrObjectNotFound rather than on the first read.
+func (s *S3Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	o, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get %s: %w", key, err)
+	}
+	if _, err := o.Stat(); err != nil {
+		o.Close()
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			return nil, fmt.Errorf("get %s: %w", key, ErrObjectNotFound)
+		}
+		return nil, fmt.Errorf("get %s: %w", key, err)
+	}
+	return o, nil
 }
 
 // Probe lists at most one key under prefix. It proves the endpoint, the keys,

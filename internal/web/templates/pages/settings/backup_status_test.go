@@ -45,3 +45,33 @@ func TestBackupCard(t *testing.T) {
 		t.Errorf("never card = %s", got)
 	}
 }
+
+func TestBackupCard_LazyRestorePoints(t *testing.T) {
+	for _, st := range []*backup.Status{{Enabled: false}, {Enabled: true, Bucket: "b", Prefix: "p/"}} {
+		got := render(t, st)
+		if !strings.Contains(got, `hx-get="/settings/backups/restore-points"`) || !strings.Contains(got, `hx-trigger="load"`) {
+			t.Errorf("card has no lazy restore points: %s", got)
+		}
+		if strings.Contains(got, "backup restore") && strings.Contains(got, "<button") {
+			t.Errorf("card has a restore button: %s", got)
+		}
+	}
+}
+
+func TestBackupRestorePoints_EmptyAndProblem(t *testing.T) {
+	var b bytes.Buffer
+	if err := BackupRestorePoints(&backup.RestorePointsView{Bucket: "b", Prefix: "p/"}).Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "No complete backups in b/p/ yet.") {
+		t.Errorf("empty = %s", b.String())
+	}
+	b.Reset()
+	v := &backup.RestorePointsView{Points: []backup.RestorePoint{{RunKey: "2026-10-29/20261029T070000Z", Problem: "manifest version is newer"}}}
+	if err := BackupRestorePoints(v).Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "manifest version is newer") || !strings.Contains(b.String(), "backup restore 2026-10-29/20261029T070000Z") {
+		t.Errorf("problem row = %s", b.String())
+	}
+}
