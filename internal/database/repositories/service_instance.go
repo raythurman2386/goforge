@@ -206,6 +206,49 @@ func (r *ServiceInstanceRepository) Update(ctx context.Context, s *models.Servic
 	return nil
 }
 
+// UpdateIfStatus writes s like Update, but only while the stored status is
+// still expected. The check and the write are one UPDATE, so of two callers
+// that both read the same status, exactly one swaps it; the other gets
+// false and nothing is written. It also returns false when the row is gone.
+func (r *ServiceInstanceRepository) UpdateIfStatus(ctx context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error) {
+	config, connection, err := r.sealInstance(s)
+	if err != nil {
+		return false, err
+	}
+	updatedAt := time.Now()
+
+	query := `
+		UPDATE service_instances SET
+			name = $1, version = $2, config = $3, domain = $4,
+			status = $5, connection_info = $6, updated_at = $7
+		WHERE id = $8 AND status = $9`
+
+	result, err := r.db.ExecContext(ctx, query,
+		s.Name,
+		s.Version,
+		config,
+		s.Domain,
+		s.Status,
+		connection,
+		updatedAt,
+		s.ID,
+		expected,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if rows == 0 {
+		return false, nil
+	}
+	s.UpdatedAt = updatedAt
+	return true, nil
+}
+
 // Delete deletes a service instance.
 func (r *ServiceInstanceRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM service_instances WHERE id = $1`

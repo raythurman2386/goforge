@@ -186,6 +186,8 @@ GoForge will:
 | **Restart** | Restart the service container |
 | **Delete** | Stop and remove the service and its data |
 
+A service runs one **Edit configuration** or **Update image** at a time. While one is recreating the container, the service is `pending`, and another edit or update is refused with `409 Conflict`, even one sent at the same moment.
+
 ### Image updates
 
 GoForge pulls the image every time it deploys a service or recreates its container, unless the image is pinned by digest (`name@sha256:...`). A tag such as `latest` can point at a newer image upstream, and the pull picks it up. A pull of an unchanged tag only checks the registry and downloads nothing. If the registry can't be reached during a deploy or a configuration edit, GoForge logs a warning and uses the local copy of the image.

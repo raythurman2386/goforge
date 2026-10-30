@@ -20,7 +20,9 @@ type mockInstanceRepository struct {
 	getByIDFunc      func(ctx context.Context, id string) (*models.ServiceInstance, error)
 	listByUserIDFunc func(ctx context.Context, userID string) ([]*models.ServiceInstance, error)
 	updateFunc       func(ctx context.Context, s *models.ServiceInstance) error
-	deleteFunc       func(ctx context.Context, id string) error
+	// updateIfStatusFunc, when nil, falls back to updateFunc and always swaps.
+	updateIfStatusFunc func(ctx context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error)
+	deleteFunc         func(ctx context.Context, id string) error
 }
 
 func (m *mockInstanceRepository) Create(ctx context.Context, s *models.ServiceInstance) error {
@@ -49,6 +51,16 @@ func (m *mockInstanceRepository) Update(ctx context.Context, s *models.ServiceIn
 		return m.updateFunc(ctx, s)
 	}
 	return nil
+}
+
+func (m *mockInstanceRepository) UpdateIfStatus(ctx context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error) {
+	if m.updateIfStatusFunc != nil {
+		return m.updateIfStatusFunc(ctx, s, expected)
+	}
+	if err := m.Update(ctx, s); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (m *mockInstanceRepository) Delete(ctx context.Context, id string) error {
