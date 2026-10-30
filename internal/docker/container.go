@@ -75,8 +75,12 @@ func portBindings(bindings []PortBinding) (exposed network.PortSet, pm network.P
 		if b.HostIP == "" {
 			return nil, nil, fmt.Errorf("port %s: host IP is required; refusing to publish on all interfaces", p)
 		}
+		// Unmap so ::ffff:0.0.0.0 is caught as unspecified and
+		// ::ffff:127.0.0.1 binds as 127.0.0.1; refuse zoned addresses
+		// (fe80::1%eth0), which net.ParseIP never accepted.
 		ip, ipErr := netip.ParseAddr(b.HostIP)
-		if ipErr != nil || ip.IsUnspecified() {
+		ip = ip.Unmap()
+		if ipErr != nil || ip.Zone() != "" || ip.IsUnspecified() {
 			return nil, nil, fmt.Errorf("port %s: host IP %q is not allowed; publish on a specific address such as 127.0.0.1", p, b.HostIP)
 		}
 		if b.HostPort == "" {

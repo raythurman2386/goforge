@@ -83,6 +83,16 @@ func TestCreateContainer_PortBindings(t *testing.T) {
 		{name: "empty host IP refused", mappings: []PortBinding{{ContainerPort: "22", HostPort: "2223"}}, wantErr: "host IP is required"},
 		{name: "0.0.0.0 refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "0.0.0.0", HostPort: "2223"}}, wantErr: "not allowed"},
 		{name: ":: refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "::", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "::ffff:0.0.0.0 refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "::ffff:0.0.0.0", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "zoned link-local refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "fe80::1%eth0", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "zoned loopback refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "::1%lo", HostPort: "2223"}}, wantErr: "not allowed"},
+		{name: "garbage host IP refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "not-an-ip", HostPort: "2223"}}, wantErr: "not allowed"},
+		{
+			name:        "::ffff:127.0.0.1 binds as 127.0.0.1",
+			mappings:    []PortBinding{{ContainerPort: "22", HostIP: "::ffff:127.0.0.1", HostPort: "2223"}},
+			wantBinding: map[string][]network.PortBinding{"22/tcp": {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "2223"}}},
+			wantExposed: []string{"22/tcp"},
+		},
 		{name: "empty host port refused", mappings: []PortBinding{{ContainerPort: "22", HostIP: "127.0.0.1"}}, wantErr: "host port is required"},
 	}
 	for _, tt := range tests {
