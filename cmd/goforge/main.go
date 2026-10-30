@@ -343,6 +343,8 @@ func runServer() error {
 	// Initialize services
 	auditService := services.NewAuditService(auditLogRepo, logger.WithComponent(log, "audit"))
 	sessionManager := auth.NewSessionManager(sessionRepo, userRepo, logger.WithComponent(log, "auth"))
+	// Delete expired session rows at startup and hourly; backgroundCtx stops it.
+	go sessionManager.RunExpiredSessionPurge(backgroundCtx, auth.SessionPurgeInterval)
 	githubProvider := auth.NewGitHubProvider(cfg)
 	authenticator := auth.NewLocalAuthenticator(userRepo)
 	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo, deploymentRepo, containerRepo, gitSourceRepo, gitService, dockerClient)
@@ -381,7 +383,12 @@ func runServer() error {
 
 	// Initialize handlers
 	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector, containerRepo, instanceRepo, deployService, projectService, logger.WithComponent(log, "sse"))
-	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, cfg.EnableRegistration, logger.WithComponent(log, "auth"))
+	// Lock out password logins after repeated failures per client IP and per
+	// account (stopped during graceful shutdown).
+	loginThrottle := middleware.NewDefaultLoginThrottle()
+	defer loginThrottle.Stop()
+	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, cfg.EnableRegistration, logger.WithComponent(log, "auth")).
+		WithLoginThrottle(loginThrottle)
 	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService, projectRepo, gitSourceRepo, logger.WithComponent(log, "dashboard"))
 	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService, logger.WithComponent(log, "projects"))
 	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments"))
@@ -395,11 +402,9 @@ func runServer() error {
 	containerHandler := handlers.NewContainerHandler(containerRepo, instanceRepo, dockerClient, logger.WithComponent(log, "containers"))
 
 	// Rate limiter (stopped during graceful shutdown)
-	trustedProxies := httputil.DefaultTrustedProxies()
-	if len(cfg.TrustedProxies) > 0 {
-		trustedProxies = httputil.ParseTrustedProxies(cfg.TrustedProxies)
-	}
-	rateLimiter := middleware.NewRateLimiter(30, 60, trustedProxies)
+	// CF-Connecting-IP is only read with CLOUDFLARE_PROXY_MODE (see httputil.ProxyTrust).
+	proxyTrust := httputil.NewProxyTrust(cfg.TrustedProxies, cfg.CloudflareProxyMode)
+	rateLimiter := middleware.NewRateLimiter(30, 60, proxyTrust)
 	defer rateLimiter.Stop()
 
 	// JSON API v1 for the GoForge MCP server (bearer tokens with scopes).
@@ -425,7 +430,7 @@ func runServer() error {
 		Logger:      logger.WithComponent(log, "api_v1"),
 		Version:     version,
 		ClientIP: func(r *http.Request) string {
-			return httputil.ClientIP(r.RemoteAddr, r.Header.Get("X-Forwarded-For"), r.Header.Get("X-Real-IP"), trustedProxies)
+			return httputil.ClientIP(r, proxyTrust)
 		},
 		ProtectedServices: cfg.ProtectedServices,
 	}).Routes()

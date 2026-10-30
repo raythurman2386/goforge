@@ -16,6 +16,7 @@ This page documents GoForge's security model, current protections, and known are
 - Passwords are hashed using **Argon2id** before storage
 - Login is handled via `POST /auth/login` with form-encoded credentials
 - Sessions are created upon successful authentication
+- Failed password logins are throttled in memory: 10 failures from one client IP, or 10 failures for one account (email, case-insensitive) from any IP, within 15 minutes lock that key for 15 minutes. A locked login gets `429` with `Retry-After` before the password is checked, so a correct password is refused until the lockout ends. A successful login clears the account counter, not the IP counter. The account limit means someone who knows an email can keep it locked; the lockout is short for that reason. Counters reset when the process restarts
 
 ### GitHub OAuth
 
@@ -37,7 +38,7 @@ The OAuth flow validates the `state` parameter using a cookie-based approach: a 
     - `HttpOnly: true` - Not accessible to JavaScript
     - `SameSite: Lax` - Prevents cross-site request forgery for most cases
     - `Path: /`
-- Expired sessions are cleaned up on access
+- Expired sessions are deleted on access, and `goforge serve` deletes every expired session row at startup and then hourly
 
 ### Known Limitations
 
@@ -48,21 +49,31 @@ The OAuth flow validates the `state` parameter using a cookie-based approach: a 
 
 ## CSRF Protection
 
-GoForge implements double-submit cookie CSRF protection:
+State-changing requests (`POST`, `PUT`, `DELETE`, `PATCH`) in the UI group must send a CSRF token in the `X-CSRF-Token` header (HTMX, via `hx-headers`) or the `csrf_token` form field. Tokens are HMAC-SHA256 values keyed by `CSRF_SECRET` (`internal/auth/csrf.go`):
 
-1. A random CSRF token is generated and stored in a cookie (`goforge_csrf`)
-2. State-changing requests (`POST`, `PUT`, `DELETE`, `PATCH`) must include the token via:
-    - HTTP header: `X-CSRF-Token` (used by HTMX)
-    - Form field: `csrf_token` (used by HTML forms)
-3. The server compares the submitted token against the cookie value
+1. **Signed in**: the token is `HMAC(CSRF_SECRET, SHA-256(session token))`. It is stable for the session, fails in any other session, and cannot be computed without both the session cookie and the secret.
+2. **Signed out** (login and register forms): the token is a random nonce plus `HMAC(CSRF_SECRET, nonce)`, stored in the `goforge_csrf` cookie and echoed in the form.
+3. The token is compared in constant time. A `goforge_csrf` cookie without a valid MAC, for example one planted by an app on a sibling subdomain, is replaced and the request gets `403 invalid CSRF token`.
 
-**Exemptions**: Webhook routes (`/webhooks/*`) are excluded from CSRF protection as they are machine-to-machine endpoints.
+The `goforge_csrf` cookie is not HttpOnly, is `SameSite=Lax`, and is `Secure` on HTTPS requests. Rotating `CSRF_SECRET` invalidates tokens in open pages; reload to get a new one.
 
-### Known Limitations
+**Exemptions**: Webhook routes (`/webhooks/*`) and `/api/v1/*` (bearer only, cookies ignored) are outside the CSRF group.
 
-- **Timing attack**: Token comparison uses `!=` (string comparison) instead of `crypto/subtle.ConstantTimeCompare()`. While exploitation is difficult over a network, constant-time comparison is the standard practice (`internal/auth/csrf.go:54`)
-- **Cookie missing `Secure` flag**: The CSRF cookie does not set `Secure: true`, meaning it could be transmitted over plain HTTP in mixed-content scenarios
-- **Token not bound to session**: The CSRF token is independent of the user session, which means a valid CSRF token from one session could theoretically be used in another
+---
+
+## Security Headers
+
+Every response carries (`internal/web/middleware/secheaders.go`):
+
+| Header | Value |
+|--------|-------|
+| `Content-Security-Policy` | `frame-ancestors 'none'; base-uri 'self'; object-src 'none'` |
+| `X-Frame-Options` | `DENY` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Strict-Transport-Security` | `max-age=31536000`, only when the request is HTTPS (`X-Forwarded-Proto: https` or TLS) |
+
+The CSP does not restrict scripts or styles because the templates use inline scripts and HTMX attributes; it only blocks framing (clickjacking), `<base>` rewrites, and plugins. HSTS leaves out `includeSubDomains` because deployed apps live on sibling subdomains GoForge does not control.
 
 ---
 
@@ -119,9 +130,20 @@ GoForge is designed to work with **Cloudflare Tunnel** for secure public access:
 
 ### Rate Limiting
 
-- Global rate limit: **30 requests/second** with a burst of **60**
+- Global rate limit: **30 requests/second** with a burst of **60**, per client IP
 - Applied to all routes via middleware
 - Uses a token bucket algorithm
+
+### Client IP
+
+The client IP keys the rate limiter, the login lockout, and audit rows (`internal/web/httputil/clientip.go`). Proxy headers are read only when the direct peer is in `TRUSTED_PROXIES` (default: loopback and private ranges). From a trusted peer, GoForge uses, in order:
+
+1. `CF-Connecting-IP`, when it is a valid IP, **only if `CLOUDFLARE_PROXY_MODE=true`**. With the default (`false`) this header is ignored, even from a trusted peer.
+2. The rightmost `X-Forwarded-For` hop that is not a trusted proxy. The leftmost entries are written by the client and are never used on their own; a hop that is not an IP stops the walk at the last trusted hop.
+3. `X-Real-IP`, when it is a valid IP.
+4. The peer address.
+
+Cloudflare overwrites `CF-Connecting-IP` at its edge, but Traefik forwards it exactly as the client sent it. If a client can reach Traefik without going through Cloudflare (no Cloudflare at all, or a LAN/host port next to a tunnel), it can choose that header. That is why it is opt-in. Only set `CLOUDFLARE_PROXY_MODE=true` when every request reaches Traefik through Cloudflare. Without it, tunnel users fall back to `X-Forwarded-For`, and cloudflared's address may be the key they share.
 
 ### Docker Network Isolation
 

@@ -40,7 +40,7 @@ See [Database Configuration](database.md) for connection pooling and migration d
 |----------|---------------|-------------|
 | `ENCRYPTION_KEY` | Auto-generated | 32-byte base64-encoded key for AES-256-GCM encryption of secrets |
 | `SESSION_SECRET` | Auto-generated | Secret for session cookie signing |
-| `CSRF_SECRET` | Auto-generated | Secret for CSRF token generation |
+| `CSRF_SECRET` | Auto-generated | HMAC key for CSRF tokens. Tokens are bound to the session and a planted `goforge_csrf` cookie does not verify without it. Changing it invalidates open forms (reload the page) |
 
 Generate production secrets with:
 
@@ -81,6 +81,7 @@ See [Authentication Configuration](authentication.md) for setup instructions.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TRAEFIK_NETWORK` | `traefik` | Docker network for Traefik service discovery |
+| `TRUSTED_PROXIES` | private and loopback ranges | Comma-separated CIDRs or IPs of reverse proxies whose client-IP headers are read. Only from such a peer does GoForge use `CF-Connecting-IP` (only with `CLOUDFLARE_PROXY_MODE=true`), then the rightmost `X-Forwarded-For` hop that is not in this list, then `X-Real-IP`. The client IP keys the rate limiter, the login lockout, and audit rows. Traefik must stay in this list (for example `172.18.0.0/16`) |
 | `ACME_EMAIL` | (empty in app code; `admin@example.com` in docker-compose.yml) | Email for Let's Encrypt certificate registration |
 
 !!! note "Compose-only variables"
@@ -92,7 +93,7 @@ See [Traefik & SSL Configuration](traefik.md) for details.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLOUDFLARE_PROXY_MODE` | `false` | Enable Cloudflare proxy mode (HTTP entrypoint, skip Let's Encrypt) |
+| `CLOUDFLARE_PROXY_MODE` | `false` | Enable Cloudflare proxy mode (HTTP entrypoint, skip Let's Encrypt, read the client IP from `CF-Connecting-IP`). Only enable it when every request reaches Traefik through Cloudflare: Traefik forwards `CF-Connecting-IP` as sent |
 
 !!! note "Compose-only variable"
     `CLOUDFLARE_TUNNEL_TOKEN` is used only in `docker-compose.yml` for the cloudflared container.

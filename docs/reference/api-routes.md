@@ -7,7 +7,8 @@ This is a complete reference of all HTTP routes exposed by the GoForge server.
 All routes pass through the following middleware (in order):
 
 1. **Recoverer** - Catches panics and returns 500
-2. **RateLimit** - 30 requests/second, burst of 60, per client IP
+2. **SecurityHeaders** - CSP `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, and HSTS on HTTPS (see [Security](../security.md#security-headers))
+3. **RateLimit** - 30 requests/second, burst of 60, per client IP (rightmost untrusted `X-Forwarded-For` hop from a `TRUSTED_PROXIES` peer, or `CF-Connecting-IP` first when `CLOUDFLARE_PROXY_MODE=true`)
 
 The JSON API under `/api/v1` stops here. It authenticates bearer tokens itself,
 ignores session cookies, checks token scopes, and is outside the CSRF group. See
@@ -15,19 +16,19 @@ ignores session cookies, checks token scopes, and is outside the CSRF group. See
 
 Every other route (webhooks, UI, and the 404/405 handlers) also uses:
 
-3. **Session** - Populates user/session in request context
-4. **APIToken** - If there is no session user and the request carries
+4. **Session** - Populates user/session in request context
+5. **APIToken** - If there is no session user and the request carries
    `Authorization: Bearer <token>`, authenticates a legacy `full` token and
    sets the user. An invalid token, or a scoped token (`read`, `write`,
    `protected`), gets `401`: scoped tokens only work on `/api/v1`.
 
 Routes under the UI group additionally use:
 
-5. **CSRFMiddleware** - CSRF token validation for state-changing methods (POST, PUT, DELETE, PATCH)
+6. **CSRF** - HMAC (`CSRF_SECRET`) token validation for state-changing methods (POST, PUT, DELETE, PATCH)
 
 Authenticated routes additionally use:
 
-6. **RequireAuth** - Redirects to `/login` (or returns `HX-Redirect` header for HTMX requests)
+7. **RequireAuth** - Redirects to `/login` (or returns `HX-Redirect` header for HTMX requests)
 
 ---
 
@@ -230,7 +231,9 @@ All state-changing methods (`POST`, `PUT`, `DELETE`, `PATCH`) under the UI route
 - **Header**: `X-CSRF-Token` (used by HTMX via `hx-headers`)
 - **Form field**: `csrf_token` (used by standard HTML forms)
 
-The CSRF token is stored in a cookie named `goforge_csrf` and is accessible to JavaScript (not HttpOnly) for HTMX integration.
+Signed in, the token is `HMAC(CSRF_SECRET, SHA-256(session token))`; signed out, it is a nonce plus its HMAC, kept in the `goforge_csrf` cookie (not HttpOnly). A cookie value without a valid MAC is rejected. See [Security](../security.md#csrf-protection).
+
+`POST /auth/login` also answers `429` with `Retry-After` while the client IP or the account is locked out after repeated failures.
 
 Webhook routes (`/webhooks/*`) and the JSON API (`/api/v1/*`) are excluded from
 CSRF protection. `/api/v1` accepts only `Authorization: Bearer` and ignores

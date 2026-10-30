@@ -50,7 +50,9 @@ type Config struct {
 	TraefikNetwork string
 	AcmeEmail      string
 
-	// Cloudflare Tunnel
+	// Cloudflare Tunnel. Also enables CF-Connecting-IP as the client IP from a
+	// trusted proxy (httputil.ProxyTrust); off by default because Traefik
+	// forwards that header as the client sent it.
 	CloudflareProxyMode bool
 
 	// Service Templates
@@ -71,9 +73,11 @@ type Config struct {
 	LogLevel  string
 	LogFormat string
 
-	// Trusted Proxies - CIDR ranges whose X-Forwarded-For/X-Real-IP headers are trusted.
-	// If empty, private/loopback networks are trusted by default (suitable for local Traefik).
-	// Set to explicit CIDRs in production if your proxy is on a non-private network.
+	// Trusted Proxies - CIDR ranges whose X-Forwarded-For / X-Real-IP headers
+	// are read (see httputil.ClientIP: rightmost untrusted X-Forwarded-For hop,
+	// never the leftmost alone). CF-Connecting-IP is also read from these peers
+	// only when CloudflareProxyMode is set. If empty, private/loopback networks
+	// are trusted by default (suitable for local Traefik).
 	TrustedProxies []string
 
 	// Registration

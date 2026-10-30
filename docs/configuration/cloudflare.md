@@ -56,6 +56,9 @@ When `CLOUDFLARE_PROXY_MODE=true`:
 | SSL certificates | Let's Encrypt (ACME) | Not needed (Cloudflare handles SSL) |
 | HTTP-to-HTTPS redirect | Enabled | Disabled (Cloudflare enforces HTTPS) |
 | Port exposure | 80 + 443 required | No ports required |
+| Client IP (rate limit, lockout, audit) | Rightmost untrusted `X-Forwarded-For` | `CF-Connecting-IP` from a `TRUSTED_PROXIES` peer |
+
+Traefik forwards `CF-Connecting-IP` exactly as the client sent it. In Cloudflare mode, make sure Traefik is reachable only through the tunnel; a client that reaches it directly can set its own client IP.
 
 ## Tunnel Configuration
 

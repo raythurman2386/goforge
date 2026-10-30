@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -25,6 +28,21 @@ type AuthHandler struct {
 	auditService       *services.AuditService
 	logger             *slog.Logger
 	enableRegistration bool
+	loginThrottle      LoginThrottle
+}
+
+// LoginThrottle limits repeated failed password logins. See
+// middleware.LoginThrottle.
+type LoginThrottle interface {
+	Check(ip, account string) (retryAfter time.Duration, allowed bool)
+	Failure(ip, account string)
+	Success(account string)
+}
+
+// WithLoginThrottle enables per-IP and per-account lockout on POST /auth/login.
+func (h *AuthHandler) WithLoginThrottle(t LoginThrottle) *AuthHandler {
+	h.loginThrottle = t
+	return h
 }
 
 // NewAuthHandler creates a new AuthHandler.
@@ -61,8 +79,29 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	rememberMe := r.FormValue("remember_me") == "on"
 
+	clientIP := getClientIP(r)
+	if h.loginThrottle != nil {
+		// Fail closed: a locked IP or account is refused before the password
+		// is checked, so a correct guess during the lockout does not succeed.
+		if retryAfter, ok := h.loginThrottle.Check(clientIP, email); !ok {
+			h.logger.Warn("login throttled", "client_ip", clientIP)
+			secs := int(math.Ceil(retryAfter.Seconds()))
+			w.Header().Set("Retry-After", strconv.Itoa(secs))
+			csrfToken := auth.GetCSRFToken(r)
+			component := pages.Login(csrfToken, "Too many failed sign-in attempts. Try again later.", h.registrationAllowed(r.Context()))
+			w.WriteHeader(http.StatusTooManyRequests)
+			if renderErr := component.Render(r.Context(), w); renderErr != nil {
+				h.logger.Error("failed to render login page", "error", renderErr)
+			}
+			return
+		}
+	}
+
 	user, err := h.authenticator.Authenticate(r.Context(), email, password)
 	if err != nil {
+		if h.loginThrottle != nil {
+			h.loginThrottle.Failure(clientIP, email)
+		}
 		csrfToken := auth.GetCSRFToken(r)
 		component := pages.Login(csrfToken, "Invalid email or password", h.registrationAllowed(r.Context()))
 		w.WriteHeader(http.StatusUnauthorized)
@@ -70,6 +109,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			RenderError(w, r, http.StatusInternalServerError, "failed to render login page")
 		}
 		return
+	}
+
+	if h.loginThrottle != nil {
+		h.loginThrottle.Success(email)
 	}
 
 	// Create session
@@ -81,7 +124,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	auth.SetSessionCookie(w, sessionToken, session.ExpiresAt, auth.IsSecureRequest(r))
 
-	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, getClientIP(r), r.UserAgent())
+	h.auditService.Record(r.Context(), user.ID, models.AuditActionLogin, models.ResourceTypeUser, user.ID, nil, clientIP, r.UserAgent())
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }

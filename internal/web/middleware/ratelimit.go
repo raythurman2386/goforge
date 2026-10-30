@@ -2,7 +2,6 @@
 package middleware
 
 import (
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -19,23 +18,23 @@ type client struct {
 
 // RateLimiter holds the rate limiter state and provides an HTTP middleware.
 type RateLimiter struct {
-	clients        sync.Map
-	rps            float64
-	burst          int
-	trustedProxies []*net.IPNet
-	done           chan struct{}
+	clients sync.Map
+	rps     float64
+	burst   int
+	trust   httputil.ProxyTrust
+	done    chan struct{}
 }
 
 // NewRateLimiter creates a new IP-based rate limiter.
-// trustedProxies controls which peers' X-Forwarded-For headers are trusted
-// for extracting the real client IP. Pass nil to only use RemoteAddr.
+// trust controls which proxy headers are read for the client IP
+// (httputil.ClientIP). The zero value only uses RemoteAddr.
 // Call Stop() during graceful shutdown to release the cleanup goroutine.
-func NewRateLimiter(rps float64, burst int, trustedProxies []*net.IPNet) *RateLimiter {
+func NewRateLimiter(rps float64, burst int, trust httputil.ProxyTrust) *RateLimiter {
 	rl := &RateLimiter{
-		rps:            rps,
-		burst:          burst,
-		trustedProxies: trustedProxies,
-		done:           make(chan struct{}),
+		rps:   rps,
+		burst: burst,
+		trust: trust,
+		done:  make(chan struct{}),
 	}
 
 	// Cleanup background routine
@@ -75,12 +74,7 @@ func (rl *RateLimiter) Stop() {
 // Middleware returns the chi-compatible middleware handler.
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := httputil.ClientIP(
-			r.RemoteAddr,
-			r.Header.Get("X-Forwarded-For"),
-			r.Header.Get("X-Real-IP"),
-			rl.trustedProxies,
-		)
+		ip := httputil.ClientIP(r, rl.trust)
 
 		var c *client
 		if v, ok := rl.clients.Load(ip); ok {
