@@ -5,49 +5,48 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentEnvID string) {
-	<div class="relative inline-block text-left" onclick="event.stopPropagation()">
-		<div>
-			@ui.Button(ui.ButtonProps{
-				Variant: ui.ButtonSecondary,
-				Class: "!py-1.5 !px-3 font-bold flex items-center shadow-sm",
-				Attrs: templ.Attributes{
-					"id": "menu-button",
-					"aria-expanded": "true",
-					"aria-haspopup": "true",
-					"onclick": "var dd = this.nextElementSibling; dd.classList.toggle('hidden'); if (!dd.classList.contains('hidden')) { var close = function(e) { if (!dd.contains(e.target) && e.target !== this) { dd.classList.add('hidden'); document.removeEventListener('click', close); } }.bind(this); document.addEventListener('click', close); }",
-				},
-			}) {
-				<div class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></div>
-				for _, e := range envs {
-					if e.ID == currentEnvID {
-						{ e.Name }
-					}
-				}
-				if currentEnvID == "" && len(envs) > 0 {
-					{ envs[0].Name }
-				} else if len(envs) == 0 {
-					No Environments
-				}
-				<svg class="-mr-1 ml-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-				</svg>
-			}
-		</div>
+// EnvironmentMenuID is the id of the project environment menu; its trigger
+// is ui.TriggerID(EnvironmentMenuID).
+const EnvironmentMenuID = "env-menu"
 
-		<div class="hidden origin-top-right absolute left-0 mt-2 w-56 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10 border border-gray-100 p-1.5 dark:bg-gray-900 dark:border-gray-800" role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
-			<div class="py-1" role="none">
-				for _, e := range envs {
-					<a href={ templ.URL("/projects/" + projectID + "?env=" + e.ID) } class="text-gray-700 block px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-700 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-primary-900/30 dark:hover:text-primary-300" role="menuitem" tabindex="-1">
-						{ e.Name }
-					</a>
+// EnvironmentSwitcher is the project header's environment menu on
+// ui.Dropdown: a menu button (aria-haspopup="menu", aria-expanded kept in
+// sync by ui.js) and a role="menu" popover with one link per environment
+// and a "New Environment" item that opens the create dialog. It sits in the
+// page header, outside the polled deployment banner.
+templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentEnvID string) {
+	<div class="inline-block text-left">
+		@ui.DropdownTrigger(ui.DropdownProps{
+			ID:      EnvironmentMenuID,
+			Variant: ui.ButtonSecondary,
+			Class:   "!py-1.5 !px-3 font-bold flex items-center shadow-sm",
+			Attrs:   templ.Attributes{"aria-label": "Environment: " + currentEnvName(envs, currentEnvID)},
+		}) {
+			<span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" aria-hidden="true"></span>
+			{ currentEnvName(envs, currentEnvID) }
+			<svg class="-mr-1 ml-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+			</svg>
+		}
+		@ui.DropdownMenu(ui.DropdownProps{ID: EnvironmentMenuID}) {
+			for _, e := range envs {
+				@ui.DropdownItem(ui.DropdownItemProps{
+					Href:  templ.URL("/projects/" + projectID + "?env=" + e.ID),
+					Attrs: envItemAttrs(e.ID == currentEnvID || (currentEnvID == "" && e == envs[0])),
+				}) {
+					{ e.Name }
 				}
-				<div class="my-1.5 border-t border-gray-100 dark:border-gray-800"></div>
-				<button hx-get={ "/projects/" + projectID + "/envs/new" } hx-target="body" hx-swap="beforeend" aria-haspopup="dialog" class="text-primary-600 block w-full text-left px-3 py-2 text-sm font-bold hover:bg-primary-600 hover:text-white rounded-lg transition-colors dark:text-primary-400" role="menuitem" tabindex="-1">
-					<span class="mr-1">+</span> New Environment
-				</button>
-			</div>
-		</div>
+			}
+			if len(envs) > 0 {
+				@ui.DropdownSeparator()
+			}
+			@ui.DropdownItem(ui.DropdownItemProps{
+				Tone:  ui.ItemPrimary,
+				Attrs: ui.OpenDialogAttrs("/projects/" + projectID + "/envs/new"),
+			}) {
+				<span class="mr-1" aria-hidden="true">+</span> New Environment
+			}
+		}
 	</div>
 }
 

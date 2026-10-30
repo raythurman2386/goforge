@@ -24,6 +24,17 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
   - `dialog-axe`: axe inside the open dialog and the open confirm finds nothing serious or critical other than the palette's known `color-contrast`.
   - `confirm-no-native-prompt`, `app-no-native-prompt`: no `window.confirm` prompt appears.
   - With a password: `app-token-dialog` drives Generate Token, submit, the swapped-in non-dismissible token dialog (a backdrop click keeps it), Escape, and focus return. `app-revoke-confirm-cancel` checks that Revoke asks through the kit confirm and that Cancel sends no `DELETE`.
+- Overlays (PR5), on the gallery's "Dropdown, Popover, Tooltip" section. They use the native `popover` attribute and `popovertarget`, so they open without JS. `ui.js` adds placement, the menu keys, focus return, and `aria-expanded`:
+  - `dropdown-keyboard`: Enter on the trigger opens the `role="menu"` with focus on the first item and `aria-expanded="true"`. ArrowDown and ArrowUp wrap, Home and End jump, and typeahead finds the next match. Escape closes the menu, sets `aria-expanded="false"`, and returns focus to the trigger.
+  - `dropdown-open-keys`: ArrowUp on the trigger opens on the last item and ArrowDown on the first. Space opens it. Tab closes it and moves on from the trigger.
+  - `dropdown-placement`: the menu opens 6 px below the trigger, flips above it near the bottom of the viewport, and `data-ui-align="end"` lines up the right edges.
+  - `dropdown-light-dismiss`: an outside click and a second trigger click both close the menu.
+  - `dropdown-item-request`, `dropdown-dialog-return`, `dropdown-confirm`: an htmx item sends one request and closes the menu. An item that opens a dialog hands focus back to the menu trigger when the dialog closes. A `hx-confirm` item asks through the kit confirm, and Escape there sends nothing.
+  - `popover`: Enter opens the `role="dialog"` panel with focus inside. Escape, an outside click, and the close button each close it, and focus returns to the trigger.
+  - `tooltip-focus`, `tooltip-hover`, `tooltip-icon-name`: a tooltip shows about 300 ms after focus or hover and is linked through `aria-describedby`. Escape hides it without moving focus. The pointer can move onto the tooltip without hiding it (WCAG 1.4.13). An icon button keeps its own `aria-label`, so the tooltip is never its only name.
+  - `overlays-history`: `htmx:beforeHistorySave` closes every open overlay.
+  - `overlays-axe`, `overlays-no-native-prompt`: inside the open overlays, axe finds nothing other than the palette's `color-contrast`, and no `window.confirm` appears.
+  - With a password: `app-env-menu`, `app-env-new-dialog`, `app-env-link` drive the project's EnvironmentSwitcher. It has no `#menu-button` and no hardcoded `aria-expanded="true"`. The keys work as above, "New Environment" opens the kit dialog and focus returns to the trigger, and Enter on an environment navigates to `?env=…`.
 - `dev-ui-gated`: `/dev/ui` returns `200` with dev mode and `404` without it. The unit tests are `TestRouter_DevUIGalleryOnlyInDevMode` and `TestRouter_DevUIDialogDemoOnlyInDevMode`.
 - `axe`: axe-core scans each page for WCAG 2.0/2.1 A and AA and 2.2 AA (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), in light and dark. The public pages are `/login`, `/auth/register`, `/dev/ui`, and a missing page. With a password, it also scans `/dashboard`, `/projects`, `/projects/new`, `/services`, `/containers`, `/settings/profile`, `/settings/git`, and the first project's Overview, Deployments, Settings, and Services tabs. `axe-gate=pass` means zero serious or critical findings.
 
@@ -42,7 +53,7 @@ Host mode on minis, where the live GoForge holds `8080`, follows [SKILL.md](../S
 
 ```bash
 export GOFORGE_VERIFY_BASE=http://127.0.0.1:18080
-export GOFORGE_VERIFY_PSQL="sudo -n docker exec -i <pg-container> psql -U goforge -d goforge_verify"
+export GOFORGE_VERIFY_PSQL="sudo -n docker exec -i <pg-container> psql -U goforge -d goforge_verify -v ON_ERROR_STOP=1 -tA"
 export GOFORGE_VERIFY_PROOF=/tmp/goforge-verify/proof
 .cursor/skills/verify-goforge/scripts/verify.sh drive-register
 .cursor/skills/verify-goforge/scripts/verify.sh drive-login
@@ -69,4 +80,8 @@ The drive writes `ui-a11y-verdict.txt`, `ui-a11y-report.json` (axe rule ids, imp
   - `/services`: many catalog-card contrast nodes.
   - `/containers` passes.
   - Clearing the gate needs a palette decision, for example `.btn-primary` on `primary-700`, and the label fixes in later PRs.
+- The `toggle` event of a popover fires after the key that closed it. That is why Tab in a menu focuses the trigger itself before it hides the menu, and why the drive waits a frame after each key before it reads focus.
+- After Escape hides a tooltip, it stays hidden until the pointer leaves the trigger or focus moves away. Each tooltip check starts by moving the pointer to the corner and blurring.
+- In host mode there is no Docker, so the containers list has no rows. Its tooltips are covered by `TestContainerRowTooltips`.
+- `GOFORGE_VERIFY_PSQL` needs `-tA`. Without it `drive-register` reads the `count` header as a user count and exits `2` with "users table is not empty".
 - The order of the `/services` catalog changes between runs, so screenshots of that page differ even when the CSS has not changed.

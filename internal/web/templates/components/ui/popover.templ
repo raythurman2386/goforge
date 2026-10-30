@@ -1,0 +1,28 @@
+package ui
+
+// PopoverTrigger opens the Popover with the same ID (popovertarget, so it
+// works without JS), with aria-haspopup="dialog", aria-controls, and
+// aria-expanded kept in sync by ui.js.
+templ PopoverTrigger(p PopoverProps) {
+	@Button(popoverTriggerProps(p)) {
+		{ children... }
+	}
+}
+
+// Popover is a non-modal disclosure panel (role="dialog", labelled by its
+// heading) on popover="auto": a click outside or Escape closes it. ui.js
+// moves focus to its first control (or the panel) on open and back to the
+// trigger on close. A [data-ui-popover-close] button inside closes it.
+templ Popover(p PopoverProps) {
+	<div { popoverAttrs(p)... }>
+		<div class="mb-2 flex items-start justify-between gap-3">
+			<h3 id={ PopoverTitleID(p.ID) } class="text-sm font-semibold text-gray-900 dark:text-gray-100">{ p.Title }</h3>
+			@Button(ButtonProps{Variant: ButtonGhost, Size: ButtonIcon, Label: "Close", Class: "-mr-2 -mt-2", Attrs: templ.Attributes{"popovertarget": p.ID, "popovertargetaction": "hide", "data-ui-popover-close": true}}) {
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+				</svg>
+			}
+		</div>
+		{ children... }
+	</div>
+}

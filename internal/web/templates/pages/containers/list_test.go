@@ -42,3 +42,31 @@ func TestContainerRowShowsType(t *testing.T) {
 		}
 	}
 }
+
+// Tooltips replace title= on the containers list: each one is a
+// role="tooltip" popover linked with aria-describedby, and icon buttons
+// keep their aria-label as the name.
+func TestContainerRowTooltips(t *testing.T) {
+	var buf bytes.Buffer
+	dc := container.Summary{ID: "abc", Names: []string{"/web"}, Image: "registry.example.com/team/web:1.2.3", State: "running"}
+	if err := ContainerRow(dc, nil).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	if strings.Contains(got, "title=") {
+		t.Errorf("row still uses title=:\n%s", got)
+	}
+	for _, f := range []string{"name", "image", "stop", "restart", "view"} {
+		id := "tip-" + f + "-abc"
+		for _, want := range []string{`aria-describedby="` + id + `"`, `data-ui-tooltip="` + id + `"`, `id="` + id + `" popover="manual" role="tooltip"`} {
+			if !strings.Contains(got, want) {
+				t.Errorf("row lacks %q", want)
+			}
+		}
+	}
+	for _, want := range []string{`aria-label="Stop web"`, `aria-label="Restart web"`, `aria-label="View web"`, `tabindex="0"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("row lacks %q", want)
+		}
+	}
+}

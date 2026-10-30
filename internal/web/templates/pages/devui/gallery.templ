@@ -204,6 +204,9 @@ templ Gallery(csrfToken string) {
 			@section("dialogs", "Dialog and confirm") {
 				@dialogSection()
 			}
+			@section("overlays", "Dropdown, Popover, Tooltip") {
+				@overlaySection()
+			}
 			@section("cards", "Card (table on legacy classes)") {
 				@ui.Card(ui.CardProps{Flush: true}) {
 					@ui.CardHeader(nil) {
@@ -257,7 +260,7 @@ templ Gallery(csrfToken string) {
 			}
 			@section("components", "Components") {
 				<p class="text-sm text-muted-foreground">
-					Primitives above: Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb, Label, Field, Input, Textarea, Select, Checkbox, Switch, Dialog, and the confirm dialog. Dropdown, Popover, Tooltip, Tabs, Table, and Sheet land here with their variants as their PRs merge.
+					Primitives above: Button, Badge, Card, Alert, Skeleton, Avatar, Breadcrumb, Label, Field, Input, Textarea, Select, Checkbox, Switch, Dialog, the confirm dialog, Dropdown, Popover, and Tooltip. Tabs, Table, and Sheet land here with their variants as their PRs merge.
 				</p>
 			}
 		</main>

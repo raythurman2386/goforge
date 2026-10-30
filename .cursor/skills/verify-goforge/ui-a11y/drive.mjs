@@ -488,6 +488,378 @@ async function appDialogChecks(scheme, page) {
   page.setDefaultTimeout(30000);
 }
 
+// PR5 overlay checks on the gallery: Dropdown, Popover, and Tooltip on the
+// popover attribute, driven with the keyboard and the mouse. Menu actions
+// go only to the dev-only /dev/ui/dialog route.
+async function overlayChecks(scheme, page) {
+  const resp = await page.goto(BASE + "/dev/ui", { waitUntil: "load" });
+  if (!resp || resp.status() !== 200) return;
+  page.setDefaultTimeout(8000);
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  let okRequests = 0;
+  const onReq = (r) => {
+    if (r.url().includes("/dev/ui/dialog?ok=1")) okRequests++;
+  };
+  page.on("request", onReq);
+  let prompts = 0;
+  const onPrompt = (d) => {
+    prompts++;
+    d.dismiss().catch(() => {});
+  };
+  page.on("dialog", onPrompt);
+  const settle = (ms = 200) => page.waitForTimeout(ms);
+  const isOpen = (id) => page.$eval("#" + id, (el) => el.matches(":popover-open"));
+  const expanded = (id) => page.$eval("#" + id + "-trigger", (el) => el.getAttribute("aria-expanded"));
+  const act = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return { id: a.id || "", testid: a.getAttribute("data-testid") || "", text: (a.textContent || "").trim(), role: a.getAttribute("role") || "", tag: a.tagName };
+    });
+  const rect = (sel) => page.$eval(sel, (el) => el.getBoundingClientRect().toJSON());
+  const key = async (k) => {
+    await page.keyboard.press(k);
+    await settle(80);
+    return (await act()).text;
+  };
+  const M = "gallery-menu";
+
+  await t("dropdown-keyboard", async () => {
+    await page.focus("#" + M + "-trigger");
+    await page.keyboard.press("Enter");
+    await settle();
+    const open = await isOpen(M);
+    const exp = await expanded(M);
+    const first = await act();
+    const seq = [];
+    for (const k of ["ArrowDown", "ArrowDown", "End", "Home", "ArrowUp", "ArrowDown"]) seq.push(await key(k));
+    const ta = [];
+    for (const k of ["d", "d", "o"]) {
+      await page.waitForTimeout(600);
+      ta.push(await key(k));
+    }
+    await page.keyboard.press("Escape");
+    await settle();
+    const closed = !(await isOpen(M));
+    const exp2 = await expanded(M);
+    const back = await act();
+    const wantSeq = ["Duplicate", "Deploy", "Delete", "Overview", "Delete", "Overview"];
+    const wantTa = ["Duplicate", "Deploy", "Open dialog…"];
+    const ok =
+      open && exp === "true" && first.role === "menuitem" && first.text === "Overview" &&
+      seq.join("|") === wantSeq.join("|") && ta.join("|") === wantTa.join("|") &&
+      closed && exp2 === "false" && back.id === M + "-trigger";
+    check(scheme, "dropdown-keyboard", ok, `Enter open=${open} aria-expanded=${exp} focus=${first.role}:${first.text} keys=[${seq.join(",")}] typeahead=[${ta.join(",")}] Escape closed=${closed} aria-expanded=${exp2} focus=#${back.id}`);
+  });
+
+  await t("dropdown-open-keys", async () => {
+    await page.focus("#" + M + "-trigger");
+    await page.keyboard.press("ArrowUp");
+    await settle();
+    const up = (await act()).text;
+    await page.keyboard.press("Escape");
+    await settle();
+    await page.keyboard.press("ArrowDown");
+    await settle();
+    const down = (await act()).text;
+    await page.keyboard.press("Escape");
+    await settle();
+    await page.keyboard.press("Space");
+    await settle();
+    const space = (await act()).text;
+    const spaceOpen = await isOpen(M);
+    await page.keyboard.press("Tab");
+    await settle();
+    const tabClosed = !(await isOpen(M));
+    const afterTab = await act();
+    const ok = up === "Delete" && down === "Overview" && space === "Overview" && spaceOpen && tabClosed && afterTab.id === M + "-icon-trigger";
+    check(scheme, "dropdown-open-keys", ok, `ArrowUp->${up} ArrowDown->${down} Space->${space} Tab closed=${tabClosed} focus=#${afterTab.id}`);
+  });
+
+  await t("dropdown-placement", async () => {
+    await page.$eval("#" + M + "-trigger", (el) => el.scrollIntoView({ block: "center" }));
+    await page.click("#" + M + "-trigger");
+    await settle(300);
+    const tr = await rect("#" + M + "-trigger");
+    const mr = await rect("#" + M);
+    const placed = await page.$eval("#" + M, (el) => el.getAttribute("data-ui-placed"));
+    const focus = await act();
+    await page.keyboard.press("Escape");
+    await settle();
+    const below = placed === "bottom" && mr.top >= tr.bottom && mr.top - tr.bottom <= 10 && Math.abs(mr.left - tr.left) <= 1;
+    // Flip: put the trigger at the bottom edge of the viewport.
+    await page.$eval("#" + M + "-trigger", (el) => el.scrollIntoView({ block: "end" }));
+    await page.click("#" + M + "-trigger");
+    await settle(300);
+    const tr2 = await rect("#" + M + "-trigger");
+    const mr2 = await rect("#" + M);
+    const placed2 = await page.$eval("#" + M, (el) => el.getAttribute("data-ui-placed"));
+    await page.keyboard.press("Escape");
+    await settle();
+    const vh = await page.evaluate(() => document.documentElement.clientHeight);
+    const flipped = placed2 === "top" && mr2.bottom <= tr2.top && mr2.top >= 0 && tr2.bottom <= vh;
+    // End alignment on the icon menu.
+    await page.$eval("#" + M + "-icon-trigger", (el) => el.scrollIntoView({ block: "center" }));
+    await page.click("#" + M + "-icon-trigger");
+    await settle(300);
+    const ir = await rect("#" + M + "-icon-trigger");
+    const imr = await rect("#" + M + "-icon");
+    await page.keyboard.press("Escape");
+    await settle();
+    const endAligned = Math.abs(imr.right - ir.right) <= 1;
+    check(
+      scheme,
+      "dropdown-placement",
+      below && flipped && endAligned && focus.role === "menuitem",
+      `below=${below} (gap=${Math.round(mr.top - tr.bottom)}px) flip-top=${flipped} (menu.bottom=${Math.round(mr2.bottom)} trigger.top=${Math.round(tr2.top)}) end-aligned=${endAligned} click-open focus=${focus.role}`,
+    );
+  });
+
+  await t("dropdown-light-dismiss", async () => {
+    await page.$eval("#" + M + "-trigger", (el) => el.scrollIntoView({ block: "center" }));
+    await page.click("#" + M + "-trigger");
+    await settle();
+    const open = await isOpen(M);
+    await page.mouse.click(5, 5);
+    await settle();
+    const closed = !(await isOpen(M));
+    const exp = await expanded(M);
+    await page.click("#" + M + "-trigger");
+    await settle();
+    await page.click("#" + M + "-trigger");
+    await settle();
+    const toggled = !(await isOpen(M));
+    check(scheme, "dropdown-light-dismiss", open && closed && exp === "false" && toggled, `open=${open} outside-click closed=${closed} aria-expanded=${exp} trigger re-click closes=${toggled}`);
+  });
+
+  await t("dropdown-item-request", async () => {
+    okRequests = 0;
+    await page.focus("#" + M + "-trigger");
+    await page.keyboard.press("Enter");
+    await settle();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await settle(500);
+    const closed = !(await isOpen(M));
+    const back = await act();
+    check(scheme, "dropdown-item-request", okRequests === 1 && closed && back.id === M + "-trigger", `Enter on Duplicate requests=${okRequests} menu closed=${closed} focus=#${back.id}`);
+  });
+
+  await t("dropdown-dialog-return", async () => {
+    await page.focus("#" + M + "-trigger");
+    await page.keyboard.press("Enter");
+    await settle();
+    await page.keyboard.press("o");
+    const item = (await act()).text;
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('dialog[data-ui-dialog="ephemeral"][open]');
+    await settle(300);
+    const inDialog = await page.evaluate(() => !!document.activeElement.closest("dialog[open]"));
+    const menuClosed = !(await isOpen(M));
+    await page.keyboard.press("Escape");
+    await settle(300);
+    const gone = (await page.$('dialog[data-ui-dialog="ephemeral"]')) === null;
+    const back = await act();
+    check(scheme, "dropdown-dialog-return", item === "Open dialog…" && inDialog && menuClosed && gone && back.id === M + "-trigger", `item=${item} focus-in-dialog=${inDialog} menu closed=${menuClosed} Escape removed=${gone} focus=#${back.id}`);
+  });
+
+  await t("dropdown-confirm", async () => {
+    okRequests = 0;
+    await page.focus("#" + M + "-trigger");
+    await page.keyboard.press("ArrowUp");
+    await settle();
+    const item = (await act()).text;
+    await page.keyboard.press("Enter");
+    await page.waitForSelector("#ui-confirm[open]");
+    await settle();
+    const label = await page.$eval("#ui-confirm [data-ui-confirm-accept]", (el) => el.textContent.trim());
+    await page.keyboard.press("Escape");
+    await settle(300);
+    const back = await act();
+    check(scheme, "dropdown-confirm", item === "Delete" && label === "Delete" && okRequests === 0 && back.id === M + "-trigger", `item=${item} confirm label=${label} requests after Escape=${okRequests} focus=#${back.id}`);
+  });
+
+  const P = "gallery-popover";
+  await t("popover", async () => {
+    await page.focus("#" + P + "-trigger");
+    await page.keyboard.press("Enter");
+    await settle();
+    const open = await isOpen(P);
+    const exp = await expanded(P);
+    const inside = await page.evaluate((id) => document.getElementById(id).contains(document.activeElement), P);
+    const role = await page.$eval("#" + P, (el) => el.getAttribute("role") + "/" + document.getElementById(el.getAttribute("aria-labelledby")).textContent.trim());
+    await page.keyboard.press("Escape");
+    await settle();
+    const escClosed = !(await isOpen(P));
+    const back1 = (await act()).id;
+    await page.click("#" + P + "-trigger");
+    await settle();
+    await page.mouse.click(5, 5);
+    await settle();
+    const lightClosed = !(await isOpen(P));
+    await page.click("#" + P + "-trigger");
+    await settle();
+    await page.click('[data-testid="popover-done"]');
+    await settle();
+    const doneClosed = !(await isOpen(P));
+    const back2 = (await act()).id;
+    const exp2 = await expanded(P);
+    const ok = open && exp === "true" && inside && role === "dialog/About overlays" && escClosed && back1 === P + "-trigger" && lightClosed && doneClosed && back2 === P + "-trigger" && exp2 === "false";
+    check(scheme, "popover", ok, `Enter open=${open} aria-expanded=${exp} focus-inside=${inside} ${role} Escape closed=${escClosed} focus=#${back1} outside-click closed=${lightClosed} Got-it closed=${doneClosed} focus=#${back2}`);
+  });
+
+  const TIP = "gallery-tip-restart";
+  await t("tooltip-focus", async () => {
+    await page.mouse.move(2, 2);
+    await page.focus("#gallery-tip-trigger");
+    await page.waitForTimeout(100);
+    const early = await isOpen(TIP);
+    await page.waitForTimeout(400);
+    const shown = await isOpen(TIP);
+    const wiring = await page.$eval("#gallery-tip-trigger", (el) => el.getAttribute("aria-describedby") + "/" + el.getAttribute("aria-label"));
+    const role = await page.$eval("#" + TIP, (el) => el.getAttribute("role"));
+    const tr = await rect("#gallery-tip-trigger");
+    const tp = await rect("#" + TIP);
+    const above = tp.bottom <= tr.top && Math.abs(tp.left + tp.width / 2 - (tr.left + tr.width / 2)) <= 1;
+    await page.keyboard.press("Escape");
+    await settle();
+    const hidden = !(await isOpen(TIP));
+    const stay = (await act()).id;
+    const ok = !early && shown && role === "tooltip" && wiring === TIP + "/Restart web" && above && hidden && stay === "gallery-tip-trigger";
+    check(scheme, "tooltip-focus", ok, `at100ms=${early} at500ms=${shown} role=${role} describedby/label=${wiring} above-centered=${above} Escape hidden=${hidden} focus stays=#${stay}`);
+    await page.evaluate(() => document.activeElement.blur());
+  });
+
+  await t("tooltip-hover", async () => {
+    await page.mouse.move(2, 2);
+    await settle(300);
+    const tr = await rect("#gallery-tip-trigger");
+    await page.mouse.move(tr.left + tr.width / 2, tr.top + tr.height / 2, { steps: 3 });
+    await page.waitForTimeout(500);
+    const shown = await isOpen(TIP);
+    const tp = await rect("#" + TIP);
+    await page.mouse.move(tp.left + tp.width / 2, tp.top + tp.height / 2, { steps: 4 });
+    await page.waitForTimeout(400);
+    const hoverable = await isOpen(TIP);
+    await page.mouse.move(2, 2, { steps: 3 });
+    await page.waitForTimeout(400);
+    const left = !(await isOpen(TIP));
+    check(scheme, "tooltip-hover", shown && hoverable && left, `hover shows=${shown} pointer on tooltip keeps it=${hoverable} pointer away hides=${left}`);
+  });
+
+  await t("tooltip-escape-in-menu-trigger", async () => {
+    // A tooltip on a menu trigger: Escape hides the tooltip only; the icon
+    // trigger keeps its aria-label as the name.
+    await page.focus("#" + M + "-icon-trigger");
+    await page.waitForTimeout(500);
+    const shown = await isOpen("gallery-tip-more");
+    const name = await page.$eval("#" + M + "-icon-trigger", (el) => el.getAttribute("aria-label"));
+    await page.keyboard.press("Escape");
+    await settle();
+    const hidden = !(await isOpen("gallery-tip-more"));
+    const stay = (await act()).id;
+    check(scheme, "tooltip-icon-name", shown && hidden && name === "More actions" && stay === M + "-icon-trigger", `tooltip shown=${shown} Escape hidden=${hidden} aria-label=${name} focus=#${stay}`);
+    await page.evaluate(() => document.activeElement.blur());
+  });
+
+  await t("overlays-history", async () => {
+    await page.click("#" + M + "-trigger");
+    await settle();
+    const before = await isOpen(M);
+    await page.evaluate(() => document.body.dispatchEvent(new CustomEvent("htmx:beforeHistorySave", { bubbles: true })));
+    await settle();
+    const after = await isOpen(M);
+    const open = await page.$$eval("[data-ui-overlay]", (els) => els.filter((e) => e.matches(":popover-open")).length);
+    check(scheme, "overlays-history", before && !after && open === 0, `menu open=${before} after htmx:beforeHistorySave open=${after} overlays open=${open}`);
+  });
+
+  await t("overlays-axe", async () => {
+    await page.evaluate(AXE_SOURCE);
+    const run = (sel) =>
+      page.evaluate(
+        ([tags, sel]) => window.axe.run({ include: [[sel]] }, { runOnly: { type: "tag", values: tags }, resultTypes: ["violations"] }),
+        [AXE_TAGS, sel],
+      );
+    await page.click("#" + M + "-trigger");
+    await settle(300);
+    const r1 = await run("#" + M);
+    await page.keyboard.press("Escape");
+    await settle();
+    await page.click("#" + P + "-trigger");
+    await settle(300);
+    const r2 = await run("#" + P);
+    await page.keyboard.press("Escape");
+    await settle();
+    await page.focus("#gallery-tip-trigger");
+    await page.waitForTimeout(500);
+    const r3 = await run("#overlays");
+    await page.keyboard.press("Escape");
+    const bad = (r) => r.violations.filter((v) => GATE_IMPACTS.has(v.impact) && v.id !== "color-contrast").map((v) => `${v.id}(${v.impact})`);
+    const b = bad(r1).concat(bad(r2), bad(r3));
+    const all = r1.violations.concat(r2.violations, r3.violations).map((v) => `${v.id}(${v.impact})`);
+    check(scheme, "overlays-axe", b.length === 0, `serious/critical other than color-contrast=${b.length}${b.length ? " " + b.join(",") : ""} all=[${all.join(",")}]`);
+  });
+
+  page.off("request", onReq);
+  page.off("dialog", onPrompt);
+  check(scheme, "overlays-no-native-prompt", prompts === 0, `window.confirm prompts=${prompts}`);
+  page.setDefaultTimeout(30000);
+}
+
+// PR5 on the real project page: the EnvironmentSwitcher is a kit Dropdown.
+async function appEnvMenuChecks(scheme, page, projectHref) {
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  if (!projectHref) {
+    check(scheme, "app-env-menu", false, "no project to open (run drive-login first)");
+    return;
+  }
+  page.setDefaultTimeout(8000);
+  const settle = (ms = 200) => page.waitForTimeout(ms);
+  const act = () => page.evaluate(() => ({ id: document.activeElement.id, text: document.activeElement.textContent.trim(), role: document.activeElement.getAttribute("role") || "" }));
+  const isOpen = () => page.$eval("#env-menu", (el) => el.matches(":popover-open"));
+  await t("app-env-menu", async () => {
+    await page.goto(BASE + projectHref, { waitUntil: "load" });
+    const legacy = await page.$$eval('#menu-button, [aria-expanded="true"]', (els) => els.length);
+    const exp0 = await page.$eval("#env-menu-trigger", (el) => el.getAttribute("aria-expanded") + "/" + el.getAttribute("aria-haspopup"));
+    await page.focus("#env-menu-trigger");
+    await page.keyboard.press("Enter");
+    await settle();
+    const open = await isOpen();
+    const first = await act();
+    await page.keyboard.press("End");
+    await settle(80);
+    const last = await act();
+    await page.keyboard.press("Escape");
+    await settle();
+    const closed = !(await isOpen());
+    const back = await act();
+    const exp1 = await page.$eval("#env-menu-trigger", (el) => el.getAttribute("aria-expanded"));
+    const ok = legacy === 0 && exp0 === "false/menu" && open && first.role === "menuitem" && last.text.endsWith("New Environment") && closed && back.id === "env-menu-trigger" && exp1 === "false";
+    check(scheme, "app-env-menu", ok, `legacy #menu-button/aria-expanded=true=${legacy} initial=${exp0} Enter open=${open} first=${first.role}:${first.text} End=${last.text} Escape closed=${closed} focus=#${back.id} aria-expanded=${exp1}`);
+  });
+  await t("app-env-new-dialog", async () => {
+    await page.focus("#env-menu-trigger");
+    await page.keyboard.press("ArrowUp");
+    await settle();
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('dialog[data-ui-dialog="ephemeral"][open] #environment-name');
+    await settle(300);
+    const focus = await act();
+    await page.keyboard.press("Escape");
+    await settle(300);
+    const back = await act();
+    check(scheme, "app-env-new-dialog", focus.id === "environment-name" && back.id === "env-menu-trigger", `New Environment dialog focus=#${focus.id} Escape focus=#${back.id}`);
+  });
+  await t("app-env-link", async () => {
+    await page.focus("#env-menu-trigger");
+    await page.keyboard.press("ArrowDown");
+    await settle();
+    await Promise.all([page.waitForURL(/[?&]env=/, { timeout: 5000 }), page.keyboard.press("Enter")]);
+    const url = new URL(page.url());
+    check(scheme, "app-env-link", url.searchParams.has("env"), `Enter on first environment navigated to ${url.pathname}?env=…`);
+  });
+  page.setDefaultTimeout(30000);
+}
+
 // Sign in by posting the real login form from the browser context, so the
 // session cookie lands in the context's jar. drive-register stores the
 // password with a trailing newline (curl --data-urlencode @file sends it
@@ -530,11 +902,14 @@ async function main() {
       for (const route of custom || PUBLIC_ROUTES) results.push(await scan(page, scheme, route));
       await galleryChecks(browser, scheme, page);
       await dialogChecks(scheme, page);
+      await overlayChecks(scheme, page);
       if (!custom) {
         if (canLogin && (await login(page))) {
           lines.push(`login ${scheme} pass`);
           await appDialogChecks(scheme, page);
-          const routes = AUTH_ROUTES.concat(await projectRoutes(page));
+          const projectTabs = await projectRoutes(page);
+          await appEnvMenuChecks(scheme, page, projectTabs[0]);
+          const routes = AUTH_ROUTES.concat(projectTabs);
           for (const route of routes) results.push(await scan(page, scheme, route));
         } else {
           lines.push(`login ${scheme} ${canLogin ? "fail" : "skip reason=no-register-password"}`);

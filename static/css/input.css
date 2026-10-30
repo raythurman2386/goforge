@@ -362,6 +362,56 @@ dialog[data-ui-dialog][open]::backdrop {
 }
 
 /*
+ * Overlays (components/ui Dropdown, Popover, Tooltip) on the popover
+ * attribute. The browser puts an open panel in the top layer; ui.js sets
+ * its top and left next to the trigger. Without JS the panel still opens
+ * (popovertarget), at the UA's centered position. Plain CSS because
+ * Tailwind 3.4 has no utilities for :popover-open or @starting-style.
+ */
+[data-ui-overlay][popover] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  opacity: 0;
+  transform: translateY(-0.25rem);
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out,
+    overlay 120ms ease-out allow-discrete,
+    display 120ms ease-out allow-discrete;
+}
+
+[data-ui-overlay][popover]:not([data-ui-placed]) {
+  inset: 0;
+  margin: auto;
+}
+
+[data-ui-overlay][data-ui-placed="top"] {
+  transform: translateY(0.25rem);
+}
+
+[data-ui-overlay][popover]:popover-open {
+  opacity: 1;
+  transform: none;
+}
+
+@starting-style {
+  [data-ui-overlay][popover]:popover-open {
+    opacity: 0;
+  }
+}
+
+[data-ui-overlay="menu"],
+[data-ui-overlay="popover"] {
+  max-height: calc(100vh - 1rem);
+  overflow-y: auto;
+}
+
+[data-ui-overlay="tooltip"] {
+  pointer-events: auto;
+}
+
+/*
  * Reduced motion: drop transitions, smooth scrolling, and decorative
  * animations. Spinners keep turning (animate-spin) because they carry the
  * loading state; everything else ends on its final frame.
@@ -380,7 +430,8 @@ dialog[data-ui-dialog][open]::backdrop {
   }
 
   dialog[data-ui-dialog],
-  dialog[data-ui-dialog]::backdrop {
+  dialog[data-ui-dialog]::backdrop,
+  [data-ui-overlay][popover] {
     transition: none !important;
   }
 

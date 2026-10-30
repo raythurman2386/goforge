@@ -68,12 +68,14 @@ templ ListAPI(trackedContainers []*models.Container, dockerContainers []containe
 templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 	<tr class="hover:bg-gray-50/60 transition-colors dark:hover:bg-gray-800/50">
 		<td class="table-td pl-6 font-medium text-gray-900 dark:text-gray-100">
-			<a href={ templ.URL("/containers/" + dc.ID) } class="block truncate hover:text-primary-700 dark:hover:text-primary-300" title={ containerName(dc) }>
+			<a href={ templ.URL("/containers/" + dc.ID) } class="block truncate hover:text-primary-700 dark:hover:text-primary-300" { ui.TooltipAttrs(tipID(dc, "name"))... }>
 				{ containerName(dc) }
 			</a>
+			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "name"), Text: containerName(dc), Align: ui.AlignStart})
 		</td>
 		<td class="table-td">
-			<span class="block truncate font-mono text-xs text-gray-600 dark:text-gray-400" title={ dc.Image }>{ dc.Image }</span>
+			<span tabindex="0" class="block truncate rounded font-mono text-xs text-gray-600 dark:text-gray-400" { ui.TooltipAttrs(tipID(dc, "image"))... }>{ dc.Image }</span>
+			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "image"), Text: dc.Image, Align: ui.AlignStart, Class: "break-all font-mono"})
 		</td>
 		<td class="table-td">
 			@components.StatusBadge("container", string(dc.State))
@@ -88,53 +90,57 @@ templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 						Variant: ui.ButtonGhostWarning,
 						Size: ui.ButtonIcon,
 						Label: "Stop " + containerName(dc),
-						Attrs: templ.Attributes{
+						Attrs: ui.Attrs(ui.TooltipAttrs(tipID(dc, "stop")), templ.Attributes{
 							"hx-post": "/containers/" + dc.ID + "/stop",
 							"hx-confirm": "Are you sure you want to stop this container?",
 							"data-ui-confirm-tone": "danger",
 							"data-ui-confirm-label": "Stop",
 							"hx-disabled-elt": "this",
-							"title": "Stop",
-						},
+						}),
 					}) {
 						<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 							<rect x="6" y="6" width="12" height="12" rx="1.5" stroke-width="2"></rect>
 						</svg>
 					}
+					@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "stop"), Text: "Stop"})
 					@ui.Button(ui.ButtonProps{
 						Variant: ui.ButtonGhostPrimary,
 						Size: ui.ButtonIcon,
 						Label: "Restart " + containerName(dc),
-						Attrs: templ.Attributes{
+						Attrs: ui.Attrs(ui.TooltipAttrs(tipID(dc, "restart")), templ.Attributes{
 							"hx-post": "/containers/" + dc.ID + "/restart",
 							"hx-confirm": "Are you sure you want to restart this container?",
 							"data-ui-confirm-label": "Restart",
 							"hx-disabled-elt": "this",
-							"title": "Restart",
-						},
+						}),
 					}) {
 						<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
 						</svg>
 					}
+					@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "restart"), Text: "Restart"})
 				}
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonGhost,
 					Size: ui.ButtonIcon,
 					Href: templ.URL("/containers/" + dc.ID),
 					Label: "View " + containerName(dc),
-					Attrs: templ.Attributes{
-						"title": "View",
-					},
+					Attrs: ui.TooltipAttrs(tipID(dc, "view")),
 				}) {
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
 					</svg>
 				}
+				@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "view"), Text: "View"})
 			</div>
 		</td>
 	</tr>
+}
+
+// tipID is the id of one row tooltip: unique per container and field.
+func tipID(dc container.Summary, field string) string {
+	return "tip-" + field + "-" + dc.ID
 }
 
 // containerName is the Docker name without the leading slash.
