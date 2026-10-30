@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, maskedConn map[string]map[string]string, activeTab string, csrfToken string) {
+templ Detail(project *models.Project, envs []*models.Environment, currentEnv *models.Environment, latestDeployment *models.Deployment, deployments []*models.Deployment, activeContainer *models.Container, containerSummary *docker.InspectSummary, linkedServices []*models.ServiceInstance, availableServices []*models.ServiceInstance, maskedConn map[string]map[string]string, activeTab string, csrfToken string) {
 	@layouts.AppLayout(project.Name, csrfToken) {
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
@@ -75,7 +76,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 	</div>
 
 		if activeTab == "overview" {
-			@Overview(project, latestDeployment, activeContainer)
+			@Overview(project, latestDeployment, activeContainer, containerSummary)
 		} else if activeTab == "deployments" {
 			@Deployments(project, deployments)
 		} else if activeTab == "services" {
@@ -131,7 +132,7 @@ templ DeploymentStatusBanner(projectID string, deployment *models.Deployment) {
 	</div>
 }
 
-templ Overview(project *models.Project, latestDeployment *models.Deployment, activeContainer *models.Container) {
+templ Overview(project *models.Project, latestDeployment *models.Deployment, activeContainer *models.Container, containerSummary *docker.InspectSummary) {
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 		// Main info card
 		<div class="lg:col-span-2 card overflow-hidden !p-0">
@@ -210,21 +211,13 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 			</div>
 		</div>
 
+		// activeContainer is only ever a running container (see
+		// handlers.activeContainer); otherwise the card shows an empty state.
 		if activeContainer != nil {
-			<div class="card overflow-hidden !p-0 lg:col-span-3">
-				<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
-					<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Resource Usage</h3>
-					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Real-time container performance metrics.</p>
-				</div>
-				<div class="p-6" hx-ext="sse" sse-connect={ "/containers/" + activeContainer.DockerID + "/stats" }>
-					<div sse-swap="stats" class="flex items-center justify-center py-12">
-						<div class="flex flex-col items-center">
-							<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
-							<p class="text-sm text-gray-400 font-medium">Connecting to metrics stream...</p>
-						</div>
-					</div>
-				</div>
-			</div>
+			@components.ResourceUsageCard(activeContainer.DockerID, "lg:col-span-3")
+			@components.ContainerCard(activeContainer.DockerID, containerSummary, "lg:col-span-3")
+		} else if latestDeployment != nil {
+			@components.NoRunningContainer("lg:col-span-3")
 		}
 	</div>
 }

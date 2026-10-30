@@ -51,7 +51,7 @@ templ Detail(containerID string, csrfToken string) {
 			<div class="card-header">
 				<h3 class="card-title">Resource Usage</h3>
 			</div>
-			<div id="container-stats" class="card-body" hx-ext="sse" sse-connect={ fmt.Sprintf("/containers/%s/stats", containerID) } sse-swap="stats">
+			<div id="container-stats" class="card-body" hx-ext="sse" sse-connect={ fmt.Sprintf("/containers/%s/stats", containerID) } sse-swap="stats,unavailable">
 				@components.LoadingState("Waiting for stats...")
 			</div>
 		</div>

@@ -37,6 +37,7 @@ type ProjectHandler struct {
 	containerRepo          *repositories.ContainerRepository
 	projectServiceInstRepo *repositories.ProjectServiceInstanceRepository
 	instanceService        *services.InstanceService
+	inspector              containerInspector
 	logger                 *slog.Logger
 }
 
@@ -251,9 +252,10 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("failed to fetch latest deployment", "environment_id", currentEnv.ID, "error", err)
 		}
 		if err == nil && latestDeployment != nil && h.containerRepo != nil {
-			activeContainer = h.getActiveContainer(r.Context(), latestDeployment.ID)
+			activeContainer = h.getActiveContainer(r.Context(), currentEnv.ID, latestDeployment)
 		}
 	}
+	containerSummary := inspectSummary(r.Context(), h.inspector, activeContainer, h.logger)
 
 	tab := resolveTab(r.URL.Path)
 
@@ -274,7 +276,7 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		maskedConn[svc.ID] = services.MaskedConnectionInfo(h.instanceService.Template(svc.TemplateName), svc)
 	}
 
-	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, linkedServices, availableServices, maskedConn, tab, csrfToken)
+	component := projects.Detail(p, envs, currentEnv, latestDeployment, deployments, activeContainer, containerSummary, linkedServices, availableServices, maskedConn, tab, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render project detail page")
 	}
@@ -294,21 +296,22 @@ func (h *ProjectHandler) getCurrentEnv(envs []*models.Environment, envID string)
 	return envs[0]
 }
 
-func (h *ProjectHandler) getActiveContainer(ctx context.Context, deploymentID string) *models.Container {
-	containers, err := h.containerRepo.ListByDeploymentID(ctx, deploymentID)
-	if err != nil {
-		h.logger.Warn("failed to list containers for deployment", "deployment_id", deploymentID, "error", err)
+func (h *ProjectHandler) getActiveContainer(ctx context.Context, envID string, latest *models.Deployment) *models.Container {
+	if h.containerRepo == nil {
 		return nil
 	}
-	if len(containers) == 0 {
-		return nil
+	var deployments deploymentLister
+	if h.deploymentRepo != nil {
+		deployments = h.deploymentRepo
 	}
-	for _, c := range containers {
-		if c.Status == models.ContainerStatusRunning {
-			return c
-		}
-	}
-	return containers[0]
+	return activeContainer(ctx, h.containerRepo, deployments, envID, latest, h.logger)
+}
+
+// WithInspector lets the project overview show the Container card from
+// Docker inspect. Without it the card says details are unavailable.
+func (h *ProjectHandler) WithInspector(insp containerInspector) *ProjectHandler {
+	h.inspector = insp
+	return h
 }
 
 // resolveTab determines the active tab from the URL path suffix.

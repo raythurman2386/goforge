@@ -1,0 +1,39 @@
+package components
+
+// MetricsStreamID is the id of the element that owns a container's stats
+// EventSource. It is keyed by Docker ID so hx-preserve keeps the same stream
+// across a poll swap while the container is unchanged, and a recreate (new
+// Docker ID) opens a new stream.
+func MetricsStreamID(dockerID string) string {
+	return "metrics-stream-" + dockerID
+}
+
+// ResourceUsageCard streams live stats for one container. The stream swaps
+// in a "stats" frame or an "unavailable" frame that says why there is none.
+templ ResourceUsageCard(dockerID string, class string) {
+	<div class={ "card overflow-hidden !p-0", class } data-resource-usage>
+		<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
+			<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Resource Usage</h3>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Real-time container performance metrics.</p>
+		</div>
+		<div class="p-6" id={ MetricsStreamID(dockerID) } hx-preserve="true" hx-ext="sse" sse-connect={ "/containers/" + dockerID + "/stats" }>
+			<div sse-swap="stats,unavailable" class="flex items-center justify-center py-12">
+				<div class="flex flex-col items-center">
+					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
+					<p class="text-sm text-gray-400 font-medium">Connecting to metrics stream...</p>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// NoRunningContainer is the Resource Usage empty state when there is no
+// running container to stream.
+templ NoRunningContainer(class string) {
+	<div class={ "card overflow-hidden !p-0", class } data-resource-usage-empty>
+		<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
+			<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Resource Usage</h3>
+		</div>
+		<p class="px-6 py-8 text-sm text-center text-gray-500 dark:text-gray-400">No running container for this environment.</p>
+	</div>
+}

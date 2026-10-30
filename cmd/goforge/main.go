@@ -422,6 +422,8 @@ func runServer() error {
 	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments"))
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments"))
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services"))
+	projectHandler.WithInspector(dockerClient)
+	serviceHandler.WithInspector(dockerClient)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).
 		WithRestorePoints(&backup.RestorePointLister{

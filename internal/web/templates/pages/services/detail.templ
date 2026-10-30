@@ -3,6 +3,7 @@ package pages_services
 import (
 	"net/url"
 
+	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
@@ -14,20 +15,24 @@ func isPending(instance *models.ServiceInstance) bool {
 	return instance.Status == models.ServiceStatusPending || instance.Status == models.ServiceStatusStarting
 }
 
-templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl *services.ServiceTemplate, csrfToken string) {
+// Detail renders a service instance. summary is the Docker inspect summary
+// of container, or nil when there is no container or inspect failed.
+templ Detail(instance *models.ServiceInstance, container *models.Container, summary *docker.InspectSummary, tmpl *services.ServiceTemplate, csrfToken string) {
 	@layouts.AppLayout(instance.Name, csrfToken) {
-		// When pending/starting, poll the full detail page to pick up container + status changes.
-		if isPending(instance) {
-			<div
-				id="service-detail-poll"
-				hx-get={ "/services/" + instance.ID }
-				hx-trigger="every 3s"
-				hx-select="#service-detail-content"
-				hx-target="#service-detail-content"
-				hx-swap="outerHTML"
-			></div>
-		}
 		<div id="service-detail-content">
+			// When pending/starting, poll the full detail page to pick up container
+			// and status changes. The poll lives inside the swapped region, so the
+			// first non-pending render drops it and polling stops.
+			if isPending(instance) {
+				<div
+					id="service-detail-poll"
+					hx-get={ "/services/" + instance.ID }
+					hx-trigger="every 3s"
+					hx-select="#service-detail-content"
+					hx-target="#service-detail-content"
+					hx-swap="outerHTML"
+				></div>
+			}
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">
 					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">
@@ -90,21 +95,11 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, tmpl
 			</div>
 
 			if container != nil {
-			<div class="card overflow-hidden !p-0 mb-8">
-				<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
-					<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Resource Usage</h3>
-					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Real-time container performance metrics.</p>
-				</div>
-				<div class="p-6" hx-ext="sse" sse-connect={ "/containers/" + container.DockerID + "/stats" }>
-					<div sse-swap="stats" class="flex items-center justify-center py-12">
-						<div class="flex flex-col items-center">
-							<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
-							<p class="text-sm text-gray-400 font-medium">Connecting to metrics stream...</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		}
+				// hx-preserve on the stream keeps it open across pending polls
+				// while the Docker ID is unchanged.
+				@components.ResourceUsageCard(container.DockerID, "mb-8")
+				@components.ContainerCard(container.DockerID, summary, "mb-8")
+			}
 
 		<div class="card overflow-hidden !p-0">
 			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">

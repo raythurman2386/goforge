@@ -17,7 +17,15 @@ import (
 type ServiceHandler struct {
 	catalog         *services.Catalog
 	instanceService *services.InstanceService
+	inspector       containerInspector
 	logger          *slog.Logger
+}
+
+// WithInspector lets service detail show the Container card from Docker
+// inspect. Without it the card says details are unavailable.
+func (h *ServiceHandler) WithInspector(insp containerInspector) *ServiceHandler {
+	h.inspector = insp
+	return h
 }
 
 // NewServiceHandler creates a new ServiceHandler.
@@ -156,7 +164,7 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages_services.Detail(instance, container, tmpl, csrfToken)
+	component := pages_services.Detail(instance, container, inspectSummary(r.Context(), h.inspector, container, h.logger), tmpl, csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render detail page")
 	}
