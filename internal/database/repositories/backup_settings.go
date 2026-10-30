@@ -37,6 +37,12 @@ func NewBackupSettingsRepository(db *sql.DB, enc *secrets.Encryptor) *BackupSett
 // Get returns the row, or ErrNotFound when no admin has saved settings yet.
 // A database that has not run migration 020 also reads as ErrNotFound, so
 // `goforge backup run` against an older schema keeps using the environment.
+//
+// When the keys do not decrypt with the current ENCRYPTION_KEY, Get returns
+// ErrBackupSettingsUnreadable together with the row: every non-secret column
+// is filled in and both keys are blank, so an admin can see the settings and
+// enter the keys again. Callers that run backups must treat the error as
+// fatal for the row.
 func (r *BackupSettingsRepository) Get(ctx context.Context) (*models.BackupSettings, error) {
 	var s models.BackupSettings
 	var akSealed, skSealed string
@@ -57,12 +63,12 @@ func (r *BackupSettingsRepository) Get(ctx context.Context) (*models.BackupSetti
 		return nil, fmt.Errorf("failed to read backup settings: %w", err)
 	}
 	s.Timeout = time.Duration(timeoutSec) * time.Second
-	if s.AccessKeyID, err = r.open(akSealed); err != nil {
-		return nil, err
+	ak, akErr := r.open(akSealed)
+	sk, skErr := r.open(skSealed)
+	if akErr != nil || skErr != nil {
+		return &s, ErrBackupSettingsUnreadable
 	}
-	if s.SecretAccessKey, err = r.open(skSealed); err != nil {
-		return nil, err
-	}
+	s.AccessKeyID, s.SecretAccessKey = ak, sk
 	return &s, nil
 }
 

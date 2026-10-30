@@ -97,6 +97,12 @@ type Config struct {
 	// while BACKUP_S3_BUCKET is unset.
 	Backup BackupConfig
 
+	// BackupEnvErr is why BACKUP_* in the environment is invalid, or nil.
+	// Load does not fail on it: the environment only matters while no
+	// backup_settings row exists, which is known after the database is
+	// open (see backup.CheckEnv). Messages never contain the keys.
+	BackupEnvErr error
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -258,11 +264,11 @@ func fillDevSecret(current, stored string, changed bool) (value, persisted strin
 
 // validate checks that required configuration is present.
 func (c *Config) validate() error {
-	// Backup settings are checked in every mode once a bucket is set, so a
-	// typo fails at startup instead of at 02:00.
-	if err := c.Backup.validate(); err != nil {
-		return err
-	}
+	// BACKUP_* is checked in every mode once a bucket is set, so a typo
+	// fails at startup instead of at 02:00. The error is kept rather than
+	// returned: once saved backup settings exist they win and BACKUP_* is
+	// ignored, so serve and `goforge backup run` decide after reading the row.
+	c.BackupEnvErr = c.Backup.validate()
 
 	// In dev mode, we're more lenient
 	if c.DevMode {

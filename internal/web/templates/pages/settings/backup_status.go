@@ -86,8 +86,37 @@ func backupSourceLine(f *backup.SettingsView) string {
 	return "Read from BACKUP_* in your env file (.env). Saving here stores them in GoForge, and the saved settings win from then on."
 }
 
+// keysUnreadableNote is shown next to each key when the saved keys do not
+// decrypt with the current ENCRYPTION_KEY.
+const keysUnreadableNote = "Saved, but it does not decrypt with the current ENCRYPTION_KEY. Enter it again."
+
+// backupOffLine explains why backups are off and what turns them on. It
+// never tells the admin to edit BACKUP_* once saved settings exist, because
+// the environment is ignored then.
+func backupOffLine(st *backup.Status, form *backup.SettingsView) string {
+	switch {
+	case form != nil && form.KeysUnreadable:
+		return "Backups are off: the saved keys do not decrypt with the current ENCRYPTION_KEY. Enter both keys again below, tick Enabled, and save."
+	case form != nil:
+		return "Backups are off. Fill in the destination below and tick Enabled to turn on nightly backups."
+	case st.ConfiguredBy == backup.SourceSettings:
+		return "Backups are off. The saved backup settings could not be loaded; see the GoForge log."
+	default:
+		return "Backups are off. Set BACKUP_S3_BUCKET and the other BACKUP_* settings in your env file (.env) to turn on nightly backups."
+	}
+}
+
+func backupOffClass(form *backup.SettingsView) string {
+	if form != nil && form.KeysUnreadable {
+		return "text-amber-700 dark:text-amber-300"
+	}
+	return "text-gray-500 dark:text-gray-400"
+}
+
 func accessKeyState(f *backup.SettingsView) string {
 	switch {
+	case f.KeysUnreadable:
+		return keysUnreadableNote
 	case f.AccessKeyHint != "":
 		return "Set, ending in " + f.AccessKeyHint + ". Leave blank to keep it."
 	case f.AccessKeySet:
@@ -105,6 +134,9 @@ func accessKeyPlaceholder(f *backup.SettingsView) string {
 }
 
 func secretState(f *backup.SettingsView) string {
+	if f.KeysUnreadable {
+		return keysUnreadableNote
+	}
 	if f.SecretSet {
 		return "Set. Leave blank to keep it; type a new one to rotate it."
 	}

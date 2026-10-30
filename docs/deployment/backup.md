@@ -17,7 +17,7 @@ An admin sets backups up in the web UI: **Settings → Profile → Backups**. Th
 The `BACKUP_*` variables in your env file (`.env`) still work. They are the starting point and the fallback:
 
 1. With no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies the `BACKUP_*` values into the saved settings on its first start after the upgrade and logs `imported BACKUP_* into backup settings`. From then on, edit them in Settings → Profile.
-2. Once saved settings exist, they win. Changing `BACKUP_*` afterwards has no effect, and GoForge logs a warning that names the fields that differ. You can remove the keys from your env file once the import has happened.
+2. Once saved settings exist, they win. Changing `BACKUP_*` afterwards has no effect, and GoForge logs a warning that names the fields that differ. After the import, remove **every** `BACKUP_*` line from your env file (`.env`), not only the two keys, then recreate the container (`docker compose up -d goforge`) so they leave its environment.
 3. With no saved settings and no bucket, backups are off.
 
 ```bash
@@ -34,14 +34,22 @@ BACKUP_RETENTION_DAILY=7
 BACKUP_TIMEOUT=2h
 ```
 
-With a bucket set in your env file (`.env`), a missing endpoint or key stops GoForge at startup with a message naming the variable. See [Environment Variables](../configuration/index.md#backups). The form checks the same rules and names the field that is wrong.
+While no saved settings exist, a bucket in your env file (`.env`) with a missing endpoint or key, or another bad `BACKUP_*` value, stops GoForge at startup with a message naming the variable. See [Environment Variables](../configuration/index.md#backups). Once saved settings exist, the same mistake no longer stops GoForge: `BACKUP_*` is ignored and GoForge logs `BACKUP_* in the environment is invalid and ignored because saved backup settings exist`. So a half-removed env file (keys gone, bucket still there) still starts. An older GoForge would refuse it, which is one more reason to remove every `BACKUP_*` line. The form checks the same rules and names the field that is wrong.
+
+### If ENCRYPTION_KEY changes
+
+The saved access key ID and secret are sealed with `ENCRYPTION_KEY`. If GoForge starts with a different key (lost, rotated, or a restore onto a new server), the keys no longer decrypt:
+
+- Backups stay off. GoForge does not fall back to `BACKUP_*`. It logs `saved backup keys do not decrypt with the current ENCRYPTION_KEY; backups stay off until an admin enters both keys again in Settings → Profile → Backups`. `goforge backup run` fails with the same advice.
+- Settings → Profile → Backups still shows the endpoint, bucket, prefix, region, schedule, retention, and timeout. Both key fields say the saved key does not decrypt.
+- Enter **both** the access key ID and the secret, tick Enabled, and save. GoForge stores them sealed with the current key and backups resume with no restart. A save with only one key, or none, is refused with a message naming the problem. Test connection also needs both keys.
 
 `goforge backup run` uses the same settings as the server: the saved settings if they exist, otherwise `BACKUP_*`.
 
 Use a key that can only read, write, list, and delete in this one bucket. Encryption is the provider's at-rest encryption; GoForge does not encrypt the files itself. Anyone with the key can read the dumps.
 
 !!! danger "Keep ENCRYPTION_KEY outside the server"
-    The GoForge database holds service passwords, tokens, and env vars encrypted with `ENCRYPTION_KEY`. The key is never written to a backup, a log line, or a run's error. Without a copy of it, a restored database cannot decrypt those values. Store it, with the rest of your env file (`.env`), in a password manager. If the key is lost, the saved backup keys cannot be decrypted either: backups stay off until an admin saves them again.
+    The GoForge database holds service passwords, tokens, and env vars encrypted with `ENCRYPTION_KEY`. The key is never written to a backup, a log line, or a run's error. Without a copy of it, a restored database cannot decrypt those values. Store it, with the rest of your env file (`.env`), in a password manager. If the key is lost, the saved backup keys cannot be decrypted either: backups stay off until an admin enters both keys again in Settings → Profile → Backups (see [If ENCRYPTION_KEY changes](#if-encryption_key-changes)).
 
 ## What a run backs up
 

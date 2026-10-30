@@ -76,13 +76,29 @@ func TestBackupSettingsRepository_SealedRoundTrip(t *testing.T) {
 	}
 
 	// A different ENCRYPTION_KEY cannot read the keys.
-	if err := repo.Upsert(ctx, in); err != nil {
+	if err = repo.Upsert(ctx, in); err != nil {
 		t.Fatal(err)
 	}
 	key, _ := secrets.GenerateKeyString(32)
 	other, _ := secrets.NewEncryptorFromString(key)
-	if _, err := NewBackupSettingsRepository(db, other).Get(ctx); !errors.Is(err, ErrBackupSettingsUnreadable) {
+	otherRepo := NewBackupSettingsRepository(db, other)
+	partial, err := otherRepo.Get(ctx)
+	if !errors.Is(err, ErrBackupSettingsUnreadable) {
 		t.Fatalf("Get with another key = %v, want ErrBackupSettingsUnreadable", err)
+	}
+	// The non-secret columns still come back so an admin can re-enter keys.
+	if partial == nil || partial.Bucket != "b1" || partial.Endpoint != "https://s3.example.test" || partial.RetentionDaily != 9 ||
+		partial.Schedule != "03:15 America/Chicago" || !partial.Enabled || partial.AccessKeyID != "" || partial.SecretAccessKey != "" {
+		t.Fatalf("partial row = %+v", partial)
+	}
+	// Re-entering both keys overwrites the row without decrypting the old ones.
+	partial.AccessKeyID, partial.SecretAccessKey = "AKIA-recovered-0002", "sk-recovered-secret-value"
+	if upErr := otherRepo.Upsert(ctx, partial); upErr != nil {
+		t.Fatal(upErr)
+	}
+	recovered, err := otherRepo.Get(ctx)
+	if err != nil || recovered.AccessKeyID != "AKIA-recovered-0002" || recovered.SecretAccessKey != "sk-recovered-secret-value" || recovered.Bucket != "b1" {
+		t.Fatalf("after re-entering keys: %+v, %v", recovered, err)
 	}
 	if err := NewBackupSettingsRepository(db, nil).Upsert(ctx, in); err == nil {
 		t.Fatal("Upsert without an encryptor stored keys")

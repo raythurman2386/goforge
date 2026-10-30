@@ -18,6 +18,10 @@ type memSettings struct {
 	row     *models.BackupSettings
 	upserts int
 	getErr  error
+	// unreadable mimics the repository when the sealed keys do not decrypt:
+	// Get returns the row with blank keys and ErrBackupSettingsUnreadable.
+	// An Upsert seals new keys with the current key, so it clears this.
+	unreadable bool
 }
 
 func (m *memSettings) Get(context.Context) (*models.BackupSettings, error) {
@@ -30,6 +34,10 @@ func (m *memSettings) Get(context.Context) (*models.BackupSettings, error) {
 		return nil, repositories.ErrNotFound
 	}
 	cp := *m.row
+	if m.unreadable {
+		cp.AccessKeyID, cp.SecretAccessKey = "", ""
+		return &cp, repositories.ErrBackupSettingsUnreadable
+	}
 	return &cp, nil
 }
 
@@ -40,6 +48,7 @@ func (m *memSettings) Upsert(_ context.Context, s *models.BackupSettings) error 
 	cp.UpdatedAt = time.Now()
 	m.row = &cp
 	m.upserts++
+	m.unreadable = false
 	return nil
 }
 
@@ -323,5 +332,147 @@ func TestChangedFields_NamesOnly(t *testing.T) {
 	b.SecretAccessKey, b.RetentionDaily, b.ForcePathStyle = "x", 9, true
 	if got := strings.Join(ChangedFields(a, b), ","); got != "secret_access_key,force_path_style,retention_daily" {
 		t.Errorf("changed = %s", got)
+	}
+}
+
+// unreadableStore is a saved, enabled row whose keys no longer decrypt (for
+// example after ENCRYPTION_KEY was replaced).
+func unreadableStore() *memSettings {
+	row := SettingsFromConfig(envBackup())
+	row.Bucket, row.Endpoint, row.Prefix = "db-bucket", "https://db.example.com", "nightly/"
+	row.Schedule, row.RetentionDaily, row.Timeout, row.ForcePathStyle = "04:15 UTC", 9, 90*time.Minute, true
+	row.UpdatedAt = time.Date(2026, 10, 30, 15, 0, 0, 0, time.UTC)
+	return &memSettings{row: row, unreadable: true}
+}
+
+func TestUnreadableKeys_ViewShowsNonSecretColumns(t *testing.T) {
+	store := unreadableStore()
+	svc := &SettingsService{Store: store, Env: envBackup()}
+	v, err := svc.View(context.Background())
+	if err != nil || v == nil {
+		t.Fatalf("View = %v, %v; want the form", v, err)
+	}
+	if !v.KeysUnreadable || v.Source != SourceSettings || v.Enabled || v.AccessKeySet || v.SecretSet || v.AccessKeyHint != "" {
+		t.Fatalf("key state: %+v", v)
+	}
+	if v.Endpoint != "https://db.example.com" || v.Bucket != "db-bucket" || v.Prefix != "nightly/" || v.Region != "auto" ||
+		!v.ForcePathStyle || v.ScheduleTime != "04:15" || v.ScheduleZone != "UTC" || v.RetentionDaily != 9 ||
+		v.Timeout != "1h30m" || v.UpdatedAt == nil {
+		t.Fatalf("non-secret columns not shown: %+v", v)
+	}
+}
+
+func TestUnreadableKeys_SaveNeedsBothKeysThenRecovers(t *testing.T) {
+	ctx := context.Background()
+	store := unreadableStore()
+	live := &applied{}
+	svc := &SettingsService{Store: store, Env: envBackup(), Live: live}
+	cur := ConfigFromSettings(store.row)
+	in := formFrom(cur)
+	in.Enabled, in.RetentionDaily, in.Timeout = true, "9", "1h30m"
+
+	for name, keys := range map[string][2]string{"none": {"", ""}, "id only": {"NEWKEYID-1234-ABCD", ""}, "secret only": {"", "new-secret-value-5678"}} {
+		try := in
+		try.AccessKeyID, try.SecretAccessKey = keys[0], keys[1]
+		_, err := svc.Save(ctx, try, "u1")
+		var fe *config.BackupFieldError
+		if !errors.As(err, &fe) || fe.Field != "access_key_id" || !strings.Contains(fe.Message, "ENCRYPTION_KEY") {
+			t.Fatalf("%s: Save = %v, want access_key_id field error", name, err)
+		}
+	}
+	if store.upserts != 0 || len(live.cfgs) != 0 {
+		t.Fatalf("rejected saves wrote: upserts=%d applies=%d", store.upserts, len(live.cfgs))
+	}
+
+	const newID, newSecret = "NEWKEYID-1234-ABCD", "new-secret-value-5678"
+	in.AccessKeyID, in.SecretAccessKey = newID, newSecret
+	changed, err := svc.Save(ctx, in, "u1")
+	if err != nil {
+		t.Fatalf("Save with both keys: %v", err)
+	}
+	if store.upserts != 1 || len(live.cfgs) != 1 || !live.cfgs[0].Enabled() || live.srcs[0] != SourceSettings {
+		t.Fatalf("recovery did not store and apply: upserts=%d applies=%+v", store.upserts, live.cfgs)
+	}
+	got, _, err := Effective(ctx, store, envBackup())
+	if err != nil || got.AccessKeyID != newID || got.SecretAccessKey != newSecret || got.Bucket != "db-bucket" || got.RetentionDaily != 9 {
+		t.Fatalf("after recovery Effective = %+v, %v", got, err)
+	}
+	joined := strings.Join(changed, ",")
+	if !strings.Contains(joined, "access_key_id") || !strings.Contains(joined, "secret_access_key") || strings.Contains(joined, newSecret) {
+		t.Fatalf("changed = %v", changed)
+	}
+}
+
+func TestUnreadableKeys_ClearWhileDisabled(t *testing.T) {
+	store := unreadableStore()
+	svc := &SettingsService{Store: store, Env: envBackup()}
+	in := formFrom(ConfigFromSettings(store.row))
+	in.Enabled, in.ClearCredentials, in.RetentionDaily, in.Timeout = false, true, "9", "1h30m"
+	if _, err := svc.Save(context.Background(), in, ""); err != nil {
+		t.Fatalf("clear while disabled: %v", err)
+	}
+	if store.unreadable || store.row.AccessKeyID != "" || store.row.SecretAccessKey != "" || store.row.Enabled || store.row.Bucket != "db-bucket" {
+		t.Fatalf("row after clear: %+v", store.row)
+	}
+}
+
+func TestUnreadableKeys_TestNeedsBothKeys(t *testing.T) {
+	store := unreadableStore()
+	probed := false
+	svc := &SettingsService{Store: store, Env: envBackup(), Probe: func(context.Context, config.BackupConfig) (bool, error) {
+		probed = true
+		return false, nil
+	}}
+	in := formFrom(ConfigFromSettings(store.row))
+	in.RetentionDaily, in.Timeout = "9", "1h30m"
+	var fe *config.BackupFieldError
+	if _, err := svc.Test(context.Background(), in); !errors.As(err, &fe) || probed {
+		t.Fatalf("Test with blank keys = %v probed=%v", err, probed)
+	}
+	in.AccessKeyID, in.SecretAccessKey = "NEWKEYID-1234-ABCD", "new-secret-value-5678"
+	if _, err := svc.Test(context.Background(), in); err != nil || !probed {
+		t.Fatalf("Test with both keys = %v probed=%v", err, probed)
+	}
+	if store.upserts != 0 {
+		t.Fatal("Test stored settings")
+	}
+}
+
+func TestUnreadableKeys_EffectiveStaysOff(t *testing.T) {
+	// serve and `goforge backup run` must not fall back to BACKUP_*.
+	if _, _, err := Effective(context.Background(), unreadableStore(), envBackup()); !errors.Is(err, repositories.ErrBackupSettingsUnreadable) {
+		t.Fatalf("Effective = %v, want ErrBackupSettingsUnreadable", err)
+	}
+}
+
+func TestCheckEnv(t *testing.T) {
+	ctx := context.Background()
+	envErr := errors.New("BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY are required when BACKUP_S3_BUCKET is set")
+	dbErr := errors.New("connection refused")
+	withRow := &memSettings{row: SettingsFromConfig(envBackup())}
+	tests := []struct {
+		name        string
+		store       SettingsStore
+		envErr      error
+		wantIgnored bool
+		wantErr     bool
+	}{
+		{"valid env", &memSettings{}, nil, false, false},
+		{"no store", nil, envErr, false, true},
+		{"no row: env is the config, fail", &memSettings{}, envErr, false, true},
+		{"row exists: env ignored", withRow, envErr, true, false},
+		{"unreadable row: env ignored", unreadableStore(), envErr, true, false},
+		{"database error: fail", &memSettings{getErr: dbErr}, envErr, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ignored, err := CheckEnv(ctx, tt.store, tt.envErr)
+			if ignored != tt.wantIgnored || (err != nil) != tt.wantErr {
+				t.Fatalf("CheckEnv = %v, %v; want ignored=%v err=%v", ignored, err, tt.wantIgnored, tt.wantErr)
+			}
+			if err != nil && !errors.Is(err, envErr) {
+				t.Fatalf("error does not wrap the env error: %v", err)
+			}
+		})
 	}
 }

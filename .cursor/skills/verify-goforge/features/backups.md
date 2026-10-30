@@ -19,6 +19,8 @@ Configuration lives in the `backup_settings` row (migration 020) that an admin e
 - `backup-settings-csrf-403`: a save without the CSRF token is `403` and changes nothing.
 - `backup-settings-live-apply`: a save logs `next backup scheduled` for the new schedule with no restart; turning Enabled off logs `backups disabled` and keeps the other settings.
 - `backup-settings-test-connection`: Test connection returns `200` against a reachable bucket, and `502` with no secret in the body for a wrong secret.
+- `backup-settings-unreadable-keys`: when the saved keys do not decrypt with the current `ENCRYPTION_KEY`, backups stay off (no fallback to `BACKUP_*`), the form shows the non-secret settings and asks for both keys, a save with fewer than two keys is `400`, and a save with both turns backups back on with no restart. Unit-tested in `internal/backup/settings_test.go` (`TestUnreadableKeys_*`) and the repository test.
+- `backup-env-ignored`: with saved settings present, an incomplete `BACKUP_*` (for example bucket set, keys removed) does not stop serve; it logs `BACKUP_* in the environment is invalid and ignored`. With no saved settings the same env still stops startup. Unit-tested as `TestCheckEnv`.
 - `backup-status` returns `403` to a non-admin token on `GET /api/v1/backups`, and Settings shows no backup card to a non-admin.
 
 ## How to get to it (user POV)
@@ -54,7 +56,7 @@ verify.sh drive-register && verify.sh drive-login && verify.sh drive-backup-sett
 
 With registration open, `register-closed`, `register-closed-post`, and `register-admin-role` in `register-verdict.txt` read `fail`. That is expected there.
 
-The run smoke is the integration test. The maintained smoke is the integration test, which starts its own throwaway containers (names `gfbk-it-*`): MinIO (`cgr.dev/chainguard/minio`), `postgres:17-alpine`, `gitea/gitea:1.25.5`, `vaultwarden/server:latest`, and volumes for each. It removes them when it ends.
+The run smoke is the integration test, which starts its own throwaway containers (names `gfbk-it-*`): MinIO (`cgr.dev/chainguard/minio`), `postgres:17-alpine`, `gitea/gitea:1.25.5`, `vaultwarden/server:latest`, and volumes for each. It removes them when it ends.
 
 Preconditions:
 
@@ -78,7 +80,6 @@ Proof: keep the `go test -v` output in `/tmp/goforge-verify/proof/backups-integr
 - On minis the live `goforge-goforge-1` holds `127.0.0.1:8080`, so `launch` refuses. Do not stop it; use host mode above.
 - Do not name a file `$STATE_DIR/app.log`: an earlier drive version scanned the log through that path and truncated a host log written there. The drive now uses a `mktemp` file and fails if the captured log is empty.
 - Docker needs root on minis (`sudo -n docker`): `--env-file` works through sudo, `<(...)` process substitution and inherited `-e VAR` do not.
-
 - `docker.io/minio/minio` and `quay.io/minio/minio` did not pull on minis on 2026-10-29. The test uses `cgr.dev/chainguard/minio`.
 - If the Docker socket needs root, run the test with `sudo`, then give the Go caches back (`chown -R`).
 - Do not probe a starting Gitea with `sqlite3 /data/gitea/gitea.db` as root. sqlite3 creates a missing file, and Gitea then fails with "attempt to write a readonly database".

@@ -168,18 +168,25 @@ func TestLoad_BackupEnabledValidation(t *testing.T) {
 			for k, v := range tt.override {
 				os.Setenv(k, v)
 			}
+			// Load never fails on BACKUP_*: once saved settings exist they win,
+			// which is only known after the database is open (backup.CheckEnv).
+			// The error is kept in BackupEnvErr instead.
 			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
 			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("err = %v, want mention of %s", err, tt.wantErr)
+				envErr := cfg.BackupEnvErr
+				if envErr == nil || !strings.Contains(envErr.Error(), tt.wantErr) {
+					t.Fatalf("BackupEnvErr = %v, want mention of %s", envErr, tt.wantErr)
 				}
-				if strings.Contains(err.Error(), "topsecret") {
-					t.Fatalf("error leaks the secret: %v", err)
+				if strings.Contains(envErr.Error(), "topsecret") {
+					t.Fatalf("error leaks the secret: %v", envErr)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("Load: %v", err)
+			if cfg.BackupEnvErr != nil {
+				t.Fatalf("BackupEnvErr: %v", cfg.BackupEnvErr)
 			}
 			if cfg.Backup.Prefix != "nightly/" {
 				t.Errorf("prefix = %q, want nightly/", cfg.Backup.Prefix)

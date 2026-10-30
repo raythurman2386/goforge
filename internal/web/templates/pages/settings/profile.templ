@@ -257,12 +257,8 @@ templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string)
 	<div class="card mb-8" id="backup-status">
 		<h3 class="card-title mb-2">Backups</h3>
 		if !st.Enabled {
-			<p class="text-sm text-gray-500 dark:text-gray-400" data-testid="backup-off">
-				if form != nil {
-					Backups are off. Fill in the destination below and tick Enabled to turn on nightly backups.
-				} else {
-					Backups are off. Set <code>BACKUP_S3_BUCKET</code> and the other <code>BACKUP_*</code> settings to turn on nightly backups.
-				}
+			<p class={ "text-sm", backupOffClass(form) } data-testid="backup-off">
+				{ backupOffLine(st, form) }
 			</p>
 		} else {
 			<p class={ "text-sm", backupLineClass(st) } data-testid="backup-last">

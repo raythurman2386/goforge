@@ -72,6 +72,30 @@ func Effective(ctx context.Context, store SettingsStore, env config.BackupConfig
 	return ConfigFromSettings(row), SourceSettings, nil
 }
 
+// CheckEnv decides whether an invalid BACKUP_* environment (envErr, from
+// config.Load) stops serve or `goforge backup run`. While no backup_settings
+// row exists the environment is the config, so envErr is returned. Once a
+// row exists, readable or not, it wins and BACKUP_* is ignored: CheckEnv
+// returns ignored=true and no error, so an operator who removed only some
+// BACKUP_* lines after the import can still start GoForge.
+func CheckEnv(ctx context.Context, store SettingsStore, envErr error) (ignored bool, err error) {
+	if envErr == nil {
+		return false, nil
+	}
+	if store == nil {
+		return false, envErr
+	}
+	_, gerr := store.Get(ctx)
+	switch {
+	case gerr == nil, errors.Is(gerr, repositories.ErrBackupSettingsUnreadable):
+		return true, nil
+	case errors.Is(gerr, repositories.ErrNotFound):
+		return false, envErr
+	default:
+		return false, fmt.Errorf("%w (could not check for saved backup settings: %w)", envErr, gerr)
+	}
+}
+
 // AutoImport copies the BACKUP_* environment into the Settings row on first
 // start: only when no row exists and BACKUP_S3_BUCKET is set. It reports
 // whether it wrote the row.
@@ -221,6 +245,9 @@ type SettingsView struct {
 	RetentionDaily int
 	Timeout        string
 	UpdatedAt      *time.Time
+	// KeysUnreadable means the saved keys do not decrypt with the current
+	// ENCRYPTION_KEY. Backups are off until both keys are entered again.
+	KeysUnreadable bool
 }
 
 // accessKeyHint is the last four characters of a long access key ID, or ""
@@ -276,23 +303,71 @@ func formatTimeout(d time.Duration) string {
 	return s
 }
 
-// current is the effective config the form edits.
-func (s *SettingsService) current(ctx context.Context) (config.BackupConfig, string, error) {
-	return Effective(ctx, s.Store, s.Env)
+// formState is what the form edits: the effective config, where it came
+// from, when the row was last saved, and whether its keys are unreadable.
+type formState struct {
+	cfg            config.BackupConfig
+	source         string
+	updatedAt      *time.Time
+	keysUnreadable bool
+}
+
+// errKeysUnreadable is the form error when the saved keys do not decrypt
+// and the form does not supply both new keys.
+var errKeysUnreadable = &config.BackupFieldError{
+	Field:   "access_key_id",
+	Message: "the saved keys do not decrypt with the current ENCRYPTION_KEY; enter both the access key ID and the secret access key again",
+}
+
+// current reads the config the form edits. Unlike Effective, a row whose
+// keys do not decrypt is returned (with blank keys and keysUnreadable set),
+// so an admin can recover by entering the keys again.
+func (s *SettingsService) current(ctx context.Context) (formState, error) {
+	if s.Store == nil {
+		return formState{cfg: s.Env, source: SourceEnvironment}, nil
+	}
+	row, err := s.Store.Get(ctx)
+	switch {
+	case errors.Is(err, repositories.ErrNotFound):
+		return formState{cfg: s.Env, source: SourceEnvironment}, nil
+	case errors.Is(err, repositories.ErrBackupSettingsUnreadable) && row != nil:
+		row.AccessKeyID, row.SecretAccessKey = "", ""
+		t := row.UpdatedAt
+		return formState{cfg: ConfigFromSettings(row), source: SourceSettings, updatedAt: &t, keysUnreadable: true}, nil
+	case err != nil:
+		return formState{}, err
+	}
+	t := row.UpdatedAt
+	return formState{cfg: ConfigFromSettings(row), source: SourceSettings, updatedAt: &t}, nil
+}
+
+// needsBothKeys rejects a form that would keep unreadable keys. Clearing
+// both keys while disabled is allowed too.
+func (st formState) needsBothKeys(in SettingsInput) error {
+	if !st.keysUnreadable {
+		return nil
+	}
+	if in.ClearCredentials && !in.Enabled {
+		return nil
+	}
+	if strings.TrimSpace(in.AccessKeyID) == "" || strings.TrimSpace(in.SecretAccessKey) == "" {
+		return errKeysUnreadable
+	}
+	return nil
 }
 
 // View returns the form view.
 func (s *SettingsService) View(ctx context.Context) (*SettingsView, error) {
-	cfg, source, err := s.current(ctx)
+	st, err := s.current(ctx)
 	if err != nil {
 		return nil, err
 	}
-	v := NewSettingsView(cfg, source)
-	if source == SourceSettings && s.Store != nil {
-		if row, rerr := s.Store.Get(ctx); rerr == nil {
-			t := row.UpdatedAt
-			v.UpdatedAt = &t
-		}
+	v := NewSettingsView(st.cfg, st.source)
+	v.UpdatedAt = st.updatedAt
+	v.KeysUnreadable = st.keysUnreadable
+	if st.keysUnreadable {
+		// The row says enabled, but nothing runs until the keys are back.
+		v.Enabled = false
 	}
 	return v, nil
 }
@@ -300,11 +375,19 @@ func (s *SettingsService) View(ctx context.Context) (*SettingsView, error) {
 // Save validates the form against the current settings, stores the row, and
 // applies it live. It returns the changed field names (never values).
 // Validation errors are *config.BackupFieldError and store nothing.
+//
+// When the saved keys do not decrypt, the form must supply both new keys
+// (or clear them with backups off). The row is then rewritten whole, so the
+// old sealed keys never need to decrypt.
 func (s *SettingsService) Save(ctx context.Context, in SettingsInput, userID string) ([]string, error) {
-	cur, source, err := s.current(ctx)
+	st, err := s.current(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if keysErr := st.needsBothKeys(in); keysErr != nil {
+		return nil, keysErr
+	}
+	cur := st.cfg
 	next, err := in.Apply(cur)
 	if err != nil {
 		return nil, err
@@ -313,7 +396,7 @@ func (s *SettingsService) Save(ctx context.Context, in SettingsInput, userID str
 		return nil, err
 	}
 	changed := ChangedFields(cur, next)
-	if len(changed) == 0 && source == SourceSettings {
+	if len(changed) == 0 && st.source == SourceSettings && !st.keysUnreadable {
 		return nil, nil
 	}
 	row := SettingsFromConfig(next)
@@ -340,12 +423,15 @@ func (e *ProbeError) Error() string { return e.Message }
 // prefix. It stores nothing. Validation errors are *config.BackupFieldError;
 // a failed probe is *ProbeError with a redacted message.
 func (s *SettingsService) Test(ctx context.Context, in SettingsInput) (string, error) {
-	cur, _, err := s.current(ctx)
+	st, err := s.current(ctx)
 	if err != nil {
 		return "", err
 	}
 	in.Enabled = true // the destination fields are required to test
-	next, err := in.Apply(cur)
+	if keysErr := st.needsBothKeys(in); keysErr != nil {
+		return "", keysErr
+	}
+	next, err := in.Apply(st.cfg)
 	if err != nil {
 		return "", err
 	}

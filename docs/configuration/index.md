@@ -129,7 +129,7 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 ## Backups
 
-Nightly backups to S3-compatible storage. An admin edits these in **Settings → Profile → Backups**, and a save applies without a restart. The variables below are the starting point: with no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies them into the saved settings on its first start. Once saved settings exist they win, and later changes to these variables are ignored with a warning in the log. With neither, backups are off. `goforge backup run` uses the same settings. See [Backup & Restore](../deployment/backup.md#turn-it-on).
+Nightly backups to S3-compatible storage. An admin edits these in **Settings → Profile → Backups**, and a save applies without a restart. The variables below are the starting point: with no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies them into the saved settings on its first start. Once saved settings exist they win, and later changes to these variables are ignored with a warning in the log; an incomplete or invalid `BACKUP_*` set no longer stops startup then. With no saved settings, an invalid set stops GoForge at startup. After the import, remove every `BACKUP_*` line from your env file (`.env`). With neither, backups are off. `goforge backup run` uses the same settings. See [Backup & Restore](../deployment/backup.md#turn-it-on).
 
 | Variable | Default | Description |
 |----------|---------|-------------|

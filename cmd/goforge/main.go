@@ -216,7 +216,16 @@ func runBackupOnce(ctx context.Context) error {
 		return fmt.Errorf("failed to create encryptor: %w", err)
 	}
 	// Same config serve uses: the Settings row when one exists, else BACKUP_*.
-	bc, _, err := backup.Effective(ctx, repositories.NewBackupSettingsRepository(db.DB, enc), cfg.Backup)
+	store := repositories.NewBackupSettingsRepository(db.DB, enc)
+	if ignored, cerr := backup.CheckEnv(ctx, store, cfg.BackupEnvErr); cerr != nil {
+		return fmt.Errorf("invalid backup configuration: %w", cerr)
+	} else if ignored {
+		log.Warn("BACKUP_* in the environment is invalid and ignored because saved backup settings exist; remove every BACKUP_* line from your env file", "error", cfg.BackupEnvErr)
+	}
+	bc, _, err := backup.Effective(ctx, store, cfg.Backup)
+	if errors.Is(err, repositories.ErrBackupSettingsUnreadable) {
+		return fmt.Errorf("read backup settings: %w; an admin must enter both keys again in Settings → Profile → Backups", err)
+	}
 	if err != nil {
 		return fmt.Errorf("read backup settings: %w", err)
 	}
@@ -347,7 +356,9 @@ func runServer() error {
 	}()
 	backupRuns := repositories.NewBackupRunRepository(db.DB)
 	backupSettingsRepo := repositories.NewBackupSettingsRepository(db.DB, secretService)
-	startBackups(backgroundCtx, backupManager, backupSettingsRepo, cfg.Backup, backupLog)
+	if err := startBackups(backgroundCtx, backupManager, backupSettingsRepo, cfg.Backup, cfg.BackupEnvErr, backupLog); err != nil {
+		return err
+	}
 	backupStatus := &backup.StatusReader{Live: backupManager, Runs: backupRuns}
 	backupSettings := &backup.SettingsService{
 		Store: backupSettingsRepo, Env: cfg.Backup, Live: backupManager,
@@ -526,26 +537,41 @@ func runServer() error {
 	return nil
 }
 
-// startBackups imports BACKUP_* into the Settings row on first start, then
-// starts the scheduler for the effective config (the row when one exists,
-// else BACKUP_*). Values are never logged.
-func startBackups(ctx context.Context, m *backup.Manager, store backup.SettingsStore, env config.BackupConfig, log *slog.Logger) {
-	imported, err := backup.AutoImport(ctx, store, env)
-	switch {
-	case err != nil:
-		log.Error("backup settings import failed; using BACKUP_* from the environment", "error", err)
-	case imported:
-		log.Info("imported BACKUP_* into backup settings; edit them in Settings → Profile from now on")
+// startBackups checks BACKUP_* against the Settings row, imports BACKUP_*
+// into the row on first start, then hands the effective config to the
+// Manager. It fails only when no row exists and BACKUP_* is invalid, which is
+// the old fail-at-startup behavior for the environment.
+func startBackups(ctx context.Context, m *backup.Manager, store backup.SettingsStore, env config.BackupConfig, envErr error, log *slog.Logger) error {
+	ignored, err := backup.CheckEnv(ctx, store, envErr)
+	if err != nil {
+		return fmt.Errorf("invalid backup configuration: %w", err)
+	}
+	if ignored {
+		log.Warn("BACKUP_* in the environment is invalid and ignored because saved backup settings exist; remove every BACKUP_* line from your env file", "error", envErr)
+	} else {
+		imported, ierr := backup.AutoImport(ctx, store, env)
+		switch {
+		case ierr != nil:
+			log.Error("backup settings import failed; using BACKUP_* from the environment", "error", ierr)
+		case imported:
+			log.Info("imported BACKUP_* into backup settings; edit them in Settings → Profile from now on and remove every BACKUP_* line from your env file")
+		}
 	}
 	eff, source, err := backup.Effective(ctx, store, env)
-	if err != nil {
-		// Unreadable row (wrong ENCRYPTION_KEY?): stay off rather than fall
-		// back to env and back up somewhere the admin did not pick.
-		log.Error("backup settings unreadable; backups stay off until they are saved again in Settings → Profile", "error", err)
+	switch {
+	case errors.Is(err, repositories.ErrBackupSettingsUnreadable):
+		// Stay off rather than fall back to env and back up somewhere the
+		// admin did not pick. The form shows the other settings and asks
+		// for both keys again.
+		log.Error("saved backup keys do not decrypt with the current ENCRYPTION_KEY; backups stay off until an admin enters both keys again in Settings → Profile → Backups")
 		eff, source = config.BackupConfig{Disabled: true}, backup.SourceSettings
-	} else if source == backup.SourceSettings && env.Enabled() && len(backup.ChangedFields(env, eff)) > 0 {
+	case err != nil:
+		log.Error("backup settings unreadable; backups stay off", "error", err)
+		eff, source = config.BackupConfig{Disabled: true}, backup.SourceSettings
+	case !ignored && source == backup.SourceSettings && env.Enabled() && len(backup.ChangedFields(env, eff)) > 0:
 		log.Warn("BACKUP_* in the environment differ from the saved backup settings; the saved settings win",
 			"fields", backup.ChangedFields(env, eff))
 	}
 	m.Apply(eff, source) //nolint:contextcheck // the Manager runs on the serve lifetime context it was built with
+	return nil
 }

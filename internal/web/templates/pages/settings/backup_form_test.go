@@ -62,3 +62,45 @@ func TestProfile_NonAdminHasNoBackupCard(t *testing.T) {
 		t.Error("API token alert not updated")
 	}
 }
+
+func TestBackupCard_UnreadableKeysAsksForBothKeys(t *testing.T) {
+	view := backup.NewSettingsView(config.BackupConfig{
+		Endpoint: "https://s3.example.com", Region: "auto", Bucket: "bk", Prefix: "goforge/",
+		Schedule: "02:00 America/Chicago", RetentionDaily: 7, Timeout: 2 * time.Hour,
+	}, backup.SourceSettings)
+	view.KeysUnreadable = true
+	var b bytes.Buffer
+	if err := BackupCard(&backup.Status{ConfiguredBy: backup.SourceSettings}, view, "tok").Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	got := b.String()
+	for _, want := range []string{
+		"the saved keys do not decrypt with the current ENCRYPTION_KEY", "Enter both keys again below",
+		"does not decrypt with the current ENCRYPTION_KEY. Enter it again.", `value="bk"`, `value="https://s3.example.com"`,
+		`hx-put="/settings/backups"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("card missing %q", want)
+		}
+	}
+	if strings.Contains(got, "BACKUP_S3_BUCKET") || strings.Contains(got, "Leave blank to keep") {
+		t.Fatalf("card points at env or promises to keep unreadable keys: %s", got)
+	}
+}
+
+func TestBackupCard_OffLineDoesNotPointAtEnvOnceSaved(t *testing.T) {
+	var b bytes.Buffer
+	if err := BackupCard(&backup.Status{ConfiguredBy: backup.SourceSettings}, nil, "").Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if got := b.String(); strings.Contains(got, "BACKUP_S3_BUCKET") || !strings.Contains(got, "could not be loaded") {
+		t.Fatalf("off line with saved settings: %s", got)
+	}
+	b.Reset()
+	if err := BackupCard(&backup.Status{ConfiguredBy: backup.SourceEnvironment}, nil, "").Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if got := b.String(); !strings.Contains(got, "BACKUP_S3_BUCKET") {
+		t.Fatalf("off line from env: %s", got)
+	}
+}
