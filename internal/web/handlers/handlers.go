@@ -54,16 +54,18 @@ func RenderError(w http.ResponseWriter, r *http.Request, status int, message str
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
+	// Signed-in users get the app shell and a dashboard link; others get sign in.
+	signedIn := auth.GetUserFromContext(r.Context()) != nil
 	var component templ.Component
 	switch status {
 	case http.StatusNotFound:
-		component = errors.NotFound(csrfToken)
+		component = errors.NotFound(csrfToken, signedIn)
 	case http.StatusForbidden:
-		component = errors.Forbidden(csrfToken)
+		component = errors.Forbidden(csrfToken, signedIn)
 	case http.StatusInternalServerError:
-		component = errors.InternalError(csrfToken)
+		component = errors.InternalError(csrfToken, signedIn)
 	default:
-		component = errors.ErrorPage(status, http.StatusText(status), message, csrfToken)
+		component = errors.ErrorPage(status, http.StatusText(status), message, csrfToken, signedIn)
 	}
 
 	w.WriteHeader(status)
