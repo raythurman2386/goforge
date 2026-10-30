@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/go-chi/chi/v5"
+	"github.com/moby/moby/api/pkg/stdcopy"
 
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"

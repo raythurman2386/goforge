@@ -15,8 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
@@ -33,12 +32,12 @@ func TestGiteaPostStartBootstrap(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	api, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	api, err := client.New(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		t.Skipf("docker client: %v", err)
 	}
 	defer api.Close()
-	if _, pingErr := api.Ping(ctx); pingErr != nil {
+	if _, pingErr := api.Ping(ctx, client.PingOptions{}); pingErr != nil {
 		t.Skipf("docker not reachable: %v", pingErr)
 	}
 	dc, err := docker.NewClient("")
@@ -54,13 +53,13 @@ func TestGiteaPostStartBootstrap(t *testing.T) {
 	id := "it43-" + hex.EncodeToString(suffix)
 	netName := "goforge-it43-" + hex.EncodeToString(suffix)
 
-	if _, err = api.NetworkCreate(ctx, netName, network.CreateOptions{}); err != nil {
+	if _, err = api.NetworkCreate(ctx, netName, client.NetworkCreateOptions{}); err != nil {
 		t.Fatalf("create network: %v", err)
 	}
 	t.Cleanup(func() {
 		cctx, ccancel := context.WithTimeout(context.Background(), time.Minute)
 		defer ccancel()
-		if rmErr := api.NetworkRemove(cctx, netName); rmErr != nil {
+		if _, rmErr := api.NetworkRemove(cctx, netName, client.NetworkRemoveOptions{}); rmErr != nil {
 			t.Logf("remove network %s: %v", netName, rmErr)
 		}
 	})
@@ -105,7 +104,7 @@ func TestGiteaPostStartBootstrap(t *testing.T) {
 			}
 		}
 		vol := VolumeName(id, "data")
-		if rmErr := api.VolumeRemove(cctx, vol, true); rmErr != nil {
+		if _, rmErr := api.VolumeRemove(cctx, vol, client.VolumeRemoveOptions{Force: true}); rmErr != nil {
 			t.Logf("remove volume %s: %v", vol, rmErr)
 		}
 	})
@@ -120,7 +119,7 @@ func TestGiteaPostStartBootstrap(t *testing.T) {
 	}
 	t.Logf("first post_start run finished %s after create", time.Since(start).Round(time.Second))
 
-	info, err := api.ContainerInspect(ctx, dockerID)
+	info, err := inspectContainer(ctx, api, dockerID)
 	if err != nil {
 		t.Fatal(err)
 	}

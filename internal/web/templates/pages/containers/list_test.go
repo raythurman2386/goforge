@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types"
+	"github.com/moby/moby/api/types/container"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -26,7 +26,7 @@ func TestContainerRowShowsType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		var buf bytes.Buffer
-		dc := types.Container{ID: tt.id, Names: []string{"/app-" + tt.id}, Image: "nginx:latest", State: "running"}
+		dc := container.Summary{ID: tt.id, Names: []string{"/app-" + tt.id}, Image: "nginx:latest", State: "running"}
 		if err := ContainerRow(dc, tracked).Render(context.Background(), &buf); err != nil {
 			t.Fatal(err)
 		}

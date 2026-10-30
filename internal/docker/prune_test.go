@@ -4,41 +4,44 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/client"
 )
 
 func TestCleanupSystem_ScopesToManagedLabel(t *testing.T) {
 	t.Parallel()
 
-	var imageFilters, containerFilters filters.Args
+	var imageFilters, containerFilters client.Filters
 	api := &mockDockerAPI{
-		imagesPruneFunc: func(_ context.Context, pruneFilters filters.Args) (image.PruneReport, error) {
-			imageFilters = pruneFilters
-			return image.PruneReport{}, nil
+		imagesPruneFunc: func(_ context.Context, opts client.ImagePruneOptions) (client.ImagePruneResult, error) {
+			imageFilters = opts.Filters
+			return client.ImagePruneResult{}, nil
 		},
-		containersPrune: func(_ context.Context, pruneFilters filters.Args) (container.PruneReport, error) {
-			containerFilters = pruneFilters
-			return container.PruneReport{}, nil
+		containersPrune: func(_ context.Context, opts client.ContainerPruneOptions) (client.ContainerPruneResult, error) {
+			containerFilters = opts.Filters
+			return client.ContainerPruneResult{}, nil
 		},
 	}
 
-	client := &Client{docker: api}
-	if err := client.CleanupSystem(context.Background()); err != nil {
+	c := &Client{docker: api}
+	if err := c.CleanupSystem(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	if !imageFilters.ExactMatch("label", ManagedLabelFilter) {
+	if !exactMatch(imageFilters, "label", ManagedLabelFilter) {
 		t.Fatalf("image prune filters = %#v", imageFilters)
 	}
-	if !imageFilters.ExactMatch("dangling", "false") {
+	if !exactMatch(imageFilters, "dangling", "false") {
 		t.Fatal("image prune should include dangling=false")
 	}
-	if !containerFilters.ExactMatch("label", ManagedLabelFilter) {
+	if !exactMatch(containerFilters, "label", ManagedLabelFilter) {
 		t.Fatalf("container prune filters = %#v", containerFilters)
 	}
-	if len(containerFilters.Get("dangling")) != 0 {
+	if len(containerFilters["dangling"]) != 0 {
 		t.Fatalf("container prune should not set dangling: %#v", containerFilters)
 	}
+}
+
+// exactMatch reports whether term is set to exactly the single value want.
+func exactMatch(f client.Filters, term, want string) bool {
+	return len(f[term]) == 1 && f[term][want]
 }

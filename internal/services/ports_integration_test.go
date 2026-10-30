@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/netip"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -19,11 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
@@ -42,12 +41,12 @@ func TestGiteaSSHPublish(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
 
-	api, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	api, err := client.New(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		t.Skipf("docker client: %v", err)
 	}
 	defer api.Close()
-	if _, pingErr := api.Ping(ctx); pingErr != nil {
+	if _, pingErr := api.Ping(ctx, client.PingOptions{}); pingErr != nil {
 		t.Skipf("docker not reachable: %v", pingErr)
 	}
 	dc, err := docker.NewClient("")
@@ -64,14 +63,14 @@ func TestGiteaSSHPublish(t *testing.T) {
 	netName := "goforge-it42-" + hex.EncodeToString(suffix)
 	containerName := "goforge-service-" + id
 
-	if _, err = api.NetworkCreate(ctx, netName, network.CreateOptions{}); err != nil {
+	if _, err = api.NetworkCreate(ctx, netName, client.NetworkCreateOptions{}); err != nil {
 		t.Fatalf("create network: %v", err)
 	}
 	// Registered first, so it runs last: containers, then volume, then network.
 	t.Cleanup(func() {
 		cctx, ccancel := context.WithTimeout(context.Background(), time.Minute)
 		defer ccancel()
-		if rmErr := api.NetworkRemove(cctx, netName); rmErr != nil {
+		if _, rmErr := api.NetworkRemove(cctx, netName, client.NetworkRemoveOptions{}); rmErr != nil {
 			t.Logf("remove network %s: %v", netName, rmErr)
 		}
 	})
@@ -79,17 +78,17 @@ func TestGiteaSSHPublish(t *testing.T) {
 		cctx, ccancel := context.WithTimeout(context.Background(), time.Minute)
 		defer ccancel()
 		// Every container whose name carries this run's id, including a parked one.
-		list, listErr := api.ContainerList(cctx, container.ListOptions{All: true, Filters: filters.NewArgs(filters.Arg("name", id))})
+		list, listErr := api.ContainerList(cctx, client.ContainerListOptions{All: true, Filters: make(client.Filters).Add("name", id)})
 		if listErr != nil {
 			t.Logf("list containers: %v", listErr)
 		}
-		for _, c := range list {
-			if rmErr := api.ContainerRemove(cctx, c.ID, container.RemoveOptions{Force: true}); rmErr != nil {
+		for _, c := range list.Items {
+			if _, rmErr := api.ContainerRemove(cctx, c.ID, client.ContainerRemoveOptions{Force: true}); rmErr != nil {
 				t.Logf("remove container %v: %v", c.Names, rmErr)
 			}
 		}
 		vol := VolumeName(id, "data")
-		if rmErr := api.VolumeRemove(cctx, vol, true); rmErr != nil {
+		if _, rmErr := api.VolumeRemove(cctx, vol, client.VolumeRemoveOptions{Force: true}); rmErr != nil {
 			t.Logf("remove volume %s: %v", vol, rmErr)
 		}
 	})
@@ -132,15 +131,15 @@ func TestGiteaSSHPublish(t *testing.T) {
 	first := store.current()
 	t.Logf("deployed %s in %s, ssh_port %d", containerName, time.Since(start).Round(time.Second), sshPort)
 
-	info, err := api.ContainerInspect(ctx, first.DockerID)
+	info, err := inspectContainer(ctx, api, first.DockerID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	startedAt := info.State.StartedAt
 
 	t.Run("PortBindings loopback only", func(t *testing.T) {
-		want := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: strconv.Itoa(sshPort)}}
-		got := info.HostConfig.PortBindings[nat.Port("22/tcp")]
+		want := []network.PortBinding{{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: strconv.Itoa(sshPort)}}
+		got := info.HostConfig.PortBindings[network.MustParsePort("22/tcp")]
 		if len(got) != 1 || got[0] != want[0] {
 			t.Errorf("HostConfig.PortBindings[22/tcp] = %v, want %v", got, want)
 		}
@@ -149,7 +148,7 @@ func TestGiteaSSHPublish(t *testing.T) {
 		}
 		for port, bindings := range info.NetworkSettings.Ports {
 			for _, b := range bindings {
-				if b.HostIP != "127.0.0.1" {
+				if b.HostIP != netip.MustParseAddr("127.0.0.1") {
 					t.Errorf("NetworkSettings.Ports[%s] binds %s:%s, want 127.0.0.1 only", port, b.HostIP, b.HostPort)
 				}
 			}
@@ -259,7 +258,7 @@ func TestGiteaSSHPublish(t *testing.T) {
 		if cur := store.current(); cur == nil || cur.DockerID != first.DockerID {
 			t.Errorf("container row = %+v, want the original %s", cur, first.DockerID)
 		}
-		after, iErr := api.ContainerInspect(ctx, first.DockerID)
+		after, iErr := inspectContainer(ctx, api, first.DockerID)
 		if iErr != nil {
 			t.Fatalf("old container gone: %v", iErr)
 		}
@@ -270,14 +269,14 @@ func TestGiteaSSHPublish(t *testing.T) {
 			t.Errorf("old container state = %s, want running", after.State.Status)
 		}
 		t.Logf("old container StartedAt %s -> %s (stopped for the attempt, then started again)", startedAt, after.State.StartedAt)
-		got := after.HostConfig.PortBindings[nat.Port("22/tcp")]
-		if len(got) != 1 || got[0].HostIP != "127.0.0.1" || got[0].HostPort != strconv.Itoa(sshPort) {
+		got := after.HostConfig.PortBindings[network.MustParsePort("22/tcp")]
+		if len(got) != 1 || got[0].HostIP != netip.MustParseAddr("127.0.0.1") || got[0].HostPort != strconv.Itoa(sshPort) {
 			t.Errorf("old container PortBindings = %v, want 127.0.0.1:%d", got, sshPort)
 		}
-		list, _ := api.ContainerList(ctx, container.ListOptions{All: true, Filters: filters.NewArgs(filters.Arg("name", id))})
-		if len(list) != 1 {
-			names := make([]string, 0, len(list))
-			for _, c := range list {
+		list, _ := api.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: make(client.Filters).Add("name", id)})
+		if len(list.Items) != 1 {
+			names := make([]string, 0, len(list.Items))
+			for _, c := range list.Items {
 				names = append(names, strings.Join(c.Names, ","))
 			}
 			t.Errorf("containers for %s = %v, want only the restored one", id, names)
@@ -424,4 +423,11 @@ func (m *memStore) containers() *mockContainerRepository {
 			return nil
 		},
 	}
+}
+
+// inspectContainer returns the inspect body for id, dropping the raw JSON the
+// Moby client also returns.
+func inspectContainer(ctx context.Context, api *client.Client, id string) (container.InspectResponse, error) {
+	res, err := api.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+	return res.Container, err
 }

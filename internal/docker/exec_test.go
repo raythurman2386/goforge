@@ -1,63 +1,70 @@
 package docker
 
 import (
-	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
+
+// writeFrame appends one frame of Docker's multiplexed stream format: an
+// 8-byte header (stream type, three zero bytes, big-endian payload length)
+// followed by the payload.
+func writeFrame(buf *bytes.Buffer, stream stdcopy.StdType, payload string) {
+	var hdr [8]byte
+	hdr[0] = byte(stream)
+	binary.BigEndian.PutUint32(hdr[4:], uint32(len(payload)))
+	buf.Write(hdr[:])
+	buf.WriteString(payload)
+}
 
 // hijacked returns an exec attach response whose stream carries stdout and
 // stderr in Docker's multiplexed framing.
-func hijacked(t *testing.T, stdout, stderr string) types.HijackedResponse {
+func hijacked(t *testing.T, stdout, stderr string) client.ExecAttachResult {
 	t.Helper()
 	var framed bytes.Buffer
 	if stdout != "" {
-		if _, err := stdcopy.NewStdWriter(&framed, stdcopy.Stdout).Write([]byte(stdout)); err != nil {
-			t.Fatal(err)
-		}
+		writeFrame(&framed, stdcopy.Stdout, stdout)
 	}
 	if stderr != "" {
-		if _, err := stdcopy.NewStdWriter(&framed, stdcopy.Stderr).Write([]byte(stderr)); err != nil {
-			t.Fatal(err)
-		}
+		writeFrame(&framed, stdcopy.Stderr, stderr)
 	}
-	client, server := net.Pipe()
+	conn, server := net.Pipe()
 	go func() {
 		_, _ = server.Write(framed.Bytes())
 		_ = server.Close()
 	}()
-	return types.HijackedResponse{Conn: client, Reader: bufio.NewReader(client)}
+	return client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(conn, "")}
 }
 
 func TestClient_Exec(t *testing.T) {
 	t.Parallel()
 
-	var gotOpts container.ExecOptions
+	var gotOpts client.ExecCreateOptions
 	inspects := 0
 	api := &mockDockerAPI{
-		execCreateFunc: func(_ context.Context, id string, opts container.ExecOptions) (types.IDResponse, error) {
+		execCreateFunc: func(_ context.Context, id string, opts client.ExecCreateOptions) (client.ExecCreateResult, error) {
 			if id != "ctr" {
 				t.Errorf("exec container = %q, want ctr", id)
 			}
 			gotOpts = opts
-			return types.IDResponse{ID: "exec-1"}, nil
+			return client.ExecCreateResult{ID: "exec-1"}, nil
 		},
-		execAttachFunc: func(_ context.Context, _ string, _ container.ExecAttachOptions) (types.HijackedResponse, error) {
+		execAttachFunc: func(_ context.Context, _ string, _ client.ExecAttachOptions) (client.ExecAttachResult, error) {
 			return hijacked(t, "out\n", "err\n"), nil
 		},
-		execInspectFunc: func(_ context.Context, _ string) (container.ExecInspect, error) {
+		execInspectFunc: func(_ context.Context, _ string) (client.ExecInspectResult, error) {
 			inspects++
 			// The first inspect still reports running, like a slow daemon.
-			return container.ExecInspect{Running: inspects < 2, ExitCode: 3}, nil
+			return client.ExecInspectResult{Running: inspects < 2, ExitCode: 3}, nil
 		},
 	}
 	c := &Client{docker: api}
@@ -88,8 +95,8 @@ func TestClient_Exec_Errors(t *testing.T) {
 	}
 
 	c = &Client{docker: &mockDockerAPI{
-		execCreateFunc: func(context.Context, string, container.ExecOptions) (types.IDResponse, error) {
-			return types.IDResponse{}, errors.New("no such container")
+		execCreateFunc: func(context.Context, string, client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			return client.ExecCreateResult{}, errors.New("no such container")
 		},
 	}}
 	if _, err := c.Exec(context.Background(), "ctr", ExecOptions{Cmd: []string{"true"}}); err == nil {
@@ -102,14 +109,14 @@ func TestClient_Exec_Errors(t *testing.T) {
 func TestClient_Exec_ContextEndsWhileStreaming(t *testing.T) {
 	t.Parallel()
 	c := &Client{docker: &mockDockerAPI{
-		execCreateFunc: func(context.Context, string, container.ExecOptions) (types.IDResponse, error) {
-			return types.IDResponse{ID: "exec-1"}, nil
+		execCreateFunc: func(context.Context, string, client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			return client.ExecCreateResult{ID: "exec-1"}, nil
 		},
-		execAttachFunc: func(context.Context, string, container.ExecAttachOptions) (types.HijackedResponse, error) {
+		execAttachFunc: func(context.Context, string, client.ExecAttachOptions) (client.ExecAttachResult, error) {
 			// The server end stays open and silent, like a hung hook.
-			client, server := net.Pipe()
+			conn, server := net.Pipe()
 			t.Cleanup(func() { _ = server.Close() })
-			return types.HijackedResponse{Conn: client, Reader: bufio.NewReader(client)}, nil
+			return client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(conn, "")}, nil
 		},
 	}}
 
@@ -143,12 +150,12 @@ func TestCappedBuffer(t *testing.T) {
 	}
 }
 
-func state(running bool, status, health string) types.ContainerJSON {
-	st := &types.ContainerState{Running: running, Status: status, ExitCode: 1}
+func state(running bool, status container.ContainerState, health container.HealthStatus) client.ContainerInspectResult {
+	st := &container.State{Running: running, Status: status, ExitCode: 1}
 	if health != "" {
-		st.Health = &types.Health{Status: health}
+		st.Health = &container.Health{Status: health}
 	}
-	return types.ContainerJSON{ContainerJSONBase: &types.ContainerJSONBase{State: st}}
+	return client.ContainerInspectResult{Container: container.InspectResponse{State: st}}
 }
 
 func TestClient_WaitHealthy(t *testing.T) {
@@ -156,24 +163,24 @@ func TestClient_WaitHealthy(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		states  []types.ContainerJSON
+		states  []client.ContainerInspectResult
 		wantErr bool
 	}{
-		{name: "starting then healthy", states: []types.ContainerJSON{
-			state(true, "running", types.Starting), state(true, "running", types.Starting), state(true, "running", types.Healthy),
+		{name: "starting then healthy", states: []client.ContainerInspectResult{
+			state(true, "running", container.Starting), state(true, "running", container.Starting), state(true, "running", container.Healthy),
 		}},
-		{name: "no health check returns once running", states: []types.ContainerJSON{
+		{name: "no health check returns once running", states: []client.ContainerInspectResult{
 			state(false, "created", ""), state(true, "running", ""),
 		}},
-		{name: "unhealthy fails", states: []types.ContainerJSON{state(true, "running", types.Unhealthy)}, wantErr: true},
-		{name: "exited fails", states: []types.ContainerJSON{state(false, "exited", types.Starting)}, wantErr: true},
+		{name: "unhealthy fails", states: []client.ContainerInspectResult{state(true, "running", container.Unhealthy)}, wantErr: true},
+		{name: "exited fails", states: []client.ContainerInspectResult{state(false, "exited", container.Starting)}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			i := 0
 			c := &Client{docker: &mockDockerAPI{
-				containerInspectFunc: func(context.Context, string) (types.ContainerJSON, error) {
+				containerInspectFunc: func(context.Context, string) (client.ContainerInspectResult, error) {
 					s := tt.states[min(i, len(tt.states)-1)]
 					i++
 					return s, nil
@@ -193,8 +200,8 @@ func TestClient_WaitHealthy(t *testing.T) {
 func TestClient_WaitHealthy_ContextEnds(t *testing.T) {
 	t.Parallel()
 	c := &Client{docker: &mockDockerAPI{
-		containerInspectFunc: func(context.Context, string) (types.ContainerJSON, error) {
-			return state(true, "running", types.Starting), nil
+		containerInspectFunc: func(context.Context, string) (client.ContainerInspectResult, error) {
+			return state(true, "running", container.Starting), nil
 		},
 	}}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)

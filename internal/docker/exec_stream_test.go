@@ -7,8 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 func TestClient_ExecStream_LargeStdoutNotTruncated(t *testing.T) {
@@ -16,14 +15,14 @@ func TestClient_ExecStream_LargeStdoutNotTruncated(t *testing.T) {
 
 	big := strings.Repeat("x", 3*maxExecOutput+17)
 	api := &mockDockerAPI{
-		execCreateFunc: func(_ context.Context, _ string, _ container.ExecOptions) (types.IDResponse, error) {
-			return types.IDResponse{ID: "exec-1"}, nil
+		execCreateFunc: func(_ context.Context, _ string, _ client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			return client.ExecCreateResult{ID: "exec-1"}, nil
 		},
-		execAttachFunc: func(_ context.Context, _ string, _ container.ExecAttachOptions) (types.HijackedResponse, error) {
+		execAttachFunc: func(_ context.Context, _ string, _ client.ExecAttachOptions) (client.ExecAttachResult, error) {
 			return hijacked(t, big, "warn\n"), nil
 		},
-		execInspectFunc: func(_ context.Context, _ string) (container.ExecInspect, error) {
-			return container.ExecInspect{Running: false, ExitCode: 0}, nil
+		execInspectFunc: func(_ context.Context, _ string) (client.ExecInspectResult, error) {
+			return client.ExecInspectResult{Running: false, ExitCode: 0}, nil
 		},
 	}
 	c := &Client{docker: api}
@@ -48,14 +47,14 @@ func TestClient_ExecStream_ExitCodeAndStderrCap(t *testing.T) {
 	t.Parallel()
 
 	api := &mockDockerAPI{
-		execCreateFunc: func(_ context.Context, _ string, _ container.ExecOptions) (types.IDResponse, error) {
-			return types.IDResponse{ID: "exec-1"}, nil
+		execCreateFunc: func(_ context.Context, _ string, _ client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			return client.ExecCreateResult{ID: "exec-1"}, nil
 		},
-		execAttachFunc: func(_ context.Context, _ string, _ container.ExecAttachOptions) (types.HijackedResponse, error) {
+		execAttachFunc: func(_ context.Context, _ string, _ client.ExecAttachOptions) (client.ExecAttachResult, error) {
 			return hijacked(t, "", strings.Repeat("e", maxStreamStderr+100)), nil
 		},
-		execInspectFunc: func(_ context.Context, _ string) (container.ExecInspect, error) {
-			return container.ExecInspect{ExitCode: 2}, nil
+		execInspectFunc: func(_ context.Context, _ string) (client.ExecInspectResult, error) {
+			return client.ExecInspectResult{ExitCode: 2}, nil
 		},
 	}
 	c := &Client{docker: api}
@@ -79,14 +78,14 @@ func TestClient_ExecStream_WriterErrorFails(t *testing.T) {
 	t.Parallel()
 
 	api := &mockDockerAPI{
-		execCreateFunc: func(_ context.Context, _ string, _ container.ExecOptions) (types.IDResponse, error) {
-			return types.IDResponse{ID: "exec-1"}, nil
+		execCreateFunc: func(_ context.Context, _ string, _ client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			return client.ExecCreateResult{ID: "exec-1"}, nil
 		},
-		execAttachFunc: func(_ context.Context, _ string, _ container.ExecAttachOptions) (types.HijackedResponse, error) {
+		execAttachFunc: func(_ context.Context, _ string, _ client.ExecAttachOptions) (client.ExecAttachResult, error) {
 			return hijacked(t, "data", ""), nil
 		},
-		execInspectFunc: func(_ context.Context, _ string) (container.ExecInspect, error) {
-			return container.ExecInspect{}, nil
+		execInspectFunc: func(_ context.Context, _ string) (client.ExecInspectResult, error) {
+			return client.ExecInspectResult{}, nil
 		},
 	}
 	c := &Client{docker: api}

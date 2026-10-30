@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // maxExecOutput caps how much exec output is kept in memory. Callers only use
@@ -44,7 +44,7 @@ func (c *Client) Exec(ctx context.Context, id string, opts ExecOptions) (ExecRes
 	if len(opts.Cmd) == 0 {
 		return ExecResult{}, errors.New("exec: empty command")
 	}
-	created, err := c.docker.ContainerExecCreate(ctx, id, container.ExecOptions{
+	created, err := c.docker.ExecCreate(ctx, id, client.ExecCreateOptions{
 		User:         opts.User,
 		Env:          opts.Env,
 		Cmd:          opts.Cmd,
@@ -55,7 +55,7 @@ func (c *Client) Exec(ctx context.Context, id string, opts ExecOptions) (ExecRes
 		return ExecResult{}, fmt.Errorf("failed to create exec: %w", err)
 	}
 
-	resp, err := c.docker.ContainerExecAttach(ctx, created.ID, container.ExecAttachOptions{})
+	resp, err := c.docker.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
 	if err != nil {
 		return ExecResult{}, fmt.Errorf("failed to attach exec: %w", err)
 	}
@@ -76,7 +76,7 @@ func (c *Client) Exec(ctx context.Context, id string, opts ExecOptions) (ExecRes
 	// The stream ends when the process exits, but the daemon can report the
 	// exit code a moment later.
 	for {
-		inspect, inspErr := c.docker.ContainerExecInspect(ctx, created.ID)
+		inspect, inspErr := c.docker.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
 		if inspErr != nil {
 			return ExecResult{}, fmt.Errorf("failed to inspect exec: %w", inspErr)
 		}
@@ -96,11 +96,11 @@ func (c *Client) Exec(ctx context.Context, id string, opts ExecOptions) (ExecRes
 // error when the container turns unhealthy or stops, or when ctx ends.
 func (c *Client) WaitHealthy(ctx context.Context, id string, poll time.Duration) error {
 	for {
-		info, err := c.docker.ContainerInspect(ctx, id)
+		res, err := c.docker.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to inspect container: %w", err)
 		}
-		if done, stateErr := healthReady(info.State); done || stateErr != nil {
+		if done, stateErr := healthReady(res.Container.State); done || stateErr != nil {
 			return stateErr
 		}
 		select {
@@ -113,7 +113,7 @@ func (c *Client) WaitHealthy(ctx context.Context, id string, poll time.Duration)
 
 // healthReady reports whether a container in state st is ready for commands.
 // A nil error with done false means keep waiting.
-func healthReady(st *types.ContainerState) (bool, error) {
+func healthReady(st *container.State) (bool, error) {
 	if st == nil {
 		return false, errors.New("container has no state")
 	}
@@ -123,13 +123,13 @@ func healthReady(st *types.ContainerState) (bool, error) {
 		}
 		return false, fmt.Errorf("container is %s (exit code %d)", st.Status, st.ExitCode)
 	}
-	if st.Health == nil || st.Health.Status == "" || st.Health.Status == types.NoHealthcheck {
+	if st.Health == nil || st.Health.Status == "" || st.Health.Status == container.NoHealthcheck {
 		return true, nil
 	}
 	switch st.Health.Status {
-	case types.Healthy:
+	case container.Healthy:
 		return true, nil
-	case types.Unhealthy:
+	case container.Unhealthy:
 		return false, errors.New("container health check reports unhealthy")
 	default:
 		return false, nil
