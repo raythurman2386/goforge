@@ -55,7 +55,7 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 ### Phase 2: UX Polish & Edge Cases
 
 #### 5. Navigation & Wayfinding
-- [ ] **Breadcrumbs** (Add to all major pages) *(Partial: `components.Breadcrumbs` exists since #67 and is used on deployment and container detail; project and service detail still lack it)*
+- [x] **Breadcrumbs** (Add to all major pages) *(Done: `ui.Breadcrumb` (UI kit, replaces `components.Breadcrumbs` from #67) is used on project, service, deployment, and container detail)*
   - Project detail: Dashboard → Projects → {Project Name}
   - Service detail: Dashboard → Services → {Service Name}
   - Deployment detail: Already has breadcrumbs (reference implementation)
