@@ -19,13 +19,15 @@ description: "Model-check the GoForge redeploy lifecycle (blue-green grace, reti
 |---|---|
 | `formal/deploy-retire/DeployRetire.tla` | The model. Every action names the Go function it stands for. |
 | `formal/deploy-retire/DeployRetire.cfg` | Code as shipped, 1 redeploy, up to 2 restarts. Every rule must hold. |
-| `formal/deploy-retire/DeployRetireBackToBack.cfg` | Code as shipped, 2 redeploys, 1 restart. Expected break: `NewestKeepsRunning` (finding F1). |
-| `formal/deploy-retire/DeployRetireDockerErrors.cfg` | Code as shipped, Docker stop/rm may error. Expected breaks: `AfterGraceAtMostOneRunning`, `NoGhostAfterRetire` (finding F2). |
+| `formal/deploy-retire/DeployRetireBackToBack.cfg` | Code as shipped, 2 redeploys, 1 restart. Every rule must hold (F1 fixed). |
+| `formal/deploy-retire/DeployRetireDockerErrors.cfg` | Code as shipped, Docker stop/rm may error. Every rule must hold (F2 fixed). |
 | `formal/deploy-retire/mutants/Pre95NoRemove.cfg` | Mutant: no `RemoveContainer` (code before #95). Must break `NoGhostAfterRetire`. |
 | `formal/deploy-retire/mutants/Pre96NoRecover.cfg` | Mutant: no boot recovery (code before #96). Must break `AfterGraceAtMostOneRunning`, `NoGhostAfterRetire`. |
+| `formal/deploy-retire/mutants/PreF1RetireNewer.cfg` | Mutant: `RetireOnlyOlder = FALSE`, retire skips only the current deployment (code before the F1 fix). Must break `NewestKeepsRunning`. |
+| `formal/deploy-retire/mutants/PreF2ExitOnError.cfg` | Mutant: `RetryFailedRetire = FALSE`, row marked exited after a failed remove, no retry (code before the F2 fix). Must break `AfterGraceAtMostOneRunning`, `NoGhostAfterRetire`. |
 | `formal/deploy-retire/view.ts` | Reader labels for the `/statechart` chart. |
 | `formal/deploy-retire/check.sh` | The one rerun command (below). |
-| `internal/deploy/cleanup_replay_test.go` | Go replays of F1 and F2 against the real code, build tag `formalreplay`. They fail until the findings are fixed. |
+| `internal/deploy/cleanup_replay_test.go` | Go replays of F1 and F2 against the real code. They failed before the fix; the `formalreplay` tag is dropped so `make test` keeps them fixed. |
 
 Each config's `\* expect-break:` line is the contract `check.sh` enforces.
 
@@ -37,22 +39,23 @@ Yes if the diff changes any of these (the coverage record):
 |---|---|
 | `DeploymentRunning` | `internal/deploy/pipeline.go` `RunPipeline` tail: `dockerClient.CreateContainer`, `containerRepo.Create` (status running), `performHealthCheck`, `Transition(..., DeploymentStatusRunning)`, `go s.CleanupOldDeployments(cleanupCtx, envID, deployID)` |
 | `GraceElapses`, `WaitGraceReturns` | `internal/deploy/cleanup.go` `waitGrace`, `gracePeriod` (`BlueGreenConfig.GracePeriod`, default 5m in `bluegreen.go`), `runningSince` |
-| `ListByEnvironmentID` | `retireSuperseded`: `deploymentRepo.ListByEnvironmentID(ctx, environmentID, 10)` and the skip `d.ID == currentDeploymentID \|\| d.Status != DeploymentStatusRunning` |
+| `ListByEnvironmentID`, `Keep` | `retireSuperseded`: `deploymentRepo.ListByEnvironmentID(ctx, environmentID, 10)` (current via the list, else `GetByID`), one `time.Now()`; `keep` = newest running deployment that is current or newer with `now.Sub(runningSince(d)) >= gracePeriod()`; retire only running `d` with `newerDeployment(keep, d)` (`created_at`, then ID). `RetireOnlyOlder = FALSE` is the pre-F1 skip `d.ID == currentDeploymentID \|\| d.Status != running` |
 | `ListByDeploymentID` | `retireSuperseded`: `containerRepo.ListByDeploymentID`, `c.Status == ContainerStatusRunning` |
 | `StopContainer`, `StopContainerFails` | `retireContainer`: `dockerClient.StopContainer` (`internal/docker/container.go`) |
-| `RemoveContainer`, `RemoveContainerFails`, `RemoveSkipped` | `retireContainer`: `dockerClient.RemoveContainer`, which uses `Force: true` (`internal/docker/container.go`); runs even if stop failed |
-| `UpdateStatusExited` | `retireContainer`: `containerRepo.UpdateStatus(ctx, c.ID, ContainerStatusExited)`, whatever Docker returned |
-| `RetireSupersededReturns` | end of `retireSuperseded` (`pruneImages` not modeled) |
+| `RemoveContainer`, `RemoveContainerFails`, `RemoveSkipped` | `retireContainer`: `dockerClient.RemoveContainer`, which uses `Force: true` (`internal/docker/container.go`); runs even if stop failed. A `cerrdefs.IsNotFound` error counts as removed. Any other error: return false, row left running, pass marked pending (`RetryFailedRetire`) |
+| `UpdateStatusExited` | `retireContainer`: `containerRepo.UpdateStatus(ctx, c.ID, ContainerStatusExited)`, only after remove succeeded |
+| `RetireSupersededReturns` | end of `retireSuperseded`: `errRetirePending` if any remove failed (`pruneImages` not modeled) |
+| `RetryRetire` | `retireUntilDone`: on error, `waitGrace(ctx, retireRetryInterval())` (default 30 s) then the next pass, each pass under `context.WithTimeout(ctx, retireAttemptTimeout)` (2 min). Exits on success, ctx end, or current deployment no longer running (rollback, not modeled). Used by `CleanupOldDeployments` and the `RecoverPendingRetires` goroutine; `RunPipeline`'s cleanup goroutine has no overall timeout |
 | `Restart` | process death: every goroutine (grace timers, retire loops) dies; DB rows and containers (`RestartUnlessStopped`) stay; `cmd/goforge/main.go` starts `go deployService.RecoverPendingRetires(backgroundCtx)` after `deployWorker.Start()` |
-| `RecoverBoot` | `RecoverPendingRetires`: `ListByStatus(running)`, newest `CreatedAt` per env is current, `hasSuperseded`; then `wait := gracePeriod() - time.Since(runningSince(cur))`, `waitGrace`, `retireSuperseded` |
+| `RecoverBoot` | `RecoverPendingRetires`: `ListByStatus(running)`, newest per env (`newerDeployment`) is current, `hasSuperseded`; then `wait := gracePeriod() - time.Since(runningSince(cur))`, `waitGrace`, `retireUntilDone` |
 | `Newest` | `RecoverPendingRetires`' "newest running deployment of each environment is the current one" |
 
 A change elsewhere (UI, rollback, Traefik labels, image build) does not need this check unless it changes deployment or container statuses.
 
-**Sync commit:** `a6185202674c74a02f1c3b3e0cd4893bfb2988ff` (main, #96). The model was confirmed against the code above at this commit. To see whether covered code moved since then:
+**Sync commit:** `ea92e110376b2d96e23b27373eeb39b04525dcc7` (F1/F2 fix). The model was confirmed against the code above at this commit. To see whether covered code moved since then:
 
 ```bash
-git diff --stat a6185202674c74a02f1c3b3e0cd4893bfb2988ff -- internal/deploy/cleanup.go internal/deploy/pipeline.go cmd/goforge/main.go internal/docker/container.go internal/deploy/bluegreen.go internal/deploy/state.go
+git diff --stat ea92e110376b2d96e23b27373eeb39b04525dcc7 -- internal/deploy/cleanup.go internal/deploy/pipeline.go cmd/goforge/main.go internal/docker/container.go internal/deploy/bluegreen.go internal/deploy/state.go
 ```
 
 Move the sync commit forward only after you have read the changed code and confirmed every row of the coverage record still describes it (or updated the model and the row).
@@ -71,7 +74,7 @@ Then the Go side:
 
 ```bash
 go test -count=1 -run 'TestRedeploy|TestCleanup|TestRecover' ./internal/deploy/            # must pass
-go test -tags formalreplay -run TestReplay -count=1 ./internal/deploy/                     # fails while F1/F2 stand
+go test -count=1 -run 'TestReplay|TestRetire' ./internal/deploy/                          # F1/F2 replays, must pass
 ```
 
 **Read every TLC result with the pstack `/statechart` skill**, run on `DeployRetire.tla` with the config in question and `view.ts` as the view, output to a new folder outside the repo. It turns each broken rule into its shortest path in plain words and, for `DeployRetire.cfg` (under 500 states), draws the chart. Do not read raw TLC traces by hand. Never commit its output folder.
@@ -79,7 +82,7 @@ go test -tags formalreplay -run TestReplay -count=1 ./internal/deploy/          
 ## Reading a result
 
 - `ok ... other rules hold` and `... breaks as expected` everywhere: the change kept the model's verdicts. Still confirm the coverage record matches your diff.
-- A rule breaks on `DeployRetire.cfg`, or a new rule breaks on another config: get the path from `/statechart`, then replay it against the real code as a Go test, one step per action (copy the pattern in `cleanup_replay_test.go`: `redeployFixture`, `restartFixture`, `hostRuntime`). If the Go replay shows the same ghost or outage, it is a real bug: report it with the path in code words. If it does not, the model is wrong until shown otherwise: find the action that does not match the code and fix the model, not the rule.
+- A rule breaks on `DeployRetire.cfg`, or a new rule breaks on another config: get the path from `/statechart`, then replay it against the real code as a Go test, one step per action (copy the pattern in `cleanup_replay_test.go`: `redeployFixture`, `restartFixture`, `hostRuntime`; put a new failing replay behind `//go:build formalreplay` until it is fixed). If the Go replay shows the same ghost or outage, it is a real bug: report it with the path in code words. If it does not, the model is wrong until shown otherwise: find the action that does not match the code and fix the model, not the rule.
 - An expected break stops breaking: either the code fixed the finding (good: move the config's `expect-break:` line, drop the `formalreplay` tag on its replay test so CI keeps it fixed, note it in CHANGELOG) or the model lost the step that causes it (bad: fix the model).
 - A mutant stops breaking: the model can no longer catch that bug. Fix the model.
 
@@ -103,16 +106,16 @@ Change the action that stands for the code you changed, keep its name equal to t
 - Every redeploy succeeds (health check passes); failed, canceled, and rolled-back deployments are not modeled.
 - Deploys reach running one at a time (one `Worker`). The pipeline tail is one step: a restart between `CreateContainer` and `Transition(running)` is not modeled.
 - All deployments have the same grace period, so graces end in the order deployments reached running; `RecoverPendingRetires`' remaining wait ends when the original grace would have.
-- `hasSuperseded`'s row reads are one step (reads only). `ListByEnvironmentID`'s `LIMIT 10` never truncates (N ≤ 3). `pruneImages` is not modeled. `DockerErrors` models an error with no effect; a partial effect is not modeled.
-- DB writes do not fail.
+- `hasSuperseded`'s row reads are one step (reads only). The `retireRetry` wait is not timed: a retry may come at any point. `ListByEnvironmentID`'s `LIMIT 10` never truncates (N ≤ 3). `pruneImages` is not modeled. `DockerErrors` models an error with no effect; a partial effect is not modeled.
+- DB writes do not fail. The DB clock (`finished_at`) and the goforge clock agree (`retireSuperseded` compares them for `keep`).
 
-## Findings at the sync commit
+## Findings (fixed at the sync commit)
 
-- **F1, `NewestKeepsRunning` (DeployRetireBackToBack.cfg).** Two redeploys within one grace period: deploy 2 reaches running, deploy 3 reaches running before deploy 2's grace ends; deploy 2's `CleanupOldDeployments` wakes, `retireSuperseded(env, dep2)` skips only `dep2` and non-running deployments, so it calls `retireContainer` on deploy 3's container (`StopContainer`, `RemoveContainer`, row exited). Deploy 3's own cleanup then retires deploy 2: no container runs. Replay: `TestReplayBackToBackRedeployKeepsNewest` (`docker ps = []`). `AfterGraceAtMostOneRunning` still holds there (0 ≤ 1); the harm is an outage.
-- **F2, `AfterGraceAtMostOneRunning` and `NoGhostAfterRetire` (DeployRetireDockerErrors.cfg).** `StopContainer` and `RemoveContainer` both return an error (daemon unreachable); `retireContainer` still runs `UpdateStatus(exited)`, so `hasSuperseded` and later cleanups skip the row and the old container runs forever. With only `RemoveContainer` failing it stays stopped on the host. Replay: `TestReplayDockerErrorsLeaveNoSecondRunning`.
+- **F1, `NewestKeepsRunning` (DeployRetireBackToBack.cfg; mutant PreF1RetireNewer.cfg).** Two redeploys within one grace period: deploy 2 reaches running, deploy 3 reaches running before deploy 2's grace ends; deploy 2's `CleanupOldDeployments` wakes and `retireSuperseded(env, dep2)` skipped only `dep2` and non-running deployments, so it retired deploy 3's container. Deploy 3's own cleanup then retired deploy 2: no container ran. Fixed: retire only deployments older than `keep`. Replay: `TestReplayBackToBackRedeployKeepsNewest`; also `TestRetireSupersededNeverRetiresNewer` (real grace).
+- **F2, `AfterGraceAtMostOneRunning` and `NoGhostAfterRetire` (DeployRetireDockerErrors.cfg; mutant PreF2ExitOnError.cfg).** `StopContainer` and `RemoveContainer` both returned an error; `retireContainer` still ran `UpdateStatus(exited)`, so `hasSuperseded` and later cleanups skipped the row and the old container ran forever. Fixed: the row stays running until removed and `retireUntilDone` retries; after a restart `RecoverPendingRetires` finds it. Replay: `TestReplayDockerErrorsLeaveNoSecondRunning` (the restart is the ctx ending); also `TestCleanupOldDeploymentsRetriesFailedRemove`, `TestCleanupOldDeploymentsKeepsRowRunningWhileDockerDown`.
 
 ## Not covered
 
-Rollback (`internal/deploy/rollback.go`), failed or canceled deploys and their containers, restarts inside `RunPipeline`, several environments sharing cleanup, the `BlueGreenDeployer.scheduleCleanup` path (only used when `OldContainerID` is set, which `performHealthCheck` never does), Traefik routing, `pruneImages`, real Docker timing, and anything past the bounds above.
+Rollback (`internal/deploy/rollback.go`, including a cleanup still retrying when a rollback makes an older deployment running again), failed or canceled deploys and their containers, restarts inside `RunPipeline`, several environments sharing cleanup, the `BlueGreenDeployer.scheduleCleanup` path (only used when `OldContainerID` is set, which `performHealthCheck` never does), Traefik routing, `pruneImages`, real Docker timing, and anything past the bounds above.
 
 To bring this skill back in line after changes that skipped this check, use the pstack `/maintain-formal-verification-skill` skill.
