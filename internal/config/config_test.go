@@ -55,6 +55,7 @@ func TestLoad_AllRequiredFields(t *testing.T) {
 	os.Setenv("ENCRYPTION_KEY", "test-encryption-key-32-bytes-xx")
 	os.Setenv("SESSION_SECRET", "test-session-secret")
 	os.Setenv("CSRF_SECRET", "test-csrf-secret")
+	os.Setenv("WEBHOOK_SECRET", "test-webhook-secret")
 	defer os.Clearenv()
 
 	cfg, err := Load()
@@ -68,6 +69,58 @@ func TestLoad_AllRequiredFields(t *testing.T) {
 
 	if cfg.DatabaseType != DatabaseTypePostgres {
 		t.Errorf("expected postgres database type, got %s", cfg.DatabaseType)
+	}
+}
+
+func setProductionSecrets(t *testing.T) {
+	t.Helper()
+	os.Clearenv()
+	t.Cleanup(os.Clearenv)
+	os.Setenv("DATABASE_URL", "postgres://test:test@localhost:5432/test")
+	os.Setenv("ENCRYPTION_KEY", "test-encryption-key-32-bytes-xx")
+	os.Setenv("SESSION_SECRET", "test-session-secret")
+	os.Setenv("CSRF_SECRET", "test-csrf-secret")
+}
+
+func TestLoad_WebhookSecretRequiredOutsideDevMode(t *testing.T) {
+	for _, value := range []string{"", "   "} {
+		setProductionSecrets(t)
+		if value != "" {
+			os.Setenv("WEBHOOK_SECRET", value)
+		}
+
+		_, err := Load()
+		if err == nil || err.Error() != "WEBHOOK_SECRET is required" {
+			t.Fatalf("WEBHOOK_SECRET=%q outside dev mode: err = %v, want WEBHOOK_SECRET is required", value, err)
+		}
+	}
+}
+
+func TestLoad_WebhookSecretSetOutsideDevMode(t *testing.T) {
+	setProductionSecrets(t)
+	os.Setenv("WEBHOOK_SECRET", "test-webhook-secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.WebhookSecret != "test-webhook-secret" {
+		t.Fatalf("WebhookSecret = %q, want the env value", cfg.WebhookSecret)
+	}
+}
+
+func TestLoad_WebhookSecretEmptyInDevMode(t *testing.T) {
+	os.Clearenv()
+	t.Cleanup(os.Clearenv)
+	os.Setenv("GOFORGE_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_SECRETS_FILE", filepath.Join(t.TempDir(), "dev-secrets.json"))
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("dev mode with empty WEBHOOK_SECRET: unexpected error: %v", err)
+	}
+	if cfg.WebhookSecret == "" {
+		t.Fatal("dev mode left WebhookSecret empty; want a generated dev secret")
 	}
 }
 

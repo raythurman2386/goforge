@@ -296,6 +296,12 @@ func (c *Config) validate() error {
 	if c.CSRFSecret == "" {
 		return errors.New("CSRF_SECRET is required")
 	}
+	// An empty secret makes every webhook forgeable: the HMAC key is empty
+	// (GitHub, Gitea) and an empty X-Gitlab-Token matches. Dev mode fills it
+	// from the dev secrets file instead.
+	if strings.TrimSpace(c.WebhookSecret) == "" {
+		return errors.New("WEBHOOK_SECRET is required")
+	}
 	return nil
 }
 

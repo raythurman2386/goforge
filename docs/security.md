@@ -184,7 +184,7 @@ Webhooks receive push events from git providers to trigger deployments.
 Bodies are capped at 1 MB. GitHub and Gitea `ping` events are answered before the signature check and trigger nothing. Webhook routes are outside the CSRF group and need no session.
 
 !!! warning "Set `WEBHOOK_SECRET`"
-    GoForge starts with an empty `WEBHOOK_SECRET` even outside dev mode. With it empty, anyone can compute the HMAC (empty key) or send an empty `X-Gitlab-Token`, so a forged push for a project's repository and branch can trigger a deployment. Generate it with `openssl rand -base64 32`.
+    Outside dev mode GoForge refuses to start while `WEBHOOK_SECRET` is empty or only whitespace. With an empty secret anyone could compute the HMAC (empty key) or send an empty `X-Gitlab-Token`, so a forged push for a project's repository and branch could trigger a deployment. Dev mode generates a secret and keeps it in `GOFORGE_DEV_SECRETS_FILE`. Generate it with `openssl rand -base64 32`.
 
 ---
 

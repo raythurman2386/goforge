@@ -299,7 +299,7 @@ Parked items need Raymond's OK before anyone starts them.
 - [x] **Aesthetics Goal 3 nits** (#68 leftovers): `class_check.py` also checks `class={ ... }`, `*Class()` helpers, and `app.js` classes; `make css` fails unless it runs Tailwind v3.4.17 (standalone or `npx`); unused `.sidebar-link*` removed; dark `select` chevron; auth-aware error page (B17)
 - [ ] **Deadcode sweep** (parked): `deadcode ./...` reported 96 unreachable functions on 2026-10-29. Not removed in the cleanup goal; needs a reviewed pass
 - [ ] **Stale remote branches** (needs Raymond's OK): about 30 squash-merged branches remain on `origin` (for example `ui/shell-fixes`, `security/auth-edge-hardening`, `fix/4x-*`). Delete only with approval
-- [ ] **Open security findings**, documented in `SECURITY.md`: `/health/ready` is public and returns error text (HEALTH-READY-PUBLIC); main image runs as root; an empty `WEBHOOK_SECRET` is accepted outside dev mode and lets anyone forge a webhook (found 2026-10-30; the deployed instance sets it). ENV-CREDS is closed for the repo Compose file (#80)
+- [ ] **Open security findings**, documented in `SECURITY.md`: `/health/ready` is public and returns error text (HEALTH-READY-PUBLIC); main image runs as root. Empty `WEBHOOK_SECRET` outside dev mode is closed: GoForge refuses to start (#92). ENV-CREDS is closed for the repo Compose file (#80)
 - [ ] **Rollback feedback** in the UI (see Developer Experience)
 
 ---

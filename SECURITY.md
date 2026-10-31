@@ -58,19 +58,19 @@ Checked against `main` on 2026-10-30.
 - [ ] Resource quota enforcement per project (per-container CPU and memory limits exist)
 - [ ] `/health/ready` is unauthenticated and its JSON includes database and Docker error text (HEALTH-READY-PUBLIC)
 - [ ] The main `goforge` image runs as root (the `mcp` image runs as uid 10001)
-- [ ] `WEBHOOK_SECRET` is not required outside dev mode. With it empty, anyone can sign a GitHub or Gitea webhook (HMAC with an empty key) or send an empty `X-Gitlab-Token`, and a matching push can trigger a deployment. Set it in every install; `.env.example` and the quickstart say to
 - [ ] Webhook routes are not limited to a provider's IP ranges; the signature or token is the only check
 
 ### Closed since the 2026-10-29 audit
 
 - **`BACKUP_S3_*` in the container environment (ENV-CREDS).** The repo `docker-compose.yml` passes no `BACKUP_*` variable (#80). Backup keys saved in Settings → Profile are stored encrypted with `ENCRYPTION_KEY` and never sent back to the browser (#77). On 2026-10-30 `docker inspect` of the deployed `goforge` container listed no `BACKUP_*` names. If you import settings through a `docker-compose.override.yml`, remove every `BACKUP_*` variable from it afterwards (not only the two keys) and recreate the `goforge` container. Host runs and `goforge backup run` still read `BACKUP_*` from the process environment.
 - **API token rotation.** Settings → Profile can rotate a token in place; the old secret stops working on its next request (#78).
+- **Empty `WEBHOOK_SECRET` outside dev mode.** With it empty, anyone could sign a GitHub or Gitea webhook (HMAC with an empty key) or send an empty `X-Gitlab-Token`, and a matching push could trigger a deployment. GoForge now refuses to start outside dev mode while `WEBHOOK_SECRET` is empty or only whitespace (#92). Dev mode still generates it.
 - **Client IP spoofing, login lockout, CSRF, and session purge** (#70). See [docs/security.md](docs/security.md).
 
 ### Defaults that reduce exposure
 
 - Registration is closed after the first account unless `GOFORGE_ENABLE_REGISTRATION=true`.
-- `GOFORGE_DEV_MODE` defaults to `false`. Outside dev mode GoForge refuses to start without `DATABASE_URL`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET`.
+- `GOFORGE_DEV_MODE` defaults to `false`. Outside dev mode GoForge refuses to start without `DATABASE_URL`, `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET`.
 - Docker Compose publishes the app on `127.0.0.1` only. Postgres is not published on the host.
 - The Traefik API and dashboard are off: `--api`, `--api.dashboard`, and `--api.insecure` all follow `TRAEFIK_DASHBOARD_INSECURE` (default `false`), so the `api@internal` service does not exist and no router, including one added through container labels, can expose it. `TRAEFIK_DASHBOARD_INSECURE=true` turns them on for local debugging only, on `127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}`. No router in the repo compose file publishes `api@internal` on the web or websecure entrypoints.
 - Image tags are pinned: `cloudflare/cloudflared:2026.6.0` in Compose and `alpine:3.24` for the runtime and MCP images.

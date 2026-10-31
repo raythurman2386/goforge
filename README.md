@@ -42,7 +42,7 @@ This is the supported way to run GoForge. You need Docker Engine with the Compos
     ```
 
 3.  **Fill in the required values in `.env`:**
-    - `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET`: generate each with `openssl rand -base64 32`. Compose refuses to start while the first three are empty.
+    - `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET`: generate each with `openssl rand -base64 32`. Compose refuses to start while the first three are empty, and GoForge refuses to start outside dev mode while `WEBHOOK_SECRET` is empty.
     - `POSTGRES_PASSWORD`: set a real password and use the same value in `DATABASE_URL`.
     - `GOFORGE_ADMIN_EMAIL`: the email of the operator account. Matching ignores case. Leave it empty and nobody is admin.
     - Leave `GOFORGE_DEV_MODE=false`.
@@ -131,7 +131,7 @@ GoForge follows a clean architecture with:
 
 2. **Secret Management**
    - Never commit `.env` files or secrets to version control
-   - Use strong, unique secrets for `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET`. GoForge starts with an empty `WEBHOOK_SECRET`, and then anyone can forge a webhook
+   - Use strong, unique secrets for `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET`. Outside dev mode GoForge refuses to start with an empty `WEBHOOK_SECRET`, since an empty secret would let anyone forge a webhook
    - Rotate credentials regularly
    - Consider using Docker secrets or external secret stores
 

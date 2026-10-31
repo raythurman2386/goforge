@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- GoForge refuses to start outside dev mode when `WEBHOOK_SECRET` is empty or only whitespace (`WEBHOOK_SECRET is required`), like `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET`. An empty secret let anyone sign a GitHub or Gitea webhook (HMAC with an empty key) or send an empty `X-Gitlab-Token`. Dev mode still generates the secret when it is unset. Installs that already set it are unaffected. `docker-compose.yml` still passes `${WEBHOOK_SECRET:-}` so dev-mode Compose runs without it
+
 ### Fixed
 - The last axe serious issues: `drive-ui-a11y` went from 22 serious nodes (6 `color-contrast`, 16 `dlitem`) to 0 issues of any impact on its 32 light and dark scans. `.btn-warning` now rests on `amber-700` with white text in light and dark (5.0:1, hover `amber-800` 7.1:1; was white on `amber-500`, 2.15:1). Ghost buttons (`.btn-ghost`, `.btn-ghost-primary`, `-warning`, `-danger`) rest on `text-gray-500` in light (4.8:1 on white) and `gray-400` in dark (7.0:1 on `gray-900`), and hover to a darker or lighter shade (4.8:1 or more). Muted text that used light `text-gray-400` (2.5:1) uses `text-gray-500`: the project card footer, the Overview "Click Deploy Now" hint, and "Connecting to metrics stream...". The amber "Connecting..." status on service detail uses `text-amber-700`. The project Overview description list is a `<dl>`, so its `<dt>`/`<dd>` pairs are valid (`TestOverviewDescriptionListNesting`)
 - Primary buttons and links failed axe `color-contrast` (WCAG AA 4.5:1): white on `primary-600` was 3.76:1 and `text-primary-600` text 3.6–3.76:1. `.btn-primary` now rests on `primary-700` (5.48:1) and hovers to `primary-800` (7.68:1) in light and dark; primary text links and labels (sign-in/sign-up links, error code, project and container links, "View Details", section headings) use `text-primary-700` (5.25:1 on `gray-50`). Dark text stays `primary-400`. `.btn-warning`, `dlitem`, and gray muted text are unchanged
@@ -18,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `drive-ui-a11y` dialog and overlay checks no longer exempt `color-contrast`; any serious or critical axe issue fails them
-- Security docs brought up to date with the code: `SECURITY.md` known gaps (API token rotation and `BACKUP_*` in the container env closed; audit and session coverage spelled out; empty `WEBHOOK_SECRET` added as an open gap) and `docs/security.md` (session rotation on login, webhook verification per provider, server timeouts, encrypted backup keys, production checklist)
+- Security docs brought up to date with the code: `SECURITY.md` known gaps (API token rotation and `BACKUP_*` in the container env closed; audit and session coverage spelled out; empty `WEBHOOK_SECRET` outside dev mode closed, see Security) and `docs/security.md` (session rotation on login, webhook verification per provider, server timeouts, encrypted backup keys, production checklist)
 - README features, commands (`make ci`, `make css`, `make css-check`), architecture, and security considerations; ROADMAP through #91; `docs/reference/ui-kit.md` and the `verify-goforge` a11y notes now state a zero axe baseline; `docs/guides/git-integration.md` (file content and clone auth for every provider), `docs/guides/monitoring.md` (prune location, metrics not stored, `/health/ready`), and `ENABLE_METRICS` / `METRICS_RETENTION` marked unused in `docs/configuration/index.md` and `.env.example`
 
 ### Added
