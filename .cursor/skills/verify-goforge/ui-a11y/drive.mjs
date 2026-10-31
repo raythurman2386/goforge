@@ -390,9 +390,9 @@ async function dialogChecks(scheme, page) {
     const r2 = await run("#ui-confirm");
     await page.keyboard.press("Escape");
     await settle();
-    // color-contrast is the known palette baseline (btn-primary 3.76:1),
-    // reported by the page scans and out of scope here; gate the rest.
-    const bad = (r) => r.violations.filter((v) => GATE_IMPACTS.has(v.impact) && v.id !== "color-contrast").map((v) => `${v.id}(${v.impact})`);
+    // The palette baseline is cleared, so every serious or critical rule
+    // gates here, color-contrast included.
+    const bad = (r) => r.violations.filter((v) => GATE_IMPACTS.has(v.impact)).map((v) => `${v.id}(${v.impact})`);
     const b = bad(r1).concat(bad(r2));
     const nodes = (r, id) => r.violations.filter((v) => v.id === id).reduce((n, v) => n + v.nodes.length, 0);
     const all = r1.violations.concat(r2.violations).map((v) => v.id);
@@ -400,7 +400,7 @@ async function dialogChecks(scheme, page) {
       scheme,
       "dialog-axe",
       b.length === 0,
-      `serious/critical other than color-contrast=${b.length}${b.length ? " " + b.join(",") : ""} color-contrast nodes dialog=${nodes(r1, "color-contrast")} confirm=${nodes(r2, "color-contrast")} all=[${all.join(",")}]`,
+      `serious/critical=${b.length}${b.length ? " " + b.join(",") : ""} color-contrast nodes dialog=${nodes(r1, "color-contrast")} confirm=${nodes(r2, "color-contrast")} all=[${all.join(",")}]`,
     );
   });
 
@@ -793,10 +793,10 @@ async function overlayChecks(scheme, page) {
     await page.waitForTimeout(500);
     const r3 = await run("#overlays");
     await page.keyboard.press("Escape");
-    const bad = (r) => r.violations.filter((v) => GATE_IMPACTS.has(v.impact) && v.id !== "color-contrast").map((v) => `${v.id}(${v.impact})`);
+    const bad = (r) => r.violations.filter((v) => GATE_IMPACTS.has(v.impact)).map((v) => `${v.id}(${v.impact})`);
     const b = bad(r1).concat(bad(r2), bad(r3));
     const all = r1.violations.concat(r2.violations, r3.violations).map((v) => `${v.id}(${v.impact})`);
-    check(scheme, "overlays-axe", b.length === 0, `serious/critical other than color-contrast=${b.length}${b.length ? " " + b.join(",") : ""} all=[${all.join(",")}]`);
+    check(scheme, "overlays-axe", b.length === 0, `serious/critical=${b.length}${b.length ? " " + b.join(",") : ""} all=[${all.join(",")}]`);
   });
 
   page.off("request", onReq);

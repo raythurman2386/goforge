@@ -21,7 +21,7 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
   - `dialog-static`: a `data-ui-dialog="static"` dialog is kept in the page after Escape.
   - `confirm-cancel`, `confirm-accept-keyboard`, `confirm-danger`: `hx-confirm` opens the kit `role="alertdialog"` with the question and the accept label. Escape and Cancel send nothing. Tab to Confirm and Enter sends exactly one request. The danger tone uses `btn-danger`.
   - `confirm-plain-form`: a plain form submit with `hx-confirm` is gated the same way and navigates only after Confirm.
-  - `dialog-axe`: axe inside the open dialog and the open confirm finds nothing serious or critical other than the palette's known `color-contrast`.
+  - `dialog-axe`: axe inside the open dialog and the open confirm finds nothing serious or critical.
   - `confirm-no-native-prompt`, `app-no-native-prompt`: no `window.confirm` prompt appears.
   - With a password: `app-token-dialog` drives Generate Token, submit, the swapped-in non-dismissible token dialog (a backdrop click keeps it), Escape, and focus return. `app-revoke-confirm-cancel` checks that Revoke asks through the kit confirm and that Cancel sends no `DELETE`.
 - Overlays (PR5), on the gallery's "Dropdown, Popover, Tooltip" section. They use the native `popover` attribute and `popovertarget`, so they open without JS. `ui.js` adds placement, the menu keys, focus return, and `aria-expanded`:
@@ -33,7 +33,7 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
   - `popover`: Enter opens the `role="dialog"` panel with focus inside. Escape, an outside click, and the close button each close it, and focus returns to the trigger.
   - `tooltip-focus`, `tooltip-hover`, `tooltip-icon-name`: a tooltip shows about 300 ms after focus or hover and is linked through `aria-describedby`. Escape hides it without moving focus. The pointer can move onto the tooltip without hiding it (WCAG 1.4.13). An icon button keeps its own `aria-label`, so the tooltip is never its only name.
   - `overlays-history`: `htmx:beforeHistorySave` closes every open overlay.
-  - `overlays-axe`, `overlays-no-native-prompt`: inside the open overlays, axe finds nothing other than the palette's `color-contrast`, and no `window.confirm` appears.
+  - `overlays-axe`, `overlays-no-native-prompt`: inside the open overlays, axe finds nothing serious or critical, and no `window.confirm` appears.
   - With a password: `app-env-menu`, `app-env-new-dialog`, `app-env-link` drive the project's EnvironmentSwitcher. It has no `#menu-button` and no hardcoded `aria-expanded="true"`. The keys work as above, "New Environment" opens the kit dialog and focus returns to the trigger, and Enter on an environment navigates to `?env=…`.
 - Tabs, Table, and Sheet (PR6), on the gallery's NavTabs, Tabs, Table, and Sheet sections:
   - `tabs-keyboard`: on the `role="tablist"`, ArrowRight and ArrowLeft wrap, and Home and End jump. Activation is automatic, so each key moves focus, `aria-selected`, the single `tabindex="0"` (roving tabindex), and the one visible `role="tabpanel"` together. Tab then leaves the tablist for the active panel.
@@ -91,6 +91,7 @@ The drive writes `ui-a11y-verdict.txt`, `ui-a11y-report.json` (axe rule ids, imp
   - `/containers` passes.
   - Clearing the gate needs a palette decision, for example `.btn-primary` on `primary-700`, and the label fixes in later PRs.
   - Since `fix/axe-primary-palette-contrast`, `.btn-primary` rests on `primary-700` and primary text links use `text-primary-700`, so the white-on-`#059669` and `#059669`-text nodes are gone (72 nodes to 0 on the 2026-10-30 host run). The remaining `color-contrast` nodes are `.btn-warning` and gray muted text (`#9ca3af` light, `#6b7280` dark), plus `dlitem` on project Overview.
+  - Since `fix/axe-leftovers-and-docs`, `.btn-warning` rests on `amber-700`, ghost buttons and muted text use `gray-500` (dark `gray-400`), and the Overview pairs sit in a `<dl>`. The 2026-10-30 host run went from 22 serious nodes on `main` (6 `color-contrast`, 16 `dlitem`) to 0 issues of any impact, and `axe-gate=pass` in light and dark. The baseline is zero; `dialog-axe` and `overlays-axe` no longer exempt `color-contrast`.
 - The `toggle` event of a popover fires after the key that closed it. That is why Tab in a menu focuses the trigger itself before it hides the menu, and why the drive waits a frame after each key before it reads focus.
 - After Escape hides a tooltip, it stays hidden until the pointer leaves the trigger or focus moves away. Each tooltip check starts by moving the pointer to the corner and blurring.
 - The sidebar nav renders twice from one templ (the desktop aside and the mobile Sheet). `app.js` marks the current link in both, and one of the two is always `display: none`, so there is one nav landmark at a time.

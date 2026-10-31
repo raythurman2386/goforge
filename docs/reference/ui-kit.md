@@ -167,11 +167,13 @@ Tokens are CSS variables in `static/css/input.css` (`--gf-*`, RGB triplets with 
 
 The variant classes (`.btn-*`, `.input`, `.select`, `.label`, `.checkbox`, `.switch`, `.card*`, `.skeleton-*`) live in the components layer of `input.css` and are emitted only by the kit's class helpers. A caller's `Class` utility always wins over them. `.ui-focus-ring` is the shared `focus-visible` ring.
 
+Text must meet 4.5:1. Filled buttons use the `-700` shade with white text (`.btn-primary` on `primary-700`, `.btn-warning` on `amber-700`), ghost buttons rest on `text-gray-500` (dark `gray-400`), and primary text uses `text-primary-700` (dark `primary-400`). Keep light `text-gray-400` for icons, not text. The ratios are in comments beside each class in `input.css`.
+
 ## Accessibility expectations
 
 Every change to a page or component keeps these:
 
-- axe finds no new serious or critical issues on the page in light or dark (`drive-ui-a11y`). The parked baseline is palette `color-contrast` and the project Overview `dlitem`; do not add to it.
+- axe finds no serious or critical issues on the page in light or dark (`drive-ui-a11y`). The baseline is zero on all 32 scans; keep it there.
 - Every control has a visible label or, for icon-only buttons, an `aria-label`. A tooltip is never the only name.
 - Icon-only buttons are at least 44 by 44 px below `md` (`ButtonIcon`, the Alert and toast dismiss buttons).
 - Keyboard focus is always visible (`focus-visible` ring) and never lost. Overlays move focus in, trap it when modal, close on Escape, and return focus to the opener.

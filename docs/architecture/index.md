@@ -70,7 +70,7 @@ graph TB
 
 - **Router** (`internal/web/router.go`) -- Chi-based HTTP router with middleware chain
 - **Handlers** (`internal/web/handlers/`) -- Thin HTTP handlers that parse requests, call services, and render responses
-- **Templates** (`internal/web/templates/`) -- templ-based server-side templates with HTMX integration
+- **Templates** (`internal/web/templates/`) -- templ-based server-side templates with HTMX integration. Pages are built from the UI kit in `components/ui` (see [UI kit](../reference/ui-kit.md))
 - **Middleware** -- Authentication, CSRF protection, rate limiting, logging
 
 ### 2. Service Layer (Business Logic)
@@ -146,7 +146,7 @@ stateDiagram-v2
 | Router | go-chi/chi/v5 | HTTP routing and middleware |
 | Templates | a-h/templ | Type-safe server-side HTML templates |
 | Frontend | HTMX 2 | Dynamic UI without JavaScript frameworks |
-| Styling | TailwindCSS | Utility-first CSS framework |
+| Styling | TailwindCSS 3.4.17 | Utility-first CSS, with design tokens as CSS variables in `static/css/input.css` |
 | Database | PostgreSQL | Primary data store |
 | Docker | Docker SDK | Container management |
 | Git | go-git/v5 | Git clone/pull operations |

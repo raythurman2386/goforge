@@ -49,7 +49,7 @@ openssl rand -base64 32
 ```
 
 !!! danger "Required in production"
-    When `GOFORGE_DEV_MODE=false`, `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET` must be explicitly set. The application will refuse to start without them. Docker Compose also refuses to start while those variables, `DATABASE_URL`, or `POSTGRES_PASSWORD` are empty.
+    When `GOFORGE_DEV_MODE=false`, `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET` must be explicitly set. The application will refuse to start without them. Docker Compose also refuses to start while those variables, `DATABASE_URL`, or `POSTGRES_PASSWORD` are empty.
 
 Dev mode writes any secrets it generates to `GOFORGE_DEV_SECRETS_FILE` (mode `0600`) and reloads them on the next start. Values already set in the environment are used as-is and are not copied into that file.
 
@@ -112,7 +112,7 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WEBHOOK_SECRET` | (empty) | Shared secret for webhook signature verification |
+| `WEBHOOK_SECRET` | (empty) | Shared secret for webhook signature (GitHub, Gitea) and token (GitLab) checks. Required outside dev mode: GoForge refuses to start while it is empty, because an empty secret lets anyone forge a webhook. Dev mode generates it |
 
 ## Deployment Limits
 
@@ -125,8 +125,8 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ENABLE_METRICS` | `true` | Enable Prometheus metrics endpoint |
-| `METRICS_RETENTION` | `168h` | How long to retain container metrics (default: 7 days) |
+| `ENABLE_METRICS` | `true` | Accepted, but unused. There is no `/metrics` endpoint |
+| `METRICS_RETENTION` | `168h` | Accepted, but unused. Container metrics are streamed live and not stored |
 
 ## Backups
 

@@ -19,6 +19,7 @@ Before deploying GoForge to production, ensure:
 - [ ] Strong, unique `ENCRYPTION_KEY` generated (`openssl rand -base64 32`)
 - [ ] Strong, unique `SESSION_SECRET` generated
 - [ ] Strong, unique `CSRF_SECRET` generated
+- [ ] `WEBHOOK_SECRET` set (GoForge refuses to start without it outside dev mode)
 - [ ] Strong database password (not the default `password`)
 - [ ] `DATABASE_URL` uses `sslmode=require` or stronger
 - [ ] GitHub OAuth callback URL uses HTTPS

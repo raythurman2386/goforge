@@ -179,5 +179,6 @@ GOFORGE_DEV_MODE=false \
 ENCRYPTION_KEY=$(openssl rand -base64 32) \
 SESSION_SECRET=$(openssl rand -base64 32) \
 CSRF_SECRET=$(openssl rand -base64 32) \
+WEBHOOK_SECRET=$(openssl rand -base64 32) \
 make dev
 ```

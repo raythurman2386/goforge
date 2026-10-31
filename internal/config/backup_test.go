@@ -118,6 +118,7 @@ func TestLoad_BackupDisabledByDefault(t *testing.T) {
 	os.Setenv("ENCRYPTION_KEY", "k")
 	os.Setenv("SESSION_SECRET", "s")
 	os.Setenv("CSRF_SECRET", "c")
+	os.Setenv("WEBHOOK_SECRET", "w")
 	// A broken schedule must not matter while the bucket is unset.
 	os.Setenv("BACKUP_SCHEDULE", "nonsense")
 
@@ -139,6 +140,7 @@ func TestLoad_BackupEnabledValidation(t *testing.T) {
 		"ENCRYPTION_KEY":              "k",
 		"SESSION_SECRET":              "s",
 		"CSRF_SECRET":                 "c",
+		"WEBHOOK_SECRET":              "w",
 		"BACKUP_S3_BUCKET":            "goforge-backups",
 		"BACKUP_S3_ENDPOINT":          "http://127.0.0.1:9000",
 		"BACKUP_S3_ACCESS_KEY_ID":     "id",

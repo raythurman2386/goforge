@@ -82,6 +82,8 @@ reviewer is the check.
    golangci-lint version as `go.mod` (v1.64.8). CI also has a `css` job that
    builds Tailwind v3.4.17 and runs `scripts/class_check.py`; run it locally
    with `make css-check` when you touch templates, `static/js`, or CSS.
+   `make ci` runs `deps`, `templ`, `css-check`, and the `make check` steps
+   in one go.
 2. **Follow the Go style in [AGENTS.md](AGENTS.md).** Wrapped errors,
    `context.Context` first, grouped imports, sentinel errors with
    `errors.Is`. Enforced by golangci-lint and review.

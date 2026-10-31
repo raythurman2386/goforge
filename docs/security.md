@@ -1,7 +1,7 @@
 # Security
 
 > **⚠️ Warning: GoForge is in active development.** 
-> This document describes the current security model. Some features listed as "planned" or "known limitations" should be addressed before production use. See the [Security Policy](https://github.com/raythurman2386/goforge/blob/main/SECURITY.md) for full disclaimers.
+> This document describes the current security model. The items under "Known limitations" should be addressed before production use. See the [Security Policy](https://github.com/raythurman2386/goforge/blob/main/SECURITY.md) for full disclaimers.
 
 ---
 
@@ -25,7 +25,7 @@ This page documents GoForge's security model, current protections, and known are
 - GitHub user ID is linked to the local user account
 - Access tokens are stored in the `users` table for API access
 
-The OAuth flow validates the `state` parameter using a cookie-based approach: a UUID is generated, stored in a `github_oauth_state` cookie (HttpOnly, 5-minute expiry), and verified on callback (`internal/web/handlers/auth.go:157-179`).
+The OAuth flow validates the `state` parameter using a cookie-based approach: a UUID is generated, stored in a `github_oauth_state` cookie (HttpOnly, 5-minute expiry), and verified on callback (`GitHubLogin` and `GitHubCallback` in `internal/web/handlers/auth.go`).
 
 ---
 
@@ -37,12 +37,15 @@ The OAuth flow validates the `state` parameter using a cookie-based approach: a 
 - Session cookies use:
     - `HttpOnly: true` - Not accessible to JavaScript
     - `SameSite: Lax` - Prevents cross-site request forgery for most cases
+    - `Secure` on HTTPS requests (`X-Forwarded-Proto: https` or TLS)
     - `Path: /`
+- Sessions last 24 hours, or 30 days with "remember me" (GitHub login sessions last 30 days)
 - Expired sessions are deleted on access, and `goforge serve` deletes every expired session row at startup and then hourly
 
 ### Known Limitations
 
-- **No session rotation after login**: The session token is not regenerated after authentication, which creates a session fixation risk if an attacker can set the session cookie before the user logs in
+- Each login, registration, and GitHub callback creates a new session with a new random token. There is no anonymous session that becomes authenticated, so a session cookie planted before login is not promoted
+- **Password change keeps other sessions**: changing the password does not end the account's other sessions
 - **No concurrent session limits**: Users can have unlimited active sessions
 
 ---
@@ -73,7 +76,7 @@ Every response carries (`internal/web/middleware/secheaders.go`):
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Strict-Transport-Security` | `max-age=31536000`, only when the request is HTTPS (`X-Forwarded-Proto: https` or TLS) |
 
-The CSP does not restrict scripts or styles because the templates use inline scripts and HTMX attributes; it only blocks framing (clickjacking), `<base>` rewrites, and plugins. HSTS leaves out `includeSubDomains` because deployed apps live on sibling subdomains GoForge does not control.
+The CSP does not restrict scripts or styles because a few pages still use inline `<script>` blocks (service detail, container detail, the Git repository browser) and HTMX attributes; the UI kit itself has no inline event handlers since #89. The CSP only blocks framing (clickjacking), `<base>` rewrites, and plugins. HSTS leaves out `includeSubDomains` because deployed apps live on sibling subdomains GoForge does not control.
 
 ---
 
@@ -110,9 +113,15 @@ Accounts have a `role` of `admin` or `user`. Registration creates users, includi
 - These are encrypted at rest using the same `secrets.Encryptor` (`internal/database/repositories/git_source.go`)
 - GitHub user access tokens in the `users` table are also encrypted (`internal/database/repositories/user.go`)
 
+### One-click services, backups, and tokens
+
+- One-click service `config` and `connection_info` (generated passwords included) are encrypted with the same key
+- The S3 access key ID and secret saved in Settings → Profile → Backups are sealed with `ENCRYPTION_KEY` and never sent back to the browser. `ENCRYPTION_KEY` itself is never uploaded with a backup
+- API tokens and session tokens are stored only as SHA-256 hashes
+
 ### Recommendations
 
-- Rotate `ENCRYPTION_KEY` periodically and implement key rotation tooling
+- GoForge has no `ENCRYPTION_KEY` rotation tooling. Changing the key makes existing encrypted values unreadable
 - Use a key management system or derive encryption keys from a master secret
 - Consider integrating with external secret managers (HashiCorp Vault, etc.)
 
@@ -168,12 +177,14 @@ Webhooks receive push events from git providers to trigger deployments.
 
 | Provider | Path | Verification |
 |----------|------|--------------|
-| GitHub | `/webhooks/github` | Signature verification (`X-Hub-Signature-256`) should be implemented |
-| GitLab | `/webhooks/gitlab` | Token-based verification |
-| Gitea | `/webhooks/gitea` | Token-based verification |
+| GitHub | `/webhooks/github` | HMAC-SHA256 of the body with `WEBHOOK_SECRET` in `X-Hub-Signature-256`, compared with `hmac.Equal` |
+| GitLab | `/webhooks/gitlab` | `X-Gitlab-Token` equal to `WEBHOOK_SECRET`, constant-time compare |
+| Gitea | `/webhooks/gitea` | HMAC-SHA256 in `X-Gitea-Signature` (falls back to `X-Hub-Signature-256`) |
 
-!!! warning "Improvement Needed"
-    Webhook signature verification should be thoroughly reviewed to ensure all providers properly validate the request origin. Unsigned webhooks could allow anyone to trigger deployments.
+Bodies are capped at 1 MB. GitHub and Gitea `ping` events are answered before the signature check and trigger nothing. Webhook routes are outside the CSRF group and need no session.
+
+!!! warning "Set `WEBHOOK_SECRET`"
+    Outside dev mode GoForge refuses to start while `WEBHOOK_SECRET` is empty or only whitespace. With an empty secret anyone could compute the HMAC (empty key) or send an empty `X-Gitlab-Token`, so a forged push for a project's repository and branch could trigger a deployment. Dev mode generates a secret and keeps it in `GOFORGE_DEV_SECRETS_FILE`. Generate it with `openssl rand -base64 32`.
 
 ---
 
@@ -189,11 +200,12 @@ Webhooks receive push events from git providers to trigger deployments.
 
 - Containers run with default Docker security settings
 - Resource limits (CPU, memory) are configurable per environment
-- The GoForge application itself runs as root in the Docker container
+- The GoForge application itself runs as root in the Docker container (the optional `mcp` stdio image runs as uid 10001)
+- GoForge does not mount the Docker socket into the project and service containers it deploys. See "Docker socket trust model" in `SECURITY.md`
 
 ### Recommendations
 
-- Run the GoForge container as a non-root user
+- A non-root `goforge` image is not available yet; the socket mount makes the process root-equivalent on the host either way
 - Consider using Docker Content Trust for image verification
 - Implement a Dockerfile linter/scanner in the build pipeline
 - Add network policies to restrict inter-container communication
@@ -219,9 +231,10 @@ Webhooks receive push events from git providers to trigger deployments.
 | Setting | Value | Notes |
 |---------|-------|-------|
 | Read Timeout | 15s | |
-| Write Timeout | 15s | May kill SSE connections prematurely |
+| Write Timeout | none on the server | SSE streams are long-lived; `/api/v1`, `/mcp`, and the non-streaming UI routes get a 15s `middleware.Timeout` instead |
 | Idle Timeout | 60s | |
-| Max Header Bytes | 1MB | |
+| Max Header Bytes | 1MB | Go's default (`http.DefaultMaxHeaderBytes`) |
+| Rate limit | 30 req/s, burst 60 per client IP | Global middleware |
 
 ---
 
@@ -237,14 +250,14 @@ Webhooks receive push events from git providers to trigger deployments.
 
 ### Deployment Checklist
 
-- [ ] Set strong, unique values for `SESSION_SECRET` and `CSRF_SECRET`
+- [ ] Set strong, unique values for `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET`
 - [ ] Use a strong `DATABASE_URL` password (not the default)
 - [ ] Configure `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` if using OAuth
 - [ ] **Use Cloudflare Tunnel** for external access (recommended)
 - [ ] Enable HTTPS via Traefik with valid SSL certificates
-- [ ] Remove PostgreSQL host port mapping in Docker Compose
-- [ ] Run GoForge as a non-root user
-- [ ] Turn on nightly backups (see [Backup & Restore](deployment/backup.md)) and keep `ENCRYPTION_KEY` off the server
+- [ ] Keep PostgreSQL unpublished (the repo `docker-compose.yml` does not publish it; do not add a mapping in an override)
+- [ ] Set `TRUSTED_PROXIES` to your proxy addresses, and `CLOUDFLARE_PROXY_MODE=true` only when every request arrives through Cloudflare
+- [ ] Turn on nightly backups (Settings → Profile → Backups; see [Backup & Restore](deployment/backup.md)) and keep a copy of `ENCRYPTION_KEY` somewhere other than the server
 - [ ] Review and restrict Docker socket access. The read-write socket in the `goforge` container, Traefik's `:ro` socket, and `docker` group membership are all root-equivalent on the host (see `SECURITY.md`, "Docker socket trust model")
 - [ ] Keep the Traefik dashboard off (`TRAEFIK_DASHBOARD_INSECURE=false`, the default)
 - [ ] Configure firewall rules to limit access (allow outbound to Cloudflare only)

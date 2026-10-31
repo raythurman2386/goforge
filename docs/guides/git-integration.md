@@ -7,8 +7,8 @@ GoForge integrates with GitHub, GitLab, and Gitea for repository management, bra
 | Provider | Auth Method | Repo Browser | Webhooks | File Content |
 |----------|------------|--------------|----------|-------------|
 | GitHub | OAuth token | Yes | Yes | Yes |
-| GitLab | Personal access token | Yes | Yes | Planned |
-| Gitea | Personal access token | Yes | Yes | Planned |
+| GitLab | Personal access token | Yes | Yes | Yes |
+| Gitea | Personal access token | Yes | Yes | Yes |
 
 ## GitHub Integration
 
@@ -80,11 +80,13 @@ When a deployment is triggered, GoForge clones the repository:
 
 ### Clone Authentication
 
+Every provider uses the same code path (`internal/git/operations.go`): when the project's Git source has an access token, the clone sends it as the HTTP basic password with the username `x-access-token`. A public repository clones with no token.
+
 | Provider | Method |
 |----------|--------|
-| GitHub | `x-access-token` HTTP basic auth |
-| GitLab | Token-based (planned) |
-| Gitea | Token-based (planned) |
+| GitHub | OAuth or access token, HTTP basic auth |
+| GitLab | Personal access token, HTTP basic auth |
+| Gitea | Personal access token, HTTP basic auth |
 
 ## Webhook Verification
 
@@ -93,5 +95,5 @@ GoForge verifies webhook signatures to prevent unauthorized deployment triggers:
 | Provider | Header | Algorithm |
 |----------|--------|-----------|
 | GitHub | `X-Hub-Signature-256` | HMAC-SHA256 |
-| GitLab | `X-Gitlab-Token` | Token comparison |
-| Gitea | `X-Gitea-Signature` | HMAC-SHA256 |
+| GitLab | `X-Gitlab-Token` | Constant-time token comparison |
+| Gitea | `X-Gitea-Signature` (or `X-Hub-Signature-256`) | HMAC-SHA256 |
