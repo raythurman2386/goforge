@@ -1,0 +1,100 @@
+name: ntfy
+display_name: ntfy
+description: Simple HTTP-based pub-sub push notifications with a web app and phone apps. Give it a public HTTPS domain so the phone apps and browser push can reach it. Access defaults to deny-all, and GoForge creates the admin account (ntfy-admin by default) with a generated password shown masked on the service page.
+icon: ntfy
+category: monitoring
+web: true
+
+versions:
+  - "v2.35.0"
+  - "latest"
+default_version: "v2.35.0"
+
+config:
+  # Access for anonymous users and users without an explicit grant.
+  - name: default_access
+    label: Default Access (anonymous users)
+    type: select
+    options: [deny-all, read-only, write-only, read-write]
+    default: deny-all
+    required: true
+  - name: enable_signup
+    label: Allow Web App Signups
+    type: bool
+    default: false
+    required: true
+  # The first admin account. GoForge creates it after the first healthy start
+  # (see post_start below) and never changes it afterwards: change the
+  # password in ntfy itself (ntfy user change-pass).
+  - name: admin_username
+    label: Admin Username
+    type: text
+    default: "ntfy-admin"
+    required: true
+  - name: admin_password
+    label: Admin Password
+    type: password
+    generate: true
+    length: 32
+    immutable: true
+    required: true
+
+resources:
+  cpu: "0.25"
+  memory: "128m"
+
+docker:
+  image: "binwiederhier/ntfy:{{ .Version }}"
+  ports:
+    - container: 80
+      protocol: tcp
+  # The image entrypoint is "ntfy"; "serve" starts the server.
+  command: ["serve"]
+  environment:
+    NTFY_BASE_URL: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}{{ end }}"
+    NTFY_LISTEN_HTTP: ":80"
+    # Traefik (and Cloudflare) sit in front, so take the client IP from
+    # X-Forwarded-For for rate limiting.
+    NTFY_BEHIND_PROXY: "true"
+    NTFY_CACHE_FILE: "/var/lib/ntfy/cache.db"
+    NTFY_AUTH_FILE: "/var/lib/ntfy/user.db"
+    NTFY_ATTACHMENT_CACHE_DIR: "/var/lib/ntfy/attachments"
+    NTFY_AUTH_DEFAULT_ACCESS: "{{ .Config.default_access }}"
+    NTFY_ENABLE_SIGNUP: "{{ .Config.enable_signup }}"
+    NTFY_ENABLE_LOGIN: "true"
+  volumes:
+    - name: data
+      path: /var/lib/ntfy
+  health_check:
+    test: ["CMD-SHELL", "wget -q --tries=1 -O - http://localhost:80/v1/health | grep -q '\"healthy\":true'"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+# Create the first admin once ntfy is healthy. Runs on every container create
+# and does nothing when the user already exists. ntfy reads the password from
+# NTFY_PASSWORD, so it is never in argv. The CLI finds the auth database
+# through NTFY_AUTH_FILE in the container environment.
+post_start:
+  - name: create-admin
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if ntfy user list 2>&1 | grep -q "^user $NTFY_ADMIN_USER "; then
+          echo "user $NTFY_ADMIN_USER already exists; nothing to do"
+          exit 0
+        fi
+        if [ -z "${NTFY_PASSWORD:-}" ]; then
+          echo "admin user does not exist and admin_password is empty" >&2
+          exit 1
+        fi
+        ntfy user add --role=admin "$NTFY_ADMIN_USER"
+    env:
+      NTFY_ADMIN_USER: "{{ .Config.admin_username }}"
+      NTFY_PASSWORD: "{{ .Config.admin_password }}"
+
+connection:
+  internal: "http://{{ .ContainerName }}:80"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:80{{ end }}"

@@ -1,0 +1,58 @@
+name: umami
+display_name: Umami
+description: Privacy-focused, cookie-free web analytics. Requires a PostgreSQL database; deploy the PostgreSQL service first (or use the shared one) and create an app role and database with scripts/shared-data/pg-tenant.sh, then paste its connection string. Umami creates its tables on first start. The first login is admin / umami; change that password right away.
+icon: umami
+category: monitoring
+web: true
+
+versions:
+  - "3.4.1"
+  - "latest"
+default_version: "3.4.1"
+
+config:
+  # Umami 3 supports PostgreSQL only.
+  - name: database_url
+    label: PostgreSQL Connection String (postgresql://user:pass@host:5432/db)
+    type: password
+    required: true
+  # Signs login tokens. Changing it signs every user out.
+  - name: app_secret
+    label: App Secret
+    type: password
+    generate: true
+    length: 48
+    immutable: true
+    required: true
+  # Needed only for two-factor authentication: 64 hex characters
+  # (openssl rand -hex 32). Left out of the container when blank.
+  - name: two_factor_key
+    label: Two-Factor Encryption Key (64 hex chars, optional)
+    type: password
+    required: false
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "ghcr.io/umami-software/umami:{{ .Version }}"
+  ports:
+    - container: 3000
+      protocol: tcp
+  environment:
+    DATABASE_URL: "{{ .Config.database_url }}"
+    APP_SECRET: "{{ .Config.app_secret }}"
+  optional_environment:
+    TWO_FACTOR_ENCRYPTION_KEY: "{{ .Config.two_factor_key }}"
+  # Stateless: everything lives in PostgreSQL.
+  volumes: []
+  health_check:
+    test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/heartbeat"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+
+connection:
+  internal: "http://{{ .ContainerName }}:3000"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:3000{{ end }}"

@@ -37,6 +37,14 @@ func TestRepoTemplates_WebServices(t *testing.T) {
 		{name: "solidcraft", image: "ghcr.io/tangency-labs/solidcraft-web:{{ .Version }}", port: 8080, category: "cad"},
 		{name: "vaultwarden", image: "vaultwarden/server:{{ .Version }}", port: 80, category: "security"},
 		{name: "gitea", image: "gitea/gitea:{{ .Version }}", port: 3000, category: "devtools"},
+		{name: "ntfy", image: "binwiederhier/ntfy:{{ .Version }}", port: 80, category: "monitoring"},
+		{name: "umami", image: "ghcr.io/umami-software/umami:{{ .Version }}", port: 3000, category: "monitoring"},
+		{name: "searxng", image: "searxng/searxng:{{ .Version }}", port: 8080, category: "productivity"},
+		{name: "listmonk", image: "listmonk/listmonk:{{ .Version }}", port: 9000, category: "productivity"},
+		{name: "stirlingpdf", image: "stirlingtools/stirling-pdf:{{ .Version }}", port: 8080, category: "productivity"},
+		{name: "pocketbase", image: "ghcr.io/muchobien/pocketbase:{{ .Version }}", port: 8090, category: "devtools"},
+		{name: "authentik", image: "ghcr.io/goauthentik/server:{{ .Version }}", port: 9000, category: "security"},
+		{name: "meilisearch", image: "getmeili/meilisearch:{{ .Version }}", port: 7700, category: "database"},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -286,5 +294,52 @@ func TestDeployVaultwarden_AdminTokenIsArgon2idHash(t *testing.T) {
 	}
 	if !verifyPHC(t, got, "plain-admin-token") {
 		t.Errorf("ADMIN_TOKEN %q does not verify against the stored token", got)
+	}
+}
+
+// authentik's mode select is the container command: allinone by default, or
+// server / worker for a split pair sharing one database and secret key.
+func TestDeployAuthentik_ModeIsCommand(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"allinone", "worker"} {
+		opts := deployRepoTemplate(t, "authentik", false, map[string]interface{}{
+			"name":        "idp-" + mode,
+			"mode":        mode,
+			"db_host":     "postgres-shared",
+			"db_password": "db-pass",
+		})
+		if len(opts.Cmd) != 1 || opts.Cmd[0] != mode {
+			t.Errorf("mode %s: cmd = %v, want [%s]", mode, opts.Cmd, mode)
+		}
+		env := envMap(opts)
+		if env["AUTHENTIK_POSTGRESQL__HOST"] != "postgres-shared" || env["AUTHENTIK_POSTGRESQL__PORT"] != "5432" {
+			t.Errorf("mode %s: postgres env = %v", mode, env)
+		}
+		if env["AUTHENTIK_SECRET_KEY"] == "" {
+			t.Errorf("mode %s: AUTHENTIK_SECRET_KEY not generated", mode)
+		}
+	}
+}
+
+// PocketBase's entrypoint upserts a superuser only when both PB_ADMIN_EMAIL and
+// PB_ADMIN_PASSWORD are set. A blank email must leave both out.
+func TestDeployPocketBase_SuperuserOnlyWithEmail(t *testing.T) {
+	t.Parallel()
+	opts := deployRepoTemplate(t, "pocketbase", false, map[string]interface{}{"name": "pb"})
+	env := envMap(opts)
+	if _, ok := env["PB_ADMIN_EMAIL"]; ok {
+		t.Errorf("PB_ADMIN_EMAIL set without an email: %v", env)
+	}
+	if _, ok := env["PB_ADMIN_PASSWORD"]; ok {
+		t.Errorf("PB_ADMIN_PASSWORD set without an email: %v", env)
+	}
+
+	opts = deployRepoTemplate(t, "pocketbase", false, map[string]interface{}{
+		"name":        "pb2",
+		"admin_email": "me@example.com",
+	})
+	env = envMap(opts)
+	if env["PB_ADMIN_EMAIL"] != "me@example.com" || len(env["PB_ADMIN_PASSWORD"]) != 32 {
+		t.Errorf("superuser env = %v, want email and a generated 32-char password", env)
 	}
 }

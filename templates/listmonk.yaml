@@ -1,0 +1,104 @@
+name: listmonk
+display_name: Listmonk
+description: Self-hosted newsletter and mailing list manager. Requires a PostgreSQL database; deploy the PostgreSQL service first (or use the shared one), create an app role and database with scripts/shared-data/pg-tenant.sh, and enter its host, name, user, and password here. Listmonk installs its schema on the first start, applies migrations after an image update, and creates the admin account (listmonk-admin by default) with a generated password shown masked on the service page. Set the Root URL and SMTP server under Settings after you sign in.
+icon: listmonk
+category: productivity
+web: true
+
+versions:
+  - "v6.2.0"
+  - "latest"
+default_version: "v6.2.0"
+
+# Listmonk takes its database settings as separate LISTMONK_db__* values, not a
+# connection string, so the fields mirror pg-tenant.sh output.
+config:
+  - name: db_host
+    label: PostgreSQL Host (container name)
+    type: text
+    required: true
+  - name: db_port
+    label: PostgreSQL Port
+    type: number
+    default: 5432
+    required: true
+  - name: db_name
+    label: Database Name
+    type: text
+    default: "listmonk"
+    required: true
+  - name: db_user
+    label: Database User
+    type: text
+    default: "listmonk"
+    required: true
+  - name: db_password
+    label: Database Password
+    type: password
+    required: true
+  - name: db_ssl_mode
+    label: Database SSL Mode
+    type: select
+    options: [disable, require, verify-full]
+    default: disable
+    required: true
+  # The first Super Admin. Listmonk reads these only while it installs the
+  # schema on an empty database; change the password in Listmonk afterwards.
+  - name: admin_username
+    label: Admin Username
+    type: text
+    default: "listmonk-admin"
+    immutable: true
+    required: true
+  - name: admin_password
+    label: Admin Password
+    type: password
+    generate: true
+    length: 32
+    immutable: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "256m"
+
+docker:
+  image: "listmonk/listmonk:{{ .Version }}"
+  ports:
+    - container: 9000
+      protocol: tcp
+  # Upstream's documented container command. --config '' makes listmonk read
+  # only the LISTMONK_* environment. --install --idempotent creates the schema
+  # only on an empty database, and --upgrade applies migrations after an image
+  # update; both are no-ops otherwise, so every start is safe.
+  command:
+    - sh
+    - -c
+    - "./listmonk --install --idempotent --yes --config '' && ./listmonk --upgrade --yes --config '' && exec ./listmonk --config ''"
+  environment:
+    LISTMONK_app__address: "0.0.0.0:9000"
+    LISTMONK_db__host: "{{ .Config.db_host }}"
+    LISTMONK_db__port: "{{ .Config.db_port }}"
+    LISTMONK_db__database: "{{ .Config.db_name }}"
+    LISTMONK_db__user: "{{ .Config.db_user }}"
+    LISTMONK_db__password: "{{ .Config.db_password }}"
+    LISTMONK_db__ssl_mode: "{{ .Config.db_ssl_mode }}"
+    LISTMONK_db__max_open: "25"
+    LISTMONK_db__max_idle: "25"
+    LISTMONK_db__max_lifetime: "300s"
+    LISTMONK_ADMIN_USER: "{{ .Config.admin_username }}"
+    LISTMONK_ADMIN_PASSWORD: "{{ .Config.admin_password }}"
+    TZ: "Etc/UTC"
+  volumes:
+    # Media uploads. Point Settings -> Media at /listmonk/uploads.
+    - name: uploads
+      path: /listmonk/uploads
+  health_check:
+    test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/api/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+
+connection:
+  internal: "http://{{ .ContainerName }}:9000"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:9000{{ end }}"
