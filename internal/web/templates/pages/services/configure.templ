@@ -60,7 +60,7 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 						<div id="svc-domain-help" class="mb-4 text-xs text-gray-500 space-y-1 dark:text-gray-400">
 							<p>Required. Cloudflare Tunnel mode: use a public first-level host such as <code>{ tmpl.Name }-app.example.com</code>. Cloudflare Universal SSL covers <code>*.example.com</code> but not <code>*.apps.example.com</code>, so a deeper name fails the TLS handshake.</p>
 							<p>Before you deploy, create a proxied CNAME for the host that points at <code>&lt;tunnel-id&gt;.cfargotunnel.com</code>, unless a proxied wildcard already does. <code>.localhost</code> hosts cannot be reached through the tunnel.</p>
-							<p><a href={ templ.SafeURL(cloudflareDomainsDocURL) } target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline dark:text-primary-400">Cloudflare service domains guide</a></p>
+							<p><a href={ templ.SafeURL(cloudflareDomainsDocURL) } target="_blank" rel="noopener noreferrer" class="text-primary-700 hover:underline dark:text-primary-400">Cloudflare service domains guide</a></p>
 						</div>
 					} else {
 						<p id="svc-domain-help" class="mb-4 text-xs text-gray-500 dark:text-gray-400">

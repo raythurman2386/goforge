@@ -90,6 +90,7 @@ The drive writes `ui-a11y-verdict.txt`, `ui-a11y-report.json` (axe rule ids, imp
   - `/services`: many catalog-card contrast nodes.
   - `/containers` passes.
   - Clearing the gate needs a palette decision, for example `.btn-primary` on `primary-700`, and the label fixes in later PRs.
+  - Since `fix/axe-primary-palette-contrast`, `.btn-primary` rests on `primary-700` and primary text links use `text-primary-700`, so the white-on-`#059669` and `#059669`-text nodes are gone (72 nodes to 0 on the 2026-10-30 host run). The remaining `color-contrast` nodes are `.btn-warning` and gray muted text (`#9ca3af` light, `#6b7280` dark), plus `dlitem` on project Overview.
 - The `toggle` event of a popover fires after the key that closed it. That is why Tab in a menu focuses the trigger itself before it hides the menu, and why the drive waits a frame after each key before it reads focus.
 - After Escape hides a tooltip, it stays hidden until the pointer leaves the trigger or focus moves away. Each tooltip check starts by moving the pointer to the corner and blurring.
 - The sidebar nav renders twice from one templ (the desktop aside and the mobile Sheet). `app.js` marks the current link in both, and one of the two is always `display: none`, so there is one nav landmark at a time.
