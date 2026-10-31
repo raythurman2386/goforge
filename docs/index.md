@@ -20,7 +20,7 @@ GoForge provides git-to-deploy workflows, one-click services, automatic SSL via 
 - **Real-Time Monitoring** -- Live CPU, memory, and network stats for all containers via Server-Sent Events.
 - **Blue-Green Deployments** -- Zero-downtime deployments with health check verification and automatic rollback.
 - **Authentication** -- Local email/password authentication (Argon2id) and GitHub OAuth.
-- **Secrets Management** -- AES-256-GCM encryption for access tokens, SSH keys, and project variables marked secret (non-secret variables are stored in plaintext).
+- **Secrets Management** -- `ENCRYPTION_KEY` encrypts at rest with AES-GCM: project variables marked secret, GitHub OAuth and Git source access tokens, SSH private keys, one-click service credentials (`config` and `connection_info`), and the backup S3 keys saved in Settings. Non-secret variables are stored in plaintext, and rows written by an older version stay plaintext until updated; see the [Security Guide](security.md).
 - **Audit Logging** -- Records logins, logouts, registration, API token changes, backup settings and restores, and every `/api/v1` and `/mcp` write. Changes made in the web UI to projects, deployments, variables, and services are not recorded yet; see the [Security Guide](security.md).
 - **HTMX Frontend** -- Fast, server-rendered UI with real-time updates using HTMX 2 and templ templates.
 

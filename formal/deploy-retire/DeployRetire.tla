@@ -97,7 +97,8 @@ WaitGraceReturns(t) ==
     /\ task' = [task EXCEPT ![t].pc = "list"]
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
-(* retireSuperseded: deploymentRepo.ListByEnvironmentID(env, 10) and one  *)
+(* retireSuperseded: deploymentRepo.ListByStatus(running) filtered to the *)
+(* environment (every running deployment, no row limit) and one           *)
 (* time.Now(). keep is the newest running deployment that is cur or newer  *)
 (* with its grace over (now - runningSince >= gracePeriod); only running   *)
 (* deployments older than keep (newerDeployment: created_at, then ID) are  *)
@@ -105,7 +106,7 @@ WaitGraceReturns(t) ==
 (* only d.ID == currentDeploymentID || d.Status != running.               *)
 Keep(cur) == Max({e \in RunningDeps : e = cur \/ (e > cur /\ graceOver[e])})
 
-ListByEnvironmentID(t) ==
+ListByStatus(t) ==
     /\ task[t].pc = "list"
     /\ task' = [task EXCEPT ![t].pc = "next",
                             ![t].todo =
@@ -238,7 +239,7 @@ Next ==
     \/ \E d \in Deps : DeploymentRunning(d)
     \/ \E d \in Deps : GraceElapses(d)
     \/ \E t \in TaskIds : WaitGraceReturns(t)
-    \/ \E t \in TaskIds : ListByEnvironmentID(t)
+    \/ \E t \in TaskIds : ListByStatus(t)
     \/ \E t \in TaskIds : ListByDeploymentID(t)
     \/ \E t \in TaskIds : RetireSupersededReturns(t)
     \/ \E t \in TaskIds : RetryRetire(t)

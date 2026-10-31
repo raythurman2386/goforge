@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"sort"
@@ -267,6 +268,62 @@ func TestRetireSupersededNeverRetiresNewer(t *testing.T) {
 	}
 	if st := containerRowStatus(t, containers, "newest-ctr"); st != models.ContainerStatusRunning {
 		t.Fatalf("newest container row status = %s, want running", st)
+	}
+}
+
+// TestRetireSupersededPastTenNewerFailures: an older deployment still running
+// behind more than ten newer failed deploys is retired. retireSuperseded used
+// to read only the ten newest deployment rows (LIMIT 10), so after a run of
+// failed builds the old container was never seen and ran beside the new one.
+// A running deployment of another environment is left alone.
+func TestRetireSupersededPastTenNewerFailures(t *testing.T) {
+	svc, deploys, containers, host := redeployFixture(t)
+	svc.blueGreenDeployer = &BlueGreenDeployer{config: BlueGreenConfig{GracePeriod: 5 * time.Minute}}
+	now := time.Now()
+	for i := range 11 {
+		id := fmt.Sprintf("dep-failed-%02d", i)
+		deploys.items[id] = &models.Deployment{
+			ID: id, EnvironmentID: "env-1", Status: models.DeploymentStatusFailed,
+			CreatedAt: now.Add(-50*time.Minute + time.Duration(i)*time.Minute),
+		}
+	}
+	deploys.items["dep-1"].Status = models.DeploymentStatusRunning
+	deploys.items["dep-1"].CreatedAt = now.Add(-7 * time.Minute)
+	deploys.items["dep-1"].FinishedAt = sql.NullTime{Time: now.Add(-6 * time.Minute), Valid: true}
+	if err := containers.Create(context.Background(), &models.Container{
+		ID: "row-new", DeploymentID: sql.NullString{String: "dep-1", Valid: true},
+		DockerID: "new-ctr", Status: models.ContainerStatusRunning,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	host.exists["new-ctr"], host.running["new-ctr"] = true, true
+	deploys.items["dep-other"] = &models.Deployment{
+		ID: "dep-other", EnvironmentID: "env-2", Status: models.DeploymentStatusRunning,
+		CreatedAt: now.Add(-2 * time.Hour),
+	}
+	if err := containers.Create(context.Background(), &models.Container{
+		ID: "row-other", DeploymentID: sql.NullString{String: "dep-other", Valid: true},
+		DockerID: "other-ctr", Status: models.ContainerStatusRunning,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	host.exists["other-ctr"], host.running["other-ctr"] = true, true
+
+	n, err := svc.retireSuperseded(context.Background(), "env-1", "dep-1")
+	if err != nil {
+		t.Fatalf("retireSuperseded(dep-1): %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("retired %d containers, want 1 (old-ctr)", n)
+	}
+	if got := host.psAll(); len(got) != 2 || got[0] != "new-ctr" || got[1] != "other-ctr" {
+		t.Fatalf("docker ps -a = %v, want new-ctr and other-ctr (old-ctr removed)", got)
+	}
+	if st := containerRowStatus(t, containers, "old-ctr"); st != models.ContainerStatusExited {
+		t.Fatalf("old container row status = %s, want exited", st)
+	}
+	if st := containerRowStatus(t, containers, "other-ctr"); st != models.ContainerStatusRunning {
+		t.Fatalf("other environment's container row status = %s, want running", st)
 	}
 }
 

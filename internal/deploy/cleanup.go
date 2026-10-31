@@ -199,10 +199,19 @@ func newerDeployment(a, b *models.Deployment) bool {
 // is the one serving. It returns how many containers it retired, and
 // errRetirePending if Docker failed to remove one (its row stays running).
 func (s *Service) retireSuperseded(ctx context.Context, environmentID, currentDeploymentID string) (int, error) {
-	deployments, err := s.deploymentRepo.ListByEnvironmentID(ctx, environmentID, 10)
+	// Every running deployment of the environment, not the newest N rows: a
+	// run of failed or canceled deploys must not push an older running one
+	// out of the list and leave its container running for good.
+	running, err := s.deploymentRepo.ListByStatus(ctx, models.DeploymentStatusRunning)
 	if err != nil {
 		s.logger.Error("failed to list deployments for cleanup", "environment_id", environmentID, "error", err)
 		return 0, err
+	}
+	deployments := make([]*models.Deployment, 0, len(running))
+	for _, d := range running {
+		if d.EnvironmentID == environmentID {
+			deployments = append(deployments, d)
+		}
 	}
 
 	var cur *models.Deployment
