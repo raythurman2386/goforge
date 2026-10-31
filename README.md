@@ -10,6 +10,8 @@
 
 GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
+![GoForge dashboard in dark mode: projects, services, running containers, CPU, memory, and Docker disk usage](docs/assets/dashboard-dark.png)
+
 ## Features
 
 - **Authentication:** Local email/password and GitHub OAuth. Registration closes after the first account unless you open it. Accounts are `user` until `GOFORGE_ADMIN_EMAIL` grants `admin`.

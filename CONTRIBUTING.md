@@ -209,6 +209,22 @@ is gitignored for this reason.
 Do not push to a PR only to catch up with `main`. Rebase when there is a
 conflict or the reviewer asks.
 
+### Releases
+
+Releases come from tags on `main`. After the changes are merged, move the
+`## [Unreleased]` entries in `CHANGELOG.md` under the new version, then:
+
+```bash
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` builds the binaries with the tag as their
+version and attaches the archives and `checksums.txt` to a GitHub Release. A
+tag with a hyphen (`v0.2.0-rc.1`) is marked as a pre-release. Locally,
+`make version` shows the version `make build` stamps (`git describe --tags`,
+or `dev` without a tag).
+
 ## 10. Bugs and security issues
 
 - Bugs and feature requests: open an issue with the forms in

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Tag-triggered releases: pushing a `v*` tag runs `.github/workflows/release.yml`, which builds `goforge` and `goforge-mcp` for linux/amd64 and linux/arm64 and attaches `goforge_<tag>_<os>_<arch>.tar.gz` archives (binaries plus `static/` and `templates/`) and `checksums.txt` to a GitHub Release. No container image is published yet
+- `goforge --version` prints the version (`goforge v0.1.0`). The version comes from the git tag through `make build` ldflags (`VERSION`, `git describe --tags`), or `dev` with no tag; `goforge-mcp --version` and the MCP server version use the same value. `docker build --build-arg VERSION=v0.1.0` stamps the image. `make version` prints it
+- README dashboard screenshot (`docs/assets/dashboard-dark.png`)
+
 ### Security
 - GoForge refuses to start outside dev mode when `WEBHOOK_SECRET` is empty or only whitespace (`WEBHOOK_SECRET is required`), like `ENCRYPTION_KEY`, `SESSION_SECRET`, and `CSRF_SECRET`. An empty secret let anyone sign a GitHub or Gitea webhook (HMAC with an empty key) or send an empty `X-Gitlab-Token`. Dev mode still generates the secret when it is unset. Installs that already set it are unaffected. `docker-compose.yml` still passes `${WEBHOOK_SECRET:-}` so dev-mode Compose runs without it
 
@@ -25,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Network and block I/O are now filled in container metrics (they were always 0, also in `/api/v1` stats)
 
 ### Changed
+- The version in `/api/v1/health`, startup logs, and backup manifests is now the build's tag (or `dev`) instead of the hard-coded `0.1.0`; the MCP server reports the same value instead of `1.0.0`
+- `docs/security.md` and `docs/guides/projects.md` say AES-GCM like the Secrets docs
 - Docs home page Secrets bullet now lists every value `ENCRYPTION_KEY` encrypts (also one-click service credentials and the backup S3 keys), says AES-GCM like `README.md` and `SECURITY.md`, and names the plaintext gaps; the architecture overview's Secrets line matches
 - `mkdocs.yml` `site_url` is now https://goforge-docs-app.ravenwoodsoftware.dev/ (was the GitHub Pages URL, which never resolved)
 - The docs workflow (`.github/workflows/docs.yml`, now "Documentation") only builds with `--strict`; the GitHub Pages deploy job is gone (Pages is unavailable on a private repo on GitHub Free, #32, #52) and its permissions drop to `contents: read`

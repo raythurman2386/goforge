@@ -173,8 +173,11 @@ var migrateCreateCmd = &cobra.Command{
 	},
 }
 
-// version is reported in logs, the API, and backup manifests.
-const version = "0.1.0"
+// version is reported by --version, in logs, the API, and backup manifests.
+// Release builds set it from the git tag with
+// -ldflags "-X main.version=v0.1.0" (see the Makefile VERSION and
+// .github/workflows/release.yml); a build without a tag reports "dev".
+var version = "dev"
 
 var backupCmd = &cobra.Command{
 	Use:   "backup",
@@ -252,6 +255,8 @@ func runBackupOnce(ctx context.Context) error {
 }
 
 func init() {
+	rootCmd.Version = version
+	rootCmd.SetVersionTemplate("goforge {{.Version}}\n")
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(migrateCmd)
 	rootCmd.AddCommand(backupCmd)

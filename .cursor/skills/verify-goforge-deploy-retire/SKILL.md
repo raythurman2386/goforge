@@ -52,10 +52,10 @@ Yes if the diff changes any of these (the coverage record):
 
 A change elsewhere (UI, rollback, Traefik labels, image build) does not need this check unless it changes deployment or container statuses.
 
-**Sync commit:** `ea92e110376b2d96e23b27373eeb39b04525dcc7` (F1/F2 fix). The model was confirmed against the code above at this commit, and again after the soft-polish change that made `retireSuperseded` list running deployments with `ListByStatus` instead of `ListByEnvironmentID(env, 10)` (model action renamed to match; move the sync commit to that change's squash commit on `main`). To see whether covered code moved since then:
+**Sync commit:** `fece8b56967c26b87e620a5bc374a69c2f094011` (F1/F2 fix). The model was confirmed against the code above at this commit, and again after the soft-polish change that made `retireSuperseded` list running deployments with `ListByStatus` instead of `ListByEnvironmentID(env, 10)` (model action renamed to match; move the sync commit to that change's squash commit on `main`). To see whether covered code moved since then:
 
 ```bash
-git diff --stat ea92e110376b2d96e23b27373eeb39b04525dcc7 -- internal/deploy/cleanup.go internal/deploy/pipeline.go cmd/goforge/main.go internal/docker/container.go internal/deploy/bluegreen.go internal/deploy/state.go
+git diff --stat fece8b56967c26b87e620a5bc374a69c2f094011 -- internal/deploy/cleanup.go internal/deploy/pipeline.go cmd/goforge/main.go internal/docker/container.go internal/deploy/bluegreen.go internal/deploy/state.go
 ```
 
 Move the sync commit forward only after you have read the changed code and confirmed every row of the coverage record still describes it (or updated the model and the row).

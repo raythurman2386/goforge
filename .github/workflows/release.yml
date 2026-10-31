@@ -1,0 +1,114 @@
+name: Release
+
+# Cut a release by pushing a tag: git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0
+# The tag becomes the version in the binaries (goforge --version, /api/v1/health,
+# goforge-mcp --version) through the Makefile VERSION ldflags.
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  GO_VERSION: "1.26"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      # GoForge runs on Linux only (internal/monitor uses syscall.Sysinfo and
+      # it drives the local Docker daemon), so there are no macOS or Windows builds.
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Download dependencies
+        run: go mod download
+
+      # templ output and static/css/output.css are not committed; the binary
+      # serves static/ and templates/ from disk, so they ship in the archive.
+      - name: Generate templates
+        run: make templ
+
+      - name: Build CSS (Tailwind 3.4.17)
+        run: make css TAILWIND="npx --yes tailwindcss@3.4.17"
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          make build-bin build-mcp VERSION="$VERSION"
+
+      - name: Check the stamped version
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          test "$(bin/goforge --version)" = "goforge $VERSION"
+          test "$(bin/goforge-mcp --version)" = "goforge-mcp $VERSION"
+
+      - name: Package
+        env:
+          VERSION: ${{ github.ref_name }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          name="goforge_${VERSION}_${GOOS}_${GOARCH}"
+          mkdir -p "dist/$name"
+          cp bin/goforge bin/goforge-mcp LICENSE README.md CHANGELOG.md .env.example "dist/$name/"
+          cp -r static templates "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: goforge-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum *.tar.gz > checksums.txt
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac  # v0.1.0-rc.1
+          gh release create "$TAG" dist/*.tar.gz dist/checksums.txt \
+            --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag $prerelease
