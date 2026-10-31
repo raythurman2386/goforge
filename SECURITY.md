@@ -42,21 +42,30 @@ We take security vulnerabilities seriously. If you find a security issue:
 
 ## Known Security Gaps (As of Current Version)
 
+Checked against `main` on 2026-10-30.
+
 ### Partly done
 
-- [ ] **Database encryption at rest.** `ENCRYPTION_KEY` encrypts these values with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, and one-click service `config` and `connection_info`. Gaps: rows written in plaintext by an older version stay plaintext until they are updated, non-secret project variables are plaintext, and there is no key rotation.
-- [ ] **Role-based access control.** Accounts have a role of `admin` or `user`. Every account is created as `user`, and only the address in `GOFORGE_ADMIN_EMAIL` becomes `admin` (matching ignores case). The admin role gates host operations such as Docker prune. Projects, deployments, and services are scoped to the owning account, and another account's project or deployment returns `404`. Gaps: no teams, invites, or per-project roles.
-- [ ] **Audit logging.** An `audit_logs` table exists and some actions, such as login, are recorded. Coverage is not complete.
+- [ ] **Database encryption at rest.** `ENCRYPTION_KEY` encrypts these values with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, one-click service `config` and `connection_info`, and the S3 access key ID and secret saved in Settings → Profile → Backups. API tokens and session tokens are stored only as SHA-256 hashes. Gaps: rows written in plaintext by an older version stay plaintext until they are updated, non-secret project variables are plaintext, and there is no `ENCRYPTION_KEY` rotation.
+- [ ] **Role-based access control.** Accounts have a role of `admin` or `user`. Every account is created as `user`, and only the address in `GOFORGE_ADMIN_EMAIL` becomes `admin` (matching ignores case). The admin role gates host operations such as Docker prune and the backup settings. Projects, deployments, and services are scoped to the owning account, and another account's project or deployment returns `404`. Gaps: no teams, invites, or per-project roles.
+- [ ] **Audit logging.** `audit_logs` records login (password and GitHub), registration, logout, API token create, rotate, and revoke, backup settings saves, `goforge backup restore`, and every `/api/v1` and `/mcp` write (recorded before it acts). Changes made in the web UI to projects, deployments, variables, and services are not recorded.
+- [ ] **Sessions.** Each login creates a new random session token, so a session cookie set before login is never promoted. Gaps: changing the password does not end the account's other sessions, and there is no limit on concurrent sessions.
 
 ### Not started
 
 - [ ] Two-factor authentication (2FA)
-- [ ] API key rotation mechanism
 - [ ] Container escape prevention measures
-- [ ] Resource quota enforcement per project
-- [ ] `/health/ready` is unauthenticated and its JSON includes database and Docker error text
-- [ ] `BACKUP_S3_*` credentials passed into the `goforge` container's environment are plain environment variables, so anyone who can run `docker inspect` (the `docker` group) can read them. The repo `docker-compose.yml` no longer passes any `BACKUP_*` variable, so a compose install only has them if an operator adds them in an override for a one-time import. Backup keys saved in Settings → Profile are stored in the database encrypted with `ENCRYPTION_KEY` and never sent back to the browser; after an import, remove every `BACKUP_*` variable from the override (not only the two keys) and recreate the `goforge` container. Open until a deployed `goforge` container is checked with `docker inspect` and shows no `BACKUP_*` names
+- [ ] Resource quota enforcement per project (per-container CPU and memory limits exist)
+- [ ] `/health/ready` is unauthenticated and its JSON includes database and Docker error text (HEALTH-READY-PUBLIC)
 - [ ] The main `goforge` image runs as root (the `mcp` image runs as uid 10001)
+- [ ] `WEBHOOK_SECRET` is not required outside dev mode. With it empty, anyone can sign a GitHub or Gitea webhook (HMAC with an empty key) or send an empty `X-Gitlab-Token`, and a matching push can trigger a deployment. Set it in every install; `.env.example` and the quickstart say to
+- [ ] Webhook routes are not limited to a provider's IP ranges; the signature or token is the only check
+
+### Closed since the 2026-10-29 audit
+
+- **`BACKUP_S3_*` in the container environment (ENV-CREDS).** The repo `docker-compose.yml` passes no `BACKUP_*` variable (#80). Backup keys saved in Settings → Profile are stored encrypted with `ENCRYPTION_KEY` and never sent back to the browser (#77). On 2026-10-30 `docker inspect` of the deployed `goforge` container listed no `BACKUP_*` names. If you import settings through a `docker-compose.override.yml`, remove every `BACKUP_*` variable from it afterwards (not only the two keys) and recreate the `goforge` container. Host runs and `goforge backup run` still read `BACKUP_*` from the process environment.
+- **API token rotation.** Settings → Profile can rotate a token in place; the old secret stops working on its next request (#78).
+- **Client IP spoofing, login lockout, CSRF, and session purge** (#70). See [docs/security.md](docs/security.md).
 
 ### Defaults that reduce exposure
 
@@ -89,13 +98,13 @@ What reduces the blast radius:
 - [ ] Use **Cloudflare Tunnel** for external access (recommended - no inbound ports needed)
 - [ ] Traefik handles internal container routing only (host ports 80/443 bound to `127.0.0.1` or unpublished in an override)
 - [ ] Keep the Traefik dashboard off (`TRAEFIK_DASHBOARD_INSECURE=false`, the default)
-- [ ] Use strong, unique secrets for all credentials
+- [ ] Use strong, unique secrets for all credentials, including `WEBHOOK_SECRET`
 - [ ] Restrict access to Docker socket (see "Docker socket trust model" above)
 - [ ] Enable firewall rules (allow outbound to Cloudflare, block unnecessary inbound)
 - [ ] Regular security updates and patches
 
 ### Recommended Hardening
-- [ ] Review audit log coverage (partial today)
+- [ ] Review audit log coverage (web UI changes are not recorded today)
 - [ ] Implement network segmentation
 - [ ] Use secrets management (Vault, AWS Secrets Manager, etc.)
 - [ ] Regular penetration testing

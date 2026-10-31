@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap tracks the development of GoForge. Last brought up to date through #71 (2026-10-30).
+This roadmap tracks the development of GoForge. Last brought up to date through #91 (2026-10-30).
 
 ## 🚨 CRITICAL: User Flow & Experience Gaps (Immediate Priority)
 
@@ -251,13 +251,13 @@ Before tagging V1.0, the following **must** be completed:
 **Quality Assurance:**
 - [ ] All critical user paths tested manually
 - [ ] Mobile responsiveness verified on actual devices
-- [ ] Accessibility audit (WCAG 2.1 AA)
+- [ ] Accessibility audit (WCAG 2.1 AA) *(the `drive-ui-a11y` axe scan, WCAG 2.2 AA tags, reports 0 serious or critical issues on its 32 light and dark scans since `fix/axe-leftovers-and-docs`; a manual audit, including screen readers, is still open)*
 - [ ] Security review of auth flows *(2026-10-29 audit findings on client IP, lockout, CSRF, and session purge fixed in #70; a dedicated auth-flow review is still open)*
 - [ ] Load testing for concurrent deployments
 
 ---
 
-## 📦 Shipped since V1.0.x (#58-#71)
+## 📦 Shipped since V1.0.x (#58-#91)
 
 - [x] **#58** Redis template enforces `requirepass`; services without a Domain get `traefik.enable=false`; Postgres health check and MinIO `command` fixed
 - [x] **#59** A1 shared data services: Postgres 17 (`pgadmin`), Redis 7.4 (AOF, `noeviction`), `scripts/shared-data/pg-tenant.sh`
@@ -273,20 +273,33 @@ Before tagging V1.0, the following **must** be completed:
 - [x] **#69** Dependency and toolchain bump to 0 reachable govulncheck findings; Docker SDK moved to `github.com/moby/moby/client` + `api`; `golang:1.26.10` builder (security Goal 1)
 - [x] **#70** Client IP / XFF spoofing fix, login lockout, security headers, HMAC CSRF, expired-session purge (security Goal 2)
 - [x] **#71** Repo Compose hardening (Traefik dashboard off, loopback port, pinned images) and Docker socket trust model (security Goal 3)
-- [x] **#82-#87** UI kit (Path A): tokens, `components/ui` (20 components), native `<dialog>` and `popover`, `static/js/ui.js`, `/dev/ui` gallery behind `GOFORGE_DEV_MODE`, `drive-ui-a11y` (axe plus keyboard scripts, light and dark); every page migrated. The final sweep and docs PR removes the last inline `onclick` handlers and adds `docs/reference/ui-kit.md`. A full WCAG 2.1 AA audit is still open (Quality Assurance)
-- [x] Cleanup and roadmap truth (security Goal 4): this ROADMAP and `CHANGELOG.md` through #71, `.env.example` gaps, Tailwind v3.4.17 pin in `make css`, `css-check` in `make ci`, golangci-lint pinned in CI, stale docs
+- [x] **#72** Cleanup and roadmap truth (security Goal 4): this ROADMAP and `CHANGELOG.md` through #71, `.env.example` gaps, Tailwind v3.4.17 pin in `make css`, `css-check` in `make ci`, golangci-lint pinned in CI, stale docs
+- [x] **#73** Sidebar Log out stays on screen; dashboard skeleton mirrors the stats
+- [x] **#74** Redis per-app ACL users (#60 template change)
+- [x] **#75** Service edits claim the instance with a status compare-and-swap; a concurrent edit gets `409` (#48)
+- [x] **#76** Aesthetics Goal 3 nits from #68
+- [x] **#77** Backup settings in Settings → Profile (S3 keys sealed with `ENCRYPTION_KEY`)
+- [x] **#78** MCP over HTTP at `/mcp` with Profile API tokens (create, rotate, revoke)
+- [x] **#79** `goforge backup list` and `goforge backup restore` for the GoForge database (CLI)
+- [x] **#80** Repo Compose stops passing `BACKUP_*` into the `goforge` container (ENV-CREDS)
+- [x] **#81** Stats stream resumes after a config save; Container card on service detail and project Overview
+- [x] **#82-#87** UI kit (Path A): tokens, `components/ui` (20 components), native `<dialog>` and `popover`, `static/js/ui.js`, `/dev/ui` gallery behind `GOFORGE_DEV_MODE`, `drive-ui-a11y` (axe plus keyboard scripts, light and dark); every page migrated
+- [x] **#88** Script URLs are cache-busted so the mobile navigation opens after a deploy
+- [x] **#89** Final sweep: last inline handlers and legacy classes removed, `docs/reference/ui-kit.md` added
+- [x] **#90** Body scroll locks while the mobile Sheet is open
+- [x] **#91** Primary buttons rest on `primary-700` and primary text uses `text-primary-700`, for color contrast
+- [x] **`fix/axe-leftovers-and-docs`** `.btn-warning`, muted gray text, and the Overview `dlitem` fixed, so `drive-ui-a11y` reports 0 serious or critical issues; security docs and README brought up to date
 
 ## 🅿️ Parked and follow-up
 
 Parked items need Raymond's OK before anyone starts them.
 
-- [ ] **#48 Service edit CAS** (parked): compare-and-swap on service config edits
 - [x] **Backup restore (GoForge database)**: `goforge backup list` and `goforge backup restore <run key>` (CLI only), read-only Restore points on Settings → Profile; PostgreSQL 15 runbook fixed (`docs/deployment/backup.md`)
 - [ ] **Backup restore, follow-up** (parked): service data restore (Postgres services, Gitea, Vaultwarden), web/API/MCP restore, run-now from the API
 - [x] **Aesthetics Goal 3 nits** (#68 leftovers): `class_check.py` also checks `class={ ... }`, `*Class()` helpers, and `app.js` classes; `make css` fails unless it runs Tailwind v3.4.17 (standalone or `npx`); unused `.sidebar-link*` removed; dark `select` chevron; auth-aware error page (B17)
 - [ ] **Deadcode sweep** (parked): `deadcode ./...` reported 96 unreachable functions on 2026-10-29. Not removed in the cleanup goal; needs a reviewed pass
 - [ ] **Stale remote branches** (needs Raymond's OK): about 30 squash-merged branches remain on `origin` (for example `ui/shell-fixes`, `security/auth-edge-hardening`, `fix/4x-*`). Delete only with approval
-- [ ] **Open audit findings** (2026-10-29), documented in `SECURITY.md`: `/health/ready` is public and returns error text (HEALTH-READY-PUBLIC); `BACKUP_S3_*` credentials in container env (ENV-CREDS); main image runs as root
+- [ ] **Open security findings**, documented in `SECURITY.md`: `/health/ready` is public and returns error text (HEALTH-READY-PUBLIC); main image runs as root; an empty `WEBHOOK_SECRET` is accepted outside dev mode and lets anyone forge a webhook (found 2026-10-30; the deployed instance sets it). ENV-CREDS is closed for the repo Compose file (#80)
 - [ ] **Rollback feedback** in the UI (see Developer Experience)
 
 ---

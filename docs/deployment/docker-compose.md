@@ -43,6 +43,7 @@ GOFORGE_DOMAIN=goforge.example.com
 ENCRYPTION_KEY=<generated>
 SESSION_SECRET=<generated>
 CSRF_SECRET=<generated>
+WEBHOOK_SECRET=<generated>
 
 # Strong database password
 POSTGRES_PASSWORD=<strong-random-password>

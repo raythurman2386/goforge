@@ -112,7 +112,7 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WEBHOOK_SECRET` | (empty) | Shared secret for webhook signature verification |
+| `WEBHOOK_SECRET` | (empty) | Shared secret for webhook signature (GitHub, Gitea) and token (GitLab) checks. Not enforced at startup; set it, because an empty secret lets anyone forge a webhook |
 
 ## Deployment Limits
 
@@ -125,8 +125,8 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ENABLE_METRICS` | `true` | Enable Prometheus metrics endpoint |
-| `METRICS_RETENTION` | `168h` | How long to retain container metrics (default: 7 days) |
+| `ENABLE_METRICS` | `true` | Accepted, but unused. There is no `/metrics` endpoint |
+| `METRICS_RETENTION` | `168h` | Accepted, but unused. Container metrics are streamed live and not stored |
 
 ## Backups
 
