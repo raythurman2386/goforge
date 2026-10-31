@@ -254,7 +254,7 @@ templ-based HTML templates.
 ```
 templates/
 ├── layouts/
-│   └── base.templ         # Base HTML layout with sidebar
+│   └── base.templ         # Base(title, csrfToken), AuthLayout, AppLayout
 ├── pages/
 │   ├── dashboard.templ    # Dashboard page
 │   ├── login.templ        # Login form
@@ -265,12 +265,10 @@ templates/
 │   ├── settings/          # User settings
 │   └── errors/            # Error pages (404, 500)
 └── components/
-    ├── sidebar.templ      # Navigation sidebar
-    ├── nav.templ          # Top navigation
-    ├── form.templ         # Reusable form components
-    ├── ui/dialog.templ    # ui.Dialog and the hx-confirm dialog (native <dialog>)
+    ├── ui/                # UI kit (package ui), see docs/reference/ui-kit.md
+    ├── sidebar.templ      # Desktop sidebar and mobile navigation Sheet
     ├── toast.templ        # Toast notifications
-    ├── table.templ        # Data tables
+    ├── status.templ       # StatusBadge wrappers over ui.Badge
     ├── pagination.templ   # Pagination controls
     ├── stats.templ        # Stats cards
     ├── variables.templ    # Environment variable editor

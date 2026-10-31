@@ -120,8 +120,8 @@ func TestCheckboxGroupIsAFieldset(t *testing.T) {
 }
 
 func TestFormClassHelpers(t *testing.T) {
-	if got := labelClass("mb-0"); got != "label mb-0" {
-		t.Errorf("labelClass = %q", got)
+	if got := LabelClass("mb-0"); got != "label mb-0" {
+		t.Errorf("LabelClass = %q", got)
 	}
 	if got := inputClass(""); got != "input" {
 		t.Errorf("inputClass = %q", got)
@@ -135,4 +135,10 @@ func TestFormClassHelpers(t *testing.T) {
 	if ControlID("", "name") == "name" {
 		t.Error("ControlID fell back to the bare name")
 	}
+}
+
+func TestCopyAttrs(t *testing.T) {
+	got := render(t, Button(ButtonProps{Attrs: CopyAttrs("snippet")}), "Copy")
+	assertHas(t, got, `data-ui-copy="snippet"`, `type="button"`)
+	assertLacks(t, got, "onclick")
 }

@@ -11,7 +11,7 @@ templ Label(p LabelProps) {
 		if p.For != "" {
 			for={ p.For }
 		}
-		{ Attrs(templ.Attributes{"class": labelClass(p.Class)}, p.Attrs)... }
+		{ Attrs(templ.Attributes{"class": LabelClass(p.Class)}, p.Attrs)... }
 	>
 		{ children... }
 		@requiredMark(p.Required)

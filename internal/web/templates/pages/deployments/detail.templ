@@ -136,28 +136,30 @@ templ Detail(props DetailProps) {
 						Timeline
 					}
 				}
-				<dl class="card-body space-y-4">
-					<div>
-						<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
-						<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.CreatedAt) }</dd>
-					</div>
-					if props.Deployment.StartedAt.Valid {
+				@ui.CardContent(nil) {
+					<dl class="space-y-4">
 						<div>
-							<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Started</dt>
-							<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.StartedAt.Time) }</dd>
+							<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
+							<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.CreatedAt) }</dd>
 						</div>
-					}
-					if props.Deployment.FinishedAt.Valid {
+						if props.Deployment.StartedAt.Valid {
+							<div>
+								<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Started</dt>
+								<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.StartedAt.Time) }</dd>
+							</div>
+						}
+						if props.Deployment.FinishedAt.Valid {
+							<div>
+								<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Finished</dt>
+								<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.FinishedAt.Time) }</dd>
+							</div>
+						}
 						<div>
-							<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Finished</dt>
-							<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatTimestamp(props.Deployment.FinishedAt.Time) }</dd>
+							<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Duration</dt>
+							<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatDuration(props.Deployment.Duration()) }</dd>
 						</div>
-					}
-					<div>
-						<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Duration</dt>
-						<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{ formatDuration(props.Deployment.Duration()) }</dd>
-					</div>
-				</dl>
+					</dl>
+				}
 			}
 		</div>
 

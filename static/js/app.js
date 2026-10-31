@@ -47,11 +47,9 @@
 		var close = document.createElement("button");
 		close.type = "button";
 		close.setAttribute("aria-label", "Dismiss");
-		close.className = "opacity-60 hover:opacity-100";
+		close.setAttribute("data-toast-dismiss", "");
+		close.className = "-m-1.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-ui opacity-70 hover:opacity-100 ui-focus-ring md:h-8 md:w-8";
 		close.textContent = "\u00d7";
-		close.addEventListener("click", function () {
-			el.remove();
-		});
 
 		el.appendChild(text);
 		el.appendChild(close);
@@ -70,6 +68,15 @@
 			});
 		}).observe(region, { childList: true });
 	}
+
+	// One delegated listener dismisses every toast, whether app.js built it
+	// or the server swapped in components.Toast. No inline onclick.
+	document.addEventListener("click", function (evt) {
+		var btn = evt.target && evt.target.closest && evt.target.closest("[data-toast-dismiss]");
+		if (!btn) return;
+		var toast = btn.closest("[data-toast]");
+		if (toast) toast.remove();
+	});
 
 	// --- HTMX error routing -------------------------------------------------
 

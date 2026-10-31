@@ -7,7 +7,7 @@ GoForge uses [templ](https://templ.guide/) for type-safe server-side templates a
 ```
 internal/web/templates/
 ├── layouts/
-│   └── base.templ         # HTML shell with sidebar, nav, scripts
+│   └── base.templ         # Base(title, csrfToken), AuthLayout, AppLayout (sidebar, mobile Sheet, scripts)
 ├── pages/
 │   ├── dashboard.templ    # Dashboard with stats cards
 │   ├── login.templ        # Login form
@@ -18,11 +18,10 @@ internal/web/templates/
 │   ├── settings/          # User settings
 │   └── errors/            # Error pages (404, 500)
 └── components/
-    ├── sidebar.templ      # Navigation sidebar
-    ├── nav.templ          # Top navigation bar
-    ├── form.templ         # Reusable form elements
-    ├── ui/dialog.templ    # ui.Dialog and the hx-confirm dialog (native <dialog>)
+    ├── ui/                # The UI kit (package ui): Button, Input, Dialog, ... (docs/reference/ui-kit.md)
+    ├── sidebar.templ      # Desktop sidebar and the mobile navigation Sheet
     ├── toast.templ        # Toast notifications
+    ├── status.templ       # StatusBadge wrappers over ui.Badge
     └── ...
 ```
 
@@ -47,15 +46,22 @@ templ templates are Go files with HTML-like syntax:
 ```go
 package pages
 
-import "github.com/raythurman2386/goforge/internal/models"
+import (
+    "github.com/raythurman2386/goforge/internal/models"
+    "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
 
 templ ProjectList(projects []*models.Project) {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         for _, p := range projects {
-            <div class="card">
-                <h3>{ p.Name }</h3>
-                <p>{ p.Description }</p>
-            </div>
+            @ui.Card(ui.CardProps{}) {
+                @ui.CardTitle(3, nil) {
+                    { p.Name }
+                }
+                @ui.CardDescription(nil) {
+                    { p.Description }
+                }
+            }
         }
     </div>
 }
@@ -144,7 +150,7 @@ make css-check
 
 The Tailwind configuration is in `tailwind.config.js`:
 
-- Scans `.templ` and generated `_templ.go` files for class names
+- Scans `.templ` and generated `_templ.go` files, Go files under `internal/web/templates` and `internal/web/handlers`, and `static/js/app.js` and `static/js/ui.js` for class names (the same sources `class_check.py` reads)
 - Uses a green/emerald color palette
 - Includes custom font families
 
@@ -157,9 +163,11 @@ The Tailwind configuration is in `tailwind.config.js`:
 
 Colors, radius, and the focus ring are CSS variables in `static/css/input.css` (`--gf-*`, RGB triplets with light and dark values). `tailwind.config.js` maps them to utilities such as `bg-card`, `text-muted-foreground`, `border-field-border`, `ring-ring`, and `rounded-ui`. The `primary` palette keeps its emerald values through the same tokens. Prefer the semantic utilities in new markup.
 
+Pages and shared components use the kit in `internal/web/templates/components/ui`. [UI kit reference](../reference/ui-kit.md) covers all 20 components, their variants, the `ui.js` contract, and the accessibility expectations. `TestPagesUseKit` (`components/sweep_gate_test.go`) fails on hand-written `class="btn`, `class="card`, `class="input`, `class="select`, or `class="label`, on inline `onclick=` or `confirm(`, and on the old `id="modal"` and `id="menu-button"` outside `components/ui`.
+
 Shared primitives live in `internal/web/templates/components/ui`. Each one takes `templ.Attributes` for `hx-*`, `data-*`, and `aria-*` passthrough. `ui.Attrs` merges them, appending a caller `class` rather than replacing it. `ui.Class` joins literal class lists. `static/js/ui.js` is the delegated runtime: components register with `GoForgeUI.register(name, {init, events})` and are marked `data-ui="name"`. They are initialized once per element on `htmx:load`, and overlays close before htmx saves history. There is no JS build step.
 
-The static primitives are `ui.Button` (a `<button type="button">` unless `Type` is set, or an `<a>` when `Href` is set; icon-only buttons need `Label`), `ui.Badge` (`StatusBadge` wraps it), `ui.Card` with `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, and `CardFooter`, `ui.Alert` and `ui.AlertMessage` (`role="alert"` for errors only), `ui.Skeleton` (aria-hidden; the loading region carries `role="status"` and `aria-busy="true"`), `ui.Avatar` (initials only), and `ui.Breadcrumb`. Variant styles are component-layer classes (`.btn-*`, `.card`, `.skeleton-*`), so a caller `Class` utility overrides them. A `templ` script handler (`onclick={ copyText(...) }`) cannot ride `templ.Attributes`; keep a native element styled with `class={ ui.ButtonClass(...) }` there.
+The static primitives are `ui.Button` (a `<button type="button">` unless `Type` is set, or an `<a>` when `Href` is set; icon-only buttons need `Label`), `ui.Badge` (`StatusBadge` wraps it), `ui.Card` with `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, and `CardFooter`, `ui.Alert` and `ui.AlertMessage` (`role="alert"` for errors only), `ui.Skeleton` (aria-hidden; the loading region carries `role="status"` and `aria-busy="true"`), `ui.Avatar` (initials only), and `ui.Breadcrumb`. Variant styles are component-layer classes (`.btn-*`, `.card`, `.skeleton-*`), so a caller `Class` utility overrides them. Do not use a templ `script` handler (`onclick={ ... }`). A copy button is a `ui.Button` with `Attrs: ui.CopyAttrs("<id of the element to copy>")`.
 
 With `GOFORGE_DEV_MODE=true`, `/dev/ui` renders a gallery of the tokens and components. `verify.sh drive-ui-a11y` (in `.cursor/skills/verify-goforge`) scans it and the main pages with axe.
 
@@ -171,10 +179,19 @@ With `GOFORGE_DEV_MODE=true`, `/dev/ui` renders a gallery of the tokens and comp
 // internal/web/templates/pages/newpage.templ
 package pages
 
-templ NewPage(data SomeData) {
-    @layouts.Base("Page Title") {
-        <h1>New Page</h1>
-        // page content
+import (
+    "github.com/raythurman2386/goforge/internal/web/templates/components"
+    "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+    "github.com/raythurman2386/goforge/internal/web/templates/layouts"
+)
+
+templ NewPage(data SomeData, csrfToken string) {
+    @layouts.AppLayout("Page Title", csrfToken) {
+        @components.PageHeader("Page Title", "One line about the page.") {
+        }
+        @ui.Card(ui.CardProps{}) {
+            // page content, built from components/ui
+        }
     }
 }
 ```
@@ -184,7 +201,7 @@ templ NewPage(data SomeData) {
 ```go
 func (h *Handler) NewPage(w http.ResponseWriter, r *http.Request) {
     data := h.service.GetData(r.Context())
-    pages.NewPage(data).Render(r.Context(), w)
+    pages.NewPage(data, auth.GetCSRFToken(r)).Render(r.Context(), w)
 }
 ```
 

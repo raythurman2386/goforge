@@ -123,6 +123,20 @@ return errors.New("connection failed")  // correct
 return errors.New("Connection failed.") // wrong
 ```
 
+### Templates and UI
+- Pages and shared components use the kit in `internal/web/templates/components/ui`
+  (`ui.Button`, `ui.Card`, `ui.Input`, `ui.Dialog`, ...). Reference:
+  `docs/reference/ui-kit.md`. Do not hand-write `class="btn…"`, `class="card…"`,
+  `class="input"`, `class="select"`, or `class="label"`, inline `onclick=`, or
+  `confirm(`. `TestPagesUseKit` (`components/sweep_gate_test.go`) enforces it.
+- Layouts: `layouts.Base(title, csrfToken)`, `layouts.AuthLayout(title, csrfToken)`,
+  `layouts.AppLayout(title, csrfToken)`.
+- Behavior goes in the delegated runtimes: `static/js/ui.js` (kit, `data-ui*`
+  attributes) or `static/js/app.js` (toasts, htmx error toasts, active nav).
+  Both are class sources for `tailwind.config.js` `content` and
+  `scripts/class_check.py`; keep every class a complete literal.
+- Dark mode is OS-only (`prefers-color-scheme`); there is no toggle.
+
 ### Context
 - First parameter for functions doing I/O or cancellable work
 - Pass through, don't store in structs
@@ -207,9 +221,10 @@ internal/
     handlers/            # HTTP handlers
     templates/
       layouts/           # Base templates (base.templ)
-      components/        # Reusable components (nav.templ, modal.templ)
+      components/        # Shared components (sidebar.templ, toast.templ, ...)
+        ui/              # UI kit: pages use these (docs/reference/ui-kit.md)
       pages/             # Page templates
-static/                  # CSS, JS (htmx.min.js)
+static/                  # CSS (input.css tokens), JS (htmx, app.js shell, ui.js kit runtime)
 templates/               # Service YAML templates (postgres.yaml, redis.yaml)
 ```
 

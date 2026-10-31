@@ -4,8 +4,9 @@
 // PR 1 shipped the delegated listener pattern and the htmx:load init pass.
 // PR 2 added the dismissible Alert. PR 4 added Dialog and the hx-confirm
 // dialog. PR 5 added Dropdown, Popover, and Tooltip on the popover
-// attribute. PR 6 adds in-page Tabs and the Sheet (an edge-pinned static
-// dialog on the same runtime). Rules, from the UI kit
+// attribute. PR 6 added in-page Tabs and the Sheet (an edge-pinned static
+// dialog on the same runtime). PR 7 adds copy buttons (data-ui-copy). The
+// full contract is docs/reference/ui-kit.md. Rules, from the UI kit
 // brief (docs/development/frontend.md, "UI kit (Path A)"):
 //
 //  1. Delegated listeners only. click, keydown, focusin, pointerover, and
@@ -981,6 +982,42 @@
 				else hideOverlay(p, false);
 			}
 		});
+	});
+
+	// --- Copy (ui.CopyAttrs) --------------------------------------------------
+
+	// A button with data-ui-copy="<id>" copies the text of that element and
+	// reads "Copied!" (or "Copy failed") for two seconds, then its own label
+	// again. The copied text stays in the page, never in an attribute, so a
+	// secret is not duplicated into the markup.
+	var COPY_MS = 2000;
+
+	document.addEventListener("click", function (evt) {
+		var btn = evt.target && evt.target.closest && evt.target.closest("[data-ui-copy]");
+		if (!btn) return;
+		var src = document.getElementById(btn.getAttribute("data-ui-copy"));
+		if (!src) return;
+		if (!btn.hasAttribute("data-ui-copy-label")) btn.setAttribute("data-ui-copy-label", btn.textContent.trim());
+		var label = btn.getAttribute("data-ui-copy-label");
+		function flash(text) {
+			btn.textContent = text;
+			clearTimeout(btn._uiCopyTimer);
+			btn._uiCopyTimer = setTimeout(function () {
+				btn.textContent = label;
+			}, COPY_MS);
+		}
+		var write =
+			navigator.clipboard && navigator.clipboard.writeText
+				? navigator.clipboard.writeText(src.textContent)
+				: Promise.reject(new Error("clipboard unavailable"));
+		write.then(
+			function () {
+				flash("Copied!");
+			},
+			function () {
+				flash("Copy failed");
+			}
+		);
 	});
 
 	function init() {
