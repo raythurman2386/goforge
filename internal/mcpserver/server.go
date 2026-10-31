@@ -11,8 +11,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Version is reported to MCP clients.
-const Version = "1.0.0"
+// Version is reported to MCP clients and by goforge-mcp --version. Release
+// builds set it from the git tag with -ldflags
+// "-X github.com/raythurman2386/goforge/internal/mcpserver.Version=v0.1.0"
+// (see the Makefile VERSION); a build without a tag reports "dev".
+var Version = "dev"
 
 // Server is the GoForge MCP server.
 type Server struct {

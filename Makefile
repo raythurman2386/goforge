@@ -1,4 +1,4 @@
-.PHONY: all build build-mcp docker-build-mcp dev test lint fmt vet clean css css-check templ migrate help
+.PHONY: all build build-bin build-mcp version docker-build-mcp dev test lint fmt vet clean css css-check templ migrate help
 
 # Go parameters
 GOCMD=go
@@ -36,8 +36,14 @@ TAILWIND_RESOLVE=set -e; tw="$(TAILWIND)"; \
 AIR=air
 GOLINT=go tool golangci-lint
 
-# Build flags
-LDFLAGS=-ldflags "-s -w"
+# Version: the git tag (v0.1.0, or v0.1.0-3-gabc1234[-dirty] past a tag), or
+# "dev" with no tag or no .git. Override with `make build VERSION=v0.1.0`.
+VERSION?=$(shell git describe --tags --dirty 2>/dev/null || echo dev)
+MODULE=github.com/raythurman2386/goforge
+
+# Build flags. -X sets main.version (goforge --version, /api/v1/health, logs,
+# backup manifests) and mcpserver.Version (goforge-mcp --version, MCP clients).
+LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION) -X $(MODULE)/internal/mcpserver.Version=$(VERSION)"
 
 # Default target
 all: build
@@ -51,6 +57,14 @@ help:
 
 ## build: Build production binary
 build: templ css
+	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/goforge
+
+## version: Print the version make build stamps into the binaries
+version:
+	@echo $(VERSION)
+
+## build-bin: Build the goforge binary only (templ and CSS already generated; honors GOOS/GOARCH)
+build-bin:
 	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/goforge
 
 ## build-mcp: Build the GoForge MCP server (stdio)

@@ -27,13 +27,16 @@ RUN go install github.com/a-h/templ/cmd/templ
 COPY . .
 
 # Build the application
-# We run `make build` which handles `templ generate` and `css` generation
-RUN make build
+# We run `make build` which handles `templ generate` and `css` generation.
+# .git is not in the build context, so pass the release tag in:
+# `docker build --build-arg VERSION=v0.1.0 .` (default "dev").
+ARG VERSION=dev
+RUN make build VERSION=$VERSION
 
 # MCP server build (target: mcp). Defined before the final stage so a plain
 # `docker build .` still produces the GoForge app image.
 FROM builder AS mcp-builder
-RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /app/bin/goforge-mcp ./cmd/goforge-mcp
+RUN make build-mcp VERSION=$VERSION
 
 # MCP server image: `docker build --target mcp -t goforge-mcp .`
 # Speaks MCP over stdin/stdout and calls GoForge over HTTP. It needs no

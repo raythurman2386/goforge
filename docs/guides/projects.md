@@ -51,7 +51,7 @@ Set configuration values for your application:
 3. Toggle **Secret** for sensitive values (passwords, API keys)
 4. Click **Save**
 
-Secret variables are encrypted at rest using AES-256-GCM.
+Secret variables are encrypted at rest using AES-GCM.
 
 !!! tip "Bulk import"
     You can import environment variables from a `.env` file format:

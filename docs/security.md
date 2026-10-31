@@ -103,7 +103,7 @@ Accounts have a `role` of `admin` or `user`. Registration creates users, includi
 
 ### Environment Variables
 
-- Environment variables marked as `is_secret` are encrypted at rest using AES-256-GCM via the `secrets.Encryptor` (`internal/database/repositories/env_variable.go`)
+- Environment variables marked as `is_secret` are encrypted at rest using AES-GCM via the `secrets.Encryptor` (`internal/database/repositories/env_variable.go`)
 - The `ENCRYPTION_KEY` environment variable provides the key material
 - Variables are decrypted at read time and injected into containers at deploy time via Docker environment variables
 
