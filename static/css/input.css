@@ -121,8 +121,8 @@
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-500 shadow-sm hover:shadow-primary-200/50 hover:shadow-lg;
-    @apply dark:bg-primary-600 dark:hover:bg-primary-500 dark:hover:shadow-primary-900/40;
+    @apply btn bg-primary-700 text-white hover:bg-primary-800 focus-visible:ring-primary-500 shadow-sm hover:shadow-primary-200/50 hover:shadow-lg;
+    @apply dark:bg-primary-700 dark:hover:bg-primary-800 dark:hover:shadow-primary-900/40;
   }
 
   .btn-secondary {

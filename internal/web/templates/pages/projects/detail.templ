@@ -195,7 +195,7 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 							</div>
 						}
 						<div class="mt-4 pt-4 border-t border-gray-100 flex justify-end dark:border-gray-800">
-							<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + latestDeployment.ID) } class="text-sm text-primary-600 hover:text-primary-800 font-medium hover:underline dark:text-primary-400 dark:hover:text-primary-200">
+							<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + latestDeployment.ID) } class="text-sm text-primary-700 hover:text-primary-800 font-medium hover:underline dark:text-primary-400 dark:hover:text-primary-200">
 								View Logs &rarr;
 							</a>
 						</div>
@@ -401,7 +401,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 		} else if len(linkedServices) == 0 {
 			@ui.Card(ui.CardProps{Class: "text-center py-8"}) {
 				<p class="text-sm text-gray-500 dark:text-gray-400">No running service instances available to attach.</p>
-				<a href="/services" class="mt-2 inline-block text-sm text-primary-600 hover:text-primary-800 font-medium dark:text-primary-400 dark:hover:text-primary-200">
+				<a href="/services" class="mt-2 inline-block text-sm text-primary-700 hover:text-primary-800 font-medium dark:text-primary-400 dark:hover:text-primary-200">
 					Deploy a service &rarr;
 				</a>
 			}
@@ -421,7 +421,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 					<!-- Project Defaults Section -->
 					<div class="grid grid-cols-1 gap-y-6 sm:grid-cols-6">
 						<div class="sm:col-span-6">
-							<h4 class="text-xs font-semibold text-primary-600 uppercase tracking-wider mb-2 dark:text-primary-400">Global Defaults</h4>
+							<h4 class="text-xs font-semibold text-primary-700 uppercase tracking-wider mb-2 dark:text-primary-400">Global Defaults</h4>
 							<p class="text-sm text-gray-500 dark:text-gray-400">Settings applied to all environments unless overridden.</p>
 						</div>
 
@@ -432,7 +432,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 					<div class="pt-8 grid grid-cols-1 gap-y-6 sm:grid-cols-6">
 						<div class="sm:col-span-6">
 							<div class="flex items-center space-x-2 mb-2">
-								<h4 class="text-xs font-semibold text-primary-600 uppercase tracking-wider dark:text-primary-400">Environment Overrides</h4>
+								<h4 class="text-xs font-semibold text-primary-700 uppercase tracking-wider dark:text-primary-400">Environment Overrides</h4>
 								<span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-800">
 									{ currentEnv.Name }
 								</span>
