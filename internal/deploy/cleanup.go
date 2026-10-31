@@ -7,7 +7,11 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-// CleanupOldDeployments stops containers from previous deployments of the same environment.
+// CleanupOldDeployments retires containers from previous deployments of the
+// same environment. After the blue-green grace period it stops and then
+// removes each running container of an earlier successful deployment, so a
+// redeploy replaces the old container instead of leaving it on the host.
+// The container row is kept (marked exited) because rollback rebuilds from it.
 func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, currentDeploymentID string) error {
 	// Apply grace period if blue-green deployer is configured
 	if s.blueGreenDeployer != nil {
@@ -42,18 +46,9 @@ func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, curr
 			}
 
 			for _, c := range containers {
-				// Only stop running containers
+				// Only retire running containers
 				if c.Status == models.ContainerStatusRunning {
-					// Stop and remove container from Docker
-					if err := s.dockerClient.StopContainer(ctx, c.DockerID); err != nil {
-						s.logger.Warn("failed to stop container during cleanup", "container_id", c.DockerID, "error", err)
-						// Continue anyway to update DB
-					}
-
-					// Update container status in DB
-					if err := s.containerRepo.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); err != nil {
-						s.logger.Warn("failed to update container status during cleanup", "container_id", c.ID, "error", err)
-					}
+					s.retireContainer(ctx, d.ID, currentDeploymentID, c)
 				}
 			}
 		}
@@ -66,4 +61,24 @@ func (s *Service) CleanupOldDeployments(ctx context.Context, environmentID, curr
 	}
 
 	return nil
+}
+
+// retireContainer stops and removes one previous deployment container in
+// Docker and marks its row exited. Stopping alone left the old container on
+// the host after every redeploy, so remove always runs, even if stop fails.
+func (s *Service) retireContainer(ctx context.Context, deploymentID, currentDeploymentID string, c *models.Container) {
+	if err := s.dockerClient.StopContainer(ctx, c.DockerID); err != nil {
+		s.logger.Warn("failed to stop container during cleanup", "container_id", c.DockerID, "error", err)
+	}
+	if err := s.dockerClient.RemoveContainer(ctx, c.DockerID); err != nil {
+		s.logger.Warn("failed to remove container during cleanup", "container_id", c.DockerID, "error", err)
+	} else if s.logger != nil {
+		s.logger.Info("retired previous deployment container",
+			"deployment_id", deploymentID, "container_id", c.DockerID, "current_deployment_id", currentDeploymentID)
+	}
+
+	// Update container status in DB
+	if err := s.containerRepo.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); err != nil {
+		s.logger.Warn("failed to update container status during cleanup", "container_id", c.ID, "error", err)
+	}
 }

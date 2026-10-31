@@ -63,5 +63,6 @@ type containerRuntime interface {
 	CreateContainer(ctx context.Context, opts docker.ContainerOptions) (string, error)
 	InspectContainer(ctx context.Context, id string) (container.InspectResponse, error)
 	StopContainer(ctx context.Context, id string) error
+	RemoveContainer(ctx context.Context, id string) error
 	PruneImages(ctx context.Context) (image.PruneReport, error)
 }

@@ -561,6 +561,10 @@ func (f *fakeRuntime) StopContainer(_ context.Context, _ string) error {
 	return nil
 }
 
+func (f *fakeRuntime) RemoveContainer(_ context.Context, _ string) error {
+	return nil
+}
+
 func (f *fakeRuntime) PruneImages(context.Context) (image.PruneReport, error) {
 	return image.PruneReport{}, nil
 }

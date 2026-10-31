@@ -71,7 +71,7 @@ GoForge creates and starts a Docker container from the built image with:
 
 ### 5. Running
 
-The container is running and serving traffic. Previous deployment containers are cleaned up.
+The container is running and serving traffic. The previous deployment's container keeps running for a 5-minute grace period, so during that window `docker ps` (and the dashboard's **Running Containers**) shows both. After the grace period GoForge stops and removes the previous container; its record is kept as `exited` so a rollback can rebuild it from the image. The GoForge log shows `retired previous deployment container` for each one. The grace timer lives in the GoForge process: if GoForge restarts within those 5 minutes, the previous container is not retired and must be removed by hand.
 
 ## Monitoring Deployments
 
