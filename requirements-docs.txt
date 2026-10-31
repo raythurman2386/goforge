@@ -1,0 +1,6 @@
+# Docs toolchain, pinned. Used by Dockerfile.docs and .github/workflows/docs.yml.
+# Bump together and run `mkdocs build --strict` before merging.
+mkdocs==1.6.1
+mkdocs-material==9.8.0
+mkdocs-minify-plugin==0.8.0
+pymdown-extensions==12.3

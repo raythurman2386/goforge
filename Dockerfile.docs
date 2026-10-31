@@ -1,0 +1,18 @@
+# Static image of the MkDocs site (docs/ + mkdocs.yml).
+# Build from the repo root:  docker build -f Dockerfile.docs -t goforge-docs .
+# Served by nginx on port 80; GET / returns index.html (2xx for the GoForge health check).
+# The app image is built from Dockerfile and is not affected by this file.
+
+FROM python:3.12-slim AS build
+WORKDIR /src
+COPY requirements-docs.txt ./
+RUN pip install --no-cache-dir -r requirements-docs.txt
+COPY mkdocs.yml ./
+COPY docs ./docs
+RUN mkdocs build --strict --site-dir /site
+
+FROM nginx:1.29-alpine
+COPY --from=build /site /usr/share/nginx/html
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1
