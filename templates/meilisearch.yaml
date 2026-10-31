@@ -1,0 +1,49 @@
+name: meilisearch
+display_name: Meilisearch
+description: Fast, typo-tolerant search engine with a RESTful API. Runs in production mode, so every request needs the generated master key (or an API key derived from it); the built-in search preview is off in production mode. Moving to a newer minor version may need a dump and import, so pin the version you deploy.
+icon: meilisearch
+category: database
+web: true
+
+versions:
+  - "v1.56.0"
+  - "latest"
+default_version: "v1.56.0"
+
+config:
+  # Production mode refuses a master key shorter than 16 bytes. Changing it
+  # regenerates the default API keys, so it is set once at deploy.
+  - name: master_key
+    label: Master Key
+    type: password
+    generate: true
+    length: 32
+    immutable: true
+    required: true
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "getmeili/meilisearch:{{ .Version }}"
+  ports:
+    - container: 7700
+      protocol: tcp
+  environment:
+    MEILI_MASTER_KEY: "{{ .Config.master_key }}"
+    MEILI_ENV: "production"
+    MEILI_NO_ANALYTICS: "true"
+    MEILI_DB_PATH: "/meili_data/data.ms"
+  volumes:
+    - name: data
+      path: /meili_data
+  health_check:
+    test: ["CMD", "curl", "-fsS", "http://localhost:7700/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:7700"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:7700{{ end }}"

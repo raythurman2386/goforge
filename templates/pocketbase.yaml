@@ -1,0 +1,56 @@
+name: pocketbase
+display_name: PocketBase
+description: Open source backend in one file with an embedded SQLite database, realtime subscriptions, auth, file storage, and an admin dashboard at /_/. Uses the community image ghcr.io/muchobien/pocketbase (PocketBase publishes no official image). Enter a Superuser Email to have GoForge create the superuser with the generated password; leave it blank to use the one-time installer link printed in the container logs.
+icon: pocketbase
+category: devtools
+web: true
+
+versions:
+  - "0.40.6"
+  - "latest"
+default_version: "0.40.6"
+
+config:
+  # The image entrypoint runs "pocketbase superuser upsert" on every start
+  # when both values are set, so this account's password is reset to the
+  # stored one on each restart. Leave the email blank to manage superusers
+  # in the dashboard instead.
+  - name: admin_email
+    label: Superuser Email (blank uses the installer link in the logs)
+    type: text
+    default: ""
+    required: false
+  - name: admin_password
+    label: Superuser Password
+    type: password
+    generate: true
+    length: 32
+    immutable: true
+    required: true
+
+resources:
+  cpu: "0.25"
+  memory: "256m"
+
+docker:
+  image: "ghcr.io/muchobien/pocketbase:{{ .Version }}"
+  ports:
+    - container: 8090
+      protocol: tcp
+  environment: {}
+  optional_environment:
+    # Left out when blank, which skips the entrypoint's superuser upsert.
+    PB_ADMIN_EMAIL: "{{ .Config.admin_email }}"
+    PB_ADMIN_PASSWORD: "{{ if .Config.admin_email }}{{ .Config.admin_password }}{{ end }}"
+  volumes:
+    - name: data
+      path: /pb_data
+  health_check:
+    test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/api/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:8090"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:8090{{ end }}"

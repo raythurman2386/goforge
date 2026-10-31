@@ -1,0 +1,61 @@
+name: stirlingpdf
+display_name: Stirling-PDF
+description: Web toolkit for PDFs (merge, split, convert, OCR, sign, compress) that processes files on your own server. Login is off by default, so anyone who can reach the Domain can use it; keep it private or behind Cloudflare Access, or turn on Enable Login (first sign-in admin / stirling, which Stirling-PDF makes you change).
+icon: stirlingpdf
+category: productivity
+web: true
+
+versions:
+  - "3.2.2"
+  - "latest"
+default_version: "3.2.2"
+
+config:
+  - name: enable_login
+    label: Enable Login
+    type: bool
+    default: false
+    required: true
+  - name: default_locale
+    label: Default Locale
+    type: text
+    default: "en-US"
+    required: true
+  - name: max_file_size_mb
+    label: Max Upload Size (MB)
+    type: number
+    default: 100
+    required: true
+
+# A JVM plus LibreOffice and OCR: conversions need real memory.
+resources:
+  cpu: "1"
+  memory: "2g"
+
+docker:
+  image: "stirlingtools/stirling-pdf:{{ .Version }}"
+  ports:
+    - container: 8080
+      protocol: tcp
+  environment:
+    SECURITY_ENABLELOGIN: "{{ .Config.enable_login }}"
+    SYSTEM_DEFAULTLOCALE: "{{ .Config.default_locale }}"
+    SYSTEM_MAXFILESIZE: "{{ .Config.max_file_size_mb }}"
+    SYSTEM_GOOGLEVISIBILITY: "false"
+    SHOW_SURVEY: "false"
+  volumes:
+    # settings.yml, the login database, and custom files.
+    - name: configs
+      path: /configs
+    # Extra OCR language data (*.traineddata).
+    - name: tessdata
+      path: /usr/share/tessdata
+  health_check:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v1/info/status | grep -q UP"]
+    interval: 10s
+    timeout: 10s
+    retries: 18
+
+connection:
+  internal: "http://{{ .ContainerName }}:8080"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:8080{{ end }}"

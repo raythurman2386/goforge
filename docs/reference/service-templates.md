@@ -391,6 +391,30 @@ Gitea maps `GITEA__<SECTION>__<KEY>` to `app.ini` on every start. The section na
 
 ---
 
+### App templates: ntfy, Umami, SearXNG, Listmonk, Stirling-PDF, PocketBase, authentik, Meilisearch
+
+All eight are `web: true` single-container templates: the first port is the one Traefik routes to, and no port is published on the host. Each has a health check and a `connection.internal` of `http://<container>:<port>`. See [One-Click Services](../guides/services.md#apps-that-need-postgresql-umami-listmonk-authentik) for usage.
+
+| File | Category | Image (default version) | Port | Volumes | Config fields |
+|------|----------|-------------------------|------|---------|---------------|
+| `templates/ntfy.yaml` | `monitoring` | `binwiederhier/ntfy:v2.35.0` | 80 | `data` → `/var/lib/ntfy` | `default_access` (select, `deny-all`), `enable_signup` (bool), `admin_username`, `admin_password` (generated, immutable) |
+| `templates/umami.yaml` | `monitoring` | `ghcr.io/umami-software/umami:3.4.1` | 3000 | none | `database_url` (password, required), `app_secret` (generated, immutable), `two_factor_key` (optional) |
+| `templates/searxng.yaml` | `productivity` | `searxng/searxng:latest` | 8080 | `config` → `/etc/searxng`, `cache` → `/var/cache/searxng` | `secret_key` (generated, immutable) |
+| `templates/listmonk.yaml` | `productivity` | `listmonk/listmonk:v6.2.0` | 9000 | `uploads` → `/listmonk/uploads` | `db_host`, `db_port`, `db_name`, `db_user`, `db_password`, `db_ssl_mode` (select), `admin_username` (immutable), `admin_password` (generated, immutable) |
+| `templates/stirlingpdf.yaml` | `productivity` | `stirlingtools/stirling-pdf:3.2.2` | 8080 | `configs` → `/configs`, `tessdata` → `/usr/share/tessdata` | `enable_login` (bool, `false`), `default_locale`, `max_file_size_mb` |
+| `templates/pocketbase.yaml` | `devtools` | `ghcr.io/muchobien/pocketbase:0.40.6` | 8090 | `data` → `/pb_data` | `admin_email` (optional), `admin_password` (generated, immutable) |
+| `templates/authentik.yaml` | `security` | `ghcr.io/goauthentik/server:2026.8.5` | 9000 | `data` → `/data` | `mode` (select `allinone`/`server`/`worker`, rendered as the command), `db_host`, `db_port`, `db_name`, `db_user`, `db_password`, `secret_key` (generated, immutable), `bootstrap_email`, `bootstrap_password` (generated, immutable) |
+| `templates/meilisearch.yaml` | `database` | `getmeili/meilisearch:v1.56.0` | 7700 | `data` → `/meili_data` | `master_key` (generated, 32 chars, immutable) |
+
+Every template except SearXNG also offers `latest`. Umami, Listmonk, and authentik need a PostgreSQL database that GoForge does not create; Listmonk and authentik take separate host, port, name, user, and password fields because neither accepts a connection string.
+
+- **ntfy** `post_start` `create-admin`: `ntfy user add --role=admin` with the password in `NTFY_PASSWORD` (not argv); exits 0 when the user exists.
+- **Listmonk** `command`: upstream's `./listmonk --install --idempotent --yes --config '' && ./listmonk --upgrade --yes --config '' && exec ./listmonk --config ''`. `LISTMONK_ADMIN_USER` / `LISTMONK_ADMIN_PASSWORD` apply only while installing on an empty database.
+- **PocketBase**: `PB_ADMIN_EMAIL` and `PB_ADMIN_PASSWORD` are `optional_environment` and both render empty when `admin_email` is blank, so the image's entrypoint skips its `superuser upsert`.
+- **authentik**: `AUTHENTIK_BOOTSTRAP_*` are `optional_environment`; authentik applies them only when it creates `akadmin`. Health check `ak healthcheck` works in every mode.
+
+---
+
 ## Creating Custom Templates
 
 To add a new service template:

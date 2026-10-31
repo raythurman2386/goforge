@@ -118,6 +118,42 @@ Pick an **SSH Port** that nothing else on the host uses: not `22` (the host's ss
 !!! warning "Do not redeploy to change settings or upgrade"
     As with Vaultwarden, a new deploy is a new instance with a new, empty `/data` volume, so repositories and users are lost. Use **Edit configuration** or **Update image** on the service page instead: both recreate the container on the same volume and keep the secret key. Settings that come from the environment (domain, URLs, registration, install lock, secret key) are rewritten into `app.ini` on every container start, so change those in GoForge. Change everything else in **Site Administration**.
 
+### Apps that need PostgreSQL (Umami, Listmonk, authentik)
+
+These templates run one container and keep their data in PostgreSQL. GoForge does not create the database for them. Before you deploy one:
+
+1. Deploy the **PostgreSQL** service, or use the shared one (see [Shared data services](#shared-data-services)).
+2. Create the app's role and database: `scripts/shared-data/pg-tenant.sh <postgres-container> <app>`.
+3. Enter that container name, database, user, and password in the app's configure form: a `postgresql://` connection string for Umami, separate host, port, name, user, and password fields for Listmonk and authentik (neither takes a connection string).
+
+| Service | Image | Port | Volume | Notes |
+|---------|-------|------|--------|-------|
+| Umami | `ghcr.io/umami-software/umami:3.4.1` | 3000 | none (stateless) | Creates its tables on first start. First login `admin` / `umami`: change it at once. Two-factor needs a 64-hex-char key (`openssl rand -hex 32`) |
+| Listmonk | `listmonk/listmonk:v6.2.0` | 9000 | `uploads` → `/listmonk/uploads` | Runs `--install --idempotent` then `--upgrade` on every start, so the schema is created once and migrated after **Update image**. The admin (`listmonk-admin`, generated password) is created only while installing on an empty database. Set Root URL and SMTP under **Settings** |
+| authentik | `ghcr.io/goauthentik/server:2026.8.5` | 9000 | `data` → `/data` | No Redis (removed in 2025.10). **Mode** `allinone` (default) runs server and worker in one container; `server` and `worker` split them across two deploys that share the database and **Secret Key**. Sign in as `akadmin` with the generated bootstrap password |
+
+authentik limits in a single GoForge template: the worker has no Docker socket, so outposts are deployed by hand; Docker's `shm_size` cannot be set, so `/dev/shm` (authentik's `TMPDIR`) stays at Docker's 64 MB default instead of upstream's 512 MB; and a split server/worker pair has two separate `/data` volumes, so use `allinone` unless you need to scale.
+
+### ntfy
+
+Push notifications over HTTP (`binwiederhier/ntfy:v2.35.0`, port 80, `data` volume at `/var/lib/ntfy` for the message cache, users, and attachments). `NTFY_BASE_URL` is the Domain URL and `NTFY_BEHIND_PROXY=true`. **Default Access** starts at `deny-all`, so anonymous clients can neither publish nor subscribe. A `post_start` hook creates the admin (`ntfy-admin`, generated password) with `ntfy user add --role=admin`, reading the password from `NTFY_PASSWORD` (never argv), and does nothing when that user exists. Give it a public HTTPS domain for the phone apps and web push.
+
+### SearXNG
+
+Metasearch engine (`searxng/searxng:latest`, port 8080). Volumes: `config` → `/etc/searxng` (`settings.yml`, created from the image template on first start) and `cache` → `/var/cache/searxng`. `SEARXNG_SECRET` (generated) and `SEARXNG_BASE_URL` (the Domain) come from the template. It runs without the optional Valkey limiter, so keep it private or behind Cloudflare Access.
+
+### Stirling-PDF
+
+PDF toolkit (`stirlingtools/stirling-pdf:3.2.2`, port 8080, 1 CPU / 2 GiB). Volumes: `configs` → `/configs` and `tessdata` → `/usr/share/tessdata` (extra OCR languages). **Enable Login** is off by default, so anyone who reaches the Domain can use it; keep it private or turn login on.
+
+### PocketBase
+
+Backend in one binary with SQLite (`ghcr.io/muchobien/pocketbase:0.40.6`, community image; port 8090, `data` volume at `/pb_data`, dashboard at `/_/`). Enter **Superuser Email** to have the image create the superuser with the generated password; the image upserts it on every start, so that account's password returns to the stored value after a restart. Leave the email blank to create the superuser through the installer link in the container logs instead.
+
+### Meilisearch
+
+Search engine (`getmeili/meilisearch:v1.56.0`, port 7700, `data` volume at `/meili_data`). Runs with `MEILI_ENV=production` and a generated 32-char master key, set once at deploy. Clients use the master key or API keys created with it. A newer version may need a dump and import of `data.ms`, so pin the version and read the Meilisearch upgrade notes before **Update image**.
+
 ### Public HTTPS behind Cloudflare Tunnel
 
 With `CLOUDFLARE_PROXY_MODE=true`, Cloudflare ends TLS and forwards HTTP to Traefik. GoForge routes the service on the `web` entrypoint, and templates still get `Protocol` = `https` for any domain that is not `localhost` or `*.localhost`, because that is the URL a browser uses.

@@ -1,0 +1,104 @@
+name: authentik
+display_name: authentik
+description: Identity provider (SSO, OAuth2/OIDC, SAML, LDAP, proxy auth). Requires a PostgreSQL database (14 or newer); deploy the PostgreSQL service first (or use the shared one), create an app role and database with scripts/shared-data/pg-tenant.sh, and enter its host, name, user, and password here. authentik 2025.10 and later need no Redis, and the default allinone mode runs the server and the background worker in this one container. Give it a public HTTPS domain, then sign in as akadmin with the generated bootstrap password shown masked on the service page. Outposts that need the Docker socket are not managed automatically.
+icon: authentik
+category: security
+web: true
+
+versions:
+  - "2026.8.5"
+  - "latest"
+default_version: "2026.8.5"
+
+config:
+  # allinone runs server and worker together (authentik 2026.5+). server and
+  # worker split them across two deployments of this template that share the
+  # same database and secret key; only the server needs a Domain.
+  - name: mode
+    label: Mode
+    type: select
+    options: [allinone, server, worker]
+    default: allinone
+    required: true
+  - name: db_host
+    label: PostgreSQL Host (container name)
+    type: text
+    required: true
+  - name: db_port
+    label: PostgreSQL Port
+    type: number
+    default: 5432
+    required: true
+  - name: db_name
+    label: Database Name
+    type: text
+    default: "authentik"
+    required: true
+  - name: db_user
+    label: Database User
+    type: text
+    default: "authentik"
+    required: true
+  - name: db_password
+    label: Database Password
+    type: password
+    required: true
+  # Signs sessions and encrypts stored secrets, so it must never change after
+  # the first start. A split server/worker pair must use the same value:
+  # paste the server's key into the worker at deploy.
+  - name: secret_key
+    label: Secret Key
+    type: password
+    generate: true
+    length: 60
+    immutable: true
+    required: true
+  # Applied once, by the first start that creates akadmin. Change the password
+  # in authentik afterwards.
+  - name: bootstrap_email
+    label: Bootstrap Admin Email (akadmin)
+    type: text
+    default: ""
+    required: false
+  - name: bootstrap_password
+    label: Bootstrap Admin Password (akadmin)
+    type: password
+    generate: true
+    length: 32
+    immutable: true
+    required: true
+
+resources:
+  cpu: "1"
+  memory: "1g"
+
+docker:
+  image: "ghcr.io/goauthentik/server:{{ .Version }}"
+  ports:
+    - container: 9000
+      protocol: tcp
+  # The image entrypoint is "dumb-init -- ak"; the argument picks the mode.
+  command: ["{{ .Config.mode }}"]
+  environment:
+    AUTHENTIK_POSTGRESQL__HOST: "{{ .Config.db_host }}"
+    AUTHENTIK_POSTGRESQL__PORT: "{{ .Config.db_port }}"
+    AUTHENTIK_POSTGRESQL__NAME: "{{ .Config.db_name }}"
+    AUTHENTIK_POSTGRESQL__USER: "{{ .Config.db_user }}"
+    AUTHENTIK_POSTGRESQL__PASSWORD: "{{ .Config.db_password }}"
+    AUTHENTIK_SECRET_KEY: "{{ .Config.secret_key }}"
+  optional_environment:
+    AUTHENTIK_BOOTSTRAP_PASSWORD: "{{ .Config.bootstrap_password }}"
+    AUTHENTIK_BOOTSTRAP_EMAIL: "{{ .Config.bootstrap_email }}"
+  volumes:
+    # Media uploads, certificates the worker discovers, and custom blueprints.
+    - name: data
+      path: /data
+  health_check:
+    test: ["CMD", "ak", "healthcheck"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+
+connection:
+  internal: "http://{{ .ContainerName }}:9000"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:9000{{ end }}"
