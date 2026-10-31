@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -35,6 +36,7 @@ type Service struct {
 	transitionMu               sync.Mutex
 	runsMu                     sync.Mutex
 	runs                       map[string]context.CancelFunc
+	retireRetry                time.Duration // 0: defaultRetireRetry
 }
 
 // NewService creates a new deployment Service.

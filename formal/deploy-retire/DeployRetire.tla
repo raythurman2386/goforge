@@ -8,8 +8,9 @@
 (*       containerRepo.Create(running), Transition(running),               *)
 (*       go CleanupOldDeployments                                          *)
 (*   internal/deploy/cleanup.go   CleanupOldDeployments, waitGrace,        *)
-(*       retireSuperseded, retireContainer, RecoverPendingRetires,         *)
-(*       hasSuperseded, runningSince                                       *)
+(*       retireUntilDone, retireSuperseded, retireContainer,               *)
+(*       RecoverPendingRetires, hasSuperseded, runningSince,               *)
+(*       newerDeployment                                                   *)
 (*   cmd/goforge/main.go          go deployService.RecoverPendingRetires   *)
 (*   internal/docker/container.go RemoveContainer uses Force: true         *)
 (*                                                                         *)
@@ -24,10 +25,12 @@ CONSTANTS
     MaxRestarts,     \* goforge process restarts allowed in a behavior
     RecoverOnBoot,   \* TRUE: main.go starts RecoverPendingRetires on boot (#96)
     RemoveOnRetire,  \* TRUE: retireContainer calls RemoveContainer after StopContainer (#95)
-    DockerErrors     \* TRUE: StopContainer / RemoveContainer may return an error with no effect
+    DockerErrors,    \* TRUE: StopContainer / RemoveContainer may return an error with no effect
+    RetireOnlyOlder, \* TRUE: retireSuperseded never retires a deployment newer than the newest graced one (F1 fix)
+    RetryFailedRetire \* TRUE: a failed RemoveContainer leaves the row running and the cleanup retries (F2 fix)
 
 ASSUME N \in 2..4 /\ MaxRestarts \in 0..2
-ASSUME {RecoverOnBoot, RemoveOnRetire, DockerErrors} \subseteq BOOLEAN
+ASSUME {RecoverOnBoot, RemoveOnRetire, DockerErrors, RetireOnlyOlder, RetryFailedRetire} \subseteq BOOLEAN
 
 Deps    == 1..N
 Recover == N + 1          \* task id of the RecoverPendingRetires goroutine
@@ -43,8 +46,8 @@ VARIABLES
 
 vars == <<dstatus, row, host, graceOver, task, restarts>>
 
-Idle   == [pc |-> "none", cur |-> 0, todo |-> {}, tgt |-> 0]
-Active == {"boot", "waitGrace", "list", "next", "stop", "remove", "update"}
+Idle   == [pc |-> "none", cur |-> 0, todo |-> {}, tgt |-> 0, failed |-> FALSE]
+Active == {"boot", "waitGrace", "list", "next", "stop", "remove", "update", "retry"}
 
 Max(S) == CHOOSE x \in S : \A y \in S : y <= x
 RunningDeps == {d \in Deps : dstatus[d] = "running"}
@@ -94,13 +97,21 @@ WaitGraceReturns(t) ==
     /\ task' = [task EXCEPT ![t].pc = "list"]
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
-(* retireSuperseded: deploymentRepo.ListByEnvironmentID(env, 10), then    *)
-(* skip d.ID == currentDeploymentID || d.Status != running.               *)
-(* NOTE: the code does not skip deployments NEWER than the current one.   *)
+(* retireSuperseded: deploymentRepo.ListByEnvironmentID(env, 10) and one  *)
+(* time.Now(). keep is the newest running deployment that is cur or newer  *)
+(* with its grace over (now - runningSince >= gracePeriod); only running   *)
+(* deployments older than keep (newerDeployment: created_at, then ID) are  *)
+(* retired. RetireOnlyOlder = FALSE is the code before the F1 fix: skip    *)
+(* only d.ID == currentDeploymentID || d.Status != running.               *)
+Keep(cur) == Max({e \in RunningDeps : e = cur \/ (e > cur /\ graceOver[e])})
+
 ListByEnvironmentID(t) ==
     /\ task[t].pc = "list"
     /\ task' = [task EXCEPT ![t].pc = "next",
-                            ![t].todo = {d \in RunningDeps : d # task[t].cur}]
+                            ![t].todo =
+                              IF RetireOnlyOlder
+                              THEN {d \in RunningDeps : d < Keep(task[t].cur)}
+                              ELSE {d \in RunningDeps : d # task[t].cur}]
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
 (* Loop body: containerRepo.ListByDeploymentID(d.ID); a row with Status   *)
@@ -114,11 +125,24 @@ ListByDeploymentID(t) ==
                               ![t].tgt  = IF row[d] = "running" THEN d ELSE 0]
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
-(* Loop over: retireSuperseded returns; pruneImages is not modeled.       *)
+(* Loop over: retireSuperseded returns; pruneImages is not modeled. If a  *)
+(* remove failed it returns errRetirePending and retireUntilDone waits     *)
+(* retireRetry before the next pass.                                      *)
 RetireSupersededReturns(t) ==
     /\ task[t].pc = "next"
     /\ task[t].todo = {}
-    /\ task' = [task EXCEPT ![t] = [Idle EXCEPT !.pc = "done", !.cur = task[t].cur]]
+    /\ task' = [task EXCEPT ![t] =
+                  IF task[t].failed
+                  THEN [Idle EXCEPT !.pc = "retry", !.cur = task[t].cur]
+                  ELSE [Idle EXCEPT !.pc = "done", !.cur = task[t].cur]]
+    /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
+
+(* retireUntilDone: waitGrace(ctx, retireRetry) returns and the next pass *)
+(* of retireSuperseded starts. (Its "current deployment no longer running" *)
+(* exit needs a rollback, which is not modeled.)                          *)
+RetryRetire(t) ==
+    /\ task[t].pc = "retry"
+    /\ task' = [task EXCEPT ![t].pc = "list"]
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
 (* retireContainer: dockerClient.StopContainer(c.DockerID). On a stopped  *)
@@ -137,7 +161,8 @@ StopContainerFails(t) ==
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
 (* retireContainer: dockerClient.RemoveContainer (Force: true), run even  *)
-(* if stop failed (#95). Removes a running or stopped container.          *)
+(* if stop failed (#95). Removes a running or stopped container; on one   *)
+(* already removed it returns "no such container", which counts as done.  *)
 RemoveContainer(t) ==
     /\ RemoveOnRetire
     /\ task[t].pc = "remove"
@@ -146,11 +171,16 @@ RemoveContainer(t) ==
     /\ task' = [task EXCEPT ![t].pc = "update"]
     /\ UNCHANGED <<dstatus, row, graceOver, restarts>>
 
+(* RemoveContainer returns an error (not "no such container"). With the   *)
+(* F2 fix retireContainer returns false and leaves the row running; before *)
+(* it (RetryFailedRetire = FALSE) it went on to UpdateStatus(exited).      *)
 RemoveContainerFails(t) ==
     /\ RemoveOnRetire
     /\ DockerErrors
     /\ task[t].pc = "remove"
-    /\ task' = [task EXCEPT ![t].pc = "update"]
+    /\ task' = IF RetryFailedRetire
+               THEN [task EXCEPT ![t].pc = "next", ![t].tgt = 0, ![t].failed = TRUE]
+               ELSE [task EXCEPT ![t].pc = "update"]
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
 (* Pre-#95 code: retireContainer stopped the container and never removed it. *)
@@ -160,8 +190,9 @@ RemoveSkipped(t) ==
     /\ task' = [task EXCEPT ![t].pc = "update"]
     /\ UNCHANGED <<dstatus, row, host, graceOver, restarts>>
 
-(* retireContainer: containerRepo.UpdateStatus(c.ID, exited), whatever    *)
-(* StopContainer and RemoveContainer returned.                            *)
+(* retireContainer: containerRepo.UpdateStatus(c.ID, exited) once the     *)
+(* container is removed (whatever StopContainer returned). Before the F2  *)
+(* fix it also ran after a failed RemoveContainer.                        *)
 UpdateStatusExited(t) ==
     /\ task[t].pc = "update"
     /\ row'  = [row EXCEPT ![task[t].tgt] = "exited"]
@@ -182,7 +213,8 @@ Restart ==
     /\ UNCHANGED <<dstatus, row, host, graceOver>>
 
 (* RecoverPendingRetires up to the go func: ListByStatus(running), newest *)
-(* per env is current, hasSuperseded reads the older deployments' rows.   *)
+(* per env (newerDeployment) is current, hasSuperseded reads the older    *)
+(* deployments' rows; the go func then runs retireUntilDone.              *)
 (* Reads only; done as one step.                                          *)
 RecoverBoot ==
     /\ task[Recover].pc = "boot"
@@ -209,6 +241,7 @@ Next ==
     \/ \E t \in TaskIds : ListByEnvironmentID(t)
     \/ \E t \in TaskIds : ListByDeploymentID(t)
     \/ \E t \in TaskIds : RetireSupersededReturns(t)
+    \/ \E t \in TaskIds : RetryRetire(t)
     \/ \E t \in TaskIds : StopContainer(t)
     \/ \E t \in TaskIds : StopContainerFails(t)
     \/ \E t \in TaskIds : RemoveContainer(t)

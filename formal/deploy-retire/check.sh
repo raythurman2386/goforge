@@ -32,7 +32,8 @@ cp "$here/DeployRetire.tla" "$work/"
 
 if [ $# -gt 0 ]; then configs=("$@"); else
   configs=("$here/DeployRetire.cfg" "$here/DeployRetireBackToBack.cfg" "$here/DeployRetireDockerErrors.cfg"
-           "$here/mutants/Pre95NoRemove.cfg" "$here/mutants/Pre96NoRecover.cfg")
+           "$here/mutants/Pre95NoRemove.cfg" "$here/mutants/Pre96NoRecover.cfg"
+           "$here/mutants/PreF1RetireNewer.cfg" "$here/mutants/PreF2ExitOnError.cfg")
 fi
 
 tlc() { # cfg out
