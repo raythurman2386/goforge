@@ -979,6 +979,55 @@ async function waitPath(page, want) {
   await page.waitForLoadState("load");
 }
 
+// Scroll-lock probes (t1486u). prepScroll makes the page taller than the
+// viewport with a test-only spacer and scrolls it to y.
+async function prepScroll(page, y) {
+  await page.evaluate((y) => {
+    const host = document.querySelector("main") || document.body;
+    const pad = document.createElement("div");
+    pad.id = "ui-a11y-scroll-spacer";
+    pad.style.height = "3000px";
+    host.appendChild(pad);
+    window.scrollTo({ top: y, behavior: "instant" });
+  }, y);
+}
+
+function scrollLockState(page) {
+  return page.evaluate(() => {
+    const h = document.documentElement;
+    const b = document.body;
+    const spacer = document.getElementById("ui-a11y-scroll-spacer");
+    return {
+      dialogOpen: !!document.querySelector("dialog[open]"),
+      locked: h.hasAttribute("data-ui-scroll-locked"),
+      scrollY: Math.round(window.scrollY),
+      htmlOverflow: getComputedStyle(h).overflow,
+      bodyPosition: getComputedStyle(b).position,
+      bodyTop: Math.round(parseFloat(b.style.top || "0")),
+      visualTop: spacer ? Math.round(spacer.getBoundingClientRect().top) : null,
+      htmlStyle: h.getAttribute("style"),
+      bodyStyle: b.getAttribute("style"),
+    };
+  });
+}
+
+function fmtLock(s) {
+  return `locked=${s.locked} scrollY=${s.scrollY} html.overflow=${s.htmlOverflow} body.position=${s.bodyPosition} body.top=${s.bodyTop} spacer.top=${s.visualTop}`;
+}
+
+// A touch swipe up over the backdrop: CDP Input.synthesizeScrollGesture
+// with a touch source drives a real touch scroll without touch emulation.
+async function swipe(page, x) {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("Input.synthesizeScrollGesture", { x, y: 600, yDistance: -500, gestureSourceType: "touch", speed: 2000 });
+  } finally {
+    await cdp.detach();
+  }
+  await page.waitForTimeout(350);
+  return scrollLockState(page);
+}
+
 // PR6 app checks: the mobile sidebar is a Sheet opened from the header
 // button at a 375px viewport; the desktop aside is hidden there.
 async function appSheetChecks(scheme, page) {
@@ -1167,14 +1216,74 @@ async function appSheetChecks(scheme, page) {
       steps.push(`link-back-reopen ${rt.detail}${rt.ok ? "" : "!"}`);
       check(scheme, "app-mobile-sheet-escape-away-back", ok, "375px " + steps.join(" "));
     });
-    await t("app-mobile-sheet-closes-at-md", async () => {
+    // t1486u: the page behind the open Sheet must not scroll. A spacer
+    // makes the dashboard taller than the viewport; scroll it to 300, open
+    // the Sheet, wheel and swipe over the backdrop (right of the panel),
+    // then close with Escape: the page must sit still while open and come
+    // back at 300 with its inline styles restored.
+    await t("app-mobile-sheet-scroll-lock", async () => {
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      await prepScroll(page, 300);
+      await page.click("#mobile-menu-btn");
+      await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      const open = await scrollLockState(page);
+      const panel = await page.$eval("#mobile-nav", (d) => Math.round(d.getBoundingClientRect().right));
+      const x = Math.min(370, panel + 20);
+      await page.mouse.move(x, 600);
+      await page.mouse.wheel(0, 900);
+      await settle();
+      const wheeled = await scrollLockState(page);
+      const swiped = await swipe(page, x);
+      await page.keyboard.press("Escape");
+      await settle();
+      const closed = await scrollLockState(page);
+      const focus = await page.evaluate(() => document.activeElement.id);
+      const pinned = (s) => s.htmlOverflow === "hidden" && s.bodyPosition === "fixed" && s.bodyTop === -300;
+      const ok =
+        open.dialogOpen && pinned(open) && pinned(wheeled) && pinned(swiped) && wheeled.visualTop === open.visualTop && swiped.visualTop === open.visualTop &&
+        !closed.dialogOpen && closed.scrollY === 300 && closed.htmlStyle === null && closed.bodyStyle === null && !closed.locked && focus === "mobile-menu-btn";
+      check(
+        scheme,
+        "app-mobile-sheet-scroll-lock",
+        ok,
+        `375px backdrop-x=${x} open(${fmtLock(open)}) wheel(${fmtLock(wheeled)}) swipe(${fmtLock(swiped)}) esc(${fmtLock(closed)}) focus-return=#${focus}`,
+      );
+    });
+    // t1489u: the Sheet title ("Menu") and its X share one center line.
+    await t("app-mobile-sheet-header-align", async () => {
       await page.goto(BASE + "/dashboard", { waitUntil: "load" });
       await page.click("#mobile-menu-btn");
       await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      const g = await page.$eval("#mobile-nav", (d) => {
+        const mid = (r) => r.top + r.height / 2;
+        const h = d.querySelector("h2").getBoundingClientRect();
+        const x = d.querySelector("[data-ui-dialog-close]").getBoundingClientRect();
+        return { title: Math.round(h.height), button: Math.round(x.height), dy: Math.round((mid(h) - mid(x)) * 10) / 10 };
+      });
+      await page.keyboard.press("Escape");
+      await settle();
+      check(scheme, "app-mobile-sheet-header-align", Math.abs(g.dy) <= 1, `375px title-h=${g.title} close-h=${g.button} center-dy=${g.dy}px`);
+    });
+    await t("app-mobile-sheet-closes-at-md", async () => {
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      await prepScroll(page, 200);
+      await page.click("#mobile-menu-btn");
+      await page.waitForSelector("#mobile-nav[open]");
+      await settle();
+      const locked = await scrollLockState(page);
       await page.setViewportSize({ width: 1024, height: 800 });
       await settle();
       const s = await page.evaluate(() => ({ open: document.getElementById("mobile-nav").open, aside: getComputedStyle(document.getElementById("sidebar")).display }));
-      check(scheme, "app-mobile-sheet-closes-at-md", !s.open && s.aside === "flex", `open=${s.open} aside=${s.aside}`);
+      const u = await scrollLockState(page);
+      const unlocked = !u.locked && u.htmlStyle === null && u.bodyStyle === null && u.htmlOverflow !== "hidden" && u.bodyPosition !== "fixed" && u.scrollY === 200;
+      check(
+        scheme,
+        "app-mobile-sheet-closes-at-md",
+        !s.open && s.aside === "flex" && locked.locked && unlocked,
+        `open=${s.open} aside=${s.aside} lock-while-open=${locked.locked} after-widen(${fmtLock(u)})`,
+      );
     });
   } finally {
     if (before) await page.setViewportSize(before);
