@@ -91,6 +91,24 @@ func (r *DeploymentRepository) ListByEnvironmentID(ctx context.Context, envID st
 	if err != nil {
 		return nil, err
 	}
+	return scanDeployments(rows)
+}
+
+// ListByStatus retrieves every deployment in the given status, newest first.
+func (r *DeploymentRepository) ListByStatus(ctx context.Context, status models.DeploymentStatus) ([]*models.Deployment, error) {
+	query := `
+		SELECT id, environment_id, status, trigger_type, commit_sha, commit_message,
+			commit_author, branch, image_tag, error_message, started_at, finished_at, created_at
+		FROM deployments WHERE status = $1 ORDER BY created_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, query, status)
+	if err != nil {
+		return nil, err
+	}
+	return scanDeployments(rows)
+}
+
+func scanDeployments(rows *sql.Rows) ([]*models.Deployment, error) {
 	defer rows.Close()
 
 	var deployments []*models.Deployment

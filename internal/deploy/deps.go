@@ -21,6 +21,7 @@ type deploymentStore interface {
 	GetByID(ctx context.Context, id string) (*models.Deployment, error)
 	UpdateStatus(ctx context.Context, id string, status models.DeploymentStatus, errorMsg *string) error
 	ListByEnvironmentID(ctx context.Context, envID string, limit int) ([]*models.Deployment, error)
+	ListByStatus(ctx context.Context, status models.DeploymentStatus) ([]*models.Deployment, error)
 }
 
 type deploymentLogStore interface {
