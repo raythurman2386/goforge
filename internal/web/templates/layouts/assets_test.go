@@ -26,3 +26,15 @@ func TestFileVersion(t *testing.T) {
 		t.Fatalf("hash did not change after content change: %q", v2)
 	}
 }
+
+func TestJSHref(t *testing.T) {
+	for _, name := range baseScripts {
+		if got := jsHref(name); got != "/static/js/"+name+"?v="+jsVersions()[name] {
+			t.Errorf("jsHref(%q) = %q", name, got)
+		}
+	}
+	// Outside the repo root (tests) the files are missing and the version is dev.
+	if got := jsHref("ui.js"); got != "/static/js/ui.js?v="+devVersion {
+		t.Errorf("jsHref(ui.js) = %q, want dev version in tests", got)
+	}
+}

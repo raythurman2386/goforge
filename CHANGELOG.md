@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Mobile menu did nothing on a phone after the PR6 deploy: the page loaded a cached pre-dialog `ui.js` (Cloudflare and the browser keep unversioned `/static/js/*` for up to 4 h), so the Sheet opener had no handler. Base now loads every script with a content-hash `?v=` like the stylesheet
 - Service detail stuck on "Connecting to metrics stream..." after **Edit configuration** or **Update image**: the pending poll sat outside the swapped region and never stopped, so every 3 s swap tore down the stats stream before its first frame. The poll now lives inside `#service-detail-content` and drops out once the service is `running`; the stream element is `hx-preserve`d by Docker ID across pending polls
 - `GET /containers/{id}/stats` sends its first `stats` frame about 0.5 s after connect (two one-shot samples, real CPU delta) instead of after the first 2 s tick, and sends a visible `unavailable` event for a stopped or missing container instead of staying silent
 - Project Overview streams only a running container: the latest deployment's, else the newest earlier successful deployment's (so stats stay up during a deploy), else an empty state. It no longer falls back to a stopped container

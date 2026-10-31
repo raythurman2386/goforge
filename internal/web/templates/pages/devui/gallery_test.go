@@ -26,7 +26,7 @@ func TestGalleryRenders(t *testing.T) {
 		`scope="row"`, `data-ui-table-empty`, `id="gallery-card-table"`,
 		`aria-labelledby="sheets-title"`, `id="gallery-sheet-left"`, `data-ui-sheet="left"`, `data-ui-sheet="right"`,
 		`data-ui-dialog-open="gallery-sheet-left"`, `aria-controls="gallery-sheet-right"`,
-		`src="/static/js/ui.js"`,
+		`src="/static/js/ui.js?v=`,
 		`aria-labelledby="badges-title"`, `aria-labelledby="alerts-title"`,
 		`aria-labelledby="skeletons-title"`, `aria-labelledby="avatars-title"`,
 		`aria-labelledby="breadcrumbs-title"`, `aria-label="Breadcrumb"`,

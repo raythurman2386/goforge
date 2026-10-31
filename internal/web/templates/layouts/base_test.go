@@ -42,3 +42,24 @@ func TestAppLayoutMobileNavSheet(t *testing.T) {
 		t.Error("mobile nav sheet renders inside <main>")
 	}
 }
+
+// Every script Base loads carries a ?v= cache-bust like the stylesheet, so a
+// new deploy never runs with a script the browser or CDN cached from an
+// older one (a stale ui.js left the mobile nav Sheet unopenable).
+func TestBaseScriptsCacheBusted(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Base("Dashboard", "tok").Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	srcs := regexp.MustCompile(`<script src="([^"]+)"`).FindAllStringSubmatch(html, -1)
+	if len(srcs) != len(baseScripts) {
+		t.Fatalf("got %d script tags, want %d", len(srcs), len(baseScripts))
+	}
+	for i, m := range srcs {
+		want := "/static/js/" + baseScripts[i] + "?v="
+		if !strings.HasPrefix(m[1], want) || len(m[1]) == len(want) {
+			t.Errorf("script %d src = %q, want %s<version>", i, m[1], want)
+		}
+	}
+}
