@@ -12,7 +12,11 @@ templ Sheet(p SheetProps) {
 		<div class="flex h-full flex-col">
 			<div class="flex flex-shrink-0 items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
 				<div class="min-w-0">
-					<h2 id={ DialogTitleID(p.ID) } class="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100">{ p.Title }</h2>
+					// The title row is as tall as the close button (btn-icon: 44px
+					// below md, 32px from md up), so the title centers on the X.
+					<div class="flex min-h-11 items-center md:min-h-8">
+						<h2 id={ DialogTitleID(p.ID) } class="text-lg font-bold leading-7 tracking-tight text-gray-900 dark:text-gray-100">{ p.Title }</h2>
+					</div>
 					if p.Description != "" {
 						<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-muted-foreground">{ p.Description }</p>
 					}

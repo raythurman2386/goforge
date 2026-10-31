@@ -81,7 +81,11 @@
 		hideTip(false);
 		document.querySelectorAll("dialog[open]").forEach(function (d) {
 			d.close();
+			d._uiModal = false;
 		});
+		// close events run later; unlock now so htmx saves the page's
+		// real scroll offset and unpinned body.
+		syncScrollLock();
 		document.querySelectorAll("[popover]").forEach(function (p) {
 			try {
 				if (p.matches(":popover-open")) p.hidePopover();
@@ -198,10 +202,79 @@
 		if (!d || d.open || !d.isConnected) return;
 		d._uiOpener = opener || document.activeElement;
 		d.showModal();
+		d._uiModal = true;
+		syncScrollLock();
 		setOpenerExpanded(d._uiOpener, "true");
 		var first = d.querySelector(d.hasAttribute("data-ui-sheet") ? SHEET_FOCUS_FIRST : FOCUS_FIRST);
 		if (first) first.focus();
 	}
+
+	// --- Scroll lock while a modal dialog is open ---------------------------
+	//
+	// showModal() makes the page inert, but it does not stop it scrolling:
+	// a wheel or touch over the backdrop still scrolls the document, and
+	// iOS Safari scrolls and bounces the page behind an open Sheet. While
+	// any dialog opened here is open, <html> gets overflow: hidden and
+	// <body> is pinned at its scroll offset with position: fixed (the only
+	// lock iOS honors). The last close restores the inline styles and the
+	// offset. Stacked dialogs share one lock: syncScrollLock reads the open
+	// dialogs instead of counting, so a dialog removed without a close
+	// event cannot leave the page stuck.
+	var scrollLock = null;
+
+	function anyModalOpen() {
+		return Array.prototype.some.call(document.querySelectorAll(DIALOG + "[open]"), function (d) {
+			return d._uiModal;
+		});
+	}
+
+	function lockScroll() {
+		var html = document.documentElement;
+		var body = document.body;
+		if (!body) return;
+		var gap = window.innerWidth - html.clientWidth;
+		scrollLock = {
+			x: window.scrollX,
+			y: window.scrollY,
+			html: html.getAttribute("style"),
+			body: body.getAttribute("style"),
+		};
+		html.style.overflow = "hidden";
+		html.style.overscrollBehavior = "none";
+		body.style.position = "fixed";
+		body.style.top = -scrollLock.y + "px";
+		body.style.left = -scrollLock.x + "px";
+		body.style.right = "0";
+		body.style.overflow = "hidden";
+		if (gap > 0) body.style.paddingRight = gap + "px";
+		html.setAttribute("data-ui-scroll-locked", "");
+	}
+
+	function restoreStyle(el, value) {
+		if (value === null) el.removeAttribute("style");
+		else el.setAttribute("style", value);
+	}
+
+	function unlockScroll() {
+		var lock = scrollLock;
+		scrollLock = null;
+		var html = document.documentElement;
+		restoreStyle(html, lock.html);
+		if (document.body) restoreStyle(document.body, lock.body);
+		html.removeAttribute("data-ui-scroll-locked");
+		window.scrollTo({ left: lock.x, top: lock.y, behavior: "instant" });
+	}
+
+	function syncScrollLock() {
+		var open = anyModalOpen();
+		if (open && !scrollLock) lockScroll();
+		else if (!open && scrollLock) unlockScroll();
+	}
+
+	// A swap can drop an open dialog without a close event, and a page
+	// restored from the back/forward cache comes back as it was left.
+	document.addEventListener("htmx:afterSettle", syncScrollLock);
+	window.addEventListener("pageshow", syncScrollLock);
 
 	function closeDialog(d, value) {
 		if (d && d.open) d.close(value);
@@ -231,6 +304,10 @@
 			// Reopened before this queued event ran (a new confirm replaced
 			// a stale one): nothing to tear down.
 			if (d.open) return;
+			// Unlock before focus goes back, so the page is at its old
+			// offset when the opener takes focus.
+			d._uiModal = false;
+			syncScrollLock();
 			setOpenerExpanded(liveTwin(d._uiOpener), "false");
 			var back = visibleOpener(liveTwin(d._uiOpener));
 			d._uiOpener = null;
