@@ -1,4 +1,9 @@
-name: Deploy Documentation
+name: Documentation
+
+# Builds the MkDocs site with --strict on every change to the docs.
+# Nothing is published from CI: the repository is private on GitHub Free, so
+# GitHub Pages is unavailable (#32, #52). The site is served from a GoForge
+# project that builds Dockerfile.docs (https://goforge-docs-app.ravenwoodsoftware.dev/).
 
 on:
   push:
@@ -7,168 +12,43 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - 'Dockerfile.docs'
       - '.github/workflows/docs.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - 'Dockerfile.docs'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
-# configure-pages and deploy-pages need pages: write and id-token: write.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      pages_artifact_id: ${{ steps.pages-artifact.outputs.artifact_id }}
-      deploy_pages: ${{ steps.check-pages.outputs.deploy_pages }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      # Private repos on GitHub Free cannot host Pages (#32). When Pages is not
-      # enabled (GET /pages → 404), skip the deploy path successfully so main
-      # pushes stay green instead of failing Check Pages site.
-      - name: Check Pages site
-        id: check-pages
-        if: github.event_name != 'pull_request'
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { owner, repo } = context.repo
-            const repoInfo = await github.rest.repos.get({ owner, repo })
-            core.info(`repository private=${repoInfo.data.private} visibility=${repoInfo.data.visibility}`)
-            const skipPrivatePages = (reason) => {
-              core.notice(
-                `Skipping GitHub Pages deploy: ${reason}. ` +
-                'Private repositories on GitHub Free cannot publish Pages (#32). ' +
-                'MkDocs still builds. Re-enable deploy by making the repo public or upgrading to Pro, then set Settings → Pages → GitHub Actions.'
-              )
-              core.setOutput('deploy_pages', 'false')
-            }
-            try {
-              const { data } = await github.rest.repos.getPages({ owner, repo })
-              core.info(`build_type=${data.build_type} status=${data.status} public=${data.public} url=${data.html_url}`)
-              if (data.build_type !== 'workflow') {
-                if (repoInfo.data.private) {
-                  skipPrivatePages(`Pages build_type is "${data.build_type}" (need "workflow")`)
-                  return
-                }
-                core.setFailed(
-                  `GitHub Pages build type is "${data.build_type}". ` +
-                  'actions/deploy-pages only works when Settings → Pages → Build and deployment is "GitHub Actions" (build_type "workflow").'
-                )
-                return
-              }
-              core.setOutput('deploy_pages', 'true')
-            } catch (error) {
-              const status = error.status || error.response?.status || 'unknown'
-              const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
-              if (status === 404) {
-                if (repoInfo.data.private) {
-                  skipPrivatePages(`Pages is not enabled (GET /pages → 404: ${body})`)
-                  return
-                }
-                core.setFailed(`GitHub Pages is not enabled for this repository (${body}). In Settings → Pages, set Build and deployment to GitHub Actions.`)
-                return
-              }
-              core.setFailed(`GitHub Pages request failed (${status}): ${body}`)
-            }
-
-      - name: Setup Pages
-        if: github.event_name != 'pull_request' && steps.check-pages.outputs.deploy_pages == 'true'
-        uses: actions/configure-pages@v6
 
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install mkdocs-material
-          pip install mkdocs-minify-plugin
+          pip install -r requirements-docs.txt
 
       - name: Build documentation
         run: mkdocs build --strict
-
-      - name: Upload artifact
-        id: pages-artifact
-        if: github.event_name != 'pull_request' && steps.check-pages.outputs.deploy_pages == 'true'
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: ./site
-
-  deploy:
-    if: github.event_name != 'pull_request' && needs.build.outputs.deploy_pages == 'true'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-
-      # actions/deploy-pages logs only "Validation Failed" for HTTP 422.
-      # Repeat the request so the raw body is in the log, then name the
-      # private-repository plan limit when that is what GitHub rejected.
-      - name: Explain Pages deployment failure
-        if: failure() && steps.deployment.outcome == 'failure'
-        uses: actions/github-script@v9
-        env:
-          PAGES_ARTIFACT_ID: ${{ needs.build.outputs.pages_artifact_id }}
-        with:
-          script: |
-            const { owner, repo } = context.repo
-            const repoInfo = await github.rest.repos.get({ owner, repo })
-            const artifactId = Number(process.env.PAGES_ARTIFACT_ID)
-            let detail = 'no API response body'
-            if (Number.isInteger(artifactId) && artifactId > 0) {
-              try {
-                const idToken = await core.getIDToken()
-                await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
-                  owner,
-                  repo,
-                  artifact_id: artifactId,
-                  pages_build_version: context.sha,
-                  oidc_token: idToken
-                })
-                detail = 'a follow-up deployment request was accepted'
-              } catch (error) {
-                const body = error.response?.data ? JSON.stringify(error.response.data) : error.message
-                detail = `status ${error.status}: ${body}`
-                core.info(`Pages deployment API ${detail}`)
-              }
-            }
-            if (!repoInfo.data.private) {
-              core.setFailed(`GitHub Pages rejected the deployment (${detail}).`)
-              return
-            }
-            core.setFailed(
-              `GitHub Pages rejected the deployment (${detail}). ` +
-              'This repository is private. GitHub Free publishes Pages only from public repositories, ' +
-              'so the site is unpublished and creating a deployment fails validation. ' +
-              'Change one setting, then re-run Deploy Documentation: ' +
-              'Settings → General → Danger Zone → Change repository visibility → Public, ' +
-              'or upgrade the owner account to GitHub Pro under Settings → Billing and licensing ' +
-              '(renew GitHub Education benefits if those provided Pro and have lapsed). ' +
-              'Pages is already set to Build and deployment: GitHub Actions.'
-            )

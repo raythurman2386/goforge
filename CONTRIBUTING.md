@@ -176,9 +176,14 @@ Write plain sentences. Run `mkdocs build --strict` when you touch `docs/` or
 `mkdocs.yml`; the docs workflow runs it on every PR that does.
 
 ```bash
-pip install mkdocs-material mkdocs-minify-plugin
+pip install -r requirements-docs.txt
 mkdocs build --strict
 ```
+
+The docs are served at https://goforge-docs-app.ravenwoodsoftware.dev/ from a
+GoForge project that builds `Dockerfile.docs` (nginx on port 80). Docs
+dependencies are pinned in `requirements-docs.txt`; the image and the docs
+workflow both install from it.
 
 ## 9. Sending a change
 

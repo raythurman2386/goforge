@@ -1,6 +1,6 @@
 site_name: GoForge Documentation
 site_description: Comprehensive documentation for GoForge - a lightweight, self-hosted PaaS built in Go
-site_url: https://raythurman2386.github.io/goforge/
+site_url: https://goforge-docs-app.ravenwoodsoftware.dev/
 repo_url: https://github.com/raythurman2386/goforge
 repo_name: raythurman2386/goforge
 
@@ -113,3 +113,4 @@ nav:
     - Service Templates: reference/service-templates.md
     - UI Kit: reference/ui-kit.md
   - Security: security.md
+  - Support: https://buymeacoffee.com/raythurman

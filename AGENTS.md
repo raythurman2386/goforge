@@ -47,8 +47,9 @@ DATABASE_URL=postgres://... go test -tags integration -run Integration ./interna
 # Restore: own MinIO + postgres:15-alpine and 17-alpine; needs pg_restore/psql 17 on PATH
 go test -tags integration -run TestIntegration_Restore ./internal/backup/
 
-# Docs (run when docs/ or mkdocs.yml changes)
-mkdocs build --strict
+# Docs (run when docs/ or mkdocs.yml changes; deps pinned in requirements-docs.txt)
+pip install -r requirements-docs.txt && mkdocs build --strict
+docker build -f Dockerfile.docs -t goforge-docs .   # static site image, nginx on :80
 
 # Code generation
 make templ                          # Generate templ templates (*_templ.go files)
