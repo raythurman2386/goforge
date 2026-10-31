@@ -189,3 +189,116 @@ type stopFailsRuntime struct{ *hostRuntime }
 func (s *stopFailsRuntime) StopContainer(context.Context, string) error {
 	return errors.New("container already stopped")
 }
+
+// restartFixture is the state a goforge restart leaves behind mid-redeploy:
+// dep-1 reached running finishedAgo ago with new-ctr, dep-old is still
+// running with old-ctr, and no in-memory grace timer exists any more.
+func restartFixture(t *testing.T, grace, finishedAgo time.Duration) (*Service, *memContainers, *hostRuntime) {
+	t.Helper()
+	svc, deploys, containers, host := redeployFixture(t)
+	now := time.Now()
+	deploys.items["dep-old"].CreatedAt = now.Add(-time.Hour)
+	deploys.items["dep-old"].FinishedAt = sql.NullTime{Time: now.Add(-time.Hour), Valid: true}
+	deploys.items["dep-1"].Status = models.DeploymentStatusRunning
+	deploys.items["dep-1"].CreatedAt = now.Add(-finishedAgo - time.Minute)
+	deploys.items["dep-1"].FinishedAt = sql.NullTime{Time: now.Add(-finishedAgo), Valid: true}
+	if err := containers.Create(context.Background(), &models.Container{
+		ID:           "row-new",
+		DeploymentID: sql.NullString{String: "dep-1", Valid: true},
+		DockerID:     "new-ctr",
+		Status:       models.ContainerStatusRunning,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	host.exists["new-ctr"] = true
+	host.running["new-ctr"] = true
+	svc.blueGreenDeployer = &BlueGreenDeployer{config: BlueGreenConfig{GracePeriod: grace}}
+	return svc, containers, host
+}
+
+// TestRecoverPendingRetiresAfterGraceElapsed is the regression for a goforge
+// restart during the redeploy grace period: the grace timer died with the
+// process, so old-ctr kept running beside new-ctr. On boot the grace is
+// already over, so old-ctr is retired at once.
+func TestRecoverPendingRetiresAfterGraceElapsed(t *testing.T) {
+	svc, containers, host := restartFixture(t, 5*time.Minute, 6*time.Minute)
+
+	if got := host.ps(); len(got) != 2 {
+		t.Fatalf("precondition: docker ps = %v, want old-ctr and new-ctr", got)
+	}
+
+	start := time.Now()
+	if err := svc.RecoverPendingRetires(context.Background()); err != nil {
+		t.Fatalf("RecoverPendingRetires: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("recover took %v, want immediate retire after elapsed grace", elapsed)
+	}
+	if got := host.psAll(); len(got) != 1 || got[0] != "new-ctr" {
+		t.Fatalf("docker ps -a = %v, want only new-ctr", got)
+	}
+	if st := containerRowStatus(t, containers, "old-ctr"); st != models.ContainerStatusExited {
+		t.Fatalf("old container row status = %s, want exited", st)
+	}
+	if st := containerRowStatus(t, containers, "new-ctr"); st != models.ContainerStatusRunning {
+		t.Fatalf("new container row status = %s, want running", st)
+	}
+}
+
+// TestRecoverPendingRetiresHonorsRemainingGrace restarts with part of the
+// grace period left: old-ctr keeps serving until it is over, then goes.
+func TestRecoverPendingRetiresHonorsRemainingGrace(t *testing.T) {
+	const grace = 5 * time.Minute
+	const remaining = 400 * time.Millisecond
+	svc, containers, host := restartFixture(t, grace, grace-remaining)
+
+	done := make(chan error, 1)
+	start := time.Now()
+	go func() { done <- svc.RecoverPendingRetires(context.Background()) }()
+
+	time.Sleep(50 * time.Millisecond)
+	if got := host.ps(); len(got) != 2 {
+		t.Fatalf("docker ps = %v during remaining grace, want old-ctr still running", got)
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("RecoverPendingRetires: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("recover did not retire old-ctr after the remaining grace")
+	}
+	if elapsed := time.Since(start); elapsed < remaining-100*time.Millisecond {
+		t.Fatalf("retired after %v, want about %v (remaining grace)", elapsed, remaining)
+	}
+	if got := host.psAll(); len(got) != 1 || got[0] != "new-ctr" {
+		t.Fatalf("docker ps -a = %v, want only new-ctr", got)
+	}
+	if st := containerRowStatus(t, containers, "old-ctr"); st != models.ContainerStatusExited {
+		t.Fatalf("old container row status = %s, want exited", st)
+	}
+}
+
+// TestRecoverPendingRetiresLeavesCurrentAlone: with nothing superseded, boot
+// recovery touches no container (and does not wait out any grace).
+func TestRecoverPendingRetiresLeavesCurrentAlone(t *testing.T) {
+	svc, containers, host := restartFixture(t, 5*time.Minute, time.Second)
+	if err := containers.UpdateStatus(context.Background(), "row-old", models.ContainerStatusExited); err != nil {
+		t.Fatal(err)
+	}
+
+	start := time.Now()
+	if err := svc.RecoverPendingRetires(context.Background()); err != nil {
+		t.Fatalf("RecoverPendingRetires: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("recover waited %v with nothing to retire", elapsed)
+	}
+	if got := host.ps(); len(got) != 2 {
+		t.Fatalf("docker ps = %v, want both containers untouched", got)
+	}
+	if st := containerRowStatus(t, containers, "new-ctr"); st != models.ContainerStatusRunning {
+		t.Fatalf("new container row status = %s, want running", st)
+	}
+}

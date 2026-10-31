@@ -346,6 +346,19 @@ func (m *memDeployments) ListByEnvironmentID(_ context.Context, _ string, _ int)
 	return out, nil
 }
 
+func (m *memDeployments) ListByStatus(_ context.Context, status models.DeploymentStatus) ([]*models.Deployment, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []*models.Deployment
+	for _, d := range m.items {
+		if d.Status == status {
+			cloned := *d
+			out = append(out, &cloned)
+		}
+	}
+	return out, nil
+}
+
 type memLogs struct {
 	mu    sync.Mutex
 	items []*models.DeploymentLog

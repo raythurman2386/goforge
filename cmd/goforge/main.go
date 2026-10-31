@@ -398,6 +398,13 @@ func runServer() error {
 	deployWorker := deploy.NewWorker(deployService, queueRepo, 0, 0, cfg.BuildTimeout)
 	deployWorker.Start()
 	defer deployWorker.Stop()
+	// Finish redeploy cleanups whose in-memory grace timer died with the
+	// previous process, so old and new containers do not both stay running.
+	go func() {
+		if err := deployService.RecoverPendingRetires(backgroundCtx); err != nil && backgroundCtx.Err() == nil {
+			log.Error("failed to recover pending container retires", "error", err)
+		}
+	}()
 
 	rollbackManager := deploy.NewRollbackManager(deployService)
 
