@@ -51,7 +51,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 						}
 						@components.StatusBadge("service", string(instance.Status))
 						if isPending(instance) {
-							<span class="inline-flex items-center text-xs text-amber-600 dark:text-amber-400">
+							<span class="inline-flex items-center text-xs text-amber-700 dark:text-amber-400">
 								<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3" fill="none" viewBox="0 0 24 24">
 									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
