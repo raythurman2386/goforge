@@ -81,13 +81,13 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 
 #### 7. Mobile Responsiveness (High Priority)
 - [ ] **Table Views**
-  - Horizontal scroll for deployment/service tables
+  - [x] Horizontal scroll for deployment/service tables *(`ui.Table` scroll region, UI kit PR6)*
   - Card view option for mobile
   - Collapsible columns
 - [ ] **Navigation** *(Partial)*
-  - [x] Hamburger menu for mobile sidebar (`#mobile-menu-btn` and overlay in `layouts/base.templ`)
+  - [x] Hamburger menu for mobile sidebar (`#mobile-menu-btn` opens the `ui.Sheet` navigation in `layouts/base.templ`; UI kit PR6)
   - [ ] Bottom tab bar for primary actions
-  - [ ] Touch-friendly button sizing (min 44px), not verified
+  - [ ] Touch-friendly button sizing (min 44px) *(Partial, UI kit: every icon-only button (`ui.ButtonIcon`, Alert and toast dismiss) is 44 px below `md`; text buttons (`ButtonSM` about 32 px) and inputs (about 38 px) are smaller and not yet changed)*
 - [ ] **Form Layouts**
   - Stack form fields on mobile
   - Full-width buttons on small screens
@@ -179,8 +179,8 @@ The focus for the next release is hardening the platform and improving the devel
 ### 5. Mobile & Responsive Design
 - [x] **Navigation:** Hamburger menu and slide-over sidebar on small screens. *(Bottom tab bar is still open in the Critical Phase)*
 - [x] **Dashboard Cards:** Ensure stackable layouts for project/service stats on small screens.
-- [ ] **Tables:** Add horizontal scroll or card view for deployments/containers lists on mobile. *(Moved to Critical Phase)*
-- [ ] **Touch Targets:** Verify button and input sizes meet accessibility standards (min 44px). *(Moved to Critical Phase)*
+- [ ] **Tables:** Add horizontal scroll or card view for deployments/containers lists on mobile. *(Moved to Critical Phase. Partial: `ui.Table` wraps every table in a keyboard-scrollable region; no card view)*
+- [ ] **Touch Targets:** Verify button and input sizes meet accessibility standards (min 44px). *(Moved to Critical Phase. Partial: icon-only buttons meet it below `md`)*
 
 ## 🛠 Code Review Findings (Priority Fixes)
 
@@ -273,6 +273,7 @@ Before tagging V1.0, the following **must** be completed:
 - [x] **#69** Dependency and toolchain bump to 0 reachable govulncheck findings; Docker SDK moved to `github.com/moby/moby/client` + `api`; `golang:1.26.10` builder (security Goal 1)
 - [x] **#70** Client IP / XFF spoofing fix, login lockout, security headers, HMAC CSRF, expired-session purge (security Goal 2)
 - [x] **#71** Repo Compose hardening (Traefik dashboard off, loopback port, pinned images) and Docker socket trust model (security Goal 3)
+- [x] **#82-#87** UI kit (Path A): tokens, `components/ui` (20 components), native `<dialog>` and `popover`, `static/js/ui.js`, `/dev/ui` gallery behind `GOFORGE_DEV_MODE`, `drive-ui-a11y` (axe plus keyboard scripts, light and dark); every page migrated. The final sweep and docs PR removes the last inline `onclick` handlers and adds `docs/reference/ui-kit.md`. A full WCAG 2.1 AA audit is still open (Quality Assurance)
 - [x] Cleanup and roadmap truth (security Goal 4): this ROADMAP and `CHANGELOG.md` through #71, `.env.example` gaps, Tailwind v3.4.17 pin in `make css`, `css-check` in `make ci`, golangci-lint pinned in CI, stale docs
 
 ## 🅿️ Parked and follow-up

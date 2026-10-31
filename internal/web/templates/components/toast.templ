@@ -2,7 +2,8 @@ package components
 
 // Toast renders a notification into the #toast live region in layouts.Base.
 // It swaps with innerHTML so the region itself stays in the page for the next
-// toast; static/js/app.js dismisses each toast after a few seconds. The level
+// toast; static/js/app.js dismisses each toast after a few seconds, and its
+// delegated click listener handles the [data-toast-dismiss] button. The level
 // classes match LEVEL_CLASSES in static/js/app.js and the Alert palette.
 templ Toast(message string, level string) {
 	<div id="toast" hx-swap-oob="innerHTML">
@@ -17,7 +18,7 @@ templ Toast(message string, level string) {
 			templ.KV("border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200", level != "success" && level != "error") }
 		>
 			<span>{ message }</span>
-			<button type="button" aria-label="Dismiss" onclick="this.closest('[data-toast]').remove()" class="opacity-60 hover:opacity-100">
+			<button type="button" aria-label="Dismiss" data-toast-dismiss class="-m-1.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-ui opacity-70 hover:opacity-100 ui-focus-ring md:h-8 md:w-8">
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
 				</svg>

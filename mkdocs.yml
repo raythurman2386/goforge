@@ -111,4 +111,5 @@ nav:
     - API v1: reference/api-v1.md
     - Database Schema: reference/database-schema.md
     - Service Templates: reference/service-templates.md
+    - UI Kit: reference/ui-kit.md
   - Security: security.md

@@ -98,7 +98,7 @@ templ CheckboxGroup(p CheckboxGroupProps) {
 		}
 		{ Attrs(templ.Attributes{"class": p.Class}, p.Attrs)... }
 	>
-		<legend class="label">
+		<legend class={ LabelClass("") }>
 			{ p.Legend }
 			@requiredMark(p.Required)
 		</legend>

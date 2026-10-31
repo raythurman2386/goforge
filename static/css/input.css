@@ -202,12 +202,6 @@
     @apply h-24 w-full rounded-ui-lg;
   }
 
-  /* Square icon-only button for table rows and toolbars. Needs an aria-label. */
-  .icon-btn {
-    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-ui text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:opacity-50 disabled:pointer-events-none;
-    @apply dark:text-gray-500;
-  }
-
   .input {
     @apply block w-full px-3 py-2 bg-field border border-field-border rounded-ui shadow-sm placeholder-field-placeholder transition-all focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring sm:text-sm;
     @apply dark:focus:ring-ring/30;
@@ -274,7 +268,7 @@
     @apply dark:shadow-none;
   }
 
-  /* Header row of a padding-free card (class="card !p-0"). */
+  /* Header row of a Flush card (components/ui CardHeader). */
   .card-header {
     @apply flex flex-wrap items-center justify-between gap-3 border-b border-divider px-6 py-4;
   }

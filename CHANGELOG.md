@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.env.example` lists `GOFORGE_PROTECTED_SERVICES`, `GOFORGE_BUILD_DIR`, and `MAX_CONCURRENT_BUILDS` (accepted, unused) and names the `goforge-mcp` variables (security Goal 4)
 
 ### Changed
+- UI kit (Path A, #82-#87 and the sweep PR): every page is built from `internal/web/templates/components/ui` (Button, Input, Select, Textarea, Checkbox, Switch, Label, Badge, Card, Alert, Table, Tabs, Dialog, Dropdown, Sheet, Tooltip, Popover, Breadcrumb, Avatar, Skeleton) on CSS variable tokens, with native `<dialog>` and `popover` and one delegated `static/js/ui.js`. Dialogs, menus, tabs, and the mobile navigation sheet are keyboard accessible with focus return; `hx-confirm` uses the kit confirm dialog. The copy buttons on Settings → Profile (mcp.json and a new token) and the toast dismiss button no longer use inline handlers; the toast dismiss target is 44 px below `md`. Reference: `docs/reference/ui-kit.md`
 - `docker-compose.yml` no longer passes `BACKUP_*` into the `goforge` container, so a recreated container has no `BACKUP_*` names in its environment. Compose installs set backups up in Settings → Profile → Backups; `BACKUP_*` in the compose `.env` now has no effect. For a one-time import, add them under `services.goforge.environment` in your own `docker-compose.override.yml`, then remove them. Host runs and `goforge backup run` still read `BACKUP_*` from the process environment (no code change). `.env.example` keeps the block commented out, and the backup, configuration, compose, and `SECURITY.md` docs say the same
 - `config.Load` no longer fails on invalid `BACKUP_*`. Serve and `goforge backup run` check it after opening the database: with no saved backup settings it still stops startup with the same message; once saved settings exist it is ignored with a warning, so a partly removed `BACKUP_*` set does not stop GoForge. Other commands (`migrate`) no longer fail on it
 - `ROADMAP.md` brought up to date through #71: shipped items checked after checking the code (active sidebar, MySQL/MongoDB/MinIO templates, service stop/start/restart, API tokens, mobile hamburger menu), a "Shipped since V1.0.x" list, and a parked list (#60, #48, backup restore, aesthetics Goal 3 nits, deadcode sweep, stale branches, open audit findings). The rollback-toast item was marked done but never shipped; it is open again (security Goal 4)
@@ -91,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 ### Removed
+- The unused `.icon-btn` class (every icon button is `ui.Button` with `ButtonIcon`) and the `copyText` templ script on Settings → Profile (replaced by `ui.CopyAttrs`) (UI kit sweep)
 - `components/nav.templ` (no callers) (#65); `components.Table`, the old `Loading`, and the unused `.glass`, `.glass-dark`, `.btn-ghost` classes (#67)
 - `scripts/tailwind.sh`, a duplicate of `make css` (security Goal 4)
 - Unused `.sidebar-link`, `.sidebar-link-active`, `.sidebar-link-inactive` CSS; the sidebar styles links inline with `aria-[current=page]` variants, so Tailwind purged these (aesthetics Goal 3 nits, #68)

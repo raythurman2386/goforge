@@ -129,3 +129,25 @@ func TestTokenDialogs_KitContract(t *testing.T) {
 		}
 	}
 }
+
+// Copy buttons use the ui.js data-ui-copy contract (no templ script, no
+// inline onclick), and the copied text stays in the page element.
+func TestCopyButtonsUseKit(t *testing.T) {
+	user := &models.User{Email: "u@x", Role: models.RoleUser}
+	for name, got := range map[string]string{
+		"profile": renderMCP(t, Profile(user, "tok", nil, nil, NewMCPCard("https://gf.example.test"))),
+		"created": renderMCP(t, TokenCreatedModal("API Token Created", "gf_secret", false)),
+	} {
+		if strings.Contains(got, "onclick") || strings.Contains(got, "copyText") {
+			t.Errorf("%s: inline copy handler left", name)
+		}
+	}
+	prof := renderMCP(t, Profile(user, "tok", nil, nil, NewMCPCard("https://gf.example.test")))
+	if !strings.Contains(prof, `data-ui-copy="mcp-snippet"`) || !strings.Contains(prof, `id="mcp-snippet"`) {
+		t.Error("mcp.json copy button not wired to #mcp-snippet")
+	}
+	created := renderMCP(t, TokenCreatedModal("API Token Created", "gf_secret", false))
+	if !strings.Contains(created, `data-ui-copy="created-token"`) || strings.Count(created, "gf_secret") != 1 {
+		t.Errorf("token copy button not wired, or the token is repeated in markup: %s", created)
+	}
+}

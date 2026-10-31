@@ -259,9 +259,18 @@ func inputType(t string) string {
 	return t
 }
 
-// labelClass is the label look: .label (input.css) plus caller classes.
-func labelClass(extra string) string {
+// LabelClass is the label look: .label (input.css) plus caller classes.
+// Use it for a <legend>, or a <p> naming read-only content, where a
+// <label for> does not fit. Form controls use Label or Field instead.
+func LabelClass(extra string) string {
 	return Class("label", extra)
+}
+
+// CopyAttrs makes a Button a copy button: ui.js copies the text of the
+// element with the given id and reads "Copied!" (or "Copy failed") for two
+// seconds. The text stays in the page, never in an attribute.
+func CopyAttrs(id string) templ.Attributes {
+	return templ.Attributes{"data-ui-copy": id}
 }
 
 // inputClass is the text-field look for Input and Textarea.

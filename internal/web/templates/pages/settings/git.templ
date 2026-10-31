@@ -77,7 +77,7 @@ templ AddGitSourceModal(csrfToken string) {
 			@ui.Input(ui.InputProps{ID: "git-source-name", Name: "name", Label: "Source Name", Autocomplete: "off", Required: true, Class: "mb-4"})
 			
 			<fieldset class="mb-6">
-				<legend class="label">Source Type</legend>
+				<legend class={ ui.LabelClass("") }>Source Type</legend>
 				<div class="grid grid-cols-3 gap-4">
 					<label class="relative flex flex-col p-4 border border-gray-100 rounded-xl cursor-pointer hover:bg-gray-50 transition-all focus-within:ring-2 focus-within:ring-primary-500/20 shadow-sm dark:border-gray-800 dark:hover:bg-gray-800/50">
 						<div class="flex items-center justify-between mb-2">
