@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -334,8 +335,9 @@ func (m *memDeployments) UpdateStatus(_ context.Context, id string, status model
 	return nil
 }
 
-func (m *memDeployments) ListByEnvironmentID(_ context.Context, _ string, _ int) ([]*models.Deployment, error) {
-	m.once.Do(func() { close(m.listed) })
+// ListByEnvironmentID returns every deployment, newest first, cut to limit
+// like the SQL LIMIT (environments are not filtered: fixtures use one).
+func (m *memDeployments) ListByEnvironmentID(_ context.Context, _ string, limit int) ([]*models.Deployment, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]*models.Deployment, 0, len(m.items))
@@ -343,10 +345,17 @@ func (m *memDeployments) ListByEnvironmentID(_ context.Context, _ string, _ int)
 		cloned := *d
 		out = append(out, &cloned)
 	}
+	sort.SliceStable(out, func(i, j int) bool { return newerDeployment(out[i], out[j]) })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
 	return out, nil
 }
 
+// ListByStatus closes listed on first call: the post-deploy cleanup lists
+// running deployments this way, so tests use it to see that cleanup ran.
 func (m *memDeployments) ListByStatus(_ context.Context, status models.DeploymentStatus) ([]*models.Deployment, error) {
+	m.once.Do(func() { close(m.listed) })
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []*models.Deployment

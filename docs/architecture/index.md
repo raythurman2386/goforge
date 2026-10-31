@@ -85,7 +85,7 @@ graph TB
 - **Docker Client** (`internal/docker/`) -- Docker SDK wrapper for image builds, container lifecycle, logs, and system prune
 - **Proxy Manager** (`internal/proxy/`) -- Traefik label generation with middleware support
 - **Monitor** (`internal/monitor/`) -- Real-time container metrics collection from Docker stats API
-- **Secrets** (`internal/secrets/`) -- AES-256-GCM encryption for sensitive data at rest
+- **Secrets** (`internal/secrets/`) -- AES-GCM encryption at rest with `ENCRYPTION_KEY` for secret project variables, OAuth and Git source tokens, SSH keys, one-click service credentials, and the backup S3 keys
 - **SSE Hub** (`internal/sse/`) -- Server-Sent Events pub/sub for real-time updates
 
 ### 4. Data Layer

@@ -16,6 +16,9 @@ const tasks = (v: Vars) => ids(v.task).map((t) => ({ id: t, ...v.task[t] }));
 const recoverId = (v: Vars) => ids(v.task).length; // N + 1
 const newest = (v: Vars) => Math.max(...ids(v.dstatus).filter((d) => v.dstatus[d] === "running"));
 const ACTIVE = new Set(["waitGrace", "list", "next", "stop", "remove", "update"]);
+// "retry": a pass left a container it could not remove; retireUntilDone waits
+// retireRetry, then runs the next pass. Work is still pending, so never settled.
+const RETRY = "retry";
 
 const hostWords = (v: Vars) => {
   const n = newest(v);
@@ -35,6 +38,7 @@ const phase = (v: Vars) => {
   const rec = v.task[recoverId(v)];
   if (rec.pc === "boot" || ACTIVE.has(rec.pc)) return "recovering after restart";
   if (ts.some((t) => ACTIVE.has(t.pc) && (t.pc !== "waitGrace" || v.graceOver[t.cur]))) return "retiring";
+  if (ts.some((t) => t.pc === RETRY)) return "retire failed, retry pending";
   if (ts.some((t) => t.pc === "waitGrace")) return "in grace";
   if (!v.graceOver[newest(v)]) return "in grace, no cleanup pending";
   return "settled";
@@ -47,11 +51,12 @@ export const group = (v: Vars) => {
   if (p === "recovering after restart") return "recover";
   if (p === "settled") return "settled";
   if (p === "retiring") return "retire";
+  if (p === "retire failed, retry pending") return "retry";
   if (p === "in grace, no cleanup pending") return "orphan";
   return "grace";
 };
 
-export const colors = { grace: "blue", retire: "orange", recover: "purple", settled: "teal", orphan: "pink" };
+export const colors = { grace: "blue", retire: "orange", retry: "yellow", recover: "purple", settled: "teal", orphan: "pink" };
 
 export const title = "GoForge redeploy: blue-green grace and retire of the previous container (one environment)";
 
@@ -64,12 +69,16 @@ export const step = (action: string, from: Vars, to: Vars): string => {
       return "the grace period passes";
     case "WaitGraceReturns":
       return "cleanup wakes after the grace";
-    case "ListByEnvironmentID":
+    case "ListByStatus":
       return "cleanup lists running deployments";
     case "ListByDeploymentID":
       return "cleanup reads a container row";
     case "RetireSupersededReturns":
-      return "cleanup finishes";
+      return ids(to.task).some((t) => from.task[t].pc !== RETRY && to.task[t].pc === RETRY)
+        ? "cleanup pass ends with a container left, retry pending"
+        : "cleanup finishes";
+    case "RetryRetire":
+      return "cleanup retries the retire";
     case "StopContainer":
       return "docker stop";
     case "StopContainerFails":
