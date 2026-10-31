@@ -76,7 +76,7 @@ Every response carries (`internal/web/middleware/secheaders.go`):
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Strict-Transport-Security` | `max-age=31536000`, only when the request is HTTPS (`X-Forwarded-Proto: https` or TLS) |
 
-The CSP does not restrict scripts or styles because a few pages still use inline `<script>` blocks (service detail, container detail, the Git repository browser) and HTMX attributes; the UI kit itself has no inline event handlers since #89. The CSP it only blocks framing (clickjacking), `<base>` rewrites, and plugins. HSTS leaves out `includeSubDomains` because deployed apps live on sibling subdomains GoForge does not control.
+The CSP does not restrict scripts or styles because a few pages still use inline `<script>` blocks (service detail, container detail, the Git repository browser) and HTMX attributes; the UI kit itself has no inline event handlers since #89. The CSP only blocks framing (clickjacking), `<base>` rewrites, and plugins. HSTS leaves out `includeSubDomains` because deployed apps live on sibling subdomains GoForge does not control.
 
 ---
 
