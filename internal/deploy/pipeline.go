@@ -107,11 +107,11 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) (err err
 	}
 	s.recordLog(ctx, d.ID, "info", "deploy", "deployment is running")
 
+	// No overall timeout: the cleanup retries a failed retire until it
+	// succeeds (each pass has its own timeout), and ends with the process.
 	//nolint:contextcheck // cleanup is a background task
 	go func(envID, deployID string) {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-		if cErr := s.CleanupOldDeployments(cleanupCtx, envID, deployID); cErr != nil && s.logger != nil {
+		if cErr := s.CleanupOldDeployments(context.Background(), envID, deployID); cErr != nil && s.logger != nil {
 			s.logger.Error("failed to cleanup old deployments", "error", cErr, "environment_id", envID)
 		}
 	}(d.EnvironmentID, d.ID)

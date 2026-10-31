@@ -1,13 +1,9 @@
-//go:build formalreplay
-
-// Replays of the counterexamples TLC finds in formal/deploy-retire/DeployRetire.tla,
-// one test step per model action. They assert the rule the model checks, so they
-// FAIL on the code as of the sync commit in
-// .cursor/skills/verify-goforge-deploy-retire/SKILL.md. They are behind the
-// formalreplay build tag so `make test` and CI stay green until the findings are
-// fixed; run them with:
-//
-//	go test -tags formalreplay -run TestReplay -count=1 ./internal/deploy/
+// Replays of the counterexamples TLC found in formal/deploy-retire/DeployRetire.tla
+// (findings F1 and F2), one test step per model action. They failed on the code
+// before the F1/F2 fix and now guard it. They used to sit behind the
+// formalreplay build tag; the tag is gone so `make test` and CI keep them
+// fixed. `go test -tags formalreplay -run TestReplay ./internal/deploy/` still
+// runs them.
 package deploy
 
 import (
@@ -42,9 +38,11 @@ func addRunningDeployment(t *testing.T, deploys *memDeployments, containers *mem
 
 // F1 (NewestKeepsRunning, DeployRetireBackToBack.cfg). Two redeploys within one
 // grace period: dep-1 reaches running, then dep-2 reaches running before dep-1's
-// grace ends. dep-1's CleanupOldDeployments wakes, retireSuperseded lists the
-// environment and skips only dep-1 itself and non-running rows, so it retires
-// dep-2's container too: the newest deployment goes down.
+// grace ends. dep-1's CleanupOldDeployments wakes; before the fix
+// retireSuperseded skipped only dep-1 itself and non-running rows, so it retired
+// dep-2's container too and the newest deployment went down. Now it never
+// retires a deployment newer than the newest one whose grace is over (here the
+// grace is 0, so that is dep-2 and dep-1's cleanup retires dep-old and dep-1).
 func TestReplayBackToBackRedeployKeepsNewest(t *testing.T) {
 	svc, deploys, containers, host := redeployFixture(t) // dep-old running in old-ctr
 	now := time.Now()
@@ -85,16 +83,26 @@ func (d *dockerDownRuntime) RemoveContainer(context.Context, string) error {
 }
 
 // F2 (AfterGraceAtMostOneRunning, DeployRetireDockerErrors.cfg). StopContainer
-// and RemoveContainer both return an error; retireContainer still marks the row
-// exited, so neither a later cleanup nor RecoverPendingRetires (hasSuperseded
-// reads rows) ever looks at the old container again. It runs forever.
+// and RemoveContainer both return an error. Before the fix retireContainer still
+// marked the row exited, so neither a later cleanup nor RecoverPendingRetires
+// (hasSuperseded reads rows) ever looked at the old container again and it ran
+// forever. Now the row stays running, the cleanup retries, and after a restart
+// RecoverPendingRetires retires it.
 func TestReplayDockerErrorsLeaveNoSecondRunning(t *testing.T) {
 	svc, containers, host := restartFixture(t, 0, time.Minute) // dep-old/old-ctr, dep-1/new-ctr running
 	realHost := host
-	// 3-8. cleanup wakes, lists, reads the row, docker stop fails, docker rm fails, row marked exited.
+	// 3-8. cleanup wakes, lists, reads the row, docker stop fails, docker rm
+	// fails; the row must stay running and the cleanup keeps retrying until
+	// the restart below kills it (ctx ends).
 	svc.dockerClient = &dockerDownRuntime{hostRuntime: host}
-	if err := svc.CleanupOldDeployments(context.Background(), "env-1", "dep-1"); err != nil {
-		t.Fatalf("CleanupOldDeployments: %v", err)
+	svc.retireRetry = 10 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err := svc.CleanupOldDeployments(ctx, "env-1", "dep-1"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("CleanupOldDeployments with Docker down = %v, want it still retrying until ctx ends", err)
+	}
+	if st := containerRowStatus(t, containers, "old-ctr"); st != models.ContainerStatusRunning {
+		t.Errorf("old-ctr row = %s after failed retire, want running (so it is retried)", st)
 	}
 	// Docker is back; goforge restarts and RecoverPendingRetires runs.
 	svc.dockerClient = realHost

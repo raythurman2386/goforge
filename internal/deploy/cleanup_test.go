@@ -99,9 +99,14 @@ func (h *hostRuntime) list(runningOnly bool) []string {
 func redeployFixture(t *testing.T) (*Service, *memDeployments, *memContainers, *hostRuntime) {
 	t.Helper()
 	deploys, _, _, _, svc := pipelineFixture(t)
+	// created_at orders deployments (retireSuperseded never retires a newer
+	// one), so the fixture sets it like the database default would.
+	now := time.Now()
 	deploys.items["dep-old"] = &models.Deployment{
 		ID: "dep-old", EnvironmentID: "env-1", Status: models.DeploymentStatusRunning,
+		CreatedAt: now.Add(-time.Hour),
 	}
+	deploys.items["dep-1"].CreatedAt = now
 	containers := &memContainers{}
 	if err := containers.Create(context.Background(), &models.Container{
 		ID:           "row-old",
@@ -116,6 +121,7 @@ func redeployFixture(t *testing.T) (*Service, *memDeployments, *memContainers, *
 	svc.containerRepo = containers
 	svc.dockerClient = host
 	svc.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	svc.retireRetry = 10 * time.Millisecond
 	return svc, deploys, containers, host
 }
 
@@ -182,6 +188,120 @@ func TestCleanupOldDeploymentsRemovesWhenAlreadyStopped(t *testing.T) {
 	if st := containerRowStatus(t, containers, "old-ctr"); st != models.ContainerStatusExited {
 		t.Fatalf("old container row status = %s, want exited", st)
 	}
+}
+
+// TestCleanupOldDeploymentsRetriesFailedRemove: Docker fails stop and remove
+// on the first passes. The row must stay running (not exited) and the same
+// cleanup must retry until old-ctr is gone (F2 in formal/deploy-retire).
+func TestCleanupOldDeploymentsRetriesFailedRemove(t *testing.T) {
+	svc, deploys, containers, host := redeployFixture(t)
+	deploys.items["dep-1"].Status = models.DeploymentStatusRunning
+	flaky := &flakyRuntime{hostRuntime: host, failures: 2}
+	svc.dockerClient = flaky
+
+	if err := svc.CleanupOldDeployments(context.Background(), "env-1", "dep-1"); err != nil {
+		t.Fatalf("CleanupOldDeployments: %v", err)
+	}
+	if got := flaky.removeCalls(); got != 3 {
+		t.Fatalf("RemoveContainer calls = %d, want 3 (2 failures, then success)", got)
+	}
+	if got := host.psAll(); len(got) != 0 {
+		t.Fatalf("docker ps -a = %v, want old-ctr removed", got)
+	}
+	if st := containerRowStatus(t, containers, "old-ctr"); st != models.ContainerStatusExited {
+		t.Fatalf("old container row status = %s, want exited", st)
+	}
+}
+
+// TestCleanupOldDeploymentsKeepsRowRunningWhileDockerDown: while every remove
+// fails, the row is never marked exited, so RecoverPendingRetires can find it.
+func TestCleanupOldDeploymentsKeepsRowRunningWhileDockerDown(t *testing.T) {
+	svc, deploys, containers, host := redeployFixture(t)
+	deploys.items["dep-1"].Status = models.DeploymentStatusRunning
+	svc.dockerClient = &flakyRuntime{hostRuntime: host, failures: 1 << 30}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err := svc.CleanupOldDeployments(ctx, "env-1", "dep-1"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("CleanupOldDeployments = %v, want context.DeadlineExceeded (still retrying)", err)
+	}
+	if st := containerRowStatus(t, containers, "old-ctr"); st != models.ContainerStatusRunning {
+		t.Fatalf("old container row status = %s, want running (retire not done)", st)
+	}
+}
+
+// TestRetireSupersededNeverRetiresNewer: the cleanup of an older deployment
+// whose successor is still inside its own grace retires only what is older
+// than itself (F1 in formal/deploy-retire, with a real grace period).
+func TestRetireSupersededNeverRetiresNewer(t *testing.T) {
+	svc, deploys, containers, host := redeployFixture(t)
+	now := time.Now()
+	svc.blueGreenDeployer = &BlueGreenDeployer{config: BlueGreenConfig{GracePeriod: 5 * time.Minute}}
+	deploys.items["dep-1"].Status = models.DeploymentStatusRunning
+	deploys.items["dep-1"].CreatedAt = now.Add(-7 * time.Minute)
+	deploys.items["dep-1"].FinishedAt = sql.NullTime{Time: now.Add(-6 * time.Minute), Valid: true}
+	if err := containers.Create(context.Background(), &models.Container{
+		ID: "row-new", DeploymentID: sql.NullString{String: "dep-1", Valid: true},
+		DockerID: "new-ctr", Status: models.ContainerStatusRunning,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	host.exists["new-ctr"], host.running["new-ctr"] = true, true
+	deploys.items["dep-2"] = &models.Deployment{
+		ID: "dep-2", EnvironmentID: "env-1", Status: models.DeploymentStatusRunning,
+		CreatedAt: now.Add(-2 * time.Minute), FinishedAt: sql.NullTime{Time: now.Add(-time.Minute), Valid: true},
+	}
+	if err := containers.Create(context.Background(), &models.Container{
+		ID: "row-newest", DeploymentID: sql.NullString{String: "dep-2", Valid: true},
+		DockerID: "newest-ctr", Status: models.ContainerStatusRunning,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	host.exists["newest-ctr"], host.running["newest-ctr"] = true, true
+
+	if _, err := svc.retireSuperseded(context.Background(), "env-1", "dep-1"); err != nil {
+		t.Fatalf("retireSuperseded(dep-1): %v", err)
+	}
+	if got := host.ps(); len(got) != 2 || got[0] != "new-ctr" || got[1] != "newest-ctr" {
+		t.Fatalf("docker ps = %v, want new-ctr (serving through dep-2's grace) and newest-ctr", got)
+	}
+	if st := containerRowStatus(t, containers, "newest-ctr"); st != models.ContainerStatusRunning {
+		t.Fatalf("newest container row status = %s, want running", st)
+	}
+}
+
+type flakyRuntime struct {
+	*hostRuntime
+	mu       sync.Mutex
+	failures int
+	removes  int
+}
+
+func (f *flakyRuntime) StopContainer(ctx context.Context, id string) error {
+	f.mu.Lock()
+	fail := f.removes < f.failures
+	f.mu.Unlock()
+	if fail {
+		return errors.New("Cannot connect to the Docker daemon")
+	}
+	return f.hostRuntime.StopContainer(ctx, id)
+}
+
+func (f *flakyRuntime) RemoveContainer(ctx context.Context, id string) error {
+	f.mu.Lock()
+	f.removes++
+	fail := f.removes <= f.failures
+	f.mu.Unlock()
+	if fail {
+		return errors.New("Cannot connect to the Docker daemon")
+	}
+	return f.hostRuntime.RemoveContainer(ctx, id)
+}
+
+func (f *flakyRuntime) removeCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.removes
 }
 
 type stopFailsRuntime struct{ *hostRuntime }
