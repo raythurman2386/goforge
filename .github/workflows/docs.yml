@@ -1,9 +1,9 @@
 name: Documentation
 
-# Builds the MkDocs site with --strict on every change to the docs.
-# Nothing is published from CI: the repository is private on GitHub Free, so
-# GitHub Pages is unavailable (#32, #52). The site is served from a GoForge
-# project that builds Dockerfile.docs (https://goforge-docs-app.ravenwoodsoftware.dev/).
+# Builds the MkDocs site with --strict on every change to the docs, as a check.
+# Nothing is published from CI and GitHub Pages is not used (#32, #52, #93).
+# The site is self-hosted: the GoForge project goforge-docs builds
+# Dockerfile.docs and serves https://goforge-docs-app.ravenwoodsoftware.dev/.
 
 on:
   push:

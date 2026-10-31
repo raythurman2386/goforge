@@ -31,7 +31,7 @@ When running GoForge, you are responsible for:
 We take security vulnerabilities seriously. If you find a security issue:
 
 1. **Do NOT** open a public GitHub issue
-2. Email security concerns privately (or use GitHub's private vulnerability reporting)
+2. Email **security@ravenwoodsoftware.dev** privately, or use GitHub's private vulnerability reporting (the **Report a vulnerability** button under the repository's **Security** tab). Private vulnerability reporting is enabled once the repository is public; until then, use the email address.
 3. Include detailed steps to reproduce the issue
 4. Allow reasonable time for response before public disclosure
 
