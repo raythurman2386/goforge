@@ -71,7 +71,10 @@ templ ActivityTable(id string, rows []ActivityRow, compact bool) {
 }
 
 // ActivityCard is the dashboard's recent agent actions card: the latest
-// MCP and API changes, with a link to the full activity page.
+// MCP and API changes, with a link to the full activity page. With rows, the
+// header carries "View all" beside the title. With none, there is no table
+// chrome and no header action: the card body says so and offers "View all
+// activity" as a secondary link under the message (t1683u).
 templ ActivityCard(rows []ActivityRow) {
 	@ui.Card(ui.CardProps{Flush: true, Class: "mt-8 overflow-hidden", Attrs: templ.Attributes{"id": "recent-agent-actions"}}) {
 		@ui.CardHeader(nil) {
@@ -80,11 +83,27 @@ templ ActivityCard(rows []ActivityRow) {
 					@ui.CardTitle(2, nil) { Recent agent actions }
 					@ui.CardDescription(nil) { Changes made through the API or by an MCP agent. }
 				</div>
-				@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Href: "/settings/activity?source=agent"}) {
-					View all
+				if len(rows) > 0 {
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Href: "/settings/activity?source=agent"}) {
+						View all
+					}
 				}
 			</div>
 		}
-		@ActivityTable("recent-agent-actions-table", rows, true)
+		if len(rows) == 0 {
+			<div data-testid="recent-agent-actions-empty" class="px-6 pb-6 text-center">
+				@EmptyState(EmptyStateProps{
+					Title:       "No recent agent actions",
+					Description: "Changes an API token or an MCP agent makes show up here.",
+					Icon:        "server",
+					Compact:     true,
+				})
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonLink, Href: "/settings/activity", Class: "-mt-4"}) {
+					View all activity
+				}
+			</div>
+		} else {
+			@ActivityTable("recent-agent-actions-table", rows, true)
+		}
 	}
 }
