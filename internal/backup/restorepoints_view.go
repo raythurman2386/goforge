@@ -169,10 +169,16 @@ func BacksUpTemplate(name string) bool {
 }
 
 // RestoreTemplate reports whether goforge backup restore-service restores
-// instances of the template (gitea, vaultwarden).
+// instances of the template (postgres, gitea, vaultwarden).
 func RestoreTemplate(name string) bool {
-	_, ok := serviceArtifactNames[name]
+	_, ok := serviceMounts[name]
 	return ok
+}
+
+// KeptDir is where restore-service keeps the instance's previous data,
+// with a placeholder for the time.
+func (v *InstanceRestorePointsView) KeptDir() string {
+	return ServiceMount(v.Template) + "/" + preRestorePrefix + "<time>"
 }
 
 // Location is the backup schedule's time zone, or UTC.

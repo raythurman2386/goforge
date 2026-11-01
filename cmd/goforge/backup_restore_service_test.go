@@ -164,3 +164,57 @@ func TestCheckServiceRestoreArgs(t *testing.T) {
 		t.Errorf("valid: %v", err)
 	}
 }
+
+func postgresRunStore(t *testing.T) mapStore {
+	t.Helper()
+	s := mapStore{}
+	m := backup.Manifest{Version: 1, RunKey: svcKey, Trigger: "scheduled", GoForgeVersion: "0.1.0", StartedAt: time.Date(2026, 10, 30, 7, 0, 0, 0, time.UTC)}
+	for _, a := range []struct{ key, body, db string }{{"services/p1/app.dump", "dump", "app"}, {"services/p1/roles.sql", "roles", ""}} {
+		sum := sha256.Sum256([]byte(a.body))
+		kind := backup.KindPgDump
+		if a.db == "" {
+			kind = backup.KindPgRoles
+		}
+		m.Artifacts = append(m.Artifacts, backup.ManifestArtifact{Key: a.key, Kind: kind, InstanceID: "p1", Template: "postgres", Database: a.db, Bytes: int64(len(a.body)), SHA256: hex.EncodeToString(sum[:])})
+		s["goforge/"+svcKey+"/"+a.key] = []byte(a.body)
+	}
+	body, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s["goforge/"+svcKey+"/manifest.json"] = body
+	return s
+}
+
+func TestRestoreService_PostgresDryRunAndYes(t *testing.T) {
+	var out bytes.Buffer
+	d := &cliFakeDocker{}
+	r := &backup.ServiceRestorer{Store: postgresRunStore(t), Prefix: "goforge/", Docker: d, TempDir: t.TempDir(), Progress: &out}
+	if err := restoreService(context.Background(), r, svcKey, "p1", serviceRestoreOpts{}, strings.NewReader(""), &out); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if len(d.calls) != 0 {
+		t.Errorf("dry run touched docker: %v", d.calls)
+	}
+	for _, want := range []string{"p1 (postgres), container goforge-service-p1", "roles:      services/p1/roles.sql, 5 bytes",
+		"database:   app (services/p1/app.dump), 4 bytes", "superuser:  postgres (POSTGRES_USER)",
+		"/var/lib/postgresql/data/.goforge-pre-restore-<UTC time>/ (kept)", "preflight:  ok"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("missing %q in:\n%s", want, out.String())
+		}
+	}
+
+	out.Reset()
+	if err := restoreService(context.Background(), r, svcKey, "p1", serviceRestoreOpts{Yes: true, Confirm: svcKey}, strings.NewReader(""), &out); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if got := strings.Join(d.calls, ","); got != "stop,helper,exec,rmhelper,start,healthy" {
+		t.Errorf("calls = %s", got)
+	}
+	for _, want := range []string{"Restored p1 (postgres)", "Rows written after the backup are gone",
+		"back to /var/lib/postgresql/data."} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("missing %q in:\n%s", want, out.String())
+		}
+	}
+}

@@ -25,24 +25,33 @@ var (
 
 var backupRestoreServiceCmd = &cobra.Command{
 	Use:   "restore-service <run-key> <instance-id>",
-	Short: "Restore one Gitea or Vaultwarden service's data from a backup run (dry run unless --yes)",
-	Long: `Restore the /data volume of one Gitea or Vaultwarden service instance from
-one backup run (services/<instance-id>/ in that run). The GoForge database,
-other services, and Postgres services are not touched.
+	Short: "Restore one Postgres, Gitea, or Vaultwarden service's data from a backup run (dry run unless --yes)",
+	Long: `Restore the data volume of one Postgres, Gitea, or Vaultwarden service
+instance from one backup run (services/<instance-id>/ in that run). The
+GoForge database and other services are not touched.
 
 Without --yes this is a dry run: it reads the manifest, inspects the
 service container, checks the backup lock, prints what would happen, and
 changes nothing.
 
-With --yes it takes the backup lock, downloads the SQLite snapshot and
-data.tar.gz and checks their sizes and SHA-256 against the manifest (any
-mismatch stops here, with the service still running), then stops the
-service, moves the current volume contents to
-/data/.goforge-pre-restore-<UTC time>/ (kept, never deleted), extracts the
-backup with its file owners, puts the SQLite snapshot at the database path
-with its directory's owner, starts the service, and waits for its health
-check. If extracting fails, the previous contents are put back and the
-service is started again.
+With --yes it takes the backup lock, downloads the instance's artifacts and
+checks their sizes and SHA-256 against the manifest (any mismatch stops
+here, with the service still running), then stops the service and moves the
+current volume contents to <volume>/.goforge-pre-restore-<UTC time>/ (kept,
+never deleted).
+
+Gitea and Vaultwarden: it extracts data.tar.gz with its file owners, puts
+the SQLite snapshot at the database path with its directory's owner.
+
+Postgres: it builds a new cluster in the volume with the service's own
+image (initdb as the data directory's owner, superuser POSTGRES_USER, the
+previous postgresql.conf and pg_hba.conf), loads roles.sql, runs
+pg_restore --create for each database dump on a private socket, and moves
+the new cluster into PGDATA.
+
+Then it starts the service and waits for its health check. If the restore
+fails, the previous contents are put back and the service is started
+again.
 
 Confirm by typing the run key at the prompt, or pass --confirm=<run-key>.
 Run it inside the running GoForge container (it needs the Docker socket):
@@ -139,7 +148,7 @@ func restoreService(ctx context.Context, r *backup.ServiceRestorer, runKey, inst
 	if preErr != nil {
 		return errors.New(red.Redact(preErr.Error()))
 	}
-	if cerr := confirmTyped(runKey, o.Confirm, fmt.Sprintf("This stops %s and replaces its /data.", plan.Container), in, out); cerr != nil {
+	if cerr := confirmTyped(runKey, o.Confirm, fmt.Sprintf("This stops %s and replaces its %s.", plan.Container, plan.Mount), in, out); cerr != nil {
 		return cerr
 	}
 	fmt.Fprint(out, "\n")
@@ -169,9 +178,19 @@ func printServiceRestorePlan(out io.Writer, plan *backup.ServiceRestorePlan, inf
 		}
 		fmt.Fprintf(out, "  container:  %s\n", state)
 	}
-	fmt.Fprintf(out, "  database:   %s, %d bytes, sha256 %s\n", plan.Database.Key, plan.Database.Bytes, plan.Database.SHA256)
-	fmt.Fprintf(out, "  data:       %s, %d bytes, sha256 %s\n", plan.Data.Key, plan.Data.Bytes, plan.Data.SHA256)
-	fmt.Fprint(out, "  replaces:   everything in the service's /data volume; the current contents are moved to /data/.goforge-pre-restore-<UTC time>/ (kept)\n")
+	if plan.IsPostgres() {
+		fmt.Fprintf(out, "  roles:      %s, %d bytes, sha256 %s\n", plan.Roles.Key, plan.Roles.Bytes, plan.Roles.SHA256)
+		for _, d := range plan.Dumps {
+			fmt.Fprintf(out, "  database:   %s (%s), %d bytes, sha256 %s\n", d.Database, d.Key, d.Bytes, d.SHA256)
+		}
+		if info != nil {
+			fmt.Fprintf(out, "  superuser:  %s (POSTGRES_USER); a new cluster is built with this role, then roles.sql and each dump are loaded\n", info.Superuser())
+		}
+	} else {
+		fmt.Fprintf(out, "  database:   %s, %d bytes, sha256 %s\n", plan.Database.Key, plan.Database.Bytes, plan.Database.SHA256)
+		fmt.Fprintf(out, "  data:       %s, %d bytes, sha256 %s\n", plan.Data.Key, plan.Data.Bytes, plan.Data.SHA256)
+	}
+	fmt.Fprintf(out, "  replaces:   everything in the service's %s volume; the current contents are moved to %s/.goforge-pre-restore-<UTC time>/ (kept)\n", plan.Mount, plan.Mount)
 	if preErr != nil {
 		fmt.Fprintf(out, "  preflight:  REFUSED: %s\n", red.Redact(preErr.Error()))
 	} else {
@@ -190,6 +209,8 @@ func printServiceRestoreResult(out io.Writer, plan *backup.ServiceRestorePlan, r
 		fmt.Fprint(out, "  - Sign in and check repositories, users, and recent pushes. Pushes made after the backup are gone.\n")
 	case "vaultwarden":
 		fmt.Fprint(out, "  - Sign in and check the vault. Items saved after the backup are gone; clients sync to the restored state.\n")
+	case "postgres":
+		fmt.Fprint(out, "  - Connect as each app's role and check its tables. Rows written after the backup are gone; restart apps that hold connections.\n")
 	}
-	fmt.Fprintf(out, "  - Undo: run restore-service again with a newer run key, or (service stopped) move the contents of %s back to /data.\n", res.AsideDir)
+	fmt.Fprintf(out, "  - Undo: run restore-service again with a newer run key, or (service stopped) move the contents of %s back to %s.\n", res.AsideDir, plan.Mount)
 }

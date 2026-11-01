@@ -73,12 +73,12 @@ templ RestorePoints(v *backup.InstanceRestorePointsView) {
 		}
 		if v.Restorable() {
 			<p class="mt-3 text-xs text-gray-500 dark:text-gray-400" data-testid="service-restore-howto">
-				Restoring replaces this service's data and is done from the command line on the server. Preview with the first command, then run the second. The current data is kept in <code class="font-mono">/data/.goforge-pre-restore-&lt;time&gt;</code>.
+				Restoring replaces this service's data and is done from the command line on the server. Preview with the first command, then run the second. The current data is kept in <code class="font-mono">{ v.KeptDir() }</code>.
 			</p>
 			<pre class="mt-1 overflow-x-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800" data-testid="service-restore-command"><code>{ restoreServiceCommand(v) }</code></pre>
 		} else {
 			<p class="mt-3 text-xs text-gray-500 dark:text-gray-400" data-testid="service-restore-howto">
-				This service's databases are restored by hand with <code class="font-mono">pg_restore</code>; see the Postgres runbook in docs/deployment/backup.md.
+				This service type has no scripted restore; see docs/deployment/backup.md.
 			</p>
 		}
 	}

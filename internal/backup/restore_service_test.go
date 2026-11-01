@@ -27,7 +27,8 @@ const svcRunKey = "2026-10-30/20261030T070000Z"
 func sha(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
 
 // putServiceRun writes a run with one gitea instance "g1", one vaultwarden
-// instance "v1", and one postgres instance "p1".
+// instance "v1", one postgres instance "p1" (databases app and postgres),
+// and one artifact of a template restore-service does not handle ("x1").
 func putServiceRun(t *testing.T, s *memStore) map[string][]byte {
 	t.Helper()
 	bodies := map[string][]byte{
@@ -36,23 +37,31 @@ func putServiceRun(t *testing.T, s *memStore) map[string][]byte {
 		"services/v1/vaultwarden.sqlite3": []byte("vw-db"),
 		"services/v1/data.tar.gz":         []byte("vw-tar"),
 		"services/p1/app.dump":            []byte("pg"),
+		"services/p1/postgres.dump":       []byte("pg-postgres"),
+		"services/p1/roles.sql":           []byte("roles"),
+		"services/x1/dump.rdb":            []byte("rdb"),
 	}
 	kinds := map[string]struct {
 		kind Kind
 		id   string
 		tpl  string
+		db   string
 	}{
-		"services/g1/gitea.sqlite3":       {KindSQLite, "g1", templateGitea},
-		"services/g1/data.tar.gz":         {KindTarGz, "g1", templateGitea},
-		"services/v1/vaultwarden.sqlite3": {KindSQLite, "v1", templateVaultwarden},
-		"services/v1/data.tar.gz":         {KindTarGz, "v1", templateVaultwarden},
-		"services/p1/app.dump":            {KindPgDump, "p1", "postgres"},
+		"services/g1/gitea.sqlite3":       {KindSQLite, "g1", templateGitea, ""},
+		"services/g1/data.tar.gz":         {KindTarGz, "g1", templateGitea, ""},
+		"services/v1/vaultwarden.sqlite3": {KindSQLite, "v1", templateVaultwarden, ""},
+		"services/v1/data.tar.gz":         {KindTarGz, "v1", templateVaultwarden, ""},
+		"services/p1/app.dump":            {KindPgDump, "p1", templatePostgres, "app"},
+		"services/p1/postgres.dump":       {KindPgDump, "p1", templatePostgres, maintenanceDB},
+		"services/p1/roles.sql":           {KindPgRoles, "p1", templatePostgres, ""},
+		"services/x1/dump.rdb":            {KindTarGz, "x1", "redis", ""},
 	}
 	m := &Manifest{Version: 1, RunKey: svcRunKey, RunID: "r", StartedAt: time.Date(2026, 10, 30, 7, 0, 0, 0, time.UTC),
 		Skipped: []Skipped{{InstanceID: "off", Reason: "container not running"}}}
-	for _, k := range []string{"services/g1/gitea.sqlite3", "services/g1/data.tar.gz", "services/v1/vaultwarden.sqlite3", "services/v1/data.tar.gz", "services/p1/app.dump"} {
+	for _, k := range []string{"services/g1/gitea.sqlite3", "services/g1/data.tar.gz", "services/v1/vaultwarden.sqlite3", "services/v1/data.tar.gz",
+		"services/p1/app.dump", "services/p1/postgres.dump", "services/p1/roles.sql", "services/x1/dump.rdb"} {
 		b := bodies[k]
-		m.Artifacts = append(m.Artifacts, ManifestArtifact{Key: k, Kind: kinds[k].kind, InstanceID: kinds[k].id, Template: kinds[k].tpl, Bytes: int64(len(b)), SHA256: sha(b)})
+		m.Artifacts = append(m.Artifacts, ManifestArtifact{Key: k, Kind: kinds[k].kind, InstanceID: kinds[k].id, Template: kinds[k].tpl, Database: kinds[k].db, Bytes: int64(len(b)), SHA256: sha(b)})
 		mustPut(t, s, ObjectKey(testPrefix, svcRunKey, k), string(b))
 	}
 	body, _ := json.Marshal(m)
@@ -163,8 +172,15 @@ func TestServiceRestorePlan(t *testing.T) {
 	if p, err := r.Plan(ctx, svcRunKey, "v1"); err != nil || p.Database.Key != "services/v1/vaultwarden.sqlite3" {
 		t.Fatalf("vw plan = %+v, %v", p, err)
 	}
-	if _, err := r.Plan(ctx, svcRunKey, "p1"); !errors.Is(err, ErrServiceRestoreUnsupported) {
-		t.Errorf("postgres: %v", err)
+	if p, err := r.Plan(ctx, svcRunKey, "p1"); err != nil || p.Mount != "/var/lib/postgresql/data" || p.Roles.Key != "services/p1/roles.sql" ||
+		len(p.Dumps) != 2 || p.Dumps[0].Database != "app" || p.Dumps[1].Database != maintenanceDB {
+		t.Errorf("postgres plan = %+v, %v", p, err)
+	}
+	if p, _ := r.Plan(ctx, svcRunKey, "g1"); p.Mount != "/data" {
+		t.Errorf("gitea mount = %q", p.Mount)
+	}
+	if _, err := r.Plan(ctx, svcRunKey, "x1"); !errors.Is(err, ErrServiceRestoreUnsupported) {
+		t.Errorf("redis: %v", err)
 	}
 	if _, err := r.Plan(ctx, svcRunKey, "nope"); !errors.Is(err, ErrServiceNotInRun) {
 		t.Errorf("missing: %v", err)
@@ -363,8 +379,7 @@ func TestRestoreServiceScripts_Local(t *testing.T) {
 				t.Error("an older kept copy was moved")
 			}
 
-			rb := strings.NewReplacer("mnt="+serviceMount, "mnt="+mnt).Replace(rollbackServiceScript)
-			if out, err := exec.Command("sh", "-c", rb, "sh", "s1").CombinedOutput(); err != nil { //nolint:gosec // test-only: the package script against a temp dir
+			if out, err := exec.Command("sh", "-c", rollbackServiceScript, "sh", "s1", mnt).CombinedOutput(); err != nil { //nolint:gosec // test-only: the package script against a temp dir
 				t.Fatalf("rollback script: %v\n%s", err, out)
 			}
 			assertFile(t, filepath.Join(mnt, "marker.txt"), "current")
@@ -393,6 +408,155 @@ func TestRestoreServiceScript_RefusesDBOutsideMount(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "escape.db")); err == nil {
 		t.Error("wrote outside the mount")
 	}
+}
+
+// putPostgresOnlyRun writes a run whose postgres instance "p2" lacks
+// roles.sql.
+func putPostgresOnlyRun(t *testing.T, s *memStore, key string) {
+	t.Helper()
+	b := []byte("pg")
+	m := &Manifest{Version: 1, RunKey: key, RunID: "r2", StartedAt: time.Date(2026, 10, 31, 7, 0, 0, 0, time.UTC),
+		Artifacts: []ManifestArtifact{{Key: "services/p2/app.dump", Kind: KindPgDump, InstanceID: "p2", Template: templatePostgres, Database: "app", Bytes: 2, SHA256: sha(b)}}}
+	mustPut(t, s, ObjectKey(testPrefix, key, "services/p2/app.dump"), string(b))
+	body, _ := json.Marshal(m)
+	mustPut(t, s, ObjectKey(testPrefix, key, ManifestName), string(body))
+}
+
+func TestServiceRestorePlan_PostgresNeedsRoles(t *testing.T) {
+	s := newMemStore()
+	const key = "2026-10-31/20261031T070000Z"
+	putPostgresOnlyRun(t, s, key)
+	r, _ := newSvcRestorer(t, s, &fakeSvcDocker{})
+	if _, err := r.Plan(context.Background(), key, "p2"); err == nil || !strings.Contains(err.Error(), "roles.sql") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestServiceRestore_PostgresOrderAndStaging(t *testing.T) {
+	ctx := context.Background()
+	s := newMemStore()
+	bodies := putServiceRun(t, s)
+	d := &fakeSvcDocker{info: &ServiceContainerInfo{ID: "cid", Image: "sha256:pg", Running: true, PostgresUser: "pgadmin"}}
+	r, out := newSvcRestorer(t, s, d)
+	locked := 0
+	r.Lock = func(context.Context) (func(), error) { locked++; return func() { locked-- }, nil }
+	p, err := r.Plan(ctx, svcRunKey, "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := r.Restore(ctx, p)
+	if err != nil {
+		t.Fatalf("Restore: %v\n%s", err, out)
+	}
+	want := "inspect c-p1,stop cid,helper,copy h1 /tmp,exec h1,rmhelper h1,start cid,healthy cid"
+	if got := strings.Join(d.calls, ","); got != want {
+		t.Fatalf("calls:\n got %s\nwant %s", got, want)
+	}
+	if locked != 0 {
+		t.Error("lock not released")
+	}
+	if !res.Healthy || res.AsideDir != "/var/lib/postgresql/data/.goforge-pre-restore-20261101t130000z" {
+		t.Errorf("result = %+v", res)
+	}
+	if len(d.staged) != 3 || string(d.staged["goforge-restore/roles.sql"]) != string(bodies["services/p1/roles.sql"]) ||
+		string(d.staged["goforge-restore/0.dump"]) != string(bodies["services/p1/app.dump"]) ||
+		string(d.staged["goforge-restore/1.dump"]) != string(bodies["services/p1/postgres.dump"]) {
+		t.Errorf("staged = %v", d.staged)
+	}
+	cmd := d.execCmds[0]
+	if cmd[2] != restorePostgresScript || strings.Join(cmd[3:], " ") != "sh /var/lib/postgresql/data 20261101t130000z pgadmin app postgres" {
+		t.Errorf("script args = %v", cmd[3:])
+	}
+	if entries, _ := os.ReadDir(r.TempDir); len(entries) != 0 {
+		t.Errorf("temp files left: %v", entries)
+	}
+}
+
+func TestServiceRestore_PostgresRollbackAndUser(t *testing.T) {
+	ctx := context.Background()
+	s := newMemStore()
+	putServiceRun(t, s)
+	d := &fakeSvcDocker{info: &ServiceContainerInfo{ID: "cid", Image: "img", Running: true}, execFail: 1}
+	r, _ := newSvcRestorer(t, s, d)
+	p, _ := r.Plan(ctx, svcRunKey, "p1")
+	_, err := r.Restore(ctx, p)
+	if err == nil || !strings.Contains(err.Error(), "/var/lib/postgresql/data/.goforge-failed-restore-20261101t130000z") {
+		t.Fatalf("err = %v", err)
+	}
+	if got := d.execCmds[0][6]; got != defaultPostgresSuperuser {
+		t.Errorf("superuser without POSTGRES_USER = %q", got)
+	}
+	if rb := d.execCmds[1]; rb[2] != rollbackServiceScript || rb[4] != "20261101t130000z" || rb[5] != "/var/lib/postgresql/data" {
+		t.Errorf("rollback = %v", rb[3:])
+	}
+	if !strings.HasSuffix(strings.Join(d.calls, ","), "rmhelper h1,start cid") {
+		t.Errorf("calls = %v", d.calls)
+	}
+
+	bad := &fakeSvcDocker{info: &ServiceContainerInfo{ID: "cid", Image: "img", Running: true, PostgresUser: "-x"}}
+	r2, _ := newSvcRestorer(t, s, bad)
+	if _, err := r2.Preflight(ctx, p); err == nil || !strings.Contains(err.Error(), "POSTGRES_USER") {
+		t.Errorf("bad user preflight: %v", err)
+	}
+}
+
+// The Postgres script refuses before it moves anything when the image
+// lacks its tools, and masks password hashes in what it prints.
+func TestRestorePostgresScript_Local(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("scripts use GNU/busybox stat -c")
+	}
+	root := t.TempDir()
+	mnt, src := filepath.Join(root, "pgdata"), filepath.Join(root, "stage")
+	must(t, os.MkdirAll(mnt, 0o700))
+	must(t, os.WriteFile(filepath.Join(mnt, "PG_VERSION"), []byte("17"), 0o600))
+	must(t, os.MkdirAll(src, 0o700))
+	must(t, os.WriteFile(filepath.Join(src, "roles.sql"), []byte("roles"), 0o600))
+	script := strings.Replace(restorePostgresScript, "src="+restoreStage, "src="+src, 1)
+
+	// A missing dump for a named database.
+	cmd := exec.Command("sh", "-c", script, "sh", mnt, "s1", "pgadmin", "app") //nolint:gosec // test-only: the package script against a temp dir
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "staged artifacts are missing") {
+		t.Errorf("missing dump: %v %s", err, out)
+	}
+	must(t, os.WriteFile(filepath.Join(src, "0.dump"), []byte("dump"), 0o600))
+	// No initdb/gosu on PATH: refused before the move.
+	cmd = exec.Command("sh", "-c", script, "sh", mnt, "s1", "pgadmin", "app") //nolint:gosec // test-only: the package script against a temp dir
+	cmd.Env = []string{"PATH=" + filepath.Dir(mustLook(t, "sh")) + ":/nonexistent"}
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "is not in the service image") {
+		t.Errorf("no tools: %v %s", err, out)
+	}
+	assertFile(t, filepath.Join(mnt, "PG_VERSION"), "17")
+	if _, err := os.Stat(filepath.Join(mnt, ".goforge-pre-restore-s1")); !os.IsNotExist(err) {
+		t.Errorf("aside dir created before the checks: %v", err)
+	}
+
+	var redact string
+	for _, line := range strings.Split(restorePostgresScript, "\n") {
+		if strings.HasPrefix(line, "redact()") {
+			redact = line
+		}
+	}
+	errFile := filepath.Join(root, "err")
+	must(t, os.WriteFile(errFile, []byte("ERROR: x at ALTER ROLE a PASSWORD 'SCRAM-SHA-256$4096:abc$def:ghi'\nmd50123456789abcdef0123456789abcdef\nPASSWORD 'plain'\n"), 0o600))
+	out, err := exec.Command("sh", "-c", redact+"\nredact \"$1\" 2>&1", "sh", errFile).CombinedOutput() //nolint:gosec // test-only: the package function against a temp file
+	if err != nil {
+		t.Fatalf("redact: %v %s", err, out)
+	}
+	for _, leak := range []string{"abc", "0123456789abcdef", "plain"} {
+		if strings.Contains(string(out), leak) {
+			t.Errorf("redact leaked %q:\n%s", leak, out)
+		}
+	}
+}
+
+func mustLook(t *testing.T, bin string) string {
+	t.Helper()
+	p, err := exec.LookPath(bin)
+	if err != nil {
+		t.Skipf("%s not on PATH", bin)
+	}
+	return p
 }
 
 func must(t *testing.T, err error) {
