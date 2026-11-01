@@ -167,9 +167,12 @@
    * Touch targets (ROADMAP item 5): every button and text field is at least
    * 44px tall below md (min-h-11) and keeps its padding-driven height from
    * md up. btn-inline opts out, since it sits inside running text.
+   * text-center centers a wrapped label in a link button too: an <a> or
+   * <span> (ui.Button with Href) does not get the UA text-align a <button>
+   * does.
    */
   .btn {
-    @apply min-h-11 md:min-h-0 inline-flex items-center justify-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:cursor-not-allowed active:scale-[0.98];
+    @apply min-h-11 md:min-h-0 inline-flex items-center justify-center text-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:cursor-not-allowed active:scale-[0.98];
   }
 
   .btn-primary {
@@ -347,6 +350,25 @@
 
 .htmx-indicator {
   @apply opacity-0 pointer-events-none transition-opacity duration-200;
+}
+
+/*
+ * Spinner inside a button (t1742u). opacity-0 keeps a hidden indicator in
+ * the flex row, so its ml-2 + w-4 (24px) pushed the label 12px left of
+ * center at rest. Inside .btn the indicator is out of flow until a request
+ * runs, then shows with the label centered as a group. hx-indicator="find
+ * .htmx-indicator" puts htmx-request on the svg itself; a button or form
+ * that is its own indicator puts it on an ancestor. Indicators outside a
+ * button keep the opacity rule above.
+ */
+.btn .htmx-indicator {
+  display: none;
+}
+
+.btn .htmx-indicator.htmx-request,
+.btn.htmx-request .htmx-indicator,
+.htmx-request .btn .htmx-indicator {
+  display: inline-block;
 }
 
 /*

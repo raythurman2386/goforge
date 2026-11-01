@@ -56,6 +56,7 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
   - `app-restore-points` (#104/#105): with an admin and a backed-up template, `#service-restore-points` loads (table, empty, or error state) and axe inside it is clean.
   - `app-agent-actions-card` (t1683u): on `/dashboard`, the Recent agent actions card with no rows has no table and no header "View all"; its empty message is followed by a "View all activity" link to `/settings/activity`. With rows, the header keeps "View all" (`?source=agent`) above the table. axe inside the card is clean.
   - `touch-targets /settings/profile`, `/projects/new`, `/dashboard`: at 375 px every visible text button, input, select, and textarea is at least 44 px tall (not `btn-inline`, not checkboxes); at the default desktop viewport every `btn-sm` is still under 44 px.
+  - `button-centering /dev/ui`, `/settings/profile`, `/settings/git`, `/projects/new`, the project tabs, and the service detail and edit, container detail, and deployment detail pages that are present (t1742u): at rest, at 1280 and 375 px, the visible content of every text and icon button (its text and child elements, not a hidden `Spinner` and not an `sr-only` child) is centered within 1 px of the button's center. The detail names the button and its offset when it fails. A button whose own `justify-content` is not center is counted as `exempt` rather than measured. Before t1742u every button with a `Spinner` read about -12 px (-14 px with a `-ml-1` icon).
 
 ## How to get to it (user POV)
 

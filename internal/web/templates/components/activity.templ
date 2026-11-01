@@ -110,7 +110,7 @@ templ ActivityCard(rows []ActivityRow) {
 templ activityViewAll(href templ.SafeURL, label string) {
 	@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Href: href, Attrs: templ.Attributes{"data-testid": "recent-agent-actions-view-all"}}) {
 		{ label }
-		<svg class="-mr-0.5 ml-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<svg class="ml-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
 		</svg>
 	}

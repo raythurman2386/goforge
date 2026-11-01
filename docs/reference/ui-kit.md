@@ -42,6 +42,8 @@ The 20 components of Path A, with their variants.
 - Below `md` every button except `ButtonInline` is at least 44 px tall (`min-h-11` on `.btn`). From `md` up the padding sets the height again, so `ButtonSM` is about 32 px on desktop.
 - `ButtonIcon` needs `Label`, which becomes `aria-label`. The icon `svg` gets `aria-hidden="true"`.
 - Use `Href` only for navigation, never for an action that changes state.
+- Content is centered, including a wrapped label on a link button (`text-center` on `.btn`). A leading icon is `w-4 h-4 mr-2` and a trailing chevron or arrow is `ml-2`, both with `aria-hidden="true"` and no negative margins (`-ml-1`, `-mr-1`), which pull the group off center.
+- A request spinner is `@components.Spinner()`, placed last in the button, with `"hx-indicator": "find .htmx-indicator"`. Inside `.btn` it is `display: none` at rest, so it takes no width and the label stays centered; while the request runs it shows and the label and spinner are centered as a group. The drive's `button-centering` checks measure it.
 
 ### Input, Textarea, Select
 
@@ -203,6 +205,7 @@ Every change to a page or component keeps these:
 - axe finds no serious or critical issues on the page in light or dark (`drive-ui-a11y`). The baseline is zero on every scan, including the service, container, and deployment detail pages and `/settings/activity`; keep it there.
 - Every control has a visible label or, for icon-only buttons, an `aria-label`. A tooltip is never the only name.
 - Icon-only buttons are at least 44 by 44 px below `md` (`ButtonIcon`, the Alert and toast dismiss buttons). Text buttons, inputs, selects, and textareas are at least 44 px tall below `md` (`ButtonInline` and checkboxes, whose label is the target, are exempt). The drive's `touch-targets` checks measure it at 375 px.
+- Button content is centered at rest: the visible content of every `.btn` (text and icons, not a hidden Spinner) is within 1 px of the button's center. The drive's `button-centering` checks measure it at 1280 and 375 px.
 - Keyboard focus is always visible (`focus-visible` ring) and never lost. Overlays move focus in, trap it when modal, close on Escape, and return focus to the opener.
 - Help and errors are tied to their control with `aria-describedby`; errors set `aria-invalid`.
 - Status is text, not color alone (Badge, Alert). Errors use `role="alert"`; other live updates use `role="status"`.

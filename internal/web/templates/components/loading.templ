@@ -16,7 +16,10 @@ templ LoadingState(label string) {
 
 // Spinner is a small inline request indicator. It uses the .htmx-indicator
 // class from input.css, so it is hidden until the element named by
-// hx-indicator (or an ancestor) carries htmx-request.
+// hx-indicator (or an ancestor) carries htmx-request. Inside a .btn it is
+// display:none at rest (out of flow, so the label stays centered) and shows
+// while the request runs. Put it last in the button and point the button at
+// it with "hx-indicator": "find .htmx-indicator".
 templ Spinner() {
 	<svg class="htmx-indicator animate-spin ml-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
 		<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

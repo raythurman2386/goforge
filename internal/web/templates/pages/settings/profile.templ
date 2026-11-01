@@ -115,7 +115,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 						Size: ui.ButtonSM,
 						Attrs: ui.OpenDialogAttrs("/settings/tokens/new"),
 					}) {
-						<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 						</svg>
 						Generate Token
