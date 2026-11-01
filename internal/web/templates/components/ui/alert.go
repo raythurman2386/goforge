@@ -46,13 +46,13 @@ func alertRole(t AlertTone) string {
 func alertToneClass(t AlertTone) string {
 	switch t {
 	case AlertError:
-		return "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+		return "border-danger/30 bg-danger/10 text-danger"
 	case AlertWarning:
-		return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+		return "border-warning/30 bg-warning/10 text-warning"
 	case AlertSuccess:
 		return "border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200"
 	case AlertInfo:
-		return "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200"
+		return "border-info/30 bg-info/10 text-info"
 	}
 	// The zero value and unknown values render as AlertInfo.
 	return alertToneClass(AlertInfo)
@@ -61,13 +61,13 @@ func alertToneClass(t AlertTone) string {
 func alertIconClass(t AlertTone) string {
 	switch t {
 	case AlertError:
-		return "text-red-400"
+		return "text-danger"
 	case AlertWarning:
-		return "text-amber-400"
+		return "text-warning"
 	case AlertSuccess:
 		return "text-primary-500"
 	case AlertInfo:
-		return "text-blue-400"
+		return "text-info"
 	}
 	// The zero value and unknown values render as AlertInfo.
 	return alertIconClass(AlertInfo)

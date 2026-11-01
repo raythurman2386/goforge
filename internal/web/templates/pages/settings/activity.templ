@@ -43,7 +43,7 @@ templ Activity(rows []components.ActivityRow, f ActivityFilters, csrfToken strin
 				</div>
 			</form>
 			if f.AuditID != "" {
-				<p class="mt-4 text-sm text-gray-600 dark:text-gray-400">
+				<p class="mt-4 text-sm text-foreground-secondary">
 					Showing change <span class="font-mono">{ f.AuditID }</span> and its outcomes.
 				</p>
 			}

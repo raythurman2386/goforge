@@ -32,10 +32,10 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">
-					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">
+					<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
 						Configure { tmpl.DisplayName }
 					</h2>
-					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Customize your deployment settings and environment variables.</p>
+					<p class="mt-2 text-sm text-muted-foreground">Customize your deployment settings and environment variables.</p>
 				</div>
 			</div>
 
@@ -57,13 +57,13 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 						Class:       "mb-2",
 					})
 					if cloudflareProxyMode {
-						<div id="svc-domain-help" class="mb-4 text-xs text-gray-500 space-y-1 dark:text-gray-400">
+						<div id="svc-domain-help" class="mb-4 text-xs text-muted-foreground space-y-1">
 							<p>Required. Cloudflare Tunnel mode: use a public first-level host such as <code>{ tmpl.Name }-app.example.com</code>. Cloudflare Universal SSL covers <code>*.example.com</code> but not <code>*.apps.example.com</code>, so a deeper name fails the TLS handshake.</p>
 							<p>Before you deploy, create a proxied CNAME for the host that points at <code>&lt;tunnel-id&gt;.cfargotunnel.com</code>, unless a proxied wildcard already does. <code>.localhost</code> hosts cannot be reached through the tunnel.</p>
 							<p><a href={ templ.SafeURL(cloudflareDomainsDocURL) } target="_blank" rel="noopener noreferrer" class="text-primary-700 hover:underline dark:text-primary-400">Cloudflare service domains guide</a></p>
 						</div>
 					} else {
-						<p id="svc-domain-help" class="mb-4 text-xs text-gray-500 dark:text-gray-400">
+						<p id="svc-domain-help" class="mb-4 text-xs text-muted-foreground">
 							Required. Assign a custom domain (e.g., <code>gitea.localhost</code> or <code>gitea.example.com</code>) to access this service via the browser.
 						</p>
 					}
@@ -83,7 +83,7 @@ templ Configure(tmpl *services.ServiceTemplate, csrfToken string, cloudflareProx
 						}
 					}
 
-					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3 dark:border-gray-800">
+					<div class="pt-8 border-t border-divider flex justify-end space-x-3">
 						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Href: "/services"}) {
 							Cancel
 						}

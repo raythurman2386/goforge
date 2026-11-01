@@ -28,7 +28,7 @@ func TestInputFieldWiring(t *testing.T) {
 			[]string{`aria-describedby="login-email-help"`, `<p id="login-email-help" class="mt-1.5 text-xs text-muted-foreground">Your login.</p>`},
 			[]string{"aria-invalid"}},
 		{"error is described and invalid", InputProps{ID: "p", Name: "port", Label: "Port", Help: "h", Error: "Too big."},
-			[]string{`aria-describedby="p-help p-error"`, `aria-invalid="true"`, `<p id="p-error" class="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">Too big.</p>`},
+			[]string{`aria-describedby="p-help p-error"`, `aria-invalid="true"`, `<p id="p-error" class="mt-1.5 text-xs font-medium text-danger">Too big.</p>`},
 			nil},
 		{"extra describedby ids come last", InputProps{ID: "k", Name: "key", Label: "Key", Help: "h", DescribedBy: "k-state"},
 			[]string{`aria-describedby="k-help k-state"`}, nil},

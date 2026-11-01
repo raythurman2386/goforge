@@ -14,13 +14,13 @@ func TestStatusBadge(t *testing.T) {
 		wantLabel    string
 		wantSpinner  bool
 	}{
-		{"deployment", "running", "bg-green-50 text-green-700", "Running", false},
-		{"deployment", "failed", "bg-red-50 text-red-700", "Failed", false},
-		{"deployment", "building", "bg-amber-50 text-amber-800", "Building", true},
-		{"deployment", "rolled_back", "bg-gray-50 text-gray-700", "Rolled Back", false},
-		{"container", "exited", "bg-red-50 text-red-700", "Exited", false},
-		{"service", "stopped", "bg-gray-50 text-gray-700", "Stopped", false},
-		{"service", "", "bg-gray-50 text-gray-700", "Unknown", false},
+		{"deployment", "running", "bg-success/10 text-success", "Running", false},
+		{"deployment", "failed", "bg-danger/10 text-danger", "Failed", false},
+		{"deployment", "building", "bg-warning/10 text-warning", "Building", true},
+		{"deployment", "rolled_back", "bg-muted/50 text-foreground-secondary", "Rolled Back", false},
+		{"container", "exited", "bg-danger/10 text-danger", "Exited", false},
+		{"service", "stopped", "bg-muted/50 text-foreground-secondary", "Stopped", false},
+		{"service", "", "bg-muted/50 text-foreground-secondary", "Unknown", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.kind+"/"+tt.status, func(t *testing.T) {

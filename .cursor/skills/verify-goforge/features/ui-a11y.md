@@ -4,7 +4,7 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
 
 ## Sub-features
 
-- `token-scheme`: `--gf-background` on `:root` is `249 250 251` in light and `3 7 18` in dark.
+- `token-scheme`: `--gf-background` on `:root` is `238 238 238` in light (GrokDay `#eeeeee`) and `20 20 20` in dark (GrokNight `#141414`), the t1734u palette.
 - `focus-ring-mouse-hidden`: clicking `.btn-primary` on `/dev/ui` adds no box-shadow ring.
 - `focus-ring-keyboard`: Tab focus on the same button adds the primary ring.
 - `motion-default`: `.btn` has a `0.2s` transition.

@@ -24,7 +24,7 @@ templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentE
 		}) {
 			<span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" aria-hidden="true"></span>
 			{ currentEnvName(envs, currentEnvID) }
-			<svg class="-mr-1 ml-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+			<svg class="-mr-1 ml-2 h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 				<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
 			</svg>
 		}
@@ -55,7 +55,7 @@ templ CreateEnvironmentModal(projectID string, csrfToken string) {
 		<form hx-post={ "/projects/" + projectID + "/envs" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			@ui.Input(ui.InputProps{ID: "environment-name", Name: "name", Label: "Environment Name", Autocomplete: "off", Required: true, Class: "mb-4"})
-			<p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Examples: staging, qa, feature-x</p>
+			<p class="text-xs text-muted-foreground mb-4">Examples: staging, qa, feature-x</p>
 			
 			<div class="mt-8 flex justify-end space-x-3">
 				@ui.Button(ui.ButtonProps{

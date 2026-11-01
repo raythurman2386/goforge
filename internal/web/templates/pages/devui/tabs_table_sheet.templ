@@ -108,7 +108,7 @@ templ tablesSection() {
 			}
 		</thead>
 		<tbody>
-			@ui.TR(templ.Attributes{"class": "border-t border-gray-100 dark:border-gray-800"}) {
+			@ui.TR(templ.Attributes{"class": "border-t border-divider"}) {
 				@ui.TD(ui.CellProps{Compact: true, Class: "font-mono"}) { 20261030T120000Z }
 				@ui.TD(ui.CellProps{Compact: true}) { 12.4 MB }
 			}
@@ -128,9 +128,9 @@ templ sheetsSection() {
 	</div>
 	@ui.Sheet(ui.SheetProps{ID: "gallery-sheet-left", Title: "Navigation", Side: ui.SheetLeft}) {
 		<nav aria-label="Sheet demo" class="space-y-1 p-4">
-			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">First link</a>
-			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">Second link</a>
-			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">Third link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted ui-focus-ring">First link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted ui-focus-ring">Second link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted ui-focus-ring">Third link</a>
 		</nav>
 	}
 	@ui.Sheet(ui.SheetProps{ID: "gallery-sheet-right", Title: "Filters", Description: "A right sheet with a form field.", Side: ui.SheetRight}) {

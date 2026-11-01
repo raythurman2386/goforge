@@ -24,7 +24,7 @@ templ EmptyState(p EmptyStateProps) {
 			@emptyStateBody(p)
 		</div>
 	} else {
-		@ui.Card(ui.CardProps{Class: "py-16 text-center bg-gray-50/30 border-dashed border-2 border-gray-200 shadow-none dark:bg-gray-800/50 dark:border-gray-800"}) {
+		@ui.Card(ui.CardProps{Class: "py-16 text-center bg-muted/30 border-dashed border-2 border-border shadow-none"}) {
 			@emptyStateBody(p)
 		}
 	}
@@ -32,17 +32,17 @@ templ EmptyState(p EmptyStateProps) {
 
 templ emptyStateBody(p EmptyStateProps) {
 	<div
-		class={ "bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto dark:bg-gray-900 dark:border-gray-800",
+		class={ "bg-card rounded-2xl shadow-sm border border-divider flex items-center justify-center mx-auto",
 			templ.KV("w-16 h-16 mb-5", !p.Compact),
 			templ.KV("w-12 h-12 mb-3", p.Compact) }
 	>
-		<svg class={ "text-gray-400", templ.KV("h-8 w-8", !p.Compact), templ.KV("h-6 w-6", p.Compact) } fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<svg class={ "text-muted-foreground", templ.KV("h-8 w-8", !p.Compact), templ.KV("h-6 w-6", p.Compact) } fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 			@emptyIcon(p.Icon)
 		</svg>
 	</div>
-	<h3 class={ "font-bold text-gray-900 tracking-tight dark:text-gray-100", templ.KV("text-xl", !p.Compact), templ.KV("text-base", p.Compact) }>{ p.Title }</h3>
+	<h3 class={ "font-bold text-foreground tracking-tight", templ.KV("text-xl", !p.Compact), templ.KV("text-base", p.Compact) }>{ p.Title }</h3>
 	if p.Description != "" {
-		<p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed dark:text-gray-400">{ p.Description }</p>
+		<p class="mt-2 text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">{ p.Description }</p>
 	}
 	if p.ButtonText != "" {
 		<div class={ templ.KV("mt-8", !p.Compact), templ.KV("mt-4", p.Compact) }>

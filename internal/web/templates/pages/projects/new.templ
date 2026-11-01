@@ -12,10 +12,10 @@ templ New(sources []*models.GitSource, serviceInstances []*models.ServiceInstanc
 		<div class="max-w-3xl mx-auto">
 			<div class="md:flex md:items-center md:justify-between mb-8">
 				<div class="flex-1 min-w-0">
-					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">
+					<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
 						Create Project
 					</h2>
-					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Connect your repository to start deploying your application.</p>
+					<p class="mt-2 text-sm text-muted-foreground">Connect your repository to start deploying your application.</p>
 				</div>
 			</div>
 
@@ -44,26 +44,26 @@ templ New(sources []*models.GitSource, serviceInstances []*models.ServiceInstanc
 					
 					@components.GitRepositoryBrowser(sources)
 					
-					<div class="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-6 border-t border-gray-100 pt-8 dark:border-gray-800">
+					<div class="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-6 border-t border-divider pt-8">
 						@ui.Select(ui.SelectProps{ID: "project-default-branch", Name: "default_branch", Label: "Default Branch", Options: ui.StringOptions([]string{"main", "master"}), Selected: "main", Class: "sm:col-span-2"})
 						@ui.Input(ui.InputProps{ID: "project-dockerfile", Name: "dockerfile_path", Label: "Dockerfile Path", Value: "Dockerfile", Required: true, Class: "sm:col-span-2"})
 						@ui.Input(ui.InputProps{ID: "project-build-context", Name: "build_context", Label: "Build Context", Value: ".", Required: true, Class: "sm:col-span-2"})
 					</div>
 
 					if len(serviceInstances) > 0 {
-						<div class="border-t border-gray-100 pt-8 dark:border-gray-800">
+						<div class="border-t border-divider pt-8">
 							<div class="mb-4">
 								<h4 id="project-services-title" class="text-xs font-semibold text-primary-700 uppercase tracking-wider dark:text-primary-400">Link Services</h4>
-								<p id="project-services-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">Optionally link running services to inject their connection strings as environment variables during deployment.</p>
+								<p id="project-services-help" class="mt-1 text-sm text-muted-foreground">Optionally link running services to inject their connection strings as environment variables during deployment.</p>
 							</div>
 							<fieldset class="space-y-3" aria-labelledby="project-services-title" aria-describedby="project-services-help">
 								for _, inst := range serviceInstances {
-									<label class="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50/30 transition-colors cursor-pointer dark:border-gray-800 dark:hover:bg-primary-900/30">
+									<label class="flex items-center space-x-3 p-3 rounded-lg border border-border hover:border-primary-300 hover:bg-primary-50/30 transition-colors cursor-pointer dark:hover:bg-primary-900/30">
 										@ui.CheckboxControl(ui.CheckboxProps{ID: "project-service-" + inst.ID, Name: "service_ids", Value: inst.ID})
 										<div class="flex-1 min-w-0">
 											<div class="flex items-center space-x-2">
-												<span class="text-sm font-medium text-gray-900 dark:text-gray-100">{ inst.Name }</span>
-												<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-800">{ inst.TemplateName }</span>
+												<span class="text-sm font-medium text-foreground">{ inst.Name }</span>
+												<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-foreground-secondary border border-border">{ inst.TemplateName }</span>
 											</div>
 										</div>
 										@ui.Badge(ui.BadgeProps{Tone: ui.BadgeSuccess, Class: "px-2"}) {
@@ -75,7 +75,7 @@ templ New(sources []*models.GitSource, serviceInstances []*models.ServiceInstanc
 						</div>
 					}
 					
-					<div class="pt-8 border-t border-gray-100 flex justify-end space-x-3 dark:border-gray-800">
+					<div class="pt-8 border-t border-divider flex justify-end space-x-3">
 						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Href: "/projects"}) {
 							Cancel
 						}

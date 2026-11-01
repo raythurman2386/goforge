@@ -47,8 +47,8 @@ func TestTableCells(t *testing.T) {
 	empty := render(t, TableEmpty(5), "Nothing here")
 	assertHas(t, empty, `<tr data-ui-table-empty>`, `colspan="5"`, "Nothing here")
 
-	tr := render(t, TR(templ.Attributes{"class": "hover:bg-gray-50/60", "data-testid": "r"}), "")
-	assertHas(t, tr, `<tr`, "hover:bg-gray-50/60", `data-testid="r"`)
+	tr := render(t, TR(templ.Attributes{"class": "hover:bg-muted/60", "data-testid": "r"}), "")
+	assertHas(t, tr, `<tr`, "hover:bg-muted/60", `data-testid="r"`)
 
 	body := render(t, TBody(templ.Attributes{"id": "b", "hx-get": "/x"}), "")
 	assertHas(t, body, `<tbody`, `id="b"`, `hx-get="/x"`, "divide-y")

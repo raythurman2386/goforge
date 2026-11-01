@@ -167,9 +167,9 @@ func activitySourceTone(source string) ui.BadgeTone {
 // activityRowClass highlights failed rows.
 func activityRowClass(r ActivityRow) string {
 	if r.Failed {
-		return "bg-red-50/70 dark:bg-red-950/30"
+		return "bg-danger/10"
 	}
-	return "hover:bg-gray-50/60 dark:hover:bg-gray-800/50"
+	return "hover:bg-muted/60"
 }
 
 func activityTime(t time.Time) string {

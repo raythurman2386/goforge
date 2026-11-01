@@ -20,13 +20,13 @@ templ pageHeader(title, subtitle string, badge templ.Component) {
 	<div class="md:flex md:items-center md:justify-between gap-4 mb-8">
 		<div class="flex-1 min-w-0">
 			<div class="flex flex-wrap items-center gap-3">
-				<h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl truncate dark:text-gray-100">{ title }</h1>
+				<h1 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl truncate">{ title }</h1>
 				if badge != nil {
 					@badge
 				}
 			</div>
 			if subtitle != "" {
-				<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{ subtitle }</p>
+				<p class="mt-2 text-sm text-muted-foreground">{ subtitle }</p>
 			}
 		</div>
 		<div class="mt-4 flex flex-wrap items-center gap-3 md:mt-0">

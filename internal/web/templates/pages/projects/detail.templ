@@ -20,7 +20,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 		<div class="md:flex md:items-center md:justify-between mb-8">
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center space-x-4">
-					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">
+					<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
 						{ project.Name }
 					</h2>
 					if currentEnv != nil {
@@ -106,26 +106,26 @@ func isActiveDeployment(status models.DeploymentStatus) bool {
 templ DeploymentStatusBanner(projectID string, deployment *models.Deployment) {
 	<div 
 		id="deployment-status-banner"
-		class="mb-6 p-4 rounded-lg border bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900"
+		class="mb-6 p-4 rounded-lg border bg-info/10 border-info/30"
 		hx-get={ "/projects/" + projectID + "/deployments/" + deployment.ID + "/status" }
 		hx-trigger="every 3s"
 		hx-swap="outerHTML"
 	>
 		<div class="flex items-center">
 			<div class="flex-shrink-0">
-				<svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+				<svg class="animate-spin h-5 w-5 text-info" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 				</svg>
 			</div>
 			<div class="ml-3">
-				<p class="text-sm font-medium text-blue-800 dark:text-blue-200">
+				<p class="text-sm font-medium text-info">
 					Deployment in progress: 
 					<span class="font-bold">{ string(deployment.Status) }</span>
 				</p>
 			</div>
 			<div class="ml-auto">
-				<a href={ templ.URL("/projects/" + projectID + "/deployments/" + deployment.ID) } class="text-sm text-blue-600 hover:text-blue-800 font-medium dark:text-blue-400 dark:hover:text-blue-200">
+				<a href={ templ.URL("/projects/" + projectID + "/deployments/" + deployment.ID) } class="text-sm text-info hover:text-info font-medium">
 					View Logs
 				</a>
 			</div>
@@ -137,64 +137,64 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 		// Main info card
 		@ui.Card(ui.CardProps{Flush: true, Class: "lg:col-span-2 overflow-hidden"}) {
-			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
-				<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Project Overview</h3>
-				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Details and configuration for the current environment.</p>
+			<div class="px-6 py-5 border-b border-divider bg-muted/30">
+				<h3 class="text-lg font-bold text-foreground tracking-tight">Project Overview</h3>
+				<p class="mt-1 text-sm text-muted-foreground">Details and configuration for the current environment.</p>
 			</div>
-			<dl class="divide-y divide-gray-100 dark:divide-gray-800">
+			<dl class="divide-y divide-divider">
 				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Repository</dt>
-					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-gray-50 p-2 rounded-md border border-gray-100 dark:text-gray-100 dark:bg-gray-800/50 dark:border-gray-800">{ project.RepositoryURL }</dd>
+					<dt class="text-sm font-bold text-muted-foreground uppercase tracking-wider">Repository</dt>
+					<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono bg-muted/50 p-2 rounded-md border border-divider">{ project.RepositoryURL }</dd>
 				</div>
 				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Default Branch</dt>
-					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-medium dark:text-gray-100">{ project.DefaultBranch }</dd>
+					<dt class="text-sm font-bold text-muted-foreground uppercase tracking-wider">Default Branch</dt>
+					<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-medium">{ project.DefaultBranch }</dd>
 				</div>
 				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Dockerfile</dt>
-					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono dark:text-gray-100">{ project.DockerfilePath }</dd>
+					<dt class="text-sm font-bold text-muted-foreground uppercase tracking-wider">Dockerfile</dt>
+					<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono">{ project.DockerfilePath }</dd>
 				</div>
 				<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4">
-					<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Build Context</dt>
-					<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono dark:text-gray-100">{ project.BuildContext }</dd>
+					<dt class="text-sm font-bold text-muted-foreground uppercase tracking-wider">Build Context</dt>
+					<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono">{ project.BuildContext }</dd>
 				</div>
 			</dl>
 		}
 
 		// Latest deployment card
 		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
-			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
-				<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Latest Deployment</h3>
+			<div class="px-6 py-5 border-b border-divider bg-muted/30">
+				<h3 class="text-lg font-bold text-foreground tracking-tight">Latest Deployment</h3>
 			</div>
 			<div class="p-6">
 				if latestDeployment != nil {
 					<div class="space-y-4">
 						<div class="flex items-center justify-between">
-							<span class="text-sm text-gray-500 dark:text-gray-400">Status</span>
+							<span class="text-sm text-muted-foreground">Status</span>
 							@components.DeploymentStatusBadge(latestDeployment.Status)
 						</div>
 						if latestDeployment.Branch.Valid {
 							<div class="flex items-center justify-between">
-								<span class="text-sm text-gray-500 dark:text-gray-400">Branch</span>
-								<span class="text-sm font-mono text-gray-900 dark:text-gray-100">{ latestDeployment.Branch.String }</span>
+								<span class="text-sm text-muted-foreground">Branch</span>
+								<span class="text-sm font-mono text-foreground">{ latestDeployment.Branch.String }</span>
 							</div>
 						}
 						if latestDeployment.CommitSHA.Valid && latestDeployment.CommitSHA.String != "" {
 							<div class="flex items-center justify-between">
-								<span class="text-sm text-gray-500 dark:text-gray-400">Commit</span>
-								<span class="text-sm font-mono text-gray-900 dark:text-gray-100">{ truncateCommit(latestDeployment.CommitSHA.String) }</span>
+								<span class="text-sm text-muted-foreground">Commit</span>
+								<span class="text-sm font-mono text-foreground">{ truncateCommit(latestDeployment.CommitSHA.String) }</span>
 							</div>
 						}
 						<div class="flex items-center justify-between">
-							<span class="text-sm text-gray-500 dark:text-gray-400">Started</span>
-							<span class="text-sm text-gray-900 dark:text-gray-100">{ formatTime(latestDeployment.CreatedAt) }</span>
+							<span class="text-sm text-muted-foreground">Started</span>
+							<span class="text-sm text-foreground">{ formatTime(latestDeployment.CreatedAt) }</span>
 						</div>
 						if latestDeployment.ErrorMessage.Valid && latestDeployment.ErrorMessage.String != "" {
 							<div class="mt-4">
 								@ui.AlertMessage(ui.AlertError, latestDeployment.ErrorMessage.String)
 							</div>
 						}
-						<div class="mt-4 pt-4 border-t border-gray-100 flex justify-end dark:border-gray-800">
+						<div class="mt-4 pt-4 border-t border-divider flex justify-end">
 							<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + latestDeployment.ID) } class="text-sm text-primary-700 hover:text-primary-800 font-medium hover:underline dark:text-primary-400 dark:hover:text-primary-200">
 								View Logs &rarr;
 							</a>
@@ -202,11 +202,11 @@ templ Overview(project *models.Project, latestDeployment *models.Deployment, act
 					</div>
 				} else {
 					<div class="text-center py-8">
-						<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="mx-auto h-12 w-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
 						</svg>
-						<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No deployments yet</p>
-						<p class="text-xs text-gray-500 dark:text-gray-400">Click "Deploy Now" to get started</p>
+						<p class="mt-2 text-sm text-muted-foreground">No deployments yet</p>
+						<p class="text-xs text-muted-foreground">Click "Deploy Now" to get started</p>
 					</div>
 				}
 			</div>
@@ -237,11 +237,11 @@ func formatTime(t time.Time) string {
 templ Deployments(project *models.Project, deployments []*models.Deployment) {
 	if len(deployments) == 0 {
 		<div class="text-center py-12">
-			<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<svg class="mx-auto h-12 w-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
 			</svg>
-			<h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No deployments</h3>
-			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by triggering a new deployment.</p>
+			<h3 class="mt-2 text-sm font-medium text-foreground">No deployments</h3>
+			<p class="mt-1 text-sm text-muted-foreground">Get started by triggering a new deployment.</p>
 		</div>
 	} else {
 		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
@@ -264,13 +264,13 @@ templ Deployments(project *models.Project, deployments []*models.Deployment) {
 								@components.DeploymentStatusBadge(d.Status)
 							}
 							@ui.TD(ui.CellProps{Class: "whitespace-nowrap"}) {
-								<div class="text-gray-900 dark:text-gray-100">{ d.Branch.String }</div>
-								<div class="text-gray-500 font-mono dark:text-gray-400">{ truncateCommit(d.CommitSHA.String) }</div>
+								<div class="text-foreground">{ d.Branch.String }</div>
+								<div class="text-muted-foreground font-mono">{ truncateCommit(d.CommitSHA.String) }</div>
 							}
-							@ui.TD(ui.CellProps{Class: "whitespace-nowrap text-gray-500 dark:text-gray-400"}) {
+							@ui.TD(ui.CellProps{Class: "whitespace-nowrap text-muted-foreground"}) {
 								{ formatTime(d.CreatedAt) }
 							}
-							@ui.TD(ui.CellProps{Class: "whitespace-nowrap text-gray-500 dark:text-gray-400"}) {
+							@ui.TD(ui.CellProps{Class: "whitespace-nowrap text-muted-foreground"}) {
 								if d.FinishedAt.Valid {
 									{ formatDuration(d.FinishedAt.Time.Sub(d.StartedAt.Time)) }
 								} else if isActiveDeployment(d.Status) {
@@ -280,7 +280,7 @@ templ Deployments(project *models.Project, deployments []*models.Deployment) {
 								}
 							}
 							@ui.TD(ui.CellProps{Align: ui.CellEnd, Class: "whitespace-nowrap font-medium"}) {
-								<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + d.ID) } class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200">View Logs</a>
+								<a href={ templ.URL("/projects/" + project.ID + "/deployments/" + d.ID) } class="text-info hover:text-info">View Logs</a>
 							}
 						}
 					}
@@ -308,20 +308,20 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 	<div class="space-y-6">
 		// Linked services
 		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
-			<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/50">
+			<div class="px-6 py-5 border-b border-divider bg-muted/30 flex items-center justify-between">
 				<div>
-					<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Linked Services</h3>
-					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Services attached to this project. Connection strings are auto-injected as environment variables on deploy.</p>
+					<h3 class="text-lg font-bold text-foreground tracking-tight">Linked Services</h3>
+					<p class="mt-1 text-sm text-muted-foreground">Services attached to this project. Connection strings are auto-injected as environment variables on deploy.</p>
 				</div>
 			</div>
-			<div class="divide-y divide-gray-100 dark:divide-gray-800">
+			<div class="divide-y divide-divider">
 				if len(linkedServices) == 0 {
 					<div class="text-center py-12 px-6">
-						<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="mx-auto h-12 w-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
 						</svg>
-						<h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No linked services</h3>
-						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Attach a running service below to inject its connection string into deployments.</p>
+						<h3 class="mt-2 text-sm font-medium text-foreground">No linked services</h3>
+						<p class="mt-1 text-sm text-muted-foreground">Attach a running service below to inject its connection string into deployments.</p>
 					</div>
 				} else {
 					for _, svc := range linkedServices {
@@ -335,7 +335,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 									</span>
 								</div>
 								<div class="min-w-0">
-									<p class="text-sm font-semibold text-gray-900 truncate dark:text-gray-100">{ svc.Name }</p>
+									<p class="text-sm font-semibold text-foreground truncate">{ svc.Name }</p>
 									<div class="flex items-center space-x-2 mt-1">
 										@ui.Badge(ui.BadgeProps{Square: true, Class: "px-2"}) {
 											{ svc.TemplateName }
@@ -346,8 +346,8 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 										<div class="mt-2 space-y-1">
 											for key, val := range connInfo {
 												<div class="flex items-center space-x-2">
-													<span class="text-xs font-medium text-gray-500 uppercase dark:text-gray-400">{ key }:</span>
-													<code class="text-xs bg-gray-50 px-2 py-0.5 rounded border border-gray-200 text-gray-700 font-mono truncate max-w-xs dark:bg-gray-800/50 dark:border-gray-800 dark:text-gray-300">{ val }</code>
+													<span class="text-xs font-medium text-muted-foreground uppercase">{ key }:</span>
+													<code class="text-xs bg-code px-2 py-0.5 rounded border border-border text-foreground-secondary font-mono truncate max-w-xs">{ val }</code>
 												</div>
 											}
 										</div>
@@ -357,7 +357,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 							@ui.Button(ui.ButtonProps{
 								Variant: ui.ButtonGhostDanger,
 								Size:    ui.ButtonSM,
-								Class:   "ml-4 shrink-0 text-red-700 dark:text-red-300",
+								Class:   "ml-4 shrink-0 text-danger",
 								Attrs: templ.Attributes{
 									"hx-delete":  "/projects/" + project.ID + "/services/" + svc.ID,
 									"hx-confirm": "Detach this service? The connection string will no longer be injected on next deploy.",
@@ -380,9 +380,9 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 		// Attach new service
 		if len(availableServices) > 0 {
 			@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
-				<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 dark:border-gray-800 dark:bg-gray-800/50">
-					<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Attach Service</h3>
-					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Link a running service instance to this project.</p>
+				<div class="px-6 py-5 border-b border-divider bg-muted/30">
+					<h3 class="text-lg font-bold text-foreground tracking-tight">Attach Service</h3>
+					<p class="mt-1 text-sm text-muted-foreground">Link a running service instance to this project.</p>
 				</div>
 				<div class="p-6">
 					<form hx-post={ "/projects/" + project.ID + "/services" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator" class="flex items-end space-x-4">
@@ -400,7 +400,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 			}
 		} else if len(linkedServices) == 0 {
 			@ui.Card(ui.CardProps{Class: "text-center py-8"}) {
-				<p class="text-sm text-gray-500 dark:text-gray-400">No running service instances available to attach.</p>
+				<p class="text-sm text-muted-foreground">No running service instances available to attach.</p>
 				<a href="/services" class="mt-2 inline-block text-sm text-primary-700 hover:text-primary-800 font-medium dark:text-primary-400 dark:hover:text-primary-200">
 					Deploy a service &rarr;
 				</a>
@@ -412,17 +412,17 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 templ ProjectSettings(project *models.Project, currentEnv *models.Environment, csrfToken string) {
 	if currentEnv != nil {
 		@ui.Card(ui.CardProps{Class: "mb-8"}) {
-			<h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6 dark:text-gray-100">Configuration</h3>
+			<h3 class="text-lg font-bold text-foreground tracking-tight mb-6">Configuration</h3>
 			
 			<form hx-put={ "/projects/" + project.ID + "/settings" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 				<input type="hidden" name="env_id" value={ currentEnv.ID } />
 				
-				<div class="space-y-8 divide-y divide-gray-100 dark:divide-gray-800">
+				<div class="space-y-8 divide-y divide-divider">
 					<!-- Project Defaults Section -->
 					<div class="grid grid-cols-1 gap-y-6 sm:grid-cols-6">
 						<div class="sm:col-span-6">
 							<h4 class="text-xs font-semibold text-primary-700 uppercase tracking-wider mb-2 dark:text-primary-400">Global Defaults</h4>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Settings applied to all environments unless overridden.</p>
+							<p class="text-sm text-muted-foreground">Settings applied to all environments unless overridden.</p>
 						</div>
 
 						@ui.Input(ui.InputProps{ID: "settings-custom-domain", Name: "custom_domain", Label: "Default Domain", Value: project.CustomDomain.String, Placeholder: "example.com", Class: "sm:col-span-4"})
@@ -433,11 +433,11 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 						<div class="sm:col-span-6">
 							<div class="flex items-center space-x-2 mb-2">
 								<h4 class="text-xs font-semibold text-primary-700 uppercase tracking-wider dark:text-primary-400">Environment Overrides</h4>
-								<span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-800">
+								<span class="px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground-secondary border border-border">
 									{ currentEnv.Name }
 								</span>
 							</div>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Specific settings for this environment.</p>
+							<p class="text-sm text-muted-foreground">Specific settings for this environment.</p>
 						</div>
 
 						@ui.Input(ui.InputProps{ID: "settings-domain", Name: "domain", Label: "Domain", Value: currentEnv.Domain.String, Placeholder: "env.example.com", Help: "Overrides global default.", Class: "sm:col-span-3"})
@@ -445,7 +445,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 						@ui.Input(ui.InputProps{ID: "settings-branch", Name: "branch", Label: "Git Branch", Value: currentEnv.Branch.String, Placeholder: project.DefaultBranch, Help: "Deploys from " + project.DefaultBranch + " when empty.", Class: "sm:col-span-6"})
 
 						<div class="sm:col-span-6 flex items-center justify-between pt-4">
-							<p class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+							<p class="inline-flex items-center gap-1.5 text-xs font-medium text-warning">
 								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 								</svg>
@@ -462,11 +462,11 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 		}
 	}
 
-	@ui.Card(ui.CardProps{Class: "border-red-100 bg-red-50/30 dark:border-red-900/60 dark:bg-red-950/40"}) {
+	@ui.Card(ui.CardProps{Class: "border-danger/30 bg-danger/5"}) {
 		<div class="sm:flex sm:items-start sm:justify-between">
 			<div>
-				<h3 class="text-lg font-bold text-red-900 tracking-tight dark:text-red-200">Delete Project</h3>
-				<div class="mt-2 text-sm text-red-700 dark:text-red-300">
+				<h3 class="text-lg font-bold text-danger tracking-tight">Delete Project</h3>
+				<div class="mt-2 text-sm text-danger">
 					<p>Once you delete a project, all associated resources and deployments will be permanently removed. This action cannot be undone.</p>
 				</div>
 			</div>

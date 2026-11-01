@@ -13,19 +13,19 @@ import (
 // failed; the card then says so and keeps the logs link.
 templ ContainerCard(dockerID string, summary *docker.InspectSummary, class string) {
 	@ui.Card(ui.CardProps{Flush: true, Class: ui.Class("overflow-hidden", class), Attrs: templ.Attributes{"id": "container-card", "data-container-card": true}}) {
-		<div class="px-6 py-5 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/50">
+		<div class="px-6 py-5 border-b border-divider bg-muted/30 flex items-center justify-between">
 			<div>
-				<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Container</h3>
-				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">What Docker reports for this container.</p>
+				<h3 class="text-lg font-bold text-foreground tracking-tight">Container</h3>
+				<p class="mt-1 text-sm text-muted-foreground">What Docker reports for this container.</p>
 			</div>
 			<a href={ templ.SafeURL("/containers/" + dockerID) } class="text-sm text-primary-700 hover:text-primary-800 font-medium hover:underline dark:text-primary-400 dark:hover:text-primary-200">
 				View logs &rarr;
 			</a>
 		</div>
 		if summary == nil {
-			<p class="px-6 py-5 text-sm text-gray-500 dark:text-gray-400">Container details are not available: Docker did not answer for this container.</p>
+			<p class="px-6 py-5 text-sm text-muted-foreground">Container details are not available: Docker did not answer for this container.</p>
 		} else {
-			<dl class="divide-y divide-gray-100 dark:divide-gray-800">
+			<dl class="divide-y divide-divider">
 				@containerRow("Image") {
 					<span class="font-mono break-all">{ summary.Image }</span>
 				}
@@ -72,8 +72,8 @@ templ ContainerCard(dockerID string, summary *docker.InspectSummary, class strin
 
 templ containerRow(label string) {
 	<div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-		<dt class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">{ label }</dt>
-		<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 dark:text-gray-100">
+		<dt class="text-sm font-bold text-muted-foreground uppercase tracking-wider">{ label }</dt>
+		<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2">
 			{ children... }
 		</dd>
 	</div>

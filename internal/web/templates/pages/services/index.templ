@@ -21,14 +21,14 @@ func hasPendingInstance(instances []*models.ServiceInstance) bool {
 templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceInstance, csrfToken string) {
 	@layouts.AppLayout("Services", csrfToken) {
 		<div class="mb-12">
-			<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">Your Services</h2>
-			<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Currently active and pending instances.</p>
+			<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">Your Services</h2>
+			<p class="mt-2 text-sm text-muted-foreground">Currently active and pending instances.</p>
 			@InstanceList(instances)
 		</div>
 
-		<div class="pt-12 border-t border-gray-200/60 dark:border-gray-800/60">
-			<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl mb-2 dark:text-gray-100">Service Catalog</h2>
-			<p class="mb-8 text-sm text-gray-500 dark:text-gray-400">Ready-to-deploy application and database templates.</p>
+		<div class="pt-12 border-t border-border">
+			<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl mb-2">Service Catalog</h2>
+			<p class="mb-8 text-sm text-muted-foreground">Ready-to-deploy application and database templates.</p>
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				for _, tmpl := range templates {
 					@ui.Card(ui.CardProps{
@@ -45,13 +45,13 @@ templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceIn
 								}
 							</div>
 							<div class="ml-4">
-								<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">{ tmpl.DisplayName }</h3>
-								@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-[10px] font-bold uppercase tracking-widest leading-none text-gray-500"}) {
+								<h3 class="text-lg font-bold text-foreground tracking-tight">{ tmpl.DisplayName }</h3>
+								@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-[10px] font-bold uppercase tracking-widest leading-none text-muted-foreground"}) {
 									{ tmpl.Category }
 								}
 							</div>
 						</div>
-						<p class="text-sm text-gray-500 leading-relaxed flex-1 line-clamp-2 dark:text-gray-400">{ tmpl.Description }</p>
+						<p class="text-sm text-muted-foreground leading-relaxed flex-1 line-clamp-2">{ tmpl.Description }</p>
 						<div class="mt-8">
 							@ui.Button(ui.ButtonProps{
 								Variant: ui.ButtonPrimary,
@@ -77,13 +77,13 @@ templ InstanceList(instances []*models.ServiceInstance) {
 	if len(instances) == 0 {
 		@ui.Card(ui.CardProps{Class: "mt-6 p-12 text-center", Attrs: templ.Attributes{"id": "instance-list"}}) {
 			<div class="flex flex-col items-center">
-				<div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 dark:bg-gray-800/50">
-					<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<div class="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+					<svg class="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
 					</svg>
 				</div>
-				<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">No services yet</h3>
-				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose a template from the catalog below to get started.</p>
+				<h3 class="text-lg font-bold text-foreground">No services yet</h3>
+				<p class="mt-1 text-sm text-muted-foreground">Choose a template from the catalog below to get started.</p>
 			</div>
 		}
 	} else {
@@ -102,11 +102,11 @@ templ InstanceList(instances []*models.ServiceInstance) {
 					Class: "hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 group",
 				}) {
 					<div class="flex items-center justify-between mb-4">
-						<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">{ instance.Name }</h3>
+						<h3 class="text-lg font-bold text-foreground tracking-tight">{ instance.Name }</h3>
 						@components.StatusBadge("service", string(instance.Status))
 					</div>
-					<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-						<div class="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold mr-2 dark:bg-gray-800">
+					<div class="flex items-center text-sm text-muted-foreground">
+						<div class="w-6 h-6 bg-muted rounded flex items-center justify-center text-[10px] font-bold mr-2">
 							{ string(instance.TemplateName[0]) }
 						</div>
 						{ instance.TemplateName }

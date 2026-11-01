@@ -17,7 +17,7 @@ const (
 // the swap replace that region. class overrides the shape's size, for
 // example "h-5 w-28" (the shape classes are in the components layer).
 templ Skeleton(shape SkeletonShape, class string) {
-	<div class={ Class("motion-safe:animate-pulse bg-gray-200 dark:bg-gray-700", skeletonShapeClass(shape), class) } aria-hidden="true"></div>
+	<div class={ Class("motion-safe:animate-pulse bg-highlight", skeletonShapeClass(shape), class) } aria-hidden="true"></div>
 }
 
 func skeletonShapeClass(shape SkeletonShape) string {
