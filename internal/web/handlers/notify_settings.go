@@ -42,6 +42,8 @@ func (h *SettingsHandler) notifyForm(r *http.Request, user *models.User) *notify
 // notifyFieldLabels names form fields in error messages.
 var notifyFieldLabels = map[string]string{
 	"enabled": "Enabled", "kind": "Type", "url": "URL", "token": "Access token",
+	"smtp_host": "SMTP host", "smtp_port": "SMTP port", "smtp_tls": "TLS", "smtp_username": "SMTP username",
+	"smtp_password": "SMTP password", "smtp_from": "From", "smtp_to": "To",
 }
 
 // notifyInput reads the Notifications form.
@@ -56,6 +58,15 @@ func notifyInput(r *http.Request) notify.SettingsInput {
 		URL:        r.PostFormValue("url"),
 		Token:      r.PostFormValue("token"),
 		ClearToken: on("clear_token"),
+
+		SMTPHost:          r.PostFormValue("smtp_host"),
+		SMTPPort:          r.PostFormValue("smtp_port"),
+		SMTPTLS:           r.PostFormValue("smtp_tls"),
+		SMTPUsername:      r.PostFormValue("smtp_username"),
+		SMTPPassword:      r.PostFormValue("smtp_password"),
+		ClearSMTPPassword: on("clear_smtp_password"),
+		SMTPFrom:          r.PostFormValue("smtp_from"),
+		SMTPTo:            r.PostFormValue("smtp_to"),
 	}
 }
 
@@ -133,7 +144,8 @@ func (h *SettingsHandler) UpdateNotifySettings(w http.ResponseWriter, r *http.Re
 }
 
 // TestNotifySettings sends one test notification to the form's target
-// (blank URL and token use the stored ones). Nothing is saved.
+// (blank URL, token, and SMTP password use the stored ones). Nothing is
+// saved.
 func (h *SettingsHandler) TestNotifySettings(w http.ResponseWriter, r *http.Request) {
 	if h.notifyRequest(w, r) == nil {
 		return

@@ -1,6 +1,6 @@
 # Notifications
 
-GoForge can send an alert to one outbound notifier when something fails: an [ntfy](https://ntfy.sh) topic or a webhook that takes a JSON POST. An admin sets it up in **Settings → Profile → Notifications**. A save applies at once, with no restart.
+GoForge can send an alert to one outbound notifier when something fails: an [ntfy](https://ntfy.sh) topic, a webhook that takes a JSON POST, or an email over SMTP. An admin sets it up in **Settings → Profile → Notifications**. A save applies at once, with no restart.
 
 ## What sends an alert
 
@@ -20,6 +20,7 @@ GoForge sends each alert once. A failed deploy or service is reported by the run
 2. Pick **Type**:
     - **ntfy topic**: GoForge POSTs plain text to the topic URL, with `Title`, `Tags`, `Priority` (`high` for failures), and `Click` (the link) headers.
     - **Webhook**: GoForge POSTs the JSON payload below with `Content-Type: application/json`.
+    - **Email (SMTP)**: GoForge sends a plain-text email. Fill the **Email (SMTP)** fields instead of the URL; see [Email (SMTP)](#email-smtp).
 3. Enter the **URL**, for example `https://ntfy.sh/<your-topic>` or your self-hosted ntfy. It must be `http://` or `https://`, with no `user:password@` and no `#fragment`.
 4. Optionally enter an **Access token**. GoForge sends it as `Authorization: Bearer <token>` (an ntfy access token, or your webhook's).
 5. Press **Send test**. GoForge sends one test notification to the URL in the form (or the saved one if the field is blank) and shows `Test notification sent to <host>`, or why it failed (`<host> answered 403`, `could not reach <host>`, `timed out`). Nothing is saved.
@@ -27,9 +28,30 @@ GoForge sends each alert once. A failed deploy or service is reported by the run
 
 The URL and the token are stored encrypted with `ENCRYPTION_KEY`, because an ntfy topic or a webhook path is itself a secret. After a save, the form shows only the scheme and host (`https://ntfy.sh/••••••••`). Leave the URL or token blank to keep the saved value. The saved token is only sent to the host it was entered for: a URL on another scheme or host (in a save or a test) goes without it unless you type the token again. Check **Remove the stored token** to drop the token.
 
-Every save is written to the audit log as `notify.settings.update`, with the names of the changed fields only (`enabled`, `kind`, `url`, `token`), never their values.
+Every save is written to the audit log as `notify.settings.update`, with the names of the changed fields only (`enabled`, `kind`, `url`, `token`, and for email `smtp_host`, `smtp_port`, `smtp_tls`, `smtp_username`, `smtp_password`, `smtp_from`, `smtp_to`), never their values.
 
 If the saved URL no longer decrypts (for example after `ENCRYPTION_KEY` changed), notifications stay off and the card asks you to enter the URL again.
+
+## Email (SMTP)
+
+Pick **Email (SMTP)** as the Type and fill the **Email (SMTP)** fields:
+
+| Field | Notes |
+|-------|-------|
+| **SMTP host** | A host name or IP, with no scheme, port, or user (`smtp.example.com`). |
+| **SMTP port** | Blank uses the TLS mode's usual port: 587, 465, or 25. |
+| **TLS** | `STARTTLS` (`starttls`) connects in plain text and requires the server to offer STARTTLS before anything else is sent (submission, usually 587). `TLS / SMTPS` (`implicit`) opens TLS first (usually 465). `None` (`none`) never uses TLS; it is only allowed without a username, or with one on `localhost`, `127.0.0.1`, or `::1` (a local relay), so a password is never sent in clear text. The server certificate is checked against the system roots. |
+| **SMTP username** / **SMTP password** | Optional. Sent with AUTH PLAIN after TLS is up. Leave the password blank to keep the saved one; check **Remove the stored SMTP password** to drop it. A saved password is only sent to the host it was entered for: change the host and it is dropped unless you type it again. |
+| **From** | One address, for example `GoForge <goforge@example.com>`. |
+| **To** | Up to 10 addresses separated by commas. |
+
+The host, username, password, From, and To are stored encrypted with `ENCRYPTION_KEY` (the port and TLS mode are not secret). The form shows them again, except the password, which shows only whether one is stored.
+
+The URL and token stay saved while Type is Email (and the SMTP fields while it is ntfy or webhook), so switching back does not lose them.
+
+The email's subject is the alert title (`GoForge: Deployment failed: shop / production`). The body has the redacted error, `Resource: <type> <id>`, the link, the `audit_id`, and the time. An `X-GoForge-Event` header carries the event name for mail filters.
+
+**Send test** reports `Test email sent via <host>:<port> to <n> recipient(s)`, or why it failed: `could not reach SMTP <host>:<port>`, `TLS certificate of SMTP <host>:<port> is not trusted`, `SMTP <host>:<port> does not offer STARTTLS`, `SMTP <host>:<port> rejected the username or password`, or `SMTP <host>:<port> answered <code> at <step>`. GoForge never shows or logs the server's reply text, the username, or the password.
 
 ## Payload
 
@@ -64,7 +86,7 @@ The payload never holds passwords, tokens, or connection strings. Before an erro
 - the value of any `key=value` or `key: value` pair whose key contains `password`, `secret`, `token`, `api_key`, `access_key`, `private_key`, or `credential`
 - `Bearer …` and `Basic …` credentials
 
-The notifier's own URL and token are never in the payload or in GoForge's log. Log lines name the event and resource only (`notification sent`, `notification not delivered`).
+The notifier's own URL, token, and SMTP credentials are never in the payload or in GoForge's log. Log lines name the event and resource only (`notification sent`, `notification not delivered`).
 
 ## Container health watch
 
@@ -80,6 +102,7 @@ While notifications are off, the watch does nothing and makes no Docker calls.
 
 ## Limits
 
-- One notifier for the whole instance. Email and per-project channels are not supported yet.
+- One notifier for the whole instance. Per-project channels are not supported yet.
+- Email is plain text to a fixed To list: no templates, no OAuth (XOAUTH2) SMTP login, and no inbound mail.
 - Delivery is best effort: one try with a 10 second limit. A failed delivery is logged and not retried.
 - A container stopped outside GoForge (`docker stop`), or stopped by `goforge backup restore-service` while a tick runs, can send one `container.exited` alert.

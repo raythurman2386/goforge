@@ -32,9 +32,25 @@ func TestNotifyCard_FormAndTestButton(t *testing.T) {
 	}
 }
 
+func TestNotifyCard_EmailFields(t *testing.T) {
+	out := renderNotify(t, &notify.SettingsView{Enabled: true, Kind: models.NotifyKindEmail, Configured: true, Saved: true,
+		SMTPHost: "smtp.example.test", SMTPPort: 465, SMTPTLS: models.SMTPTLSImplicit, SMTPUsername: "alerts@example.test",
+		SMTPFrom: "goforge@example.test", SMTPTo: "ops@example.test", SMTPPasswordSet: true})
+	for _, want := range []string{
+		`value="email" selected`, `value="ntfy"`, `value="webhook"`, `name="smtp_host"`, `value="smtp.example.test"`,
+		`name="smtp_port"`, `value="465"`, `value="implicit" selected`, `value="starttls"`, `value="none"`,
+		`name="smtp_username"`, `name="smtp_password"`, `name="clear_smtp_password"`, `name="smtp_from"`, `name="smtp_to"`,
+		"Set. Sent only to the saved SMTP host.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("email card missing %q", want)
+		}
+	}
+}
+
 func TestNotifyCard_UnsetAndUnreadable(t *testing.T) {
 	out := renderNotify(t, &notify.SettingsView{Kind: models.NotifyKindNtfy})
-	if !strings.Contains(out, "Add an ntfy topic or webhook URL") || strings.Contains(out, `name="clear_token"`) {
+	if !strings.Contains(out, "Add an ntfy topic, a webhook URL, or an SMTP server") || strings.Contains(out, `name="clear_token"`) {
 		t.Errorf("unset card: %s", out)
 	}
 	out = renderNotify(t, &notify.SettingsView{Kind: models.NotifyKindNtfy, Unreadable: true, Saved: true})

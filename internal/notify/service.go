@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -31,7 +32,9 @@ type Service struct {
 	BaseURL  string
 	Redactor *Redactor
 	Client   *http.Client
-	Logger   *slog.Logger
+	// SMTPTLS is the base TLS config for email; nil uses the system roots.
+	SMTPTLS *tls.Config
+	Logger  *slog.Logger
 
 	wg sync.WaitGroup
 }
@@ -64,10 +67,18 @@ func (s *Service) target(ctx context.Context) (Target, bool) {
 		s.logger().Warn("notifications skipped: settings unreadable", "error", err)
 		return Target{}, false
 	}
-	if !row.Enabled || row.URL == "" {
+	if !row.Enabled || !configured(*row) {
 		return Target{}, false
 	}
-	return Target{Kind: row.Kind, URL: row.URL, Token: row.Token}, true
+	return Target{Kind: row.Kind, URL: row.URL, Token: row.Token, SMTP: row.SMTP}, true
+}
+
+// configured reports whether the row has what its kind needs to send.
+func configured(row models.NotifySettings) bool {
+	if row.Kind == models.NotifyKindEmail {
+		return row.SMTP.Host != "" && row.SMTP.From != "" && row.SMTP.To != ""
+	}
+	return row.URL != ""
 }
 
 // Enabled reports whether a saved, enabled notifier exists.
@@ -97,7 +108,7 @@ func (s *Service) Notify(ctx context.Context, ev Event) {
 		}
 		p := buildPayload(ev, s.BaseURL, s.Redactor)
 		log := s.logger().With("event", ev.Kind, "resource_type", ev.Resource.Type, "resource_id", ev.Resource.ID)
-		if err := deliver(sendCtx, s.client(), tgt, p); err != nil {
+		if err := deliver(sendCtx, s.client(), s.SMTPTLS, tgt, p); err != nil {
 			log.Warn("notification not delivered", "error", err.Error())
 			return
 		}
