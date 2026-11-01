@@ -167,7 +167,9 @@ templ MCPCardView(mcp *MCPCard) {
 	}
 }
 
-templ APITokenRow(token *models.APIToken) {
+// APITokenRow is one token on the Profile list. res names the token's
+// projects and services; nil shows short IDs.
+templ APITokenRow(token *models.APIToken, res *TokenResources) {
 	<div class="py-4 flex items-center justify-between hover:bg-gray-50 -mx-4 px-4 dark:hover:bg-gray-800/50" id={ "token-" + token.ID }>
 		<div>
 			<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -192,6 +194,18 @@ templ APITokenRow(token *models.APIToken) {
 					}
 				}
 			</p>
+			if token.IsRestricted() {
+				<p class="mt-1 flex flex-wrap items-center gap-1" data-token-restricted>
+					<span class="text-xs text-gray-500 dark:text-gray-400">Restricted to</span>
+					for _, rr := range tokenRestrictions(token, res) {
+						@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-gray-700 dark:text-gray-300", Attrs: templ.Attributes{"data-token-" + rr.Kind: rr.ID, "title": rr.Kind + " " + rr.ID}}) {
+							{ rr.Kind }: { rr.Name }
+						}
+					}
+				</p>
+			} else {
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-token-host-wide>All projects and services</p>
+			}
 		</div>
 		<div class="flex items-center gap-2">
 			@ui.Button(ui.ButtonProps{
@@ -266,7 +280,9 @@ templ TokenCreatedModal(title, rawToken string, mcp bool) {
 // AddAPITokenModal is the token form. mcp is the MCP preset: read and
 // write checked, 90 days by default, no never-expiring option, and the
 // server refuses full.
-templ AddAPITokenModal(csrfToken string, mcp bool) {
+// AddAPITokenModal is the token form. res lists the owner's projects and
+// services for the optional restriction; nil or empty hides that section.
+templ AddAPITokenModal(csrfToken string, mcp bool, res *TokenResources) {
 	@ui.Dialog(ui.DialogProps{Title: addTokenTitle(mcp)}) {
 		<form hx-post="/settings/tokens" hx-target="closest dialog" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
@@ -284,6 +300,17 @@ templ AddAPITokenModal(csrfToken string, mcp bool) {
 				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-read", Name: "scopes", Value: "read", Label: "read: list and inspect projects, services, containers, logs", Checked: mcp})
 				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-write", Name: "scopes", Value: "write", Label: "write: gated deploys, restarts, env vars, service changes", Checked: mcp})
 				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-protected", Name: "scopes", Value: "protected", Label: "protected: stop, reconfigure, or re-image protected services"})
+			}
+			if res.hasAny() {
+				@ui.CheckboxGroup(ui.CheckboxGroupProps{Legend: "Restrict to (optional)", DescribedBy: "token-restrict-help", Class: "mb-4", Attrs: templ.Attributes{"data-token-restrict": true}}) {
+					<p id="token-restrict-help" class="text-xs text-gray-500 dark:text-gray-400">Leave all unchecked for every project and service. Check some to limit this token to them on <code>/api/v1</code> and <code>/mcp</code> (a project includes its deployments and containers). A restricted token needs at least one scope above.</p>
+					for _, p := range res.Projects {
+						@ui.Checkbox(ui.CheckboxProps{ID: "token-project-" + p.ID, Name: "project_ids", Value: p.ID, Label: "Project: " + p.Name})
+					}
+					for _, sv := range res.Services {
+						@ui.Checkbox(ui.CheckboxProps{ID: "token-service-" + sv.ID, Name: "service_ids", Value: sv.ID, Label: "Service: " + sv.Name})
+					}
+				}
 			}
 
 			<div class="mt-8 flex justify-end space-x-3">

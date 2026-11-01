@@ -343,13 +343,15 @@ Personal API tokens. Only a hash of the token is stored; the raw token is shown 
 | `token_hash` | `VARCHAR(255)` | UNIQUE, NOT NULL | Hash of the token |
 | `token_hint` | `VARCHAR(32)` | NOT NULL, default `''` | Non-secret label, `gf_…` plus the last 4 characters; empty for tokens created before migration 021. Replaced on rotate |
 | `scopes` | `TEXT[]` | NOT NULL, default `'{full}'`, CHECK non-empty subset of `full`, `read`, `write`, `protected` | What the token may do. See [API v1](api-v1.md#tokens-and-scopes) |
+| `project_ids` | `UUID[]` | NOT NULL, default `'{}'` | Projects a restricted token may reach; empty with `service_ids` empty = host-wide. See [API v1](api-v1.md#restricting-a-token-to-projects-and-services) |
+| `service_ids` | `UUID[]` | NOT NULL, default `'{}'` | Service instances a restricted token may reach |
 | `last_used_at` | `TIMESTAMPTZ` | Nullable | Last use |
 | `expires_at` | `TIMESTAMPTZ` | Nullable | Expiry (null for no expiry) |
 | `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Creation time |
 
 **Indexes**: `idx_api_tokens_user_id` (user_id), `idx_api_tokens_token_hash` (token_hash)
 
-**Migrations**: `013_create_api_tokens`, `018_api_token_scopes` (adds `scopes`; existing tokens become `{full}`), `021_api_token_hint` (adds `token_hint`)
+**Migrations**: `013_create_api_tokens`, `018_api_token_scopes` (adds `scopes`; existing tokens become `{full}`), `021_api_token_hint` (adds `token_hint`), `027_api_token_resource_scope` (adds `project_ids` and `service_ids`; existing tokens stay host-wide)
 
 ---
 

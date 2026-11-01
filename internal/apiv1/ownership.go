@@ -10,7 +10,9 @@ import (
 
 // Ownership answers match the HTML routes after #28: another user's project,
 // environment, or deployment is 404; another user's service instance,
-// container, or git source is 403.
+// container, or git source is 403. After ownership, a restricted token's
+// project and service lists are checked (403 resource_out_of_scope; see
+// resource_scope.go).
 
 func (h *Handler) loadProject(w http.ResponseWriter, r *http.Request) (*models.Project, bool) {
 	user, _ := caller(r)
@@ -21,6 +23,10 @@ func (h *Handler) loadProject(w http.ResponseWriter, r *http.Request) (*models.P
 	p, err := h.deps.Projects.GetProject(r.Context(), chi.URLParam(r, "id"))
 	if err != nil || p == nil || user == nil || p.UserID != user.ID {
 		notFound(w, "project")
+		return nil, false
+	}
+	if !allowsProject(r, p.ID) {
+		outOfScope(w, "project "+p.ID)
 		return nil, false
 	}
 	return p, true
@@ -68,6 +74,10 @@ func (h *Handler) loadInstance(w http.ResponseWriter, r *http.Request, id string
 		forbidden(w, "access denied")
 		return nil, false
 	}
+	if !allowsService(r, inst.ID) {
+		outOfScope(w, "service "+inst.ID)
+		return nil, false
+	}
 	return inst, true
 }
 
@@ -93,6 +103,10 @@ func (h *Handler) loadContainer(w http.ResponseWriter, r *http.Request) (string,
 	if err != nil || c == nil {
 		h.logger.Error("api v1: container row lookup failed after ownership check", "docker_id", dockerID, "error", err)
 		internalError(w, "failed to load container")
+		return "", nil, false
+	}
+	if _, token := caller(r); !h.containerInScope(r.Context(), token, c) {
+		outOfScope(w, "container "+dockerID)
 		return "", nil, false
 	}
 	return dockerID, c, true

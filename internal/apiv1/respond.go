@@ -16,10 +16,13 @@ const (
 	codeBadRequest        = "bad_request"
 	codeApprovalRequired  = "approval_ref_required"
 	codeProtected         = "protected_resource"
-	codeImmutable         = "immutable_field"
-	codeConflict          = "conflict"
-	codeUnavailable       = "unavailable"
-	codeInternal          = "internal_error"
+	// codeOutOfScope: the token is restricted to listed projects and
+	// services and the request names another one.
+	codeOutOfScope  = "resource_out_of_scope"
+	codeImmutable   = "immutable_field"
+	codeConflict    = "conflict"
+	codeUnavailable = "unavailable"
+	codeInternal    = "internal_error"
 	// codeTimeout: a real run did not finish while the request waited. The
 	// change keeps running; follow audit_id for its outcome.
 	codeTimeout = "timeout"

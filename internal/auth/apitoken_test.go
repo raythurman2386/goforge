@@ -34,6 +34,8 @@ func TestAPITokenMiddleware_Scopes(t *testing.T) {
 		HashAPIToken("legacy"): {ID: "t2", UserID: "u1"},
 		HashAPIToken("read"):   {ID: "t3", UserID: "u1", Scopes: []string{models.ScopeRead}},
 		HashAPIToken("write"):  {ID: "t4", UserID: "u1", Scopes: []string{models.ScopeWrite, models.ScopeProtected}},
+		// A full token restricted to a project is still /api/v1 only.
+		HashAPIToken("fullrestricted"): {ID: "t5", UserID: "u1", Scopes: []string{models.ScopeFull}, ProjectIDs: []string{"33333333-3333-3333-3333-333333333333"}},
 	}}
 	cases := []struct {
 		header   string
@@ -45,6 +47,7 @@ func TestAPITokenMiddleware_Scopes(t *testing.T) {
 		{"Bearer legacy", http.StatusOK, true},
 		{"Bearer read", http.StatusUnauthorized, false},
 		{"Bearer write", http.StatusUnauthorized, false},
+		{"Bearer fullrestricted", http.StatusUnauthorized, false},
 		{"Bearer nope", http.StatusUnauthorized, false},
 	}
 	for _, c := range cases {

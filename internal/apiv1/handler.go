@@ -47,7 +47,9 @@ func New(deps Deps) *Handler {
 }
 
 // Routes returns the /api/v1 router. Every route needs a bearer token; reads
-// need the read scope and mutations the write scope.
+// need the read scope and mutations the write scope. A token restricted to
+// listed projects and services is refused on the host-wide routes
+// (requireHostWide) and on any other project or service (load* helpers).
 func (h *Handler) Routes() http.Handler {
 	r := chi.NewRouter()
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
@@ -62,7 +64,7 @@ func (h *Handler) Routes() http.Handler {
 		r.Use(requireScope(models.ScopeRead))
 		r.Get("/health", h.health)
 		r.Get("/whoami", h.whoami)
-		r.Get("/dashboard/stats", h.dashboardStats)
+		r.With(requireHostWide).Get("/dashboard/stats", h.dashboardStats)
 
 		r.Get("/projects", h.listProjects)
 		r.Get("/projects/{id}", h.getProject)
@@ -83,11 +85,11 @@ func (h *Handler) Routes() http.Handler {
 		r.Get("/containers/{id}/stats", h.getContainerStats)
 
 		r.Get("/audit-log", h.listAuditLog)
-		r.Get("/backups", h.getBackups)
+		r.With(requireHostWide).Get("/backups", h.getBackups)
 
-		r.Get("/git-sources", h.listGitSources)
-		r.Get("/git-sources/{id}/repos", h.listRepos)
-		r.Get("/git-sources/{id}/branches", h.listBranches)
+		r.With(requireHostWide).Get("/git-sources", h.listGitSources)
+		r.With(requireHostWide).Get("/git-sources/{id}/repos", h.listRepos)
+		r.With(requireHostWide).Get("/git-sources/{id}/branches", h.listBranches)
 	})
 
 	r.Group(func(r chi.Router) {
@@ -103,7 +105,7 @@ func (h *Handler) Routes() http.Handler {
 		r.Post("/projects/{id}/services", h.linkService)
 		r.Delete("/projects/{id}/services/{serviceId}", h.unlinkService)
 
-		r.Post("/services", h.deployService)
+		r.With(requireHostWide).Post("/services", h.deployService)
 		r.Post("/services/{id}/restart", h.restartService)
 		r.Post("/services/{id}/image", h.updateServiceImage)
 		r.Patch("/services/{id}/config", h.updateServiceConfig)
@@ -156,8 +158,23 @@ func (h *Handler) isProtected(ctx context.Context, instanceID string) bool {
 }
 
 // protectedList returns the env-listed protected IDs in their configured
-// order, then the caller's services marked protected in the UI.
-func (h *Handler) protectedList(ctx context.Context, userID string) []string {
+// order, then the caller's services marked protected in the UI. For a
+// restricted token only the IDs on its service list are returned.
+func (h *Handler) protectedList(ctx context.Context, userID string, token *models.APIToken) []string {
+	all := h.protectedListAll(ctx, userID)
+	if token == nil || !token.IsRestricted() {
+		return all
+	}
+	out := make([]string, 0, len(all))
+	for _, id := range all {
+		if token.AllowsService(id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (h *Handler) protectedListAll(ctx context.Context, userID string) []string {
 	out := make([]string, 0, len(h.deps.ProtectedServices))
 	seen := map[string]bool{}
 	for _, id := range h.deps.ProtectedServices {

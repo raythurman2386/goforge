@@ -74,6 +74,9 @@ func (f *fakeProjects) GetProject(_ context.Context, id string) (*models.Project
 		return &models.Project{ID: projectID, UserID: ownerID, Name: "app", DefaultBranch: "main"}, nil
 	case foreignProj:
 		return &models.Project{ID: foreignProj, UserID: otherID, Name: "theirs"}, nil
+	case ownProj2:
+		// Owned, but not on the restricted tokens' lists.
+		return &models.Project{ID: ownProj2, UserID: ownerID, Name: "app2", DefaultBranch: "main"}, nil
 	}
 	return nil, repositories.ErrNotFound
 }
@@ -301,6 +304,10 @@ var tokenScopes = map[string][]string{
 	"tok-protected": {models.ScopeWrite, models.ScopeProtected},
 	"tok-other":     {models.ScopeWrite},
 	"tok-admin":     {models.ScopeRead},
+	// Restricted tokens (resource_scope_test.go): tokenRestrictions.
+	"tok-rsvc":  {models.ScopeWrite},
+	"tok-rproj": {models.ScopeWrite},
+	"tok-rboth": {models.ScopeWrite},
 }
 
 func newHarness(t *testing.T) *harness {
@@ -314,7 +321,11 @@ func newHarness(t *testing.T) *harness {
 		case "tok-admin":
 			uid = adminID
 		}
-		tokens.byHash[auth.HashAPIToken(raw)] = &models.APIToken{ID: "id-" + raw, UserID: uid, Name: raw, Scopes: scopes}
+		tok := &models.APIToken{ID: "id-" + raw, UserID: uid, Name: raw, Scopes: scopes}
+		if lists, ok := tokenRestrictions[raw]; ok {
+			tok.ProjectIDs, tok.ServiceIDs = lists[0], lists[1]
+		}
+		tokens.byHash[auth.HashAPIToken(raw)] = tok
 	}
 	h := &harness{
 		projects: &fakeProjects{vars: []*models.EnvVariable{

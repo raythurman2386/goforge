@@ -82,7 +82,7 @@ func get(path string) *call { return &call{method: http.MethodGet, path: path} }
 func (s *Server) registerReads() {
 	addTool(s, "health", "GoForge server, database, and Docker health.", readOnly,
 		func(context.Context, noInput) (*call, error) { return get("/health"), nil })
-	addTool(s, "whoami", "The token's user, scopes, grants, and the server's protected service list.", readOnly,
+	addTool(s, "whoami", "The token's user, scopes, project and service restriction, grants, and the protected service list.", readOnly,
 		func(context.Context, noInput) (*call, error) { return get("/whoami"), nil })
 	addTool(s, "dashboard_stats", "Counts and resource totals for your projects, services, and containers.", readOnly,
 		func(context.Context, noInput) (*call, error) { return get("/dashboard/stats"), nil })

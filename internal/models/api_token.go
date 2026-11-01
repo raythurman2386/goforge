@@ -28,8 +28,13 @@ type APIToken struct {
 	TokenHash string
 	// TokenHint is a non-secret label such as "gf_…a1b2" (prefix and last
 	// four characters). Empty for tokens created before migration 021.
-	TokenHint  string
-	Scopes     []string
+	TokenHint string
+	Scopes    []string
+	// ProjectIDs and ServiceIDs restrict the token to those projects and
+	// service instances (migration 027). Both empty means host-wide: any
+	// project or service the owner has. See IsRestricted.
+	ProjectIDs []string
+	ServiceIDs []string
 	LastUsedAt sql.NullTime
 	ExpiresAt  sql.NullTime
 	CreatedAt  time.Time
@@ -103,4 +108,82 @@ func NormalizeScopes(requested []string) (scopes []string, ok bool) {
 		}
 	}
 	return scopes, true
+}
+
+// IsRestricted reports whether the token is limited to listed projects
+// and/or services. A token with both lists empty is host-wide.
+func (t *APIToken) IsRestricted() bool {
+	return len(t.ProjectIDs) > 0 || len(t.ServiceIDs) > 0
+}
+
+// AllowsProject reports whether the token may touch project id (and the
+// project's environments, deployments, and containers). A host-wide token
+// allows every project; a restricted one only those in ProjectIDs. Scopes
+// and ownership are checked separately.
+func (t *APIToken) AllowsProject(id string) bool {
+	return !t.IsRestricted() || containsID(t.ProjectIDs, id)
+}
+
+// AllowsService reports whether the token may touch service instance id. A
+// host-wide token allows every service; a restricted one only those in
+// ServiceIDs. Scopes, the protected list, and ownership are checked
+// separately.
+func (t *APIToken) AllowsService(id string) bool {
+	return !t.IsRestricted() || containsID(t.ServiceIDs, id)
+}
+
+// containsID compares UUIDs case-insensitively; the database returns them
+// lower-case and a caller may not.
+func containsID(ids []string, id string) bool {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return false
+	}
+	for _, v := range ids {
+		if strings.EqualFold(v, id) {
+			return true
+		}
+	}
+	return false
+}
+
+// NormalizeResourceIDs trims, lower-cases, and de-duplicates resource IDs,
+// keeping their order. ok is false when any value is not a UUID.
+func NormalizeResourceIDs(requested []string) (ids []string, ok bool) {
+	seen := make(map[string]bool, len(requested))
+	ids = []string{}
+	for _, v := range requested {
+		v = strings.ToLower(strings.TrimSpace(v))
+		if v == "" {
+			continue
+		}
+		if !isUUID(v) {
+			return nil, false
+		}
+		if !seen[v] {
+			seen[v] = true
+			ids = append(ids, v)
+		}
+	}
+	return ids, true
+}
+
+// isUUID reports whether s is a lower-case 8-4-4-4-12 hex UUID.
+func isUUID(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i, c := range s {
+		switch i {
+		case 8, 13, 18, 23:
+			if c != '-' {
+				return false
+			}
+		default:
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+				return false
+			}
+		}
+	}
+	return true
 }

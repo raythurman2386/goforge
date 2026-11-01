@@ -160,9 +160,10 @@ type UserLookup interface {
 // header with an API token. If the request already has a user in context (from
 // session cookie auth) or has no Bearer token, it passes through unchanged.
 //
-// Only tokens with the legacy full scope are accepted here. Tokens limited to
-// read, write, or protected are for /api/v1 only, so their scopes cannot be
-// bypassed through the HTML and HTMX routes.
+// Only host-wide tokens with the legacy full scope are accepted here. Tokens
+// limited to read, write, or protected, or to listed projects and services,
+// are for /api/v1 only, so their limits cannot be bypassed through the HTML
+// and HTMX routes.
 func APITokenMiddleware(tokens TokenLookup, users UserLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -181,7 +182,7 @@ func APITokenMiddleware(tokens TokenLookup, users UserLookup) func(http.Handler)
 				http.Error(w, "invalid or expired API token", http.StatusUnauthorized)
 				return
 			}
-			if !apiToken.IsFull() {
+			if !apiToken.IsFull() || apiToken.IsRestricted() {
 				http.Error(w, "scoped API tokens are only valid on /api/v1", http.StatusUnauthorized)
 				return
 			}

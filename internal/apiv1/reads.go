@@ -68,6 +68,7 @@ func (h *Handler) health(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) whoami(w http.ResponseWriter, r *http.Request) {
 	user, token := caller(r)
+	rs := toResourceScope(token)
 	scopes := token.Scopes
 	if len(scopes) == 0 {
 		scopes = []string{models.ScopeFull}
@@ -84,13 +85,18 @@ func (h *Handler) whoami(w http.ResponseWriter, r *http.Request) {
 			"scopes":     scopes,
 			"expires_at": nullTime(token.ExpiresAt),
 			"created_at": token.CreatedAt,
+			// Resource restriction (migration 027): both lists empty is
+			// host-wide.
+			"restricted":  rs.Restricted,
+			"project_ids": rs.ProjectIDs,
+			"service_ids": rs.ServiceIDs,
 		},
 		"grants": map[string]bool{
 			models.ScopeRead:      token.HasScope(models.ScopeRead),
 			models.ScopeWrite:     token.HasScope(models.ScopeWrite),
 			models.ScopeProtected: token.HasScope(models.ScopeProtected),
 		},
-		"protected_services": h.protectedList(r.Context(), user.ID),
+		"protected_services": h.protectedList(r.Context(), user.ID, token),
 	})
 }
 
@@ -131,6 +137,9 @@ func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]projectDTO, 0, len(projects))
 	for _, p := range projects {
+		if !allowsProject(r, p.ID) {
+			continue
+		}
 		out = append(out, toProject(p))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"projects": out})
@@ -364,6 +373,9 @@ func (h *Handler) listServices(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]serviceSummaryDTO, 0, len(insts))
 	for _, inst := range insts {
+		if !allowsService(r, inst.ID) {
+			continue
+		}
 		out = append(out, h.toServiceSummary(inst))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"services": out})
@@ -430,7 +442,7 @@ func (h *Handler) inspect(ctx context.Context, dockerID string) *containerStateD
 }
 
 func (h *Handler) listContainers(w http.ResponseWriter, r *http.Request) {
-	user, _ := caller(r)
+	user, token := caller(r)
 	if h.deps.Containers == nil {
 		unavailable(w, "containers")
 		return
@@ -457,6 +469,9 @@ func (h *Handler) listContainers(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]item, 0, len(tracked))
 	for _, c := range tracked {
+		if !h.containerInScope(ctx, token, c) {
+			continue
+		}
 		it := item{trackedContainerDTO: h.toTrackedContainer(ctx, c)}
 		if dockerOK {
 			it.DockerState = live[c.DockerID]
@@ -564,9 +579,10 @@ func (h *Handler) getContainerStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // listAuditLog returns the caller's own audit rows. Admins may pass
-// all_users=true to read every user's rows.
+// all_users=true to read every user's rows. A restricted token must pass a
+// resource_id on its project or service list, and cannot use all_users.
 func (h *Handler) listAuditLog(w http.ResponseWriter, r *http.Request) {
-	user, _ := caller(r)
+	user, token := caller(r)
 	if h.deps.Audit == nil {
 		unavailable(w, "audit log")
 		return
@@ -579,6 +595,13 @@ func (h *Handler) listAuditLog(w http.ResponseWriter, r *http.Request) {
 		Action:       q.Get("action"),
 		Limit:        queryInt(r, "limit", defaultListLimit, maxListLimit),
 		Offset:       queryInt(r, "offset", 0, 1<<30),
+	}
+	if token.IsRestricted() {
+		id := f.ResourceID
+		if q.Get("all_users") == "true" || id == "" || !(token.AllowsProject(id) || token.AllowsService(id)) {
+			outOfScope(w, "the audit log outside its projects and services (pass resource_id)")
+			return
+		}
 	}
 	if q.Get("all_users") == "true" {
 		if !user.IsAdmin() {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -35,7 +36,70 @@ type SettingsHandler struct {
 	restorePoints   RestorePointLister
 	notifySettings  NotifySettings
 	audit           AuditRecorder
+	tokenProjects   TokenProjectLister
+	tokenServices   TokenServiceLister
 	logger          *slog.Logger
+}
+
+// TokenProjectLister lists the owner's projects for token restriction
+// (project.Service).
+type TokenProjectLister interface {
+	ListProjects(ctx context.Context, userID string) ([]*models.Project, error)
+}
+
+// TokenServiceLister lists the owner's service instances for token
+// restriction (services.InstanceService).
+type TokenServiceLister interface {
+	ListInstances(ctx context.Context, userID string) ([]*models.ServiceInstance, error)
+}
+
+// WithTokenResources lets the token form restrict a token to the owner's
+// projects and services. Without it the form has no restriction section
+// and a posted project_ids or service_ids is refused.
+func (h *SettingsHandler) WithTokenResources(p TokenProjectLister, s TokenServiceLister) *SettingsHandler {
+	h.tokenProjects = p
+	h.tokenServices = s
+	return h
+}
+
+// tokenResources loads the user's projects and services for the token
+// form and list. ok is false when either list cannot be read.
+func (h *SettingsHandler) tokenResources(ctx context.Context, userID string) (*settings.TokenResources, bool) {
+	if h.tokenProjects == nil || h.tokenServices == nil {
+		return nil, false
+	}
+	projects, err := h.tokenProjects.ListProjects(ctx, userID)
+	if err != nil {
+		h.logger.Warn("token form: could not list projects", "error", err)
+		return nil, false
+	}
+	insts, err := h.tokenServices.ListInstances(ctx, userID)
+	if err != nil {
+		h.logger.Warn("token form: could not list services", "error", err)
+		return nil, false
+	}
+	res := &settings.TokenResources{}
+	for _, p := range projects {
+		if p != nil && p.UserID == userID {
+			res.Projects = append(res.Projects, settings.TokenResource{ID: strings.ToLower(p.ID), Name: p.Name})
+		}
+	}
+	for _, in := range insts {
+		if in != nil && in.UserID == userID {
+			res.Services = append(res.Services, settings.TokenResource{ID: strings.ToLower(in.ID), Name: in.Name})
+		}
+	}
+	return res, true
+}
+
+// ownsAll reports whether every id is one of the owner's resources.
+func ownsAll(ids []string, owned []settings.TokenResource) bool {
+	for _, id := range ids {
+		if !slices.ContainsFunc(owned, func(r settings.TokenResource) bool { return r.ID == id }) {
+			return false
+		}
+	}
+	return true
 }
 
 // NewSettingsHandler creates a new SettingsHandler.
@@ -398,8 +462,12 @@ func (h *SettingsHandler) ListAPITokens(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var res *settings.TokenResources
+	if slices.ContainsFunc(tokens, (*models.APIToken).IsRestricted) {
+		res, _ = h.tokenResources(r.Context(), user.ID)
+	}
 	for _, token := range tokens {
-		if err := settings.APITokenRow(token).Render(r.Context(), w); err != nil {
+		if err := settings.APITokenRow(token, res).Render(r.Context(), w); err != nil {
 			h.logger.Error("failed to render token row", "error", err)
 		}
 	}
@@ -410,7 +478,11 @@ func (h *SettingsHandler) ListAPITokens(w http.ResponseWriter, r *http.Request) 
 // full or never-expiring option.
 func (h *SettingsHandler) NewAPITokenModal(w http.ResponseWriter, r *http.Request) {
 	csrfToken := auth.GetCSRFToken(r)
-	component := settings.AddAPITokenModal(csrfToken, r.URL.Query().Get("preset") == mcpPreset)
+	var res *settings.TokenResources
+	if user, ok := r.Context().Value(auth.UserContextKey).(*models.User); ok {
+		res, _ = h.tokenResources(r.Context(), user.ID)
+	}
+	component := settings.AddAPITokenModal(csrfToken, r.URL.Query().Get("preset") == mcpPreset, res)
 
 	if r.Header.Get("HX-Request") == htmxTrue {
 		if err := component.Render(r.Context(), w); err != nil {
@@ -493,6 +565,11 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
+	projectIDs, serviceIDs, status, msg := h.tokenResourceLists(r, user.ID, scopes)
+	if status != 0 {
+		RenderError(w, r, status, msg)
+		return
+	}
 	var expiresAt sql.NullTime
 	if days > 0 {
 		expiresAt = sql.NullTime{Time: time.Now().AddDate(0, 0, days), Valid: true}
@@ -506,13 +583,15 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	token := &models.APIToken{
-		UserID:    user.ID,
-		Name:      name,
-		TokenHash: tokenHash,
-		TokenHint: hint,
-		Scopes:    scopes,
-		ExpiresAt: expiresAt,
-		CreatedAt: time.Now(),
+		UserID:     user.ID,
+		Name:       name,
+		TokenHash:  tokenHash,
+		TokenHint:  hint,
+		Scopes:     scopes,
+		ProjectIDs: projectIDs,
+		ServiceIDs: serviceIDs,
+		ExpiresAt:  expiresAt,
+		CreatedAt:  time.Now(),
 	}
 
 	if err := h.apiTokenRepo.Create(r.Context(), token); err != nil {
@@ -533,6 +612,32 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 	if err := settings.TokenCreatedModal("API Token Created", rawToken, token.IsMCPCapable()).Render(r.Context(), w); err != nil {
 		h.logger.Error("failed to render token created modal", "error", err)
 	}
+}
+
+// tokenResourceLists reads the form's project_ids and service_ids for a new
+// token. Every ID must be one of the user's own projects or services, and a
+// restricted token needs explicit scopes. A non-zero status refuses the form
+// with msg.
+func (h *SettingsHandler) tokenResourceLists(r *http.Request, userID string, scopes []string) (projectIDs, serviceIDs []string, status int, msg string) {
+	projectIDs, okP := models.NormalizeResourceIDs(r.PostForm["project_ids"])
+	serviceIDs, okS := models.NormalizeResourceIDs(r.PostForm["service_ids"])
+	if !okP || !okS {
+		return nil, nil, http.StatusBadRequest, "Unknown project or service"
+	}
+	if len(projectIDs) == 0 && len(serviceIDs) == 0 {
+		return projectIDs, serviceIDs, 0, ""
+	}
+	if (&models.APIToken{Scopes: scopes}).IsFull() {
+		return nil, nil, http.StatusBadRequest, "A token restricted to projects or services needs explicit scopes"
+	}
+	res, ok := h.tokenResources(r.Context(), userID)
+	if !ok {
+		return nil, nil, http.StatusServiceUnavailable, "Could not check your projects and services; try again"
+	}
+	if !ownsAll(projectIDs, res.Projects) || !ownsAll(serviceIDs, res.Services) {
+		return nil, nil, http.StatusBadRequest, "Unknown project or service"
+	}
+	return projectIDs, serviceIDs, 0, ""
 }
 
 // ownedToken loads the {id} token if it belongs to the session user. Any
@@ -608,6 +713,10 @@ func (h *SettingsHandler) DeleteAPIToken(w http.ResponseWriter, r *http.Request)
 // token, its hash, or its hint.
 func tokenAuditDetails(t *models.APIToken) map[string]interface{} {
 	d := map[string]interface{}{"name": t.Name, "scopes": tokenScopeList(t)}
+	if t.IsRestricted() {
+		d["project_ids"] = append([]string{}, t.ProjectIDs...)
+		d["service_ids"] = append([]string{}, t.ServiceIDs...)
+	}
 	if t.ExpiresAt.Valid {
 		d["expires_at"] = t.ExpiresAt.Time.UTC().Format(time.RFC3339)
 	}
