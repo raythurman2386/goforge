@@ -10,6 +10,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/notify"
 	"github.com/raythurman2386/goforge/internal/services"
 )
 
@@ -31,6 +32,7 @@ type Worker struct {
 	quit          chan struct{}
 	stopped       chan struct{}
 	audit         services.AuditRunStore
+	notifier      notify.Notifier
 }
 
 // queueStore is the deployment_queue table as the worker uses it;
@@ -176,6 +178,7 @@ func (w *Worker) processItem(item *models.QueueItem) {
 			w.recordOutcome(item, models.AuditRunCanceled, "")
 		} else {
 			w.recordOutcome(item, models.AuditRunFailed, err.Error())
+			w.notifyFailed(ctx, item.DeploymentID, item.AuditID.String, err.Error())
 		}
 		return
 	}

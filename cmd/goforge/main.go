@@ -28,6 +28,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/mcphttp"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/monitor"
+	"github.com/raythurman2386/goforge/internal/notify"
 	"github.com/raythurman2386/goforge/internal/project"
 	"github.com/raythurman2386/goforge/internal/secrets"
 	"github.com/raythurman2386/goforge/internal/services"
@@ -237,6 +238,16 @@ func runBackupOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// A failed run alerts like a scheduled one; Wait lets the alert finish
+	// sending before the command exits.
+	notifier := &notify.Service{
+		Store:    repositories.NewNotifySettingsRepository(db.DB, enc),
+		BaseURL:  cfg.BaseURL,
+		Redactor: notify.NewRedactor().WithFunc(backup.RedactorFor(cfg, bc).Redact),
+		Logger:   logger.WithComponent(log, "notify"),
+	}
+	defer notifier.Wait()
+	setup.Runner.Notifier = notifier
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	run, err := setup.Runner.Run(ctx, models.BackupTriggerManual)
@@ -349,7 +360,25 @@ func runServer() error {
 	// shutdown; an in-flight run then records itself as failed.
 	backgroundCtx, cancelBackground := context.WithCancel(context.Background())
 	backupLog := logger.WithComponent(log, "backup")
-	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version)
+	// One outbound notifier (Settings → Profile → Notifications). It reads
+	// the saved row on every event, so a save applies without a restart.
+	notifySettingsRepo := repositories.NewNotifySettingsRepository(db.DB, secretService)
+	// Redaction knows the app secrets and the backup keys in effect (set
+	// below, once backupManager exists).
+	notifyRedactor := notify.NewRedactor()
+	notifier := &notify.Service{
+		Store: notifySettingsRepo, BaseURL: cfg.BaseURL, Redactor: notifyRedactor,
+		Logger: logger.WithComponent(log, "notify"),
+	}
+	// Registered first, so it runs last: alerts from a backup run canceled
+	// on shutdown still get their 10s to send.
+	defer notifier.Wait()
+	notifySettings := &notify.SettingsService{Store: notifySettingsRepo, BaseURL: cfg.BaseURL, Redactor: notifyRedactor}
+	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version).WithNotifier(notifier)
+	notifyRedactor.WithFunc(func(s string) string {
+		bc, _ := backupManager.Current()
+		return backup.RedactorFor(cfg, bc).Redact(s)
+	})
 	defer func() {
 		cancelBackground()
 		done := make(chan struct{})
@@ -372,6 +401,13 @@ func runServer() error {
 	}
 
 	monitorCollector := monitor.NewCollector(dockerClient, containerRepo, projectRepo, instanceRepo)
+	// Alert when a tracked container goes unhealthy or exits (one alert per
+	// episode, deduped). Skips ticks while notifications are off.
+	healthWatch := &monitor.HealthWatch{
+		Containers: containerRepo, Instances: instanceRepo, Docker: dockerClient,
+		Notifier: notifier, Enabled: notifier.Enabled, Logger: logger.WithComponent(log, "health-watch"),
+	}
+	go healthWatch.Run(backgroundCtx)
 
 	// Initialize services
 	auditService := services.NewAuditService(auditLogRepo, logger.WithComponent(log, "audit"))
@@ -402,7 +438,7 @@ func runServer() error {
 	// Initialize deployment worker
 	// WithAudit before Start: deployments queued with an audit id write
 	// deployment.run.completed/failed/canceled linked to it when they end.
-	deployWorker := deploy.NewWorker(deployService, queueRepo, 0, 0, cfg.BuildTimeout).WithAudit(auditLogRepo)
+	deployWorker := deploy.NewWorker(deployService, queueRepo, 0, 0, cfg.BuildTimeout).WithAudit(auditLogRepo).WithNotifier(notifier)
 	deployWorker.Start()
 	defer deployWorker.Stop()
 	// Finish redeploy cleanups whose in-memory grace timer died with the
@@ -422,7 +458,7 @@ func runServer() error {
 		log.Error("failed to load service templates", "error", err)
 	}
 	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog, cfg.TraefikNetwork, cfg.CloudflareProxyMode, logger.WithComponent(log, "instance")).
-		WithAudit(auditLogRepo)
+		WithAudit(auditLogRepo).WithNotifier(notifier)
 
 	// Initialize handlers
 	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector, containerRepo, instanceRepo, deployService, projectService, logger.WithComponent(log, "sse"))
@@ -447,7 +483,7 @@ func runServer() error {
 	}
 	serviceHandler.WithRestorePoints(restorePoints)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
-	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithNotifySettings(notifySettings).
 		WithRestorePoints(restorePoints).WithAudit(auditService).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))

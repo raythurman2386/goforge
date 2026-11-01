@@ -53,6 +53,10 @@ const (
 	// AuditActionBackupRestore is written by `goforge backup restore` into
 	// the restored database. Details hold {"run_key": ...} only.
 	AuditActionBackupRestore = "backup.restore"
+	// AuditActionNotifySettingsUpdate records a save of the admin
+	// Notifications form. Details hold {"changed": [field names]}, never
+	// the URL or token.
+	AuditActionNotifySettingsUpdate = "notify.settings.update"
 )
 
 // Common resource types
@@ -66,6 +70,7 @@ const (
 	ResourceTypeBackupSettings  = "backup_settings"
 	ResourceTypeAPIToken        = "api_token"
 	ResourceTypeBackupRun       = "backup_run"
+	ResourceTypeNotifySettings  = "notify_settings"
 )
 
 // Audit sources. Source classifies a row by who made the change; the

@@ -1,0 +1,62 @@
+package settings
+
+import (
+	"github.com/raythurman2386/goforge/internal/notify"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// NotifyCard is the admin-only Notifications card: one outbound ntfy topic
+// or JSON webhook. The form never contains the URL path or the token; it
+// only says whether each is stored.
+templ NotifyCard(v *notify.SettingsView, csrfToken string) {
+	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "notify-settings"}}) {
+		@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
+			Notifications
+		}
+		<p class="text-sm text-gray-600 dark:text-gray-400" data-testid="notify-status">{ notifyStatusLine(v) }</p>
+		<form class="mt-6 border-t border-gray-100 pt-4 dark:border-gray-800" data-testid="notify-settings-form" hx-put="/settings/notifications" hx-target="#notify-settings" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+			<input type="hidden" name="csrf_token" value={ csrfToken }/>
+			@ui.Switch(ui.CheckboxProps{ID: "notify-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops every alert and keeps the settings.", Checked: v.Enabled, Class: "mb-4"})
+			<div class="grid gap-4 sm:grid-cols-2">
+				@ui.Select(ui.SelectProps{ID: "notify-kind", Name: "kind", Label: "Type", Options: notifyKindOptions(), Selected: v.Kind})
+				<div class="sm:col-span-2">
+					@ui.Input(ui.InputProps{ID: "notify-url", Name: "url", Type: "url", Label: "URL", Autocomplete: "off", Placeholder: notifyURLPlaceholder(v), DescribedBy: "notify-url-state", Attrs: templ.Attributes{"spellcheck": "false"}})
+					<p id="notify-url-state" class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="notify-url-state">{ notifyURLState(v) }</p>
+				</div>
+				<div class="sm:col-span-2">
+					@ui.Input(ui.InputProps{ID: "notify-token", Name: "token", Type: "password", Label: "Access token", Autocomplete: "new-password", Placeholder: notifyTokenPlaceholder(v), DescribedBy: "notify-token-state"})
+					<p id="notify-token-state" class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="notify-token-state">{ notifyTokenState(v) }</p>
+				</div>
+				if v.TokenSet {
+					@ui.Checkbox(ui.CheckboxProps{ID: "notify-clear-token", Name: "clear_token", Value: "true", Label: "Remove the stored token", Class: "sm:col-span-2"})
+				}
+			</div>
+			<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">Alerts carry the event, the resource, a redacted error, a link, and the audit id. Never passwords, tokens, or connection strings.</p>
+			<div class="mt-4 flex justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonSecondary,
+					Attrs: templ.Attributes{
+						"data-testid": "notify-test",
+						"hx-post": "/settings/notifications/test",
+						"hx-include": "closest form",
+						"hx-swap": "none",
+						"hx-target": "this",
+					},
+				}) {
+					Send test
+				}
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonPrimary,
+					Type: "submit",
+					Attrs: templ.Attributes{
+						"data-testid": "notify-save",
+					},
+				}) {
+					Save notification settings
+					@components.Spinner()
+				}
+			</div>
+		</form>
+	}
+}
