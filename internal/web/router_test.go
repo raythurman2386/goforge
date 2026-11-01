@@ -88,7 +88,7 @@ func setupTestRouterWithMCP(t *testing.T, db *sql.DB, cfg *config.Config, apiV1,
 	ch := handlers.NewContainerHandler(nil, nil, nil, logger) // Container handler with nil dependencies for testing
 	rl := middleware.NewRateLimiter(100, 200, httputil.ProxyTrust{})
 	t.Cleanup(rl.Stop)
-	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch, apiV1, mcpHTTP)
+	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch, handlers.NewActivityHandler(nil, slog.Default()), apiV1, mcpHTTP)
 }
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{

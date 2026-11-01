@@ -517,6 +517,7 @@ func runServer() error {
 		sseHandler,
 		healthHandler,
 		containerHandler,
+		handlers.NewActivityHandler(auditLogRepo, logger.WithComponent(log, "activity")),
 		apiV1,
 		mcpHTTP,
 	)

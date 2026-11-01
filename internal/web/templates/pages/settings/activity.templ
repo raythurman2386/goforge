@@ -1,0 +1,69 @@
+package settings
+
+import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
+)
+
+var activitySourceOptions = []ui.SelectOption{
+	{Value: "agent", Label: "Agents (MCP or API)"},
+	{Value: "mcp", Label: "MCP"},
+	{Value: "api", Label: "API"},
+	{Value: "ui", Label: "UI"},
+}
+
+// Activity is /settings/activity: the audit log, newest first, filterable by
+// source, token name, and action.
+templ Activity(rows []components.ActivityRow, f ActivityFilters, csrfToken string) {
+	@layouts.AppLayout("Activity", csrfToken) {
+		@components.PageHeader("Activity", "Every change to your projects and services, from the UI, the API, or an MCP agent.")
+		@ui.Card(ui.CardProps{Class: "mb-6"}) {
+			<form method="GET" action="/settings/activity" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end" aria-label="Filter activity">
+				@ui.Select(ui.SelectProps{
+					ID:         "activity-source",
+					Name:       "source",
+					Label:      "Source",
+					Options:    activitySourceOptions,
+					Selected:   f.Source,
+					Blank:      true,
+					BlankLabel: "All sources",
+				})
+				@ui.Input(ui.InputProps{ID: "activity-token", Name: "token", Label: "Token name", Value: f.Token, Placeholder: "ci-bot"})
+				@ui.Input(ui.InputProps{ID: "activity-action", Name: "action", Label: "Action", Value: f.Action, Placeholder: "restart"})
+				if f.AuditID != "" {
+					<input type="hidden" name="audit_id" value={ f.AuditID }/>
+				}
+				if f.IsAdmin {
+					@ui.Checkbox(ui.CheckboxProps{ID: "activity-all", Name: "all", Value: "1", Label: "All users", Checked: f.All})
+				}
+				<div class="flex gap-2">
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) { Filter }
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Href: "/settings/activity"}) { Clear }
+				</div>
+			</form>
+			if f.AuditID != "" {
+				<p class="mt-4 text-sm text-gray-600 dark:text-gray-400">
+					Showing change <span class="font-mono">{ f.AuditID }</span> and its outcomes.
+				</p>
+			}
+		}
+		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
+			@components.ActivityTable("activity-table", rows, false)
+		}
+		if f.OlderURL != "" || f.NewerURL != "" {
+			<nav class="mt-4 flex justify-between" aria-label="Activity pages">
+				<div>
+					if f.NewerURL != "" {
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Href: f.NewerURL}) { Newer }
+					}
+				</div>
+				<div>
+					if f.OlderURL != "" {
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Href: f.OlderURL}) { Older }
+					}
+				</div>
+			</nav>
+		}
+	}
+}

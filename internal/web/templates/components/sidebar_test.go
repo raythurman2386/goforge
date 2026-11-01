@@ -95,7 +95,7 @@ func TestSidebarAndMobileNavShareNav(t *testing.T) {
 	if strings.Contains(sheet, `id="sidebar"`) {
 		t.Error("mobile nav duplicates id=sidebar")
 	}
-	if na, ns := strings.Count(aside, "data-nav="), strings.Count(sheet, "data-nav="); na != 6 || ns != na {
-		t.Errorf("data-nav links: aside=%d sheet=%d, want 6 each", na, ns)
+	if na, ns := strings.Count(aside, "data-nav="), strings.Count(sheet, "data-nav="); na != 7 || ns != na {
+		t.Errorf("data-nav links: aside=%d sheet=%d, want 7 each (Activity included)", na, ns)
 	}
 }
