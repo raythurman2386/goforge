@@ -152,7 +152,7 @@ The Tailwind configuration is in `tailwind.config.js`:
 
 - Scans `.templ` and generated `_templ.go` files, Go files under `internal/web/templates` and `internal/web/handlers`, and `static/js/app.js` and `static/js/ui.js` for class names (the same sources `class_check.py` reads)
 - Uses a green/emerald color palette
-- Includes custom font families
+- Sets `font-sans` to Geist Sans and `font-mono` to Geist Mono (code, logs, IDs), each with a system fallback
 
 ### Input and Output
 

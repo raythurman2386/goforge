@@ -2,13 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Inter, self-hosted (OFL-1.1, see static/fonts/LICENSE.txt). */
+/*
+ * Geist Sans and Geist Mono, self-hosted variable fonts (OFL-1.1, see
+ * static/fonts/LICENSE.txt). Vendored from the npm `geist` package v1.9.0
+ * (dist/fonts/geist-sans/Geist-Variable.woff2,
+ * dist/fonts/geist-mono/GeistMono-Variable.woff2). No runtime npm dependency.
+ */
 @font-face {
-  font-family: "Inter";
+  font-family: "Geist";
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("/static/fonts/InterVariable.woff2") format("woff2");
+  src: url("/static/fonts/Geist-Variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/static/fonts/GeistMono-Variable.woff2") format("woff2");
 }
 
 /*

@@ -396,7 +396,7 @@ func TestRouter_FaviconAndFont(t *testing.T) {
 	server := httptest.NewServer(setupTestRouter(t, db, cfg))
 	defer server.Close()
 
-	for _, path := range []string{"/favicon.ico", "/static/favicon.svg", "/static/fonts/InterVariable.woff2"} {
+	for _, path := range []string{"/favicon.ico", "/static/favicon.svg", "/static/fonts/Geist-Variable.woff2", "/static/fonts/GeistMono-Variable.woff2"} {
 		resp, err := http.Get(server.URL + path)
 		if err != nil {
 			t.Fatalf("GET %s failed: %v", path, err)
