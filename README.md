@@ -10,7 +10,7 @@
 
 GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 
-![GoForge dashboard in dark mode: projects, services, running containers, CPU, memory, and Docker disk usage](docs/assets/dashboard-dark.png)
+![GoForge dashboard, dark mode on the left and light mode on the right: projects, services, running containers, CPU, memory, Docker disk usage, and recent agent actions](docs/assets/dashboard-dark-light.png)
 
 ## Features
 
