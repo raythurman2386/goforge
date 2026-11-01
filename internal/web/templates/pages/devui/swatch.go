@@ -10,6 +10,8 @@ func swatchClass(token string) string {
 		return "bg-background"
 	case "foreground":
 		return "bg-foreground"
+	case "foreground-secondary":
+		return "bg-foreground-secondary"
 	case "card":
 		return "bg-card"
 	case "card-border":
@@ -42,6 +44,22 @@ func swatchClass(token string) string {
 		return "bg-ring"
 	case "ring-offset":
 		return "bg-ring-offset"
+	case "sidebar":
+		return "bg-sidebar"
+	case "terminal":
+		return "bg-terminal"
+	case "highlight":
+		return "bg-highlight"
+	case "code":
+		return "bg-code"
+	case "danger":
+		return "bg-danger"
+	case "success":
+		return "bg-success"
+	case "warning":
+		return "bg-warning"
+	case "info":
+		return "bg-info"
 	}
 	return ""
 }

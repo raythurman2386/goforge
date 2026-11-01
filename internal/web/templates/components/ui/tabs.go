@@ -32,7 +32,7 @@ type NavTabProps struct {
 }
 
 func navTabsWrapClass() string {
-	return "border-b border-gray-200/60 dark:border-gray-800/60"
+	return "border-b border-border"
 }
 
 func navTabsListClass() string {
@@ -42,7 +42,7 @@ func navTabsListClass() string {
 // navTabClass styles both states from aria-current, so the look always
 // matches what assistive tech hears.
 func navTabClass() string {
-	return "inline-flex items-center whitespace-nowrap rounded-t-ui border-b-2 border-transparent px-1 py-4 text-sm font-bold text-gray-500 transition-colors duration-200 hover:border-gray-300 hover:text-gray-700 ui-focus-ring aria-[current=page]:border-primary-600 aria-[current=page]:text-primary-700 dark:text-gray-400 dark:hover:border-gray-700 dark:hover:text-gray-300 dark:aria-[current=page]:text-primary-300"
+	return "inline-flex items-center whitespace-nowrap rounded-t-ui border-b-2 border-transparent px-1 py-4 text-sm font-bold text-foreground-secondary transition-colors duration-200 hover:border-muted-foreground/40 hover:text-foreground-secondary ui-focus-ring aria-[current=page]:border-primary-600 aria-[current=page]:text-primary-700 dark:aria-[current=page]:text-primary-300"
 }
 
 func navTabsAttrs(p NavTabsProps) templ.Attributes {
@@ -93,11 +93,11 @@ func TabID(tabsID, key string) string { return tabsID + "-tab-" + key }
 func TabPanelID(tabsID, key string) string { return tabsID + "-panel-" + key }
 
 func tabListClass() string {
-	return "-mb-px flex gap-6 overflow-x-auto border-b border-gray-200/60 dark:border-gray-800/60"
+	return "-mb-px flex gap-6 overflow-x-auto border-b border-border"
 }
 
 func tabClass() string {
-	return "inline-flex items-center whitespace-nowrap rounded-t-ui border-b-2 border-transparent px-1 py-3 text-sm font-bold text-gray-500 transition-colors duration-200 hover:border-gray-300 hover:text-gray-700 ui-focus-ring aria-selected:border-primary-600 aria-selected:text-primary-700 dark:text-gray-400 dark:hover:border-gray-700 dark:hover:text-gray-300 dark:aria-selected:text-primary-300"
+	return "inline-flex items-center whitespace-nowrap rounded-t-ui border-b-2 border-transparent px-1 py-3 text-sm font-bold text-foreground-secondary transition-colors duration-200 hover:border-muted-foreground/40 hover:text-foreground-secondary ui-focus-ring aria-selected:border-primary-600 aria-selected:text-primary-700 dark:aria-selected:text-primary-300"
 }
 
 func tabPanelClass() string {

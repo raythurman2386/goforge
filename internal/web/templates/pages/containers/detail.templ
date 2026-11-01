@@ -70,20 +70,20 @@ templ Detail(containerID string, csrfToken string) {
 				@ui.CardTitle(3, nil) {
 					Container Logs
 				}
-				<span class="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-					<span class="h-2 w-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true"></span>
+				<span class="inline-flex items-center gap-2 text-sm text-foreground-secondary">
+					<span class="h-2 w-2 rounded-full bg-success animate-pulse" aria-hidden="true"></span>
 					Live
 				</span>
 			}
 			<div
 				id="container-logs"
-				class="bg-gray-900 text-gray-100 font-mono text-sm p-4 max-h-96 overflow-y-auto dark:bg-gray-950"
+				class="bg-terminal text-foreground font-mono text-sm p-4 max-h-96 overflow-y-auto"
 				hx-ext="sse"
 				sse-connect={ fmt.Sprintf("/containers/%s/logs", containerID) }
 				sse-swap="log"
 				hx-swap="beforeend"
 			>
-				<p class="text-gray-400 italic">Waiting for logs...</p>
+				<p class="text-foreground-secondary italic">Waiting for logs...</p>
 			</div>
 		}
 

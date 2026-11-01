@@ -88,9 +88,9 @@ func tableClass(p TableProps) string {
 	case p.Compact:
 		return "min-w-full text-xs"
 	case p.Fixed:
-		return "min-w-full table-fixed divide-y divide-gray-100 dark:divide-gray-800"
+		return "min-w-full table-fixed divide-y divide-divider"
 	default:
-		return "min-w-full divide-y divide-gray-100 dark:divide-gray-800"
+		return "min-w-full divide-y divide-divider"
 	}
 }
 
@@ -102,23 +102,23 @@ func tableCaptionClass(visible bool) string {
 }
 
 func theadClass() string {
-	return "bg-gray-50/60 dark:bg-gray-800/50"
+	return "bg-muted/60"
 }
 
 func tbodyClass() string {
-	return "divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900"
+	return "divide-y divide-divider bg-card"
 }
 
 func thClass(compact bool, align CellAlign) string {
 	switch {
 	case compact && align == CellEnd:
-		return "py-1 pr-3 text-right font-medium text-gray-500 dark:text-gray-400"
+		return "py-1 pr-3 text-right font-medium text-foreground-secondary"
 	case compact:
-		return "py-1 pr-3 text-left font-medium text-gray-500 dark:text-gray-400"
+		return "py-1 pr-3 text-left font-medium text-foreground-secondary"
 	case align == CellEnd:
-		return "px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+		return "px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary"
 	default:
-		return "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+		return "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary"
 	}
 }
 

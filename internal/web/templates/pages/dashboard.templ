@@ -81,38 +81,38 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 		if stats != nil {
 			<!-- Resource Usage Section -->
 			<div class="mt-8">
-				<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Resource Usage</h2>
+				<h2 class="text-lg font-semibold text-foreground">Resource Usage</h2>
 				<dl class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 					@ui.Card(ui.CardProps{}) {
-						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Total Projects</dt>
-						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%d", stats.TotalProjects) }</dd>
+						<dt class="text-sm font-medium text-foreground-secondary truncate">Total Projects</dt>
+						<dd class="mt-1 text-3xl font-semibold text-foreground">{ fmt.Sprintf("%d", stats.TotalProjects) }</dd>
 					}
 					@ui.Card(ui.CardProps{}) {
-						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Active Services</dt>
-						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%d", stats.TotalServices) }</dd>
+						<dt class="text-sm font-medium text-foreground-secondary truncate">Active Services</dt>
+						<dd class="mt-1 text-3xl font-semibold text-foreground">{ fmt.Sprintf("%d", stats.TotalServices) }</dd>
 					}
 					@ui.Card(ui.CardProps{}) {
-						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Running Containers</dt>
-						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%d / %d", stats.RunningContainers, stats.TotalContainers) }</dd>
+						<dt class="text-sm font-medium text-foreground-secondary truncate">Running Containers</dt>
+						<dd class="mt-1 text-3xl font-semibold text-foreground">{ fmt.Sprintf("%d / %d", stats.RunningContainers, stats.TotalContainers) }</dd>
 					}
 					@ui.Card(ui.CardProps{}) {
-						<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">CPU Usage</dt>
-						<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%.1f%%", stats.TotalCPUUsage) }</dd>
+						<dt class="text-sm font-medium text-foreground-secondary truncate">CPU Usage</dt>
+						<dd class="mt-1 text-3xl font-semibold text-foreground">{ fmt.Sprintf("%.1f%%", stats.TotalCPUUsage) }</dd>
 					}
 				</dl>
 			</div>
 
 			<!-- Memory Usage Section -->
 			<div class="mt-6">
-				<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Memory Usage</h2>
+				<h2 class="text-lg font-semibold text-foreground">Memory Usage</h2>
 				@ui.Card(ui.CardProps{Class: "mt-4"}) {
 					<div class="flex items-center justify-between mb-2">
-						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+						<span class="text-sm font-medium text-foreground-secondary">
 							{ formatBytes(stats.TotalMemoryUsage) } / { formatBytes(stats.TotalMemoryLimit) }
 						</span>
-						<span class="text-sm font-medium text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%.1f%%", stats.MemoryUsagePercent) }</span>
+						<span class="text-sm font-medium text-foreground-secondary">{ fmt.Sprintf("%.1f%%", stats.MemoryUsagePercent) }</span>
 					</div>
-					<div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+					<div class="w-full bg-highlight rounded-full h-2.5">
 						<div 
 							class="bg-primary-600 h-2.5 rounded-full transition-all duration-300" 
 							style={ fmt.Sprintf("width: %.0f%%", min(stats.MemoryUsagePercent, 100)) }
@@ -125,7 +125,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 			if stats.DiskUsage != nil {
 				<div class="mt-6">
 					<div class="flex min-h-10 items-center justify-between">
-						<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Docker Disk Usage</h2>
+						<h2 class="text-lg font-semibold text-foreground">Docker Disk Usage</h2>
 						if admin {
 						<form method="POST" action="/dashboard/prune" class="inline">
 							<input type="hidden" name="csrf_token" value={ csrfToken } />
@@ -159,20 +159,20 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 					</div>
 					<dl class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 						@ui.Card(ui.CardProps{}) {
-							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Images</dt>
-							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.ImagesSize) }</dd>
+							<dt class="text-sm font-medium text-foreground-secondary truncate">Images</dt>
+							<dd class="mt-1 text-2xl font-semibold text-foreground">{ formatBytes(stats.DiskUsage.ImagesSize) }</dd>
 						}
 						@ui.Card(ui.CardProps{}) {
-							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Containers</dt>
-							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.ContainersSize) }</dd>
+							<dt class="text-sm font-medium text-foreground-secondary truncate">Containers</dt>
+							<dd class="mt-1 text-2xl font-semibold text-foreground">{ formatBytes(stats.DiskUsage.ContainersSize) }</dd>
 						}
 						@ui.Card(ui.CardProps{}) {
-							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Volumes</dt>
-							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.VolumesSize) }</dd>
+							<dt class="text-sm font-medium text-foreground-secondary truncate">Volumes</dt>
+							<dd class="mt-1 text-2xl font-semibold text-foreground">{ formatBytes(stats.DiskUsage.VolumesSize) }</dd>
 						}
 						@ui.Card(ui.CardProps{}) {
-							<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Build Cache</dt>
-							<dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{ formatBytes(stats.DiskUsage.BuildCacheSize) }</dd>
+							<dt class="text-sm font-medium text-foreground-secondary truncate">Build Cache</dt>
+							<dd class="mt-1 text-2xl font-semibold text-foreground">{ formatBytes(stats.DiskUsage.BuildCacheSize) }</dd>
 						}
 					</dl>
 					if stats.DiskUsage.ReclaimableSize > 0 {
@@ -191,14 +191,14 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 	@layouts.AppLayout("Dashboard", csrfToken) {
 		<div class="max-w-7xl">
-			<h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">Dashboard</h1>
-			<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Overview of your Platform as a Service.</p>
+			<h1 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">Dashboard</h1>
+			<p class="mt-2 text-sm text-foreground-secondary">Overview of your Platform as a Service.</p>
 
 			if !hasProjects && !hasGitSources {
 				<!-- First-Time Onboarding Flow -->
 				<div class="mt-8">
 					@ui.Card(ui.CardProps{
-						Class: "bg-white border-2 border-primary-200 dark:bg-gray-900 dark:border-primary-800",
+						Class: "bg-card border-2 border-primary-200 dark:border-primary-800",
 					}) {
 						<div class="px-4 py-5 sm:p-6 text-center">
 							<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/50">
@@ -206,25 +206,25 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 									<path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.438 4.438 0 002.946-2.368c.162-.366.28-.75.352-1.144" />
 								</svg>
 							</div>
-							<h3 class="mt-4 text-xl font-bold text-gray-900 tracking-tight dark:text-gray-100">Welcome to GoForge!</h3>
-							<div class="mt-2 max-w-xl mx-auto text-sm text-gray-500 leading-relaxed dark:text-gray-400">
+							<h3 class="mt-4 text-xl font-bold text-foreground tracking-tight">Welcome to GoForge!</h3>
+							<div class="mt-2 max-w-xl mx-auto text-sm text-foreground-secondary leading-relaxed">
 								<p>Let's get your first application deployed. Follow these simple steps to get started.</p>
 							</div>
 							
 							<div class="mt-8 text-left max-w-2xl mx-auto">
 								<ol class="overflow-hidden space-y-8">
 									<li class="relative pb-10">
-										<div class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700" aria-hidden="true"></div>
+										<div class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-highlight" aria-hidden="true"></div>
 										<div class="relative flex space-x-3">
 											<div>
-												<span class="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center ring-8 ring-white dark:ring-gray-900">
+												<span class="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center ring-8 ring-card">
 													<span class="text-white font-medium text-sm">1</span>
 												</span>
 											</div>
 											<div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
 												<div>
-													<p class="text-sm text-gray-500 dark:text-gray-400">
-														<span class="font-medium text-gray-900 dark:text-gray-100">Connect Git Source</span>
+													<p class="text-sm text-foreground-secondary">
+														<span class="font-medium text-foreground">Connect Git Source</span>
 														<br/>Link your GitHub, GitLab, or Gitea account to access your repositories.
 													</p>
 													<div class="mt-3">
@@ -242,17 +242,17 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 									</li>
 
 									<li class="relative pb-10">
-										<div class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700" aria-hidden="true"></div>
+										<div class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-highlight" aria-hidden="true"></div>
 										<div class="relative flex space-x-3">
 											<div>
-												<span class="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center ring-8 ring-white dark:bg-gray-800 dark:ring-gray-900">
-													<span class="text-gray-500 font-medium text-sm dark:text-gray-400">2</span>
+												<span class="h-8 w-8 rounded-full bg-muted flex items-center justify-center ring-8 ring-card">
+													<span class="text-foreground-secondary font-medium text-sm">2</span>
 												</span>
 											</div>
 											<div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
 												<div>
-													<p class="text-sm text-gray-500 dark:text-gray-400">
-														<span class="font-medium text-gray-900 dark:text-gray-100">Create Project</span>
+													<p class="text-sm text-foreground-secondary">
+														<span class="font-medium text-foreground">Create Project</span>
 														<br/>Select a repository and configure your build settings.
 													</p>
 												</div>
@@ -263,14 +263,14 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 									<li class="relative">
 										<div class="relative flex space-x-3">
 											<div>
-												<span class="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center ring-8 ring-white dark:bg-gray-800 dark:ring-gray-900">
-													<span class="text-gray-500 font-medium text-sm dark:text-gray-400">3</span>
+												<span class="h-8 w-8 rounded-full bg-muted flex items-center justify-center ring-8 ring-card">
+													<span class="text-foreground-secondary font-medium text-sm">3</span>
 												</span>
 											</div>
 											<div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
 												<div>
-													<p class="text-sm text-gray-500 dark:text-gray-400">
-														<span class="font-medium text-gray-900 dark:text-gray-100">Deploy!</span>
+													<p class="text-sm text-foreground-secondary">
+														<span class="font-medium text-foreground">Deploy!</span>
 														<br/>Watch your application build and deploy with zero downtime.
 													</p>
 												</div>
@@ -286,7 +286,7 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 				<!-- State: Has Git Source but no projects yet -->
 				<div class="mt-8">
 					@ui.Card(ui.CardProps{
-						Class: "bg-white border-2 border-primary-200 dark:bg-gray-900 dark:border-primary-800",
+						Class: "bg-card border-2 border-primary-200 dark:border-primary-800",
 					}) {
 						<div class="px-4 py-5 sm:p-6 text-center">
 							<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/50">
@@ -294,8 +294,8 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 									<path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
 								</svg>
 							</div>
-							<h3 class="mt-4 text-xl font-bold text-gray-900 tracking-tight dark:text-gray-100">You're ready to deploy!</h3>
-							<div class="mt-2 max-w-xl mx-auto text-sm text-gray-500 leading-relaxed dark:text-gray-400">
+							<h3 class="mt-4 text-xl font-bold text-foreground tracking-tight">You're ready to deploy!</h3>
+							<div class="mt-2 max-w-xl mx-auto text-sm text-foreground-secondary leading-relaxed">
 								<p>You've connected a Git source. Next, create a project to deploy your first application.</p>
 							</div>
 							<div class="mt-5 sm:mt-6 flex justify-center space-x-3">
@@ -313,12 +313,12 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 				<!-- Standard Welcome & Quick Actions -->
 				<div class="mt-8">
 					@ui.Card(ui.CardProps{
-						Class: "bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-900/50",
+						Class: "bg-gradient-to-br from-card to-muted/50",
 					}) {
 						<div class="sm:flex sm:items-start sm:justify-between">
 							<div>
-								<h3 class="text-xl font-bold text-gray-900 tracking-tight dark:text-gray-100">Welcome to GoForge</h3>
-								<div class="mt-2 max-w-xl text-sm text-gray-500 leading-relaxed dark:text-gray-400">
+								<h3 class="text-xl font-bold text-foreground tracking-tight">Welcome to GoForge</h3>
+								<div class="mt-2 max-w-xl text-sm text-foreground-secondary leading-relaxed">
 									<p>Start by creating a project or deploying a service from the catalog.</p>
 								</div>
 							</div>

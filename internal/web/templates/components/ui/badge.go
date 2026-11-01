@@ -77,15 +77,15 @@ func badgeToneClass(v BadgeVariant, t BadgeTone) string {
 		case BadgePrimary:
 			return "bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
 		case BadgeSuccess:
-			return "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+			return "bg-success/10 text-success-foreground"
 		case BadgeWarning:
-			return "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+			return "bg-warning/10 text-warning-foreground"
 		case BadgeDanger:
-			return "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+			return "bg-danger/10 text-danger"
 		case BadgeInfo:
-			return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+			return "bg-info/10 text-info"
 		case BadgeNeutral:
-			return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+			return "bg-muted text-foreground-secondary"
 		}
 		// The zero value and unknown values render as BadgeNeutral.
 		return badgeToneClass(v, BadgeNeutral)
@@ -102,7 +102,7 @@ func badgeToneClass(v BadgeVariant, t BadgeTone) string {
 		case BadgeInfo:
 			return "bg-blue-700 text-white"
 		case BadgeNeutral:
-			return "bg-gray-900 text-white dark:bg-gray-700"
+			return "bg-foreground text-background"
 		}
 		// The zero value and unknown values render as BadgeNeutral.
 		return badgeToneClass(v, BadgeNeutral)
@@ -111,15 +111,15 @@ func badgeToneClass(v BadgeVariant, t BadgeTone) string {
 		case BadgePrimary:
 			return "ring-1 ring-inset ring-primary-600/40 text-primary-700 dark:text-primary-300"
 		case BadgeSuccess:
-			return "ring-1 ring-inset ring-green-600/40 text-green-700 dark:text-green-300"
+			return "ring-1 ring-inset ring-success/40 text-success-foreground"
 		case BadgeWarning:
-			return "ring-1 ring-inset ring-amber-600/40 text-amber-800 dark:text-amber-200"
+			return "ring-1 ring-inset ring-warning/40 text-warning-foreground"
 		case BadgeDanger:
-			return "ring-1 ring-inset ring-red-600/40 text-red-700 dark:text-red-300"
+			return "ring-1 ring-inset ring-danger/40 text-danger"
 		case BadgeInfo:
-			return "ring-1 ring-inset ring-blue-600/40 text-blue-700 dark:text-blue-300"
+			return "ring-1 ring-inset ring-info/40 text-info"
 		case BadgeNeutral:
-			return "ring-1 ring-inset ring-gray-500/40 text-gray-700 dark:text-gray-300"
+			return "ring-1 ring-inset ring-muted-foreground/40 text-foreground-secondary"
 		}
 		// The zero value and unknown values render as BadgeNeutral.
 		return badgeToneClass(v, BadgeNeutral)
@@ -128,15 +128,15 @@ func badgeToneClass(v BadgeVariant, t BadgeTone) string {
 		case BadgePrimary:
 			return "bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-900/30 dark:text-primary-300"
 		case BadgeSuccess:
-			return "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-950/40 dark:text-green-300"
+			return "bg-success/10 text-success-foreground ring-1 ring-inset ring-success/20"
 		case BadgeWarning:
-			return "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-200"
+			return "bg-warning/10 text-warning-foreground ring-1 ring-inset ring-warning/20"
 		case BadgeDanger:
-			return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-950/40 dark:text-red-300"
+			return "bg-danger/10 text-danger ring-1 ring-inset ring-danger/20"
 		case BadgeInfo:
-			return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-950/40 dark:text-blue-300"
+			return "bg-info/10 text-info ring-1 ring-inset ring-info/20"
 		case BadgeNeutral:
-			return "bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-500/20 dark:bg-gray-800/50 dark:text-gray-300"
+			return "bg-muted/50 text-foreground-secondary ring-1 ring-inset ring-muted-foreground/20"
 		}
 		// The zero value and unknown values render as BadgeNeutral.
 		return badgeToneClass(v, BadgeNeutral)

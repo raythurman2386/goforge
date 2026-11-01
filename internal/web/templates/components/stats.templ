@@ -11,40 +11,40 @@ import (
 // totals since the container started.
 templ Stats(metrics *models.ContainerMetrics) {
 	<dl class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-		<div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
-			<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">CPU Usage</dt>
-			<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			<dt class="text-sm font-medium text-foreground-secondary truncate">CPU Usage</dt>
+			<dd class="mt-1 text-3xl font-semibold text-foreground">
 				{ fmt.Sprintf("%.2f%%", metrics.CPUPercent) }
 			</dd>
-			<dd class="mt-3 w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+			<dd class="mt-3 w-full bg-highlight rounded-full h-2">
 				<div class="bg-primary-600 h-2 rounded-full transition-all duration-300" style={ fmt.Sprintf("width: %.2f%%", min(metrics.CPUPercent, 100)) }></div>
 			</dd>
 		</div>
-		<div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
-			<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Memory Usage</dt>
-			<dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			<dt class="text-sm font-medium text-foreground-secondary truncate">Memory Usage</dt>
+			<dd class="mt-1 text-3xl font-semibold text-foreground">
 				{ fmt.Sprintf("%.2f MB", float64(metrics.MemoryUsage)/1024/1024) }
 			</dd>
-			<dd class="mt-3 w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+			<dd class="mt-3 w-full bg-highlight rounded-full h-2">
 				<div class="bg-primary-600 h-2 rounded-full transition-all duration-300" style={ fmt.Sprintf("width: %.2f%%", min(metrics.MemoryPercent, 100)) }></div>
 			</dd>
-			<dd class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+			<dd class="mt-2 text-sm text-foreground-secondary">
 				{ fmt.Sprintf("%.1f%%", metrics.MemoryPercent) } of { fmt.Sprintf("%.0f MB", float64(metrics.MemoryLimit)/1024/1024) }
 			</dd>
 		</div>
-		<div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
-			<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Network I/O</dt>
-			<dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100" data-stat="network">
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			<dt class="text-sm font-medium text-foreground-secondary truncate">Network I/O</dt>
+			<dd class="mt-1 text-lg font-semibold text-foreground" data-stat="network">
 				{ HumanBytes(metrics.NetworkRx) } in / { HumanBytes(metrics.NetworkTx) } out
 			</dd>
-			<dd class="mt-1 text-xs text-gray-500 dark:text-gray-400">Total since start</dd>
+			<dd class="mt-1 text-xs text-foreground-secondary">Total since start</dd>
 		</div>
-		<div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
-			<dt class="text-sm font-medium text-gray-500 truncate dark:text-gray-400">Block I/O</dt>
-			<dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100" data-stat="block">
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			<dt class="text-sm font-medium text-foreground-secondary truncate">Block I/O</dt>
+			<dd class="mt-1 text-lg font-semibold text-foreground" data-stat="block">
 				{ HumanBytes(metrics.BlockRead) } read / { HumanBytes(metrics.BlockWrite) } written
 			</dd>
-			<dd class="mt-1 text-xs text-gray-500 dark:text-gray-400">Total since start</dd>
+			<dd class="mt-1 text-xs text-foreground-secondary">Total since start</dd>
 		</div>
 	</dl>
 }
@@ -54,10 +54,10 @@ templ Stats(metrics *models.ContainerMetrics) {
 templ StatsUnavailable(reason string) {
 	<div class="flex items-center justify-center py-12" data-stats-unavailable>
 		<div class="flex flex-col items-center text-center">
-			<svg class="h-8 w-8 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+			<svg class="h-8 w-8 text-muted-foreground mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z"></path>
 			</svg>
-			<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{ reason }</p>
+			<p class="text-sm font-medium text-foreground-secondary">{ reason }</p>
 		</div>
 	</div>
 }

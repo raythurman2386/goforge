@@ -21,11 +21,11 @@ templ Dialog(p DialogProps) {
 
 templ dialog(p DialogProps) {
 	<dialog { dialogAttrs(p)... }>
-		<div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+		<div class="flex items-start justify-between gap-4 border-b border-divider px-6 py-4">
 			<div class="min-w-0">
-				<h2 id={ DialogTitleID(p.ID) } class="text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{ p.Title }</h2>
+				<h2 id={ DialogTitleID(p.ID) } class="text-xl font-bold tracking-tight text-foreground">{ p.Title }</h2>
 				if p.Description != "" {
-					<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-muted-foreground">{ p.Description }</p>
+					<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-foreground-secondary">{ p.Description }</p>
 				}
 			</div>
 			@Button(ButtonProps{Variant: ButtonGhost, Size: ButtonIcon, Label: "Close dialog", Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
@@ -34,7 +34,7 @@ templ dialog(p DialogProps) {
 				</svg>
 			}
 		</div>
-		<div id={ DialogErrorID(p.ID) } data-ui-dialog-error role="alert" class="mx-6 mt-4 hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"></div>
+		<div id={ DialogErrorID(p.ID) } data-ui-dialog-error role="alert" class="mx-6 mt-4 hidden rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger"></div>
 		<div class="px-6 py-6">
 			{ children... }
 		</div>
@@ -58,8 +58,8 @@ templ ConfirmDialog() {
 		class={ confirmDialogClass() }
 	>
 		<div class="px-6 pt-6">
-			<h2 id={ DialogTitleID(ConfirmDialogID) } class="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100">Please confirm</h2>
-			<p id={ DialogDescriptionID(ConfirmDialogID) } data-ui-confirm-message class="mt-2 text-sm text-muted-foreground"></p>
+			<h2 id={ DialogTitleID(ConfirmDialogID) } class="text-lg font-bold tracking-tight text-foreground">Please confirm</h2>
+			<p id={ DialogDescriptionID(ConfirmDialogID) } data-ui-confirm-message class="mt-2 text-sm text-foreground-secondary"></p>
 		</div>
 		<div class="flex justify-end gap-3 px-6 pb-6 pt-6">
 			@Button(ButtonProps{Variant: ButtonSecondary, Attrs: templ.Attributes{"data-ui-confirm-cancel": true, "autofocus": true}}) {

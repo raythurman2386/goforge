@@ -113,7 +113,7 @@ func TestActivityPage_FailedOutcomeHighlightedAndLinkedToOrigin(t *testing.T) {
 	h := NewActivityHandler(store, slog.Default())
 	html := activityGet(t, h.Page, "/settings/activity", &models.User{ID: "user-1"}).Body.String()
 	for _, want := range []string{
-		`data-failed="true"`, "bg-red-50/70", "build failed: exit 1",
+		`data-failed="true"`, "bg-danger/10", "build failed: exit 1",
 		`href="/projects/proj-1/deployments/44444444-4444-4444-8444-444444444444"`,
 		`href="/settings/activity?audit_id=` + restartAuditID + `"`,
 	} {

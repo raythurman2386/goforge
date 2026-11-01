@@ -48,9 +48,9 @@ func sheetSide(s SheetSide) string {
 // overriding and Tailwind 3.4 has no @starting-style.
 func sheetClass(s SheetSide) string {
 	if s == SheetRight {
-		return "border-l border-gray-200 bg-white p-0 text-left text-foreground shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+		return "border-l border-border bg-card p-0 text-left text-foreground shadow-2xl"
 	}
-	return "border-r border-gray-200 bg-white p-0 text-left text-foreground shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+	return "border-r border-border bg-card p-0 text-left text-foreground shadow-2xl"
 }
 
 func sheetAttrs(p SheetProps) templ.Attributes {

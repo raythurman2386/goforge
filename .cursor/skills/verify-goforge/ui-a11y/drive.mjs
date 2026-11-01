@@ -144,7 +144,7 @@ async function galleryChecks(browser, scheme, page) {
     return;
   }
   const bg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--gf-background").trim());
-  const wantBg = scheme === "dark" ? "3 7 18" : "249 250 251";
+  const wantBg = scheme === "dark" ? "20 20 20" : "238 238 238";
   check(scheme, "token-scheme", bg === wantBg, `--gf-background="${bg}" want="${wantBg}"`);
 
   const shadow = (sel) => page.$eval(sel, (el) => getComputedStyle(el).boxShadow);

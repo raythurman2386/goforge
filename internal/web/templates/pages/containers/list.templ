@@ -60,21 +60,21 @@ templ ListAPI(trackedContainers []*models.Container, dockerContainers []containe
 }
 
 templ ContainerRow(dc container.Summary, tracked []*models.Container) {
-	@ui.TR(templ.Attributes{"class": "hover:bg-gray-50/60 transition-colors dark:hover:bg-gray-800/50"}) {
-		@ui.TD(ui.CellProps{Class: "pl-6 font-medium text-gray-900 dark:text-gray-100"}) {
+	@ui.TR(templ.Attributes{"class": "hover:bg-muted/60 transition-colors"}) {
+		@ui.TD(ui.CellProps{Class: "pl-6 font-medium text-foreground"}) {
 			<a href={ templ.URL("/containers/" + dc.ID) } class="block truncate hover:text-primary-700 dark:hover:text-primary-300" { ui.TooltipAttrs(tipID(dc, "name"))... }>
 				{ containerName(dc) }
 			</a>
 			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "name"), Text: containerName(dc), Align: ui.AlignStart})
 		}
 		@ui.TD(ui.CellProps{}) {
-			<span tabindex="0" class="block truncate rounded font-mono text-xs text-gray-600 dark:text-gray-400" { ui.TooltipAttrs(tipID(dc, "image"))... }>{ dc.Image }</span>
+			<span tabindex="0" class="block truncate rounded font-mono text-xs text-foreground-secondary" { ui.TooltipAttrs(tipID(dc, "image"))... }>{ dc.Image }</span>
 			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "image"), Text: dc.Image, Align: ui.AlignStart, Class: "break-all font-mono"})
 		}
 		@ui.TD(ui.CellProps{}) {
 			@components.StatusBadge("container", string(dc.State))
 		}
-		@ui.TD(ui.CellProps{Class: "text-gray-600 dark:text-gray-400"}) {
+		@ui.TD(ui.CellProps{Class: "text-foreground-secondary"}) {
 			{ containerType(dc, tracked) }
 		}
 		@ui.TD(ui.CellProps{Class: "pr-6"}) {

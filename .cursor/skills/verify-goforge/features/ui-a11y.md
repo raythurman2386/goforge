@@ -4,7 +4,7 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
 
 ## Sub-features
 
-- `token-scheme`: `--gf-background` on `:root` is `249 250 251` in light and `3 7 18` in dark.
+- `token-scheme`: `--gf-background` on `:root` is `238 238 238` in light (GrokDay `#eeeeee`) and `20 20 20` in dark (GrokNight `#141414`), the t1734u palette.
 - `focus-ring-mouse-hidden`: clicking `.btn-primary` on `/dev/ui` adds no box-shadow ring.
 - `focus-ring-keyboard`: Tab focus on the same button adds the primary ring.
 - `motion-default`: `.btn` has a `0.2s` transition.
@@ -124,5 +124,6 @@ The drive writes `ui-a11y-verdict.txt`, `ui-a11y-report.json` (axe rule ids, imp
 - In host mode there is no Docker, so the containers list has no rows. Its tooltips are covered by `TestContainerRowTooltips`. Container detail still renders for a seeded `containers` row owned through its service (pass `GOFORGE_UI_CONTAINER_ID`).
 - The first t1681u run found three pre-existing serious issues on pages the drive had never scanned: `dlitem` on service detail Connection Details (the rows had no `<dl>`), and `color-contrast` on the light-mode log placeholders on container and deployment detail (`text-gray-500` on the `gray-900` log pane, 3.66:1). Both are fixed in the same PR (`<dl>`, `text-gray-400`).
 - `GOFORGE_VERIFY_PSQL` needs `-tA`. Without it `drive-register` reads the `count` header as a user count and exits `2` with "users table is not empty".
+- t1734u palette (PR #115): body and secondary text use `text-foreground-secondary` (`#444444` / `#c8c8c8`). `text-muted-foreground` (`#767676` / `#6c6c6c`) is only for icons, placeholders, and the switch track. Light success and warning text use `#296E1A` and `#7F5C0E`. Light danger `#CD3048` and info `#2F64D2` stay on the palette hex by Raymond's decision (t1737u), so an axe `color-contrast` finding on light danger or info text against `muted` or its own tint (3.8:1 to 4.3:1) is a known residual, not a regression. Anything else is a regression.
 - `#dashboard-stats` uses `animate-fade-in`. A scan that lands mid-fade can report extra `color-contrast` nodes (`dt` and the stat labels at `#717885`, 4.44:1) on `/dashboard`. Rerun before calling that a regression. On the PR6 N1 run, the first light pass caught 6 nodes and the rerun matched `main` (1 node). Since t1681u, `scan()` waits (up to 2 s) for every finite animation to finish before it runs axe, so this should no longer show; if it does, check for a new or longer animation.
 - The order of the `/services` catalog changes between runs, so screenshots of that page differ even when the CSS has not changed.

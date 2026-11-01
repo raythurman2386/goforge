@@ -11,8 +11,8 @@
 	// Keep in sync with components.Toast.
 	var LEVEL_CLASSES = {
 		success: "border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200",
-		error: "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200",
-		info: "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200",
+		error: "border-danger/30 bg-danger/10 text-danger",
+		info: "border-info/30 bg-info/10 text-info",
 	};
 
 	// --- Toasts --------------------------------------------------------------

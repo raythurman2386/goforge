@@ -170,9 +170,31 @@ The attributes `ui.js` reads:
 
 Tokens are CSS variables in `static/css/input.css` (`--gf-*`, RGB triplets with light and dark values under `prefers-color-scheme`). `tailwind.config.js` maps them to utilities such as `bg-card`, `text-muted-foreground`, `border-field-border`, `ring-ring`, and `rounded-ui`. Dark mode is OS-only; there is no toggle.
 
+The neutral, surface, and status values are the locked t1734u palette (GrokDay light, GrokNight dark). The brand and accent stay GoForge emerald (`primary-50` to `primary-950`, the same in both schemes), not the Grok assistant purple.
+
+| Role | Utility | Light (GrokDay) | Dark (GrokNight) |
+|---|---|---|---|
+| Page background | `bg-background` | `#eeeeee` | `#141414` |
+| Raised surface (cards, dialogs, menus, tables) | `bg-card` | `#f5f5f5` | `#1c1c1c` |
+| Sidebar and mobile header | `bg-sidebar` | `#eaeaea` | `#111111` |
+| Log viewers | `bg-terminal` | `#f5f5f5` | `#0a0a0a` |
+| Code and `<pre>` blocks | `bg-code` | `#e4e4e4` | `#1c1c1c` |
+| Hover rows, tracks | `bg-highlight` | `#dedede` | `#242424` |
+| Subtle fill (table heads, chips) | `bg-muted` | `#e4e4e4` | `#242424` |
+| Borders | `border-border`, `border-card-border`, `border-divider`, `divide-divider` | `#dedede` / `#e4e4e4` | `#242424` |
+| Body text | `text-foreground` | `#262626` | `#e1e1e1` |
+| Body copy, secondary text, labels, table heads, tabs | `text-foreground-secondary`, `text-label` | `#444444` | `#c8c8c8` |
+| Icons, placeholders, switch track (palette muted, not text) | `text-muted-foreground` on `<svg>`, `placeholder-field-placeholder`, `bg-muted-foreground` | `#767676` | `#6c6c6c` |
+| Error | `text-danger`, `bg-danger/10`, `border-danger/30` | `#CD3048` | `#f7768e` |
+| Success | text `text-success-foreground`; fills `bg-success/10`, `ring-success/20` | text `#296E1A`, fill `#378E23` | `#9ece6a` |
+| Warning | text `text-warning-foreground`; fills `bg-warning/10`, `ring-warning/20` | text `#7F5C0E`, fill `#A27612` | `#e0af68` |
+| Info and links (system) | `text-info`, `bg-info/10` | `#2F64D2` | `#7aa2f7` |
+
+Use these utilities, not raw `gray-*`, `white`, or `black` classes with `dark:` pairs: a token switches with the OS scheme, so it needs no `dark:` variant. Tints are opacity steps on the role (`bg-danger/10`, `border-danger/30`, `ring-success/20`). Raw palette classes remain only for filled status fills that carry white text (`.btn-danger`, `.btn-warning`, solid Badge tones on `-700`) and `text-white` on primary and solid fills. Inverted chips (solid neutral Badge, Tooltip, the GitHub sign-in button) use `bg-foreground text-background`.
+
 The variant classes (`.btn-*`, `.input`, `.select`, `.label`, `.checkbox`, `.switch`, `.card*`, `.skeleton-*`) live in the components layer of `input.css` and are emitted only by the kit's class helpers. A caller's `Class` utility always wins over them. `.ui-focus-ring` is the shared `focus-visible` ring.
 
-Text must meet 4.5:1. Filled buttons use the `-700` shade with white text (`.btn-primary` on `primary-700`, `.btn-warning` on `amber-700`), ghost buttons rest on `text-gray-500` (dark `gray-400`), and primary text uses `text-primary-700` (dark `primary-400`). Keep light `text-gray-400` for icons, not text. The ratios are in comments beside each class in `input.css`.
+Text must meet 4.5:1. Filled buttons use the `-700` shade with white text (`.btn-primary` on `primary-700`, `.btn-warning` on `amber-700`), ghost buttons rest on `text-foreground-secondary` (8.9:1 light, 10.2:1 dark on `card`), and primary text uses `text-primary-700` (dark `primary-400`). Body and secondary copy uses `text-foreground-secondary` (`#444444` light, 7.7:1 on `muted`; `#c8c8c8` dark, 9.3:1 on `muted`). `text-muted-foreground` is the palette muted (`#767676`, `#6c6c6c`) and is only for icons, placeholders, and the switch track, which need 3:1 (WCAG 1.4.11), not for text. Light success and warning text use darker steps of the locked hues through `text-success-foreground` (`#296E1A`) and `text-warning-foreground` (`#7F5C0E`), at least 4.7:1 on every light surface and on their own tints; their fills, tints, rings, and borders stay on the palette hex. Light danger (`#CD3048`) and info (`#2F64D2`) stay on the palette hex by Raymond's decision (t1737u), so they measure 3.8:1 to 4.7:1 on light surfaces and tints, below 4.5:1 in places. Dark status text is at least 5.5:1.
 
 ## Accessibility expectations
 

@@ -84,7 +84,7 @@ func TestButtonClassCoversEveryVariant(t *testing.T) {
 
 func TestBadgeIsTextWithTone(t *testing.T) {
 	got := render(t, Badge(BadgeProps{Tone: BadgeSuccess, Attrs: templ.Attributes{"data-status": "running"}}), "Running")
-	assertHas(t, got, "<span ", "bg-green-50 text-green-700", "rounded-full", `data-status="running"`, ">Running</span>")
+	assertHas(t, got, "<span ", "bg-success/10 text-success-foreground", "rounded-full", `data-status="running"`, ">Running</span>")
 	assertLacks(t, got, "role=")
 
 	sq := render(t, Badge(BadgeProps{Tone: BadgePrimary, Variant: BadgeSubtle, Square: true, Size: BadgeMD}), "x")

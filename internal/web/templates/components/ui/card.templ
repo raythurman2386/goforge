@@ -43,7 +43,7 @@ templ CardTitle(level CardTitleLevel, attrs templ.Attributes) {
 
 // CardDescription is the muted line under a CardTitle.
 templ CardDescription(attrs templ.Attributes) {
-	<p { Attrs(templ.Attributes{"class": "mt-1 text-sm text-muted-foreground"}, attrs)... }>
+	<p { Attrs(templ.Attributes{"class": "mt-1 text-sm text-foreground-secondary"}, attrs)... }>
 		{ children... }
 	</p>
 }

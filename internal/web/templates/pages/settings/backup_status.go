@@ -37,9 +37,9 @@ func backupLastLine(st *backup.Status) string {
 
 func backupLineClass(st *backup.Status) string {
 	if st.LastRun != nil && st.LastRun.Status == statusFailed {
-		return "text-red-700"
+		return "text-danger"
 	}
-	return "text-gray-700"
+	return "text-foreground-secondary"
 }
 
 func backupScheduleLine(st *backup.Status) string {
@@ -108,9 +108,9 @@ func backupOffLine(st *backup.Status, form *backup.SettingsView) string {
 
 func backupOffClass(form *backup.SettingsView) string {
 	if form != nil && form.KeysUnreadable {
-		return "text-amber-700 dark:text-amber-300"
+		return "text-warning-foreground"
 	}
-	return "text-gray-500 dark:text-gray-400"
+	return "text-foreground-secondary"
 }
 
 func accessKeyState(f *backup.SettingsView) string {

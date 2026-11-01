@@ -47,11 +47,11 @@ templ List(projects []*models.Project, csrfToken string) {
 								</svg>
 							</div>
 						</div>
-						<h3 class="text-lg font-bold text-gray-900 truncate tracking-tight dark:text-gray-100">{ p.Name }</h3>
-						<p class="mt-2 text-sm text-gray-500 truncate font-mono bg-gray-50 p-2 rounded-md dark:text-gray-400 dark:bg-gray-800/50">
+						<h3 class="text-lg font-bold text-foreground truncate tracking-tight">{ p.Name }</h3>
+						<p class="mt-2 text-sm text-foreground-secondary truncate font-mono bg-muted/50 p-2 rounded-md">
 							{ p.RepositoryURL }
 						</p>
-						<div class="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-[11px] font-medium text-gray-500 dark:border-gray-800 dark:text-gray-400">
+						<div class="mt-6 pt-4 border-t border-divider flex items-center justify-between text-[11px] font-medium text-foreground-secondary">
 							<div class="flex items-center">
 								<svg class="mr-1.5 h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>

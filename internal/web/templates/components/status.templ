@@ -76,13 +76,13 @@ func statusBadgeTone(tone string) ui.BadgeTone {
 func statusDotClass(tone string) string {
 	switch tone {
 	case toneSuccess:
-		return "bg-green-500"
+		return "bg-success"
 	case toneDanger:
-		return "bg-red-500"
+		return "bg-danger"
 	case toneWarning:
-		return "bg-amber-500"
+		return "bg-warning"
 	default:
-		return "bg-gray-400"
+		return "bg-muted-foreground"
 	}
 }
 

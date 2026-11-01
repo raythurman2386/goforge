@@ -76,12 +76,12 @@ func dialogMode(p DialogProps) string {
 // dialogClass is the panel look. The backdrop, the open and close
 // transitions, and reduced motion live in input.css (dialog[data-ui-dialog]).
 func dialogClass() string {
-	return "w-[calc(100%-2rem)] max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-0 text-left text-foreground shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+	return "w-[calc(100%-2rem)] max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-0 text-left text-foreground shadow-2xl"
 }
 
 // confirmDialogClass is dialogClass at the narrower confirm width.
 func confirmDialogClass() string {
-	return "w-[calc(100%-2rem)] max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-0 text-left text-foreground shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+	return "w-[calc(100%-2rem)] max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-0 text-left text-foreground shadow-2xl"
 }
 
 func dialogAttrs(p DialogProps) templ.Attributes {

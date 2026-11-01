@@ -42,7 +42,7 @@ templ checkRow(p CheckboxProps, isSwitch bool) {
 				@requiredMark(p.Required)
 			</label>
 			if p.Description != "" {
-				<p id={ DescriptionID(p.id()) } class="text-xs text-muted-foreground">{ p.Description }</p>
+				<p id={ DescriptionID(p.id()) } class="text-xs text-foreground-secondary">{ p.Description }</p>
 			}
 		</div>
 	</div>

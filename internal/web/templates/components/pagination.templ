@@ -11,9 +11,9 @@ import (
 // Pagination renders pagination controls.
 templ Pagination(p *pagination.Pagination) {
 	if p.ShowPagination() {
-		<nav class="flex items-center justify-between border-t border-gray-100 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-900" aria-label="Pagination">
+		<nav class="flex items-center justify-between border-t border-divider bg-card px-6 py-3" aria-label="Pagination">
 			<div class="hidden sm:block">
-				<p class="text-sm text-gray-700 dark:text-gray-300">
+				<p class="text-sm text-foreground-secondary">
 					Showing
 					<span class="font-medium">{ strconv.Itoa(p.StartItem()) }</span>
 					to
@@ -69,9 +69,9 @@ templ Pagination(p *pagination.Pagination) {
 // PaginationFull renders full pagination with page numbers.
 templ PaginationFull(p *pagination.Pagination) {
 	if p.ShowPagination() {
-		<nav class="flex items-center justify-between border-t border-gray-100 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-900" aria-label="Pagination">
+		<nav class="flex items-center justify-between border-t border-divider bg-card px-6 py-3" aria-label="Pagination">
 			<div class="hidden sm:block">
-				<p class="text-sm text-gray-700 dark:text-gray-300">
+				<p class="text-sm text-foreground-secondary">
 					Showing
 					<span class="font-medium">{ strconv.Itoa(p.StartItem()) }</span>
 					to
@@ -89,7 +89,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.FirstURL()),
-							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.FirstURL(),
 								"hx-target": "#content",
@@ -109,7 +109,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.PreviousURL()),
-							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.PreviousURL(),
 								"hx-target": "#content",
@@ -149,7 +149,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.NextURL()),
-							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.NextURL(),
 								"hx-target": "#content",
@@ -168,7 +168,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.LastURL()),
-							Class: "!px-2 text-gray-500 dark:text-gray-400",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.LastURL(),
 								"hx-target": "#content",
@@ -190,7 +190,7 @@ templ PaginationFull(p *pagination.Pagination) {
 
 // PaginationInfo renders just the item count info (e.g., "Showing 1 to 20 of 100 results").
 templ PaginationInfo(p *pagination.Pagination) {
-	<p class="text-sm text-gray-700 dark:text-gray-300">
+	<p class="text-sm text-foreground-secondary">
 		if p.IsEmpty() {
 			No results found
 		} else {

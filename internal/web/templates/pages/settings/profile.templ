@@ -30,7 +30,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 						@ui.CardTitle(3, nil) {
 							Account Information
 						}
-						<p class="truncate text-sm text-muted-foreground">{ components.UserDisplayName(user) }</p>
+						<p class="truncate text-sm text-foreground-secondary">{ components.UserDisplayName(user) }</p>
 					</div>
 				</div>
 				<form hx-put="/settings/profile" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
@@ -48,7 +48,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 									</svg>
 									GitHub Account
 								}
-								<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
+								<p class="mt-1 text-sm text-foreground-secondary">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
 							} else {
 								@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Size: ui.BadgeMD}) {
 									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -121,13 +121,13 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 						Generate Token
 					}
 				</div>
-				<p class="text-sm text-gray-500 mb-4 dark:text-gray-400">API tokens allow programmatic access to your account. Keep them secure!</p>
+				<p class="text-sm text-foreground-secondary mb-4">API tokens allow programmatic access to your account. Keep them secure!</p>
 				
 				<div class="mb-4">
 					@ui.AlertMessage(ui.AlertInfo, "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1 and on the MCP endpoint at /mcp. Full tokens also work on the web routes and are refused on /mcp.")
 				</div>
 
-				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-gray-100 animate-fade-in dark:divide-gray-800">
+				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-divider animate-fade-in">
 					@components.LoadingState("Loading tokens...")
 				</div>
 			}
@@ -151,14 +151,14 @@ templ MCPCardView(mcp *MCPCard) {
 				Generate MCP token
 			}
 		</div>
-		<p class="text-sm text-gray-500 mb-4 dark:text-gray-400">
+		<p class="text-sm text-foreground-secondary mb-4">
 			Point an MCP client (Cursor, Claude, or any streamable HTTP client) at this endpoint with an MCP token. A read token gets { fmt.Sprint(MCPReadTools) } read-only tools; a token with write gets all { fmt.Sprint(MCPWriteTools) }, and every change is a dry run until you pass an approval_ref. Full tokens are refused.
 		</p>
 		<p class={ ui.LabelClass("") }>Endpoint</p>
-		<code id="mcp-endpoint" class="mb-4 block w-full rounded-lg bg-gray-100 p-3 text-sm font-mono break-all border border-gray-200 dark:bg-gray-800 dark:border-gray-800">{ mcp.Endpoint }</code>
+		<code id="mcp-endpoint" class="mb-4 block w-full rounded-lg bg-code p-3 text-sm font-mono break-all border border-border">{ mcp.Endpoint }</code>
 		<p class={ ui.LabelClass("") }>mcp.json</p>
-		<pre id="mcp-snippet" class="mb-2 w-full overflow-x-auto rounded-lg bg-gray-100 p-3 text-xs font-mono border border-gray-200 dark:bg-gray-800 dark:border-gray-800">{ mcp.Snippet }</pre>
-		<p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Set <code>{ MCPTokenEnv }</code> in the client's environment to the token. The token is not stored in the file.</p>
+		<pre id="mcp-snippet" class="mb-2 w-full overflow-x-auto rounded-lg bg-code p-3 text-xs font-mono border border-border">{ mcp.Snippet }</pre>
+		<p class="text-xs text-foreground-secondary mb-4">Set <code>{ MCPTokenEnv }</code> in the client's environment to the token. The token is not stored in the file.</p>
 		<div class="flex justify-end">
 			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Attrs: ui.CopyAttrs("mcp-snippet")}) {
 				Copy mcp.json
@@ -170,15 +170,15 @@ templ MCPCardView(mcp *MCPCard) {
 // APITokenRow is one token on the Profile list. res names the token's
 // projects and services; nil shows short IDs.
 templ APITokenRow(token *models.APIToken, res *TokenResources) {
-	<div class="py-4 flex items-center justify-between hover:bg-gray-50 -mx-4 px-4 dark:hover:bg-gray-800/50" id={ "token-" + token.ID }>
+	<div class="py-4 flex items-center justify-between hover:bg-muted/50 -mx-4 px-4" id={ "token-" + token.ID }>
 		<div>
-			<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+			<p class="text-sm font-medium text-foreground">
 				{ token.Name }
 				if token.TokenHint != "" {
-					<code class="ml-2 text-xs font-mono text-gray-500 dark:text-gray-400" data-token-hint>{ token.TokenHint }</code>
+					<code class="ml-2 text-xs font-mono text-foreground-secondary" data-token-hint>{ token.TokenHint }</code>
 				}
 			</p>
-			<p class="text-xs text-gray-500 dark:text-gray-400">
+			<p class="text-xs text-foreground-secondary">
 				Created { formatDate(token.CreatedAt) }
 				if token.LastUsedAt.Valid {
 					• Last used { formatDate(token.LastUsedAt.Time) }
@@ -189,22 +189,22 @@ templ APITokenRow(token *models.APIToken, res *TokenResources) {
 			</p>
 			<p class="mt-1 flex flex-wrap gap-1">
 				for _, scope := range tokenScopes(token) {
-					@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-gray-700 dark:text-gray-300"}) {
+					@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-foreground-secondary"}) {
 						{ scope }
 					}
 				}
 			</p>
 			if token.IsRestricted() {
 				<p class="mt-1 flex flex-wrap items-center gap-1" data-token-restricted>
-					<span class="text-xs text-gray-500 dark:text-gray-400">Restricted to</span>
+					<span class="text-xs text-foreground-secondary">Restricted to</span>
 					for _, rr := range tokenRestrictions(token, res) {
-						@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-gray-700 dark:text-gray-300", Attrs: templ.Attributes{"data-token-" + rr.Kind: rr.ID, "title": rr.Kind + " " + rr.ID}}) {
+						@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-foreground-secondary", Attrs: templ.Attributes{"data-token-" + rr.Kind: rr.ID, "title": rr.Kind + " " + rr.ID}}) {
 							{ rr.Kind }: { rr.Name }
 						}
 					}
 				</p>
 			} else {
-				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-token-host-wide>All projects and services</p>
+				<p class="mt-1 text-xs text-foreground-secondary" data-token-host-wide>All projects and services</p>
 			}
 		</div>
 		<div class="flex items-center gap-2">
@@ -259,10 +259,10 @@ templ TokenCreatedModal(title, rawToken string, mcp bool) {
 				</svg>
 			</div>
 			<div class="min-w-0 flex-1">
-				<p class="text-sm text-gray-500 dark:text-gray-400">Copy this token now. You won't be able to see it again!</p>
-				<code id="created-token" class="mt-3 block w-full rounded-lg bg-gray-100 p-3 text-sm font-mono break-all border border-gray-200 dark:bg-gray-800 dark:border-gray-800">{ rawToken }</code>
+				<p class="text-sm text-foreground-secondary">Copy this token now. You won't be able to see it again!</p>
+				<code id="created-token" class="mt-3 block w-full rounded-lg bg-code p-3 text-sm font-mono break-all border border-border">{ rawToken }</code>
 				if mcp {
-					<p class="mt-3 text-xs text-gray-500 dark:text-gray-400">For MCP, set <code>{ MCPTokenEnv }</code> to this token where your client runs.</p>
+					<p class="mt-3 text-xs text-foreground-secondary">For MCP, set <code>{ MCPTokenEnv }</code> to this token where your client runs.</p>
 				}
 			</div>
 		</div>
@@ -293,9 +293,9 @@ templ AddAPITokenModal(csrfToken string, mcp bool, res *TokenResources) {
 			@ui.Select(ui.SelectProps{ID: "token-expires", Name: "expires_in", Label: "Expires", Options: tokenExpiryOptions(mcp), Selected: tokenExpiryDefault(mcp), Class: "mb-4"})
 			@ui.CheckboxGroup(ui.CheckboxGroupProps{Legend: "Scopes", DescribedBy: "token-scopes-help", Class: "mb-4"}) {
 				if mcp {
-					<p id="token-scopes-help" class="text-xs text-gray-500 dark:text-gray-400">An MCP token needs read. Add write for the gated mutation tools; add protected only if the agent may stop, reconfigure, or re-image protected services.</p>
+					<p id="token-scopes-help" class="text-xs text-foreground-secondary">An MCP token needs read. Add write for the gated mutation tools; add protected only if the agent may stop, reconfigure, or re-image protected services.</p>
 				} else {
-					<p id="token-scopes-help" class="text-xs text-gray-500 dark:text-gray-400">Leave all unchecked for a full token that also works on the web routes. A scoped token works only on <code>/api/v1</code> and <code>/mcp</code>.</p>
+					<p id="token-scopes-help" class="text-xs text-foreground-secondary">Leave all unchecked for a full token that also works on the web routes. A scoped token works only on <code>/api/v1</code> and <code>/mcp</code>.</p>
 				}
 				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-read", Name: "scopes", Value: "read", Label: "read: list and inspect projects, services, containers, logs", Checked: mcp})
 				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-write", Name: "scopes", Value: "write", Label: "write: gated deploys, restarts, env vars, service changes", Checked: mcp})
@@ -303,7 +303,7 @@ templ AddAPITokenModal(csrfToken string, mcp bool, res *TokenResources) {
 			}
 			if res.hasAny() {
 				@ui.CheckboxGroup(ui.CheckboxGroupProps{Legend: "Restrict to (optional)", DescribedBy: "token-restrict-help", Class: "mb-4", Attrs: templ.Attributes{"data-token-restrict": true}}) {
-					<p id="token-restrict-help" class="text-xs text-gray-500 dark:text-gray-400">Leave all unchecked for every project and service. Check some to limit this token to them on <code>/api/v1</code> and <code>/mcp</code> (a project includes its deployments and containers). A restricted token needs at least one scope above.</p>
+					<p id="token-restrict-help" class="text-xs text-foreground-secondary">Leave all unchecked for every project and service. Check some to limit this token to them on <code>/api/v1</code> and <code>/mcp</code> (a project includes its deployments and containers). A restricted token needs at least one scope above.</p>
 					for _, p := range res.Projects {
 						@ui.Checkbox(ui.CheckboxProps{ID: "token-project-" + p.ID, Name: "project_ids", Value: p.ID, Label: "Project: " + p.Name})
 					}
@@ -398,22 +398,22 @@ templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string)
 				{ backupLastLine(st) }
 			</p>
 			if st.LastRun != nil && st.LastRun.Status == statusFailed && st.LastRun.ErrorSummary != "" {
-				<p class="mt-1 text-xs text-red-700 break-words dark:text-red-300">{ st.LastRun.ErrorSummary }</p>
+				<p class="mt-1 text-xs text-danger break-words">{ st.LastRun.ErrorSummary }</p>
 			}
-			<p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+			<p class="mt-2 text-xs text-foreground-secondary">
 				{ backupScheduleLine(st) }
 			</p>
 		}
 		<div
 			id="backup-restore-points"
-			class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700"
+			class="mt-4 border-t border-border pt-4"
 			data-testid="backup-restore-points"
 			hx-get="/settings/backups/restore-points"
 			hx-trigger="load"
 			hx-swap="innerHTML"
 		>
-			<h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Restore points</h4>
-			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Loading restore points…</p>
+			<h4 class="text-sm font-medium text-foreground">Restore points</h4>
+			<p class="mt-1 text-xs text-foreground-secondary">Loading restore points…</p>
 		</div>
 		if form != nil {
 			@backupSettingsForm(form, csrfToken)
@@ -424,17 +424,17 @@ templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string)
 // BackupRestorePoints is the read-only Restore points list, loaded into the
 // Backups card. There is no restore button: restoring is CLI-only.
 templ BackupRestorePoints(v *backup.RestorePointsView) {
-	<h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Restore points</h4>
+	<h4 class="text-sm font-medium text-foreground">Restore points</h4>
 	if v.Error != "" {
-		<p class="mt-1 text-xs text-red-700 break-words dark:text-red-300" data-testid="restore-points-error">{ v.Error }</p>
+		<p class="mt-1 text-xs text-danger break-words" data-testid="restore-points-error">{ v.Error }</p>
 	} else if len(v.Points) == 0 {
-		<p class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="restore-points-empty">
+		<p class="mt-1 text-xs text-foreground-secondary" data-testid="restore-points-empty">
 			{ fmt.Sprintf("No complete backups in %s/%s yet.", v.Bucket, v.Prefix) }
 		</p>
 	} else {
 		@ui.Table(ui.TableProps{Caption: "Restore points", Compact: true, WrapperClass: "mt-2", Attrs: templ.Attributes{"data-testid": "restore-points"}}) {
 			<thead>
-				@ui.TR(templ.Attributes{"class": "text-gray-500 dark:text-gray-400"}) {
+				@ui.TR(templ.Attributes{"class": "text-foreground-secondary"}) {
 					@ui.TH(ui.CellProps{Compact: true}) { Run key }
 					@ui.TH(ui.CellProps{Compact: true}) { Taken }
 					@ui.TH(ui.CellProps{Compact: true}) { Trigger }
@@ -444,10 +444,10 @@ templ BackupRestorePoints(v *backup.RestorePointsView) {
 			</thead>
 			<tbody>
 				for _, p := range v.Points {
-					@ui.TR(templ.Attributes{"class": "border-t border-gray-100 text-gray-700 dark:border-gray-800 dark:text-gray-300", "data-testid": "restore-point"}) {
+					@ui.TR(templ.Attributes{"class": "border-t border-divider text-foreground-secondary", "data-testid": "restore-point"}) {
 						@ui.TD(ui.CellProps{Compact: true, Class: "font-mono"}) { { p.RunKey } }
 						if p.Manifest == nil {
-							@ui.TD(ui.CellProps{Compact: true, Colspan: 4, Class: "text-red-700 dark:text-red-300"}) { { p.Problem } }
+							@ui.TD(ui.CellProps{Compact: true, Colspan: 4, Class: "text-danger"}) { { p.Problem } }
 						} else {
 							@ui.TD(ui.CellProps{Compact: true}) { { restorePointTime(v, p.Manifest.StartedAt) } }
 							@ui.TD(ui.CellProps{Compact: true}) { { p.Manifest.Trigger } }
@@ -459,19 +459,19 @@ templ BackupRestorePoints(v *backup.RestorePointsView) {
 			</tbody>
 		}
 		if v.Incomplete > 0 {
-			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d incomplete run(s) without a manifest are not listed.", v.Incomplete) }</p>
+			<p class="mt-1 text-xs text-foreground-secondary">{ fmt.Sprintf("%d incomplete run(s) without a manifest are not listed.", v.Incomplete) }</p>
 		}
-		<p class="mt-2 text-xs text-gray-500 dark:text-gray-400" data-testid="restore-points-howto">
+		<p class="mt-2 text-xs text-foreground-secondary" data-testid="restore-points-howto">
 			Restoring replaces the GoForge database (not service data) and is done from the command line. Stop GoForge, preview with a dry run, then add <code class="font-mono">--yes</code>:
 		</p>
-		<pre class="mt-1 overflow-x-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800"><code>{ restoreCommand(v) }</code></pre>
+		<pre class="mt-1 overflow-x-auto rounded bg-code p-2 text-xs"><code>{ restoreCommand(v) }</code></pre>
 	}
 }
 
 templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
-	<form class="mt-6 border-t border-gray-100 pt-4 dark:border-gray-800" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+	<form class="mt-6 border-t border-divider pt-4" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
 		<input type="hidden" name="csrf_token" value={ csrfToken }/>
-		<p class="mb-4 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-source">{ backupSourceLine(f) }</p>
+		<p class="mb-4 text-xs text-foreground-secondary" data-testid="backup-source">{ backupSourceLine(f) }</p>
 		@ui.Switch(ui.CheckboxProps{ID: "backup-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops the schedule and keeps the settings.", Checked: f.Enabled, Class: "mb-4"})
 		<div class="grid gap-4 sm:grid-cols-2">
 			@ui.Input(ui.InputProps{ID: "backup-endpoint", Name: "endpoint", Type: "url", Label: "Endpoint", Value: f.Endpoint, Placeholder: "https://<account>.r2.cloudflarestorage.com", Class: "sm:col-span-2"})
@@ -481,11 +481,11 @@ templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
 			@ui.Checkbox(ui.CheckboxProps{ID: "backup-path-style", Name: "force_path_style", Value: "true", Label: "Path-style URLs (MinIO, Garage)", Checked: f.ForcePathStyle, Class: "self-end pb-2"})
 			<div>
 				@ui.Input(ui.InputProps{ID: "backup-access-key", Name: "access_key_id", Label: "Access key ID", Autocomplete: "off", Placeholder: accessKeyPlaceholder(f), DescribedBy: "backup-access-key-state", Attrs: templ.Attributes{"spellcheck": "false"}})
-				<p id="backup-access-key-state" class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-access-key-state">{ accessKeyState(f) }</p>
+				<p id="backup-access-key-state" class="mt-1 text-xs text-foreground-secondary" data-testid="backup-access-key-state">{ accessKeyState(f) }</p>
 			</div>
 			<div>
 				@ui.Input(ui.InputProps{ID: "backup-secret", Name: "secret_access_key", Type: "password", Label: "Secret access key", Autocomplete: "new-password", Placeholder: secretPlaceholder(f), DescribedBy: "backup-secret-state"})
-				<p id="backup-secret-state" class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="backup-secret-state">{ secretState(f) }</p>
+				<p id="backup-secret-state" class="mt-1 text-xs text-foreground-secondary" data-testid="backup-secret-state">{ secretState(f) }</p>
 			</div>
 			if f.AccessKeySet || f.SecretSet {
 				@ui.Checkbox(ui.CheckboxProps{ID: "backup-clear-creds", Name: "clear_credentials", Value: "true", Label: "Remove the stored keys (backups must be off)", Class: "sm:col-span-2"})

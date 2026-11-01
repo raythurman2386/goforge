@@ -28,7 +28,7 @@ func TestDropdownMenuAndItems(t *testing.T) {
 	assertHas(t, link, `<a href="/projects/p1?env=e1"`, `role="menuitem"`, `tabindex="-1"`, `data-ui-menuitem`)
 
 	btn := render(t, DropdownItem(DropdownItemProps{Tone: ItemDanger, Attrs: templ.Attributes{"hx-post": "/x"}}), "Delete")
-	assertHas(t, btn, `<button type="button"`, `role="menuitem"`, `hx-post="/x"`, "text-red-700")
+	assertHas(t, btn, `<button type="button"`, `role="menuitem"`, `hx-post="/x"`, "text-danger")
 
 	sep := render(t, DropdownSeparator(), "")
 	assertHas(t, sep, `role="separator"`)

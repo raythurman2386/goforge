@@ -11,7 +11,7 @@ var demoTableRows = []struct{ name, image, status string }{
 }
 
 templ navTabsSection() {
-	<p class="text-sm text-muted-foreground">Server-routed: each tab is a link to its own URL and the current one has aria-current="page". No tablist role, no JS. Project detail uses it.</p>
+	<p class="text-sm text-foreground-secondary">Server-routed: each tab is a link to its own URL and the current one has aria-current="page". No tablist role, no JS. Project detail uses it.</p>
 	@ui.NavTabs(ui.NavTabsProps{Label: "Gallery sections", Class: "mt-4", Attrs: templ.Attributes{"id": "gallery-navtabs"}}) {
 		@ui.NavTab(ui.NavTabProps{Href: "#navtabs", Current: true}) {
 			Overview
@@ -32,7 +32,7 @@ templ navTabsSection() {
 }
 
 templ tabsSection() {
-	<p class="text-sm text-muted-foreground">In-page tabs: Left and Right move and wrap, Home and End jump, and focus selects (automatic activation). Only the selected tab is in the Tab order.</p>
+	<p class="text-sm text-foreground-secondary">In-page tabs: Left and Right move and wrap, Home and End jump, and focus selects (automatic activation). Only the selected tab is in the Tab order.</p>
 	@ui.Tabs(ui.TabsProps{ID: "gallery-tabs", Class: "mt-4"}) {
 		@ui.TabList(ui.TabsProps{ID: "gallery-tabs", Label: "Log source"}) {
 			@ui.Tab(ui.TabProps{TabsID: "gallery-tabs", Key: "build", Selected: true}) {
@@ -58,7 +58,7 @@ templ tabsSection() {
 }
 
 templ tablesSection() {
-	<p class="text-sm text-muted-foreground">Table, THead, TBody, TR, TH (scope), TD, a caption (sr-only by default, visible here), and a focusable, labelled horizontal scroll region.</p>
+	<p class="text-sm text-foreground-secondary">Table, THead, TBody, TR, TH (scope), TD, a caption (sr-only by default, visible here), and a focusable, labelled horizontal scroll region.</p>
 	@ui.Table(ui.TableProps{ID: "gallery-table", Caption: "Example containers", CaptionVisible: true, WrapperClass: "mt-4"}) {
 		@ui.THead(nil) {
 			@ui.TR(nil) {
@@ -96,7 +96,7 @@ templ tablesSection() {
 		}
 		@ui.TBody(nil) {
 			@ui.TableEmpty(2) {
-				<p class="py-4 text-center text-sm text-muted-foreground">No rows yet.</p>
+				<p class="py-4 text-center text-sm text-foreground-secondary">No rows yet.</p>
 			}
 		}
 	}
@@ -108,7 +108,7 @@ templ tablesSection() {
 			}
 		</thead>
 		<tbody>
-			@ui.TR(templ.Attributes{"class": "border-t border-gray-100 dark:border-gray-800"}) {
+			@ui.TR(templ.Attributes{"class": "border-t border-divider"}) {
 				@ui.TD(ui.CellProps{Compact: true, Class: "font-mono"}) { 20261030T120000Z }
 				@ui.TD(ui.CellProps{Compact: true}) { 12.4 MB }
 			}
@@ -117,7 +117,7 @@ templ tablesSection() {
 }
 
 templ sheetsSection() {
-	<p class="text-sm text-muted-foreground">A Sheet is a static Dialog pinned to an edge: the focus trap, Escape, backdrop click, and focus return come from the same runtime. It slides in unless reduced motion is on. The app's mobile navigation is a left Sheet.</p>
+	<p class="text-sm text-foreground-secondary">A Sheet is a static Dialog pinned to an edge: the focus trap, Escape, backdrop click, and focus return come from the same runtime. It slides in unless reduced motion is on. The app's mobile navigation is a left Sheet.</p>
 	<div class="mt-4 flex flex-wrap gap-3">
 		@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: ui.Attrs(ui.OpenSheetAttrs("gallery-sheet-left"), templ.Attributes{"id": "gallery-sheet-left-open"})}) {
 			Open left sheet
@@ -128,9 +128,9 @@ templ sheetsSection() {
 	</div>
 	@ui.Sheet(ui.SheetProps{ID: "gallery-sheet-left", Title: "Navigation", Side: ui.SheetLeft}) {
 		<nav aria-label="Sheet demo" class="space-y-1 p-4">
-			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">First link</a>
-			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">Second link</a>
-			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 ui-focus-ring dark:text-gray-300 dark:hover:bg-gray-800">Third link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted ui-focus-ring">First link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted ui-focus-ring">Second link</a>
+			<a href="#sheets" class="block rounded-ui px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted ui-focus-ring">Third link</a>
 		</nav>
 	}
 	@ui.Sheet(ui.SheetProps{ID: "gallery-sheet-right", Title: "Filters", Description: "A right sheet with a form field.", Side: ui.SheetRight}) {

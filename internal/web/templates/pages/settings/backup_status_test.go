@@ -36,7 +36,7 @@ func TestBackupCard(t *testing.T) {
 	st.LastRun = &failed
 	got = render(t, st)
 	if !strings.Contains(got, "Last backup: failed Oct 30, 2026 02:00 CDT. Last success Oct 29, 2026 02:00 CDT (5.0 MiB).") ||
-		!strings.Contains(got, "app-db: boom") || !strings.Contains(got, "text-red-700") {
+		!strings.Contains(got, "app-db: boom") || !strings.Contains(got, "text-danger") {
 		t.Errorf("failed card = %s", got)
 	}
 

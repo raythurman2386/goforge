@@ -35,7 +35,10 @@ module.exports = {
         // Semantic tokens. Light and dark values live in input.css under
         // prefers-color-scheme, so these need no dark: variant.
         background: token('background'),
-        foreground: token('foreground'),
+        foreground: {
+          DEFAULT: token('foreground'),
+          secondary: token('foreground-secondary'),
+        },
         card: {
           DEFAULT: token('card'),
           border: token('card-border'),
@@ -62,6 +65,24 @@ module.exports = {
           DEFAULT: token('ring'),
           offset: token('ring-offset'),
         },
+        // Surfaces (t1734u GrokDay/GrokNight).
+        sidebar: token('sidebar'),
+        terminal: token('terminal'),
+        highlight: token('highlight'),
+        code: token('code'),
+        // Status and link roles (t1734u). Brand/accent stays primary (emerald).
+        danger: token('danger'),
+        // Light success/warning text uses a darker AA step (t1737u); fills,
+        // tints, rings, and borders stay on the palette hex.
+        success: {
+          DEFAULT: token('success'),
+          foreground: token('success-foreground'),
+        },
+        warning: {
+          DEFAULT: token('warning'),
+          foreground: token('warning-foreground'),
+        },
+        info: token('info'),
       },
       borderRadius: {
         ui: 'var(--gf-radius)',

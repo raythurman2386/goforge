@@ -105,7 +105,7 @@ func dropdownTriggerProps(p DropdownProps) ButtonProps {
 // dropdownMenuClass is the menu panel. Position, the open transition, and
 // reduced motion live in input.css ([data-ui-overlay]).
 func dropdownMenuClass() string {
-	return "min-w-[14rem] max-w-[calc(100vw-1rem)] rounded-xl border border-gray-100 bg-white p-1.5 text-left shadow-xl ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-900"
+	return "min-w-[14rem] max-w-[calc(100vw-1rem)] rounded-xl border border-divider bg-card p-1.5 text-left shadow-xl ring-1 ring-border"
 }
 
 func dropdownMenuAttrs(p DropdownProps) templ.Attributes {
@@ -148,11 +148,11 @@ func dropdownItemClass(t DropdownItemTone) string {
 	case ItemPrimary:
 		return "block w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-primary-700 outline-none transition-colors hover:bg-primary-50 focus:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30 dark:focus:bg-primary-900/30"
 	case ItemDanger:
-		return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 outline-none transition-colors hover:bg-red-50 focus:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
+		return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-danger outline-none transition-colors hover:bg-danger/10 focus:bg-danger/10"
 	case ItemDefault:
 	}
 	// ItemDefault, the zero value, and unknown values.
-	return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 outline-none transition-colors hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:text-primary-700 dark:text-gray-300 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:focus:bg-primary-900/30 dark:focus:text-primary-300"
+	return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground-secondary outline-none transition-colors hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:text-primary-700 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:focus:bg-primary-900/30 dark:focus:text-primary-300"
 }
 
 func dropdownItemAttrs(p DropdownItemProps) templ.Attributes {
@@ -209,7 +209,7 @@ func popoverTriggerProps(p PopoverProps) ButtonProps {
 }
 
 func popoverPanelClass() string {
-	return "w-80 max-w-[calc(100vw-1rem)] rounded-xl border border-gray-200 bg-white p-4 text-left text-sm text-foreground shadow-xl dark:border-gray-800 dark:bg-gray-900"
+	return "w-80 max-w-[calc(100vw-1rem)] rounded-xl border border-border bg-card p-4 text-left text-sm text-foreground shadow-xl"
 }
 
 func popoverAttrs(p PopoverProps) templ.Attributes {
@@ -257,7 +257,7 @@ func TooltipAttrs(tooltipID string) templ.Attributes {
 }
 
 func tooltipClass() string {
-	return "max-w-xs rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg dark:bg-gray-100 dark:text-gray-900"
+	return "max-w-xs rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background shadow-lg"
 }
 
 func tooltipAttrs(p TooltipProps) templ.Attributes {

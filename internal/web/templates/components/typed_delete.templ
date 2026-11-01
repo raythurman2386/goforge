@@ -34,8 +34,8 @@ templ TypedDeleteDialog(p TypedDeleteProps) {
 			autocomplete="off"
 			data-testid={ p.ID + "-form" }
 		>
-			<p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
-				Type <strong class="font-mono font-semibold text-gray-900 dark:text-gray-100">{ p.Name }</strong> to confirm.
+			<p class="mb-3 text-sm text-foreground-secondary">
+				Type <strong class="font-mono font-semibold text-foreground">{ p.Name }</strong> to confirm.
 			</p>
 			@ui.Input(ui.InputProps{
 				ID:           p.ID + "-name",

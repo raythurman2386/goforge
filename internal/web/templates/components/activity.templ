@@ -32,7 +32,7 @@ templ ActivityTable(id string, rows []ActivityRow, compact bool) {
 			}
 			for _, r := range rows {
 				@ui.TR(templ.Attributes{"class": activityRowClass(r), "data-activity-id": r.ID, "data-failed": boolAttr(r.Failed)}) {
-					@ui.TD(ui.CellProps{Class: "pl-6 whitespace-nowrap text-gray-600 dark:text-gray-400"}) {
+					@ui.TD(ui.CellProps{Class: "pl-6 whitespace-nowrap text-foreground-secondary"}) {
 						<time datetime={ r.When.UTC().Format("2006-01-02T15:04:05Z") }>{ activityTime(r.When) }</time>
 					}
 					@ui.TD(ui.CellProps{}) {
@@ -46,21 +46,21 @@ templ ActivityTable(id string, rows []ActivityRow, compact bool) {
 							@ui.Badge(ui.BadgeProps{Tone: ui.BadgeDanger, Class: "ml-2"}) { failed }
 						}
 					}
-					@ui.TD(ui.CellProps{Class: "text-gray-700 dark:text-gray-300"}) {
+					@ui.TD(ui.CellProps{Class: "text-foreground-secondary"}) {
 						{ r.TokenName }
 					}
 					@ui.TD(ui.CellProps{}) {
 						if r.ResourceURL != "" {
 							<a href={ r.ResourceURL } class="text-primary-700 hover:underline dark:text-primary-300">{ r.Resource }</a>
 						} else {
-							<span class="text-gray-600 dark:text-gray-400">{ r.Resource }</span>
+							<span class="text-foreground-secondary">{ r.Resource }</span>
 						}
 					}
 					if !compact {
-						@ui.TD(ui.CellProps{Class: "font-mono text-xs text-gray-600 dark:text-gray-400"}) {
+						@ui.TD(ui.CellProps{Class: "font-mono text-xs text-foreground-secondary"}) {
 							{ r.ApprovalRef }
 						}
-						@ui.TD(ui.CellProps{Class: "pr-6 text-xs text-red-700 dark:text-red-300 break-words"}) {
+						@ui.TD(ui.CellProps{Class: "pr-6 text-xs text-danger break-words"}) {
 							{ r.Error }
 						}
 					}
