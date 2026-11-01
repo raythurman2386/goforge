@@ -432,16 +432,24 @@ func (h *Handler) linkService(w http.ResponseWriter, r *http.Request) {
 		if err := h.deps.Links.Link(ctx, p.ID, inst.ID); err != nil {
 			return failed(err, http.StatusInternalServerError, "failed to link service")
 		}
-		added := []string{}
+		// The link stands even when a variable fails to save, so the answer
+		// says which keys did not land (partial) instead of hiding them.
+		added, failedKeys := []string{}, []string{}
 		for _, k := range inject {
 			v := &models.EnvVariable{EnvironmentID: env.ID, Key: k, Value: linkVars[k], IsSecret: true}
 			if addErr := h.deps.Projects.AddEnvVariable(ctx, v); addErr != nil {
 				h.logger.Warn("api v1: link env var not added", "key", k, "error", addErr)
+				failedKeys = append(failedKeys, k)
 				continue
 			}
 			added = append(added, k)
 		}
-		return succeeded(map[string]any{"linked": true, "added_keys": added})
+		return succeeded(map[string]any{
+			"linked":      true,
+			"added_keys":  added,
+			"failed_keys": failedKeys,
+			"partial":     len(failedKeys) > 0,
+		})
 	})
 }
 

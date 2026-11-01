@@ -63,6 +63,9 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	case r.URL.Path == "/api/v1/containers/dock-prot":
 		_, _ = w.Write([]byte(`{"docker_id":"dock-prot","service_instance_id":"server-protected"}`))
+	case r.URL.Path == "/api/v1/services/api-protected/image":
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"code":"protected_resource","message":"service api-protected is protected; update_service_image needs a token with the protected scope"}}`))
 	case r.URL.Path == "/api/v1/projects/missing":
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"error":{"code":"not_found","message":"project not found"}}`))
