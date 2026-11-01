@@ -52,3 +52,22 @@ func TestDashboardStatsLoaderMirrorsStats(t *testing.T) {
 		t.Errorf("loader reserves %d cards, loaded stats render %d", got, want)
 	}
 }
+
+// t1695u: the recent agent actions loader keeps the swap contract and
+// reserves the card's Flush shell (header, then body).
+func TestRecentAgentActionsLoaderMirrorsCard(t *testing.T) {
+	loader := render(t, RecentAgentActionsLoader())
+	for _, want := range []string{
+		`id="recent-agent-actions-loader"`,
+		`hx-get="/dashboard/activity"`,
+		`hx-swap="outerHTML"`,
+		`aria-busy="true"`,
+		`class="card p-0 mt-8 overflow-hidden"`,
+		`class="card-header"`,
+		`class="card-body"`,
+	} {
+		if !strings.Contains(loader, want) {
+			t.Errorf("loader missing %s", want)
+		}
+	}
+}

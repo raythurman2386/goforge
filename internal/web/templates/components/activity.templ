@@ -71,39 +71,47 @@ templ ActivityTable(id string, rows []ActivityRow, compact bool) {
 }
 
 // ActivityCard is the dashboard's recent agent actions card: the latest
-// MCP and API changes, with a link to the full activity page. With rows, the
-// header carries "View all" beside the title. With none, there is no table
-// chrome and no header action: the card body says so and offers "View all
-// activity" as a secondary link under the message (t1683u).
+// MCP and API changes, with a link to the full activity page. It is the kit's
+// Flush card in both states: CardHeader holds the title block on the left and
+// one ghost "View all" action on the right, then the body is the compact
+// table (rows) or a compact EmptyState in CardContent (none). The empty card
+// has no table chrome, and its header action goes to all activity, since the
+// agent-only view would be empty too (t1683u, t1695u).
 templ ActivityCard(rows []ActivityRow) {
 	@ui.Card(ui.CardProps{Flush: true, Class: "mt-8 overflow-hidden", Attrs: templ.Attributes{"id": "recent-agent-actions"}}) {
 		@ui.CardHeader(nil) {
-			<div class="flex items-center justify-between gap-4">
-				<div>
-					@ui.CardTitle(2, nil) { Recent agent actions }
-					@ui.CardDescription(nil) { Changes made through the API or by an MCP agent. }
-				</div>
-				if len(rows) > 0 {
-					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Href: "/settings/activity?source=agent"}) {
-						View all
-					}
-				}
+			<div class="min-w-0">
+				@ui.CardTitle(2, nil) { Recent agent actions }
+				@ui.CardDescription(nil) { Changes made through the API or by an MCP agent. }
 			</div>
+			if len(rows) > 0 {
+				@activityViewAll("/settings/activity?source=agent", "View all")
+			} else {
+				@activityViewAll("/settings/activity", "View all activity")
+			}
 		}
 		if len(rows) == 0 {
-			<div data-testid="recent-agent-actions-empty" class="px-6 pb-6 text-center">
+			@ui.CardContent(templ.Attributes{"data-testid": "recent-agent-actions-empty"}) {
 				@EmptyState(EmptyStateProps{
 					Title:       "No recent agent actions",
-					Description: "Changes an API token or an MCP agent makes show up here.",
+					Description: "Changes from API tokens and MCP agents appear here.",
 					Icon:        "server",
 					Compact:     true,
 				})
-				@ui.Button(ui.ButtonProps{Variant: ui.ButtonLink, Href: "/settings/activity", Class: "-mt-4"}) {
-					View all activity
-				}
-			</div>
+			}
 		} else {
 			@ActivityTable("recent-agent-actions-table", rows, true)
 		}
+	}
+}
+
+// activityViewAll is the card header's one action: a small ghost link with a
+// trailing arrow, the same in both card states.
+templ activityViewAll(href templ.SafeURL, label string) {
+	@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Href: href, Attrs: templ.Attributes{"data-testid": "recent-agent-actions-view-all"}}) {
+		{ label }
+		<svg class="-mr-0.5 ml-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+		</svg>
 	}
 }
