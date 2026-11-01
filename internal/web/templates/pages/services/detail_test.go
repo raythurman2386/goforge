@@ -145,3 +145,29 @@ func TestDetailShowsLastError(t *testing.T) {
 		t.Error("last error block shown without an error")
 	}
 }
+
+// Connection Details rows are dt/dd pairs in a div; the list around them must
+// be a <dl> so axe dlitem stays at zero (found by the extended ui-a11y drive).
+func TestDetailRowsInsideDescriptionList(t *testing.T) {
+	inst := &models.ServiceInstance{ID: "inst-1", Name: "verify-pg", Status: models.ServiceStatusRunning, Config: []byte(`{"database":"app","password":"x"}`)}
+	tmpl := &services.ServiceTemplate{DisplayName: "PostgreSQL", Config: []services.ConfigField{{Name: "database"}, {Name: "password", Type: "password"}}}
+	var buf bytes.Buffer
+	if err := Detail(inst, nil, nil, tmpl, false, Protection{InstanceID: inst.ID}, "csrf").Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if strings.Count(html, "<dt") < 2 || !strings.Contains(html, "data-secret") {
+		t.Fatalf("expected config rows with a masked secret: %d dt", strings.Count(html, "<dt"))
+	}
+	for i := 0; ; {
+		at := strings.Index(html[i:], "<dt")
+		if at < 0 {
+			break
+		}
+		at += i
+		if open := strings.Count(html[:at], "<dl") - strings.Count(html[:at], "</dl>"); open < 1 {
+			t.Fatalf("dt at byte %d has no <dl> ancestor", at)
+		}
+		i = at + 3
+	}
+}

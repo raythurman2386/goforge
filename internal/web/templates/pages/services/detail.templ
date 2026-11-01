@@ -143,11 +143,12 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 				<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Connection Details</h3>
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Use these details to connect to and manage your service.</p>
 			</div>
-			<div class="divide-y divide-gray-100 dark:divide-gray-800">
+			// A <dl>, so each row's dt/dd pair has a list parent (axe dlitem).
+			<dl class="divide-y divide-gray-100 dark:divide-gray-800">
 				for _, row := range detailRows(instance, container, tmpl) {
 					@detailRow(instance.ID, row)
 				}
-			</div>
+			</dl>
 		}
 		</div>
 		// Outside the polled region, so pending polls do not reload it.
@@ -164,7 +165,6 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 			Warning: "This removes the service and its container. Data will be lost.",
 			Label:   "Delete service",
 		})
-		@secretControlsScript()
 	}
 }
 
@@ -208,49 +208,3 @@ templ detailRow(instanceID string, row services.DetailRow) {
 		}
 	</div>
 }
-
-// secretControlsScript wires Show and Copy on masked rows. The value is
-// fetched on demand and never rendered into the page. The listener is
-// delegated so the pending-state poll swap keeps working.
-templ secretControlsScript() {
-	<script>
-		(function () {
-			if (window.goforgeSecretControls) { return; }
-			window.goforgeSecretControls = true;
-			function fetchSecret(row) {
-				return fetch(row.getAttribute('data-secret-url'), { credentials: 'same-origin', cache: 'no-store' })
-					.then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.text(); });
-			}
-			function flash(btn, text, restore) {
-				btn.textContent = text;
-				setTimeout(function () { btn.textContent = restore; }, 2000);
-			}
-			document.addEventListener('click', function (e) {
-				var btn = e.target.closest('[data-secret-action]');
-				if (!btn) { return; }
-				var row = btn.closest('[data-secret]');
-				var out = row.querySelector('[data-secret-value]');
-				if (btn.getAttribute('data-secret-action') === 'toggle') {
-					if (out.getAttribute('data-revealed') === 'true') {
-						out.textContent = row.getAttribute('data-secret-mask');
-						out.removeAttribute('data-revealed');
-						btn.textContent = 'Show';
-						return;
-					}
-					fetchSecret(row).then(function (v) {
-						out.textContent = v;
-						out.setAttribute('data-revealed', 'true');
-						btn.textContent = 'Hide';
-					}).catch(function () { flash(btn, 'Error', 'Show'); });
-					return;
-				}
-				fetchSecret(row).then(function (v) {
-					if (!navigator.clipboard) { throw new Error('clipboard unavailable'); }
-					return navigator.clipboard.writeText(v);
-				}).then(function () { flash(btn, 'Copied!', 'Copy'); })
-					.catch(function () { flash(btn, 'Copy failed', 'Copy'); });
-			});
-		})();
-	</script>
-}
-

@@ -19,10 +19,13 @@ templ GitRepositoryBrowser(sources []*models.GitSource) {
 			"hx-target":  "#project-repo-select",
 			"hx-trigger": "change",
 			"hx-include": "[name='git_source_id']",
-			"onchange":   "toggleRepoInput(this.value)",
+			// app.js switches manual URL and repo select on change.
+			"data-git-source-toggle": "",
 		},
 	})
 
+	// app.js (data-git-source-toggle) keeps exactly one of these named
+	// repository_url: the manual input when no source is picked, else the select.
 	<div id="manual-repo-input">
 		@ui.Input(ui.InputProps{ID: "project-repo-manual", Name: "repository_url_manual", Label: "Repository URL", Autocomplete: "off"})
 	</div>
@@ -43,35 +46,6 @@ templ GitRepositoryBrowser(sources []*models.GitSource) {
 			},
 		})
 	</div>
-	
-	<script>
-		function toggleRepoInput(val) {
-			const manualInput = document.getElementById('project-repo-manual');
-			const repoSelect = document.getElementById('project-repo-select');
-			const manualContainer = document.getElementById('manual-repo-input');
-			const selectContainer = document.getElementById('repo-select-container');
-			
-			if (val === "") {
-				// Manual mode: show text input, hide select dropdown
-				manualContainer.style.display = 'block';
-				selectContainer.style.display = 'none';
-				manualInput.setAttribute('name', 'repository_url');
-				manualInput.required = true;
-				repoSelect.setAttribute('name', 'repository_url_select_disabled');
-			} else {
-				// Git source mode: hide text input, show select dropdown
-				manualContainer.style.display = 'none';
-				selectContainer.style.display = 'block';
-				manualInput.removeAttribute('name');
-				manualInput.required = false;
-				repoSelect.setAttribute('name', 'repository_url');
-			}
-		}
-		// Init
-		document.addEventListener("DOMContentLoaded", function() {
-			toggleRepoInput("");
-		});
-	</script>
 }
 
 // gitSourceOptions lists the user's git sources as "name (type)".

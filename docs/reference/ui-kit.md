@@ -2,7 +2,7 @@
 
 GoForge pages are built from one templ component kit in `internal/web/templates/components/ui` (package `ui`). It runs on Tailwind 3.4.17, htmx 2, native `<dialog>`, and the native `popover` attribute. One delegated script, `static/js/ui.js`, adds keyboard and focus behavior. There is no React, no JS build step, and no client framework.
 
-**Rule:** pages and shared components use `components/ui`. Do not write `class="btn…"`, `class="card…"`, `class="input"`, `class="select"`, or `class="label"` by hand. Do not add inline `onclick=` handlers, `confirm(...)`, or the old `id="modal"` and `id="menu-button"` contracts. `TestPagesUseKit` in `internal/web/templates/components/sweep_gate_test.go` fails on any of those outside `components/ui`.
+**Rule:** pages and shared components use `components/ui`. Do not write `class="btn…"`, `class="card…"`, `class="input"`, `class="select"`, or `class="label"` by hand. Do not add `confirm(...)` or the old `id="modal"` and `id="menu-button"` contracts. `TestPagesUseKit` in `internal/web/templates/components/sweep_gate_test.go` fails on any of those outside `components/ui`. Do not add inline event handlers (any `on…=` attribute, an `"on…":` key in `templ.Attributes`, or `hx-on`) or an inline `<script>` anywhere, `components/ui` included. `TestNoInlineHandlersOrScripts` in the same file fails on them; page behavior goes in a delegated `data-*` listener in `static/js/app.js`.
 
 ## Gallery
 
@@ -35,12 +35,13 @@ The 20 components of Path A, with their variants.
 
 - Variants: `ButtonPrimary`, `ButtonSecondary` (the zero value), `ButtonDanger`, `ButtonWarning`, `ButtonGhost`, `ButtonGhostPrimary`, `ButtonGhostWarning`, `ButtonGhostDanger`, `ButtonLink`.
 - Sizes: `ButtonMD` (default), `ButtonSM`, `ButtonIcon` (square, 44 px below `md` and 32 px from `md` up), `ButtonInline` (no padding, for `ButtonLink` in text).
+- Below `md` every button except `ButtonInline` is at least 44 px tall (`min-h-11` on `.btn`). From `md` up the padding sets the height again, so `ButtonSM` is about 32 px on desktop.
 - `ButtonIcon` needs `Label`, which becomes `aria-label`. The icon `svg` gets `aria-hidden="true"`.
 - Use `Href` only for navigation, never for an action that changes state.
 
 ### Input, Textarea, Select
 
-`ui.Input`, `ui.Textarea` (`Rows`, default 4), and `ui.Select` (`Options []SelectOption`, `Blank`, `BlankLabel`; `ui.StringOptions` builds options from strings) render a label, the control, help, and an error.
+`ui.Input`, `ui.Textarea` (`Rows`, default 4), and `ui.Select` (`Options []SelectOption`, `Blank`, `BlankLabel`; `ui.StringOptions` builds options from strings) render a label, the control, help, and an error. Below `md` the control is at least 44 px tall (`min-h-11` on `.input`, which `.select` builds on).
 
 - The control id is `ID`, or `"field-" + Name` when `ID` is empty. It is never the bare name, so two forms on one page do not collide. Give an explicit form-prefixed `ID` (for example `login-email`) where two forms share a page.
 - `Help` renders `<p id="<id>-help">` and `Error` renders `<p id="<id>-error">`. Both are listed in `aria-describedby`, help first, then error, then `DescribedBy`.
@@ -173,19 +174,21 @@ Text must meet 4.5:1. Filled buttons use the `-700` shade with white text (`.btn
 
 Every change to a page or component keeps these:
 
-- axe finds no serious or critical issues on the page in light or dark (`drive-ui-a11y`). The baseline is zero on all 32 scans; keep it there.
+- axe finds no serious or critical issues on the page in light or dark (`drive-ui-a11y`). The baseline is zero on every scan, including the service, container, and deployment detail pages and `/settings/activity`; keep it there.
 - Every control has a visible label or, for icon-only buttons, an `aria-label`. A tooltip is never the only name.
-- Icon-only buttons are at least 44 by 44 px below `md` (`ButtonIcon`, the Alert and toast dismiss buttons).
+- Icon-only buttons are at least 44 by 44 px below `md` (`ButtonIcon`, the Alert and toast dismiss buttons). Text buttons, inputs, selects, and textareas are at least 44 px tall below `md` (`ButtonInline` and checkboxes, whose label is the target, are exempt). The drive's `touch-targets` checks measure it at 375 px.
 - Keyboard focus is always visible (`focus-visible` ring) and never lost. Overlays move focus in, trap it when modal, close on Escape, and return focus to the opener.
 - Help and errors are tied to their control with `aria-describedby`; errors set `aria-invalid`.
 - Status is text, not color alone (Badge, Alert). Errors use `role="alert"`; other live updates use `role="status"`.
 - Polling and SSE regions never contain an overlay.
 - Template tests next to each component assert the ARIA wiring (`components/ui/*_test.go`).
 
-## Remaining inline scripts
+## Page scripts
 
-Three page-specific scripts remain. The kit does not cover what they do, so they are not kit call sites. Move them into a delegated listener if a strict `script-src` CSP is ever adopted:
+Pages carry no inline `<script>` and no inline event handlers. The few page behaviors the kit does not cover live in `static/js/app.js` as delegated listeners keyed on `data-*` attributes, so they survive htmx swaps and are ready for a strict `script-src` CSP:
 
-- `components/git_browser.templ`: switches the project form between a manual repository URL and the git source repository select (`onchange` plus a `<script>`).
-- `pages/containers/detail.templ`: swaps the container status badge on the `containerStopped` and `containerRestarted` HX-Trigger events.
-- `pages/services/detail.templ` (`secretControlsScript`): Show and Copy for masked credentials. It fetches the value on demand, so the secret is never rendered into the page.
+- `[data-git-source-toggle]` (`components/git_browser.templ`, the project form): on change, and on load or swap, it shows either the manual repository URL input or the git source repository select, and gives exactly one of them the `repository_url` name.
+- `containerStopped` and `containerRestarted` (`pages/containers/detail.templ`): the stop and restart responses send these as `HX-Trigger`; `app.js` copies the matching `<template id="container-status-{state}">` badge into `#container-status`.
+- `[data-secret]` with `[data-secret-action="toggle"|"copy"]` (`pages/services/detail.templ`): Show and Copy for masked credentials. The value is fetched from `data-secret-url` on demand, so it is never rendered into the page.
+
+One inline-code form remains and is out of scope until a CSP goal: `hx-vals="js:{...}"` on the repository select in `git_browser.templ` (htmx evaluates it).

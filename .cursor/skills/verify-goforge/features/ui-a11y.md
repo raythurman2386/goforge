@@ -46,7 +46,16 @@ The UI reads its colors, radius, and focus ring from CSS variable tokens. Light 
     - `app-mobile-sheet-link-away-back` (375 px): open `#mobile-nav` with Enter on `#mobile-menu-btn` (into), then press Enter on its Projects link (away). On `/projects` the Sheet is closed, `aria-expanded` is `false`, and the current link is Projects. Then go Back to `/dashboard`, Forward, and Back again. At each stop the Sheet is closed, never restored open, and the current link follows the route. Reopening it on `/projects` and after each Back keeps the trap, Escape, and focus return.
     - `app-mobile-sheet-escape-away-back` (375 px): open the Sheet and close it with Escape on `/dashboard`. Leave for `/containers` through the Sheet, come back with Back, and reopen it. Then go from `/services` back to Dashboard through the Sheet's Dashboard link and reopen it once more. Each time the Sheet is closed on arrival, has one current link, and passes the trap, Escape, and focus-return checks.
 - `dev-ui-gated`: `/dev/ui` returns `200` with dev mode and `404` without it. The unit tests are `TestRouter_DevUIGalleryOnlyInDevMode` and `TestRouter_DevUIDialogDemoOnlyInDevMode`.
-- `axe`: axe-core scans each page for WCAG 2.0/2.1 A and AA and 2.2 AA (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), in light and dark. The public pages are `/login`, `/auth/register`, `/dev/ui`, and a missing page. With a password, it also scans `/dashboard`, `/projects`, `/projects/new`, `/services`, `/containers`, `/settings/profile`, `/settings/git`, and the first project's Overview, Deployments, Settings, and Services tabs. `axe-gate=pass` means zero serious or critical findings.
+- `axe`: axe-core scans each page for WCAG 2.0/2.1 A and AA and 2.2 AA (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), in light and dark. The public pages are `/login`, `/auth/register`, `/dev/ui`, and a missing page. With a password, it also scans `/dashboard`, `/projects`, `/projects/new`, `/services`, `/services/postgres/configure`, `/containers`, `/settings/profile` (which holds the backup restore points and the notifier form with its SMTP fields), `/settings/git`, `/settings/activity`, the first project's Overview, Deployments, Settings, and Services tabs, and the detail pages: service detail and edit, container detail, and deployment detail. `axe-gate=pass` means zero serious or critical findings.
+- Detail pages and page hooks (t1681u). Ids come from `GOFORGE_UI_SERVICE_ID`, `GOFORGE_UI_CONTAINER_ID`, and `GOFORGE_UI_DEPLOYMENT_PATH` (`/projects/{id}/deployments/{id}`), or else from the first matching link on `/services`, `/containers`, and the first project's Deployments tab. The verdict prints `detail-ids <scheme> service=yes|none …`; a missing id skips its routes and checks with a `skip` line:
+  - `app-git-source-toggle`: on `/projects/new` the git source select carries `data-git-source-toggle` and no `on*` attribute, the manual URL input is named `repository_url` and required, and the repository select is hidden and renamed.
+  - `app-container-status-swap`: on container detail, a `containerStopped` event on `<body>` swaps the badge to exited and `containerRestarted` to running. No Docker call; the page has no inline script.
+  - `app-secret-show-hide`: on service detail, Enter on Show reveals the first masked row (`data-revealed="true"`, button `Hide`) and Enter again re-masks it. The value is never written to evidence.
+  - `app-typed-delete` (#107): Enter on Delete opens `#delete-service-dialog` with focus inside, 14 Tab and Shift+Tab presses stay inside, axe inside the open dialog finds nothing serious or critical, an empty name sends no `DELETE` (required field), a wrong name sends one `DELETE` that the server refuses and the dialog shows the error, Escape closes it, and the page stays. The drive never types the real name.
+  - `app-protected-switch` (#107): Space on `#service-protected-switch` (`role="switch"`) flips it and the card swap keeps it; a second Space flips it back. axe inside `#service-protected` is clean.
+  - `app-restore-points` (#104/#105): with an admin and a backed-up template, `#service-restore-points` loads (table, empty, or error state) and axe inside it is clean.
+  - `app-agent-actions-card` (t1683u): on `/dashboard`, the Recent agent actions card with no rows has no table and no header "View all"; its empty message is followed by a "View all activity" link to `/settings/activity`. With rows, the header keeps "View all" (`?source=agent`) above the table. axe inside the card is clean.
+  - `touch-targets /settings/profile`, `/projects/new`, `/dashboard`: at 375 px every visible text button, input, select, and textarea is at least 44 px tall (not `btn-inline`, not checkboxes); at the default desktop viewport every `btn-sm` is still under 44 px.
 
 ## How to get to it (user POV)
 
@@ -72,6 +81,23 @@ export GOFORGE_VERIFY_PROOF=/tmp/goforge-verify/proof
 
 `drive-login` is optional. It creates the project the project-tab scans use. Without `register.password` in the state directory, only the public pages are scanned.
 
+Host mode has no Docker, so no service, container, or deployment exists unless you seed one. Seed rows into the throwaway database only (plaintext `config` is read as legacy unsealed JSON; use a random fixture value, never a real secret), then pass the container id, which the containers list cannot show without Docker:
+
+```bash
+PG="sudo -n docker exec -i <pg-container> psql -U goforge -d goforge_verify -v ON_ERROR_STOP=1 -tA"
+FIX=$(openssl rand -hex 12); DID=$(openssl rand -hex 32)
+$PG <<SQL
+insert into service_instances (user_id,template_name,name,version,config,status,connection_info)
+  values ((select id from users where role='admin'),'postgres','ui-a11y-pg','17',
+  '{"database":"app","username":"pgadmin","password":"$FIX"}','running','{"host":"goforge-service-ui-a11y","port":"5432"}');
+insert into containers (service_instance_id,docker_id,name,image,status)
+  values ((select id from service_instances where name='ui-a11y-pg'),'$DID','goforge-service-ui-a11y','postgres:17','running');
+insert into deployments (environment_id,status,trigger_type,branch,commit_message,error_message,started_at,finished_at)
+  values ((select id from environments limit 1),'failed','manual','main','ui-a11y fixture','fixture: no Docker in host mode',now()-interval '2 minutes',now()-interval '1 minute');
+SQL
+GOFORGE_UI_CONTAINER_ID=$DID .cursor/skills/verify-goforge/scripts/verify.sh drive-ui-a11y
+```
+
 To set the schemes, use `GOFORGE_UI_SCHEMES` (default `light,dark`). To replace the route list, use `GOFORGE_UI_ROUTES`.
 
 The drive writes `ui-a11y-verdict.txt`, `ui-a11y-report.json` (axe rule ids, impacts, and targets, with node HTML dropped because pages embed the CSRF token), and `ui-a11y/<scheme>/<route>.png`. It exits `0` when the harness ran. Every product miss, including `axe-gate=fail`, is a `fail` line. It exits `2` when the browser, the npm install, or the base URL failed. It exits `1` when `GOFORGE_VERIFY_BASE` is unset and there is no `stack.env`, which means it refuses to drive the default `8080`.
@@ -95,7 +121,8 @@ The drive writes `ui-a11y-verdict.txt`, `ui-a11y-report.json` (axe rule ids, imp
 - The `toggle` event of a popover fires after the key that closed it. That is why Tab in a menu focuses the trigger itself before it hides the menu, and why the drive waits a frame after each key before it reads focus.
 - After Escape hides a tooltip, it stays hidden until the pointer leaves the trigger or focus moves away. Each tooltip check starts by moving the pointer to the corner and blurring.
 - The sidebar nav renders twice from one templ (the desktop aside and the mobile Sheet). `app.js` marks the current link in both, and one of the two is always `display: none`, so there is one nav landmark at a time.
-- In host mode there is no Docker, so the containers list has no rows. Its tooltips are covered by `TestContainerRowTooltips`.
+- In host mode there is no Docker, so the containers list has no rows. Its tooltips are covered by `TestContainerRowTooltips`. Container detail still renders for a seeded `containers` row owned through its service (pass `GOFORGE_UI_CONTAINER_ID`).
+- The first t1681u run found three pre-existing serious issues on pages the drive had never scanned: `dlitem` on service detail Connection Details (the rows had no `<dl>`), and `color-contrast` on the light-mode log placeholders on container and deployment detail (`text-gray-500` on the `gray-900` log pane, 3.66:1). Both are fixed in the same PR (`<dl>`, `text-gray-400`).
 - `GOFORGE_VERIFY_PSQL` needs `-tA`. Without it `drive-register` reads the `count` header as a user count and exits `2` with "users table is not empty".
-- `#dashboard-stats` uses `animate-fade-in`. A scan that lands mid-fade can report extra `color-contrast` nodes (`dt` and the stat labels at `#717885`, 4.44:1) on `/dashboard`. Rerun before calling that a regression. On the PR6 N1 run, the first light pass caught 6 nodes and the rerun matched `main` (1 node).
+- `#dashboard-stats` uses `animate-fade-in`. A scan that lands mid-fade can report extra `color-contrast` nodes (`dt` and the stat labels at `#717885`, 4.44:1) on `/dashboard`. Rerun before calling that a regression. On the PR6 N1 run, the first light pass caught 6 nodes and the rerun matched `main` (1 node). Since t1681u, `scan()` waits (up to 2 s) for every finite animation to finish before it runs axe, so this should no longer show; if it does, check for a new or longer animation.
 - The order of the `/services` catalog changes between runs, so screenshots of that page differ even when the CSS has not changed.
