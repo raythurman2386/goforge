@@ -135,7 +135,7 @@ It prints the result and exits non-zero when the run failed. It does not run mig
 docker compose exec goforge ./goforge backup list
 ```
 
-It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run. There is no restore button in the web UI, the API, or MCP.
+It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run, and each Postgres, Gitea, or Vaultwarden service page lists the runs that hold that service's data (run key, time, size) with its `restore-service` command. There is no restore button in the web UI, the API, or MCP.
 
 ### GoForge database
 
@@ -204,25 +204,39 @@ docker exec -i "$ctr" sh -c 'pg_restore -U "$POSTGRES_USER" -d "$1" --clean --if
 
 ### Gitea or Vaultwarden
 
-Stop the service from GoForge first. Then, into a fresh volume or after moving the old files aside (never into a running container):
+`goforge backup restore-service` restores one Gitea or Vaultwarden service's `/data` volume from one run. It runs inside the running GoForge container (it needs the Docker socket; GoForge keeps serving). Find the instance ID on the service page (it is in the URL, `/services/<id>`); admins also see the service's restore points there, with the command to copy.
 
 ```bash
-ctr=goforge-service-<id>
-# Gitea: extract into /data, then put the database back
-docker run --rm --volumes-from "$ctr" -v "$PWD/restore/services/<id>:/r" alpine \
-  sh -c 'tar -xzf /r/data.tar.gz -C /data && cp /r/gitea.sqlite3 /data/gitea/gitea.db && chown -R 1000:1000 /data'
-# Vaultwarden: the database file is /data/db.sqlite3
-docker run --rm --volumes-from "$ctr" -v "$PWD/restore/services/<id>:/r" alpine \
-  sh -c 'tar -xzf /r/data.tar.gz -C /data && cp /r/vaultwarden.sqlite3 /data/db.sqlite3'
+# Dry run: reads the manifest, inspects the container, checks the backup lock; changes nothing
+docker compose exec goforge ./goforge backup restore-service 2026-10-29/20261029T070000Z <instance-id>
+# Restore: type the run key when asked (or pass --confirm=<run key> with no TTY)
+docker compose exec goforge ./goforge backup restore-service 2026-10-29/20261029T070000Z <instance-id> --yes
 ```
 
-Start the service and check it. For Gitea, run `git fsck` in the restored repositories and, if search looks wrong, rebuild the indexes from the admin panel (they are not backed up).
+With `--yes` it:
 
-The service restore steps above were written from the formats, not drilled against a live instance yet. `goforge backup restore` is covered by an integration test against PostgreSQL 15 and 17.
+1. Takes the backup lock, so no backup run can tar the volume halfway.
+2. Downloads `services/<id>/gitea.sqlite3` (or `vaultwarden.sqlite3`) and `data.tar.gz` and checks each size and SHA-256 against `manifest.json`. A mismatch stops here, with the service still running.
+3. Stops the service container.
+4. Starts a helper container from the service's own image with `--volumes-from` the service, no network, as root, and copies the two files into it.
+5. Moves everything in `/data` to `/data/.goforge-pre-restore-<UTC time>/` (kept, never deleted), extracts `data.tar.gz` with its file owners, and copies the SQLite snapshot to the database path (Gitea: `GITEA__database__PATH`, else `PATH` in the restored `app.ini`, else `/data/gitea/gitea.db`; Vaultwarden: `/data/db.sqlite3`) with the owner of its directory.
+6. Removes the helper (never its volumes), starts the service, and waits for its health check.
+
+If step 5 fails, the partial restore is moved to `/data/.goforge-failed-restore-<UTC time>/`, the previous contents are moved back, and the service is started again. Nightly backups leave both kinds of kept folder out of `data.tar.gz`. Delete a kept folder by hand once the restored service checks out:
+
+```bash
+docker exec goforge-service-<id> rm -rf /data/.goforge-pre-restore-<UTC time>
+```
+
+To undo a restore, restore a newer run, or stop the service and move the contents of the kept folder back to `/data`.
+
+The service record in GoForge (name, config, domain) is not changed, only the volume. Data written after the backup is gone: for Gitea, pushes and issues; for Vaultwarden, items saved since (clients sync to the restored state). For Gitea, run `git fsck` in the restored repositories and, if search looks wrong, rebuild the indexes from the admin panel (they are not backed up). Postgres services are refused; use the runbook above.
+
+Drilled: `TestIntegration_RestoreService` backs up throwaway `gitea/gitea:1.25.5` and `vaultwarden/server` containers into MinIO, changes them (a Gitea user, a Vaultwarden table row, marker files), restores each with `ServiceRestorer`, and checks the backed-up state is back, the changed state is in the kept folder, Gitea's files are owned by `git` (1000) and it can write its database, both report healthy, no helper is left, and the next backup leaves the kept folder out. First drilled on November 1, 2026.
 
 ## Smoke test with throwaway MinIO
 
-The integration test in `internal/backup` starts MinIO, Postgres, Gitea, and Vaultwarden in throwaway containers, runs a real backup, and checks every object. A second test (`TestIntegration_Restore`) backs up into MinIO and restores into throwaway `postgres:15-alpine` and `postgres:17-alpine` servers, including every refusal. See `.cursor/skills/verify-goforge/features/backups.md`. `docker.io/minio/minio` did not pull on our host in October 2026, so the test uses `cgr.dev/chainguard/minio`.
+The integration test in `internal/backup` starts MinIO, Postgres, Gitea, and Vaultwarden in throwaway containers, runs a real backup, and checks every object. A second test (`TestIntegration_Restore`) backs up into MinIO and restores into throwaway `postgres:15-alpine` and `postgres:17-alpine` servers, including every refusal. A third (`TestIntegration_RestoreService`) round-trips throwaway Gitea and Vaultwarden through `restore-service`. See `.cursor/skills/verify-goforge/features/backups.md` and `service-restore.md`. `docker.io/minio/minio` did not pull on our host in October 2026, so the test uses `cgr.dev/chainguard/minio`.
 
 To try `goforge backup run` against a local MinIO:
 

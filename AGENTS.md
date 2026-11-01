@@ -45,7 +45,9 @@ go test -v ./internal/docker/...
 go test -tags integration -run TestGiteaPostStartBootstrap ./internal/services/
 DATABASE_URL=postgres://... go test -tags integration -run Integration ./internal/backup/
 # Restore: own MinIO + postgres:15-alpine and 17-alpine; needs pg_restore/psql 17 on PATH
-go test -tags integration -run TestIntegration_Restore ./internal/backup/
+go test -tags integration -run 'TestIntegration_Restore$' ./internal/backup/
+# Service restore: own MinIO + throwaway Gitea and Vaultwarden (gfsr-it-*); needs sqlite3 on PATH
+go test -tags integration -run TestIntegration_RestoreService ./internal/backup/
 
 # Docs (run when docs/ or mkdocs.yml changes; deps pinned in requirements-docs.txt)
 pip install -r requirements-docs.txt && mkdocs build --strict
@@ -196,12 +198,12 @@ func TestDeploymentService_CreateDeployment(t *testing.T) {
 ## Project Structure
 
 ```
-cmd/goforge/              # Entry point (main.go): serve, migrate, backup run|list|restore
+cmd/goforge/              # Entry point (main.go): serve, migrate, backup run|list|restore|restore-service
 cmd/goforge-mcp/          # MCP server over stdio; calls /api/v1 with a scoped token
 internal/
   apiv1/                 # Bearer-token JSON API under /api/v1 (scopes, gated writes)
   auth/                  # Authentication (GitHub OAuth, sessions, CSRF)
-  backup/                # Nightly S3 backups, `goforge backup run`, restore points, `goforge backup restore` (app DB only)
+  backup/                # Nightly S3 backups, `goforge backup run`, restore points, `goforge backup restore` (app DB), `restore-service` (Gitea/Vaultwarden volumes)
   config/                # Configuration loading from env
   database/              # PostgreSQL connection, migrations, repositories
   deploy/                # Deployment pipeline and orchestration

@@ -249,7 +249,7 @@ func printRestorePlan(out io.Writer, t *backupTarget, plan *backup.RestorePlan, 
 		plan.SideDB, plan.Database, plan.Database, plan.SideDB, plan.Database)
 	fmt.Fprintf(out, "  replaces:      every GoForge table (users, API tokens, projects, env vars, service records, backup settings, audit log) with its state at %s; all sessions are cleared\n", started)
 	if n := len(m.Artifacts) - 1; n > 0 {
-		fmt.Fprintf(out, "  not restored:  %d service artifact(s) under services/; containers and volumes are not touched (see docs/backup.md for the manual runbooks)\n", n)
+		fmt.Fprintf(out, "  not restored:  %d service artifact(s) under services/; containers and volumes are not touched (gitea and vaultwarden: goforge backup restore-service; others: docs/deployment/backup.md)\n", n)
 	}
 	if preErr != nil {
 		fmt.Fprintf(out, "  preflight:     REFUSED: %s\n", t.redactor.Redact(preErr.Error()))
@@ -259,9 +259,15 @@ func printRestorePlan(out io.Writer, t *backupTarget, plan *backup.RestorePlan, 
 }
 
 func confirmRestore(runKey string, in io.Reader, out io.Writer) error {
-	if restoreConfirm != "" {
-		if restoreConfirm != runKey {
-			return fmt.Errorf("--confirm=%q does not match the run key %s", restoreConfirm, runKey)
+	return confirmTyped(runKey, restoreConfirm, "This replaces the GoForge database.", in, out)
+}
+
+// confirmTyped asks for the run key at a terminal prompt, or checks the
+// --confirm value when one was passed.
+func confirmTyped(runKey, confirm, what string, in io.Reader, out io.Writer) error {
+	if confirm != "" {
+		if confirm != runKey {
+			return fmt.Errorf("--confirm=%q does not match the run key %s", confirm, runKey)
 		}
 		return nil
 	}
@@ -273,7 +279,7 @@ func confirmRestore(runKey string, in io.Reader, out io.Writer) error {
 	if !isatty.IsTerminal(f.Fd()) {
 		return errors.New("no terminal to confirm on: pass --confirm=<run-key> (or use docker compose run with a TTY)")
 	}
-	fmt.Fprintf(out, "\nThis replaces the GoForge database. Type the run key to confirm: ")
+	fmt.Fprintf(out, "\n%s Type the run key to confirm: ", what)
 	line, err := bufio.NewReader(f).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return err

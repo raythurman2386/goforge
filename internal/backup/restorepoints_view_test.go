@@ -40,3 +40,35 @@ func TestRestorePointLister(t *testing.T) {
 		t.Fatalf("no bucket: %+v", v)
 	}
 }
+
+func TestRestorePointLister_ListInstance(t *testing.T) {
+	cfg := config.BackupConfig{Bucket: "bk", Prefix: testPrefix, Schedule: "02:00 America/Chicago"}
+	s := newMemStore()
+	putServiceRun(t, s)                                         // g1, v1, p1; "off" skipped
+	putRun(t, s, "2026-10-31/20261031T070000Z", 1, []byte("d")) // app only
+	l := &RestorePointLister{
+		Current:  func() (config.BackupConfig, string) { return cfg, SourceSettings },
+		NewStore: func(config.BackupConfig) (Store, error) { return s, nil },
+	}
+	v := l.ListInstance(context.Background(), "g1")
+	if v.Error != "" || len(v.Points) != 1 || v.Template != templateGitea || !v.Restorable() || v.Schedule != cfg.Schedule {
+		t.Fatalf("g1 view = %+v", v)
+	}
+	p := v.Points[0]
+	if p.RunKey != svcRunKey || p.Artifacts != 2 || p.Bytes != int64(len("gitea-db")+len("gitea-tar")) || p.StartedAt.IsZero() {
+		t.Errorf("g1 point = %+v", p)
+	}
+	if v := l.ListInstance(context.Background(), "p1"); len(v.Points) != 1 || v.Restorable() {
+		t.Errorf("postgres view = %+v", v)
+	}
+	if v := l.ListInstance(context.Background(), "off"); len(v.Points) != 0 || v.Skipped != 1 {
+		t.Errorf("skipped view = %+v", v)
+	}
+	if v := l.ListInstance(context.Background(), "other"); len(v.Points) != 0 || v.Error != "" || v.Template != "" {
+		t.Errorf("unknown view = %+v", v)
+	}
+	l.Current = func() (config.BackupConfig, string) { return config.BackupConfig{}, SourceSettings }
+	if v := l.ListInstance(context.Background(), "g1"); v.Error != "No backup bucket is configured." {
+		t.Errorf("no bucket: %+v", v)
+	}
+}
