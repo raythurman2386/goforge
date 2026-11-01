@@ -42,7 +42,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 					hx-swap="outerHTML"
 				></div>
 			}
-			<div class="md:flex md:items-center md:justify-between mb-8">
+			<div class="md:flex md:items-center md:justify-between gap-4 mb-8">
 				<div class="flex-1 min-w-0">
 					<h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-gray-100">
 						{ instance.Name }
@@ -68,7 +68,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 						</p>
 					}
 				</div>
-				<div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
+				<div class="mt-4 flex flex-wrap gap-3 md:mt-0" data-testid="service-detail-actions">
 					if !isPending(instance) {
 						@ui.Button(ui.ButtonProps{
 							Variant: ui.ButtonSecondary,
