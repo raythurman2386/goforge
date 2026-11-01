@@ -36,6 +36,10 @@ type ServiceInstance struct {
 	// LastError says why the instance last failed, with secret values
 	// redacted. It is cleared when the instance runs again.
 	LastError sql.NullString
+	// Protected is the flag set on the service page. Stop, config edit, and
+	// image update over /api/v1 and MCP then need the protected scope. It is
+	// merged with GOFORGE_PROTECTED_SERVICES, which the UI cannot turn off.
+	Protected bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

@@ -58,7 +58,7 @@ func (r *ProjectServiceInstanceRepository) Unlink(ctx context.Context, projectID
 func (r *ProjectServiceInstanceRepository) ListByProjectID(ctx context.Context, projectID string) ([]*models.ServiceInstance, error) {
 	query := `
 		SELECT si.id, si.user_id, si.template_name, si.name, si.version, si.config,
-			si.domain, si.status, si.connection_info, si.created_at, si.updated_at
+			si.domain, si.status, si.connection_info, si.created_at, si.updated_at, si.protected
 		FROM service_instances si
 		INNER JOIN project_service_instances psi ON si.id = psi.service_instance_id
 		WHERE psi.project_id = $1
@@ -86,6 +86,7 @@ func (r *ProjectServiceInstanceRepository) ListByProjectID(ctx context.Context, 
 			&s.ConnectionInfo,
 			&s.CreatedAt,
 			&s.UpdatedAt,
+			&s.Protected,
 		)
 		if err != nil {
 			return nil, err

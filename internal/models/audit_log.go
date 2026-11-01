@@ -142,6 +142,7 @@ const (
 	AuditActionServiceRestart        = "service.restart"
 	AuditActionServiceUpdateConfig   = "service.update_config"
 	AuditActionServiceUpdateImage    = "service.update_image"
+	AuditActionServiceSetProtected   = "service.set_protected"
 	AuditActionContainerStop         = "container.stop"
 	AuditActionContainerRestart      = "container.restart"
 )

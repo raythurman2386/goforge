@@ -32,6 +32,10 @@ const (
 	protDocker  = "dock-prot"
 	otherDocker = "dock-other"
 	dbErrDocker = "dock-dberr" // owned, but its row lookup fails
+	uiProtSvcID = "9a0c5d1e-2b3f-4c6d-8e7f-0a1b2c3d4e5f"
+	uiProtDock  = "dock-uiprot"
+	dbErrSvcID  = "aaaaaaaa-0000-4000-8000-000000000001" // its instance lookup fails
+	dbErrSvcDck = "dock-svc-dberr"
 	adminID     = "88888888-8888-8888-8888-888888888888"
 )
 
@@ -118,8 +122,24 @@ func (f *fakeInstances) GetInstance(_ context.Context, id string) (*models.Servi
 	case failedSvcID:
 		return &models.ServiceInstance{ID: id, UserID: ownerID, TemplateName: "pg", Name: "broken", Config: cfg,
 			Status: models.ServiceStatusFailed, LastError: sql.NullString{String: failedSvcLastError, Valid: true}}, nil
+	case uiProtSvcID:
+		// Marked protected on its service page; not in the env list.
+		return &models.ServiceInstance{ID: id, UserID: ownerID, TemplateName: "pg", Name: "git", Config: cfg,
+			Status: models.ServiceStatusRunning, Protected: true}, nil
+	case dbErrSvcID:
+		return nil, errors.New("connection reset by peer")
 	}
 	return nil, repositories.ErrNotFound
+}
+
+func (f *fakeInstances) ListInstances(ctx context.Context, userID string) ([]*models.ServiceInstance, error) {
+	var out []*models.ServiceInstance
+	for _, id := range []string{svcID, protSvcID, uiProtSvcID} {
+		if inst, err := f.GetInstance(ctx, id); err == nil && inst.UserID == userID {
+			out = append(out, inst)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeInstances) GetContainer(context.Context, string) (*models.Container, error) {
@@ -150,7 +170,11 @@ func (f *fakeInstances) UpdateInstanceImage(ctx context.Context, id string) (*mo
 type fakeContainers struct{ Containers }
 
 func (fakeContainers) OwnedByUser(_ context.Context, dockerID, userID string) (bool, error) {
-	return userID == ownerID && (dockerID == ownDocker || dockerID == protDocker || dockerID == dbErrDocker), nil
+	switch dockerID {
+	case ownDocker, protDocker, dbErrDocker, uiProtDock, dbErrSvcDck:
+		return userID == ownerID, nil
+	}
+	return false, nil
 }
 
 func (fakeContainers) GetByDockerID(_ context.Context, dockerID string) (*models.Container, error) {
@@ -162,6 +186,12 @@ func (fakeContainers) GetByDockerID(_ context.Context, dockerID string) (*models
 			ServiceInstanceID: sql.NullString{String: protSvcID, Valid: true}}, nil
 	case dbErrDocker:
 		return nil, errors.New("connection reset by peer")
+	case uiProtDock:
+		return &models.Container{ID: "c3", DockerID: uiProtDock, Name: "goforge-service-" + uiProtSvcID,
+			ServiceInstanceID: sql.NullString{String: uiProtSvcID, Valid: true}}, nil
+	case dbErrSvcDck:
+		return &models.Container{ID: "c4", DockerID: dbErrSvcDck, Name: "goforge-service-" + dbErrSvcID,
+			ServiceInstanceID: sql.NullString{String: dbErrSvcID, Valid: true}}, nil
 	}
 	return nil, repositories.ErrNotFound
 }
@@ -402,7 +432,7 @@ func TestWhoamiReportsGrantsAndProtectedList(t *testing.T) {
 		t.Errorf("full token grants = %v (full must never imply protected)", grants)
 	}
 	list, _ := out["protected_services"].([]any)
-	if len(list) != 1 || list[0] != protSvcID {
+	if len(list) != 2 || list[0] != protSvcID || list[1] != uiProtSvcID {
 		t.Errorf("protected_services = %v", list)
 	}
 }

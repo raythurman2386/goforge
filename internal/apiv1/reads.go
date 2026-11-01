@@ -90,7 +90,7 @@ func (h *Handler) whoami(w http.ResponseWriter, r *http.Request) {
 			models.ScopeWrite:     token.HasScope(models.ScopeWrite),
 			models.ScopeProtected: token.HasScope(models.ScopeProtected),
 		},
-		"protected_services": h.protectedList(),
+		"protected_services": h.protectedList(r.Context(), user.ID),
 	})
 }
 
@@ -402,7 +402,7 @@ func (h *Handler) getService(w http.ResponseWriter, r *http.Request) {
 		out["volumes"] = namedVolumes(inst.ID, tmpl)
 	}
 	if c, err := h.deps.Instances.GetContainer(ctx, inst.ID); err == nil && c != nil {
-		tracked := h.toTrackedContainer(c)
+		tracked := h.toTrackedContainer(ctx, c)
 		tracked.Docker = h.inspect(ctx, c.DockerID)
 		out["container"] = tracked
 	}
@@ -457,7 +457,7 @@ func (h *Handler) listContainers(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]item, 0, len(tracked))
 	for _, c := range tracked {
-		it := item{trackedContainerDTO: h.toTrackedContainer(c)}
+		it := item{trackedContainerDTO: h.toTrackedContainer(ctx, c)}
 		if dockerOK {
 			it.DockerState = live[c.DockerID]
 			if it.DockerState == "" {
@@ -474,7 +474,7 @@ func (h *Handler) getContainer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	out := h.toTrackedContainer(c)
+	out := h.toTrackedContainer(r.Context(), c)
 	out.Docker = h.inspect(r.Context(), dockerID)
 	writeJSON(w, http.StatusOK, out)
 }

@@ -31,6 +31,8 @@ type InstanceRepository interface {
 	// expected, as one atomic update. It returns false, writing nothing,
 	// when the status has changed since the caller read it.
 	UpdateIfStatus(ctx context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error)
+	// SetProtected sets only the protected flag of an instance.
+	SetProtected(ctx context.Context, id string, protected bool) error
 	Delete(ctx context.Context, id string) error
 }
 
@@ -1076,6 +1078,13 @@ func (s *InstanceService) ListInstances(ctx context.Context, userID string) ([]*
 // GetInstance retrieves a service instance by ID.
 func (s *InstanceService) GetInstance(ctx context.Context, id string) (*models.ServiceInstance, error) {
 	return s.instanceRepo.GetByID(ctx, id)
+}
+
+// SetProtected marks the instance protected or not. A protected instance
+// cannot be stopped, reconfigured, or re-imaged over /api/v1 or MCP without
+// the protected scope. It changes nothing about the running container.
+func (s *InstanceService) SetProtected(ctx context.Context, id string, protected bool) error {
+	return s.instanceRepo.SetProtected(ctx, id, protected)
 }
 
 // StopInstance stops the service instance.

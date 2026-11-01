@@ -19,7 +19,8 @@ func isPending(instance *models.ServiceInstance) bool {
 // Detail renders a service instance. summary is the Docker inspect summary
 // of container, or nil when there is no container or inspect failed.
 // restorePoints adds the Restore points card (admins, backed-up templates).
-templ Detail(instance *models.ServiceInstance, container *models.Container, summary *docker.InspectSummary, tmpl *services.ServiceTemplate, restorePoints bool, csrfToken string) {
+// protection drives the Protected card.
+templ Detail(instance *models.ServiceInstance, container *models.Container, summary *docker.InspectSummary, tmpl *services.ServiceTemplate, restorePoints bool, protection Protection, csrfToken string) {
 	@layouts.AppLayout(instance.Name, csrfToken) {
 		// Outside the polled region: the poll selects #service-detail-content
 		// only, so the trail is rendered once.
@@ -115,10 +116,9 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 					@ui.Button(ui.ButtonProps{
 						Variant: ui.ButtonDanger,
 						Attrs: templ.Attributes{
-							"hx-delete": "/services/" + instance.ID,
-							"hx-confirm": "Are you sure you want to delete this service? Data will be lost.",
-							"data-ui-confirm-tone": "danger",
-							"data-ui-confirm-label": "Delete service",
+							"data-ui-dialog-open": "delete-service-dialog",
+							"aria-haspopup": "dialog",
+							"data-testid": "delete-service-open",
 						},
 					}) {
 						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,6 +128,8 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 					}
 				</div>
 			</div>
+
+			@ProtectedCard(protection)
 
 			if container != nil {
 				// hx-preserve on the stream keeps it open across pending polls
@@ -152,6 +154,16 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 		if restorePoints {
 			@restorePointsCard(instance.ID)
 		}
+		// Static and outside the polled region; the Delete button opens it.
+		@components.TypedDeleteDialog(components.TypedDeleteProps{
+			ID:      "delete-service-dialog",
+			Title:   "Delete service",
+			Kind:    "service",
+			Name:    instance.Name,
+			URL:     "/services/" + instance.ID,
+			Warning: "This removes the service and its container. Data will be lost.",
+			Label:   "Delete service",
+		})
 		@secretControlsScript()
 	}
 }

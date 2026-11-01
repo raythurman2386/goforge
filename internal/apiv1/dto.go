@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -167,7 +168,7 @@ func (h *Handler) toServiceSummary(inst *models.ServiceInstance) serviceSummaryD
 		Version:   nullString(inst.Version),
 		Domain:    nullString(inst.Domain),
 		Status:    string(inst.Status),
-		Protected: h.isProtected(inst.ID),
+		Protected: h.instanceProtected(inst),
 		LastError: nullString(inst.LastError),
 		CreatedAt: inst.CreatedAt,
 		UpdatedAt: inst.UpdatedAt,
@@ -279,7 +280,7 @@ type trackedContainerDTO struct {
 	Docker            *containerStateDTO `json:"docker,omitempty"`
 }
 
-func (h *Handler) toTrackedContainer(c *models.Container) trackedContainerDTO {
+func (h *Handler) toTrackedContainer(ctx context.Context, c *models.Container) trackedContainerDTO {
 	instanceID := containerInstanceID(c)
 	return trackedContainerDTO{
 		DockerID:          c.DockerID,
@@ -288,7 +289,7 @@ func (h *Handler) toTrackedContainer(c *models.Container) trackedContainerDTO {
 		Status:            string(c.Status),
 		DeploymentID:      nullString(c.DeploymentID),
 		ServiceInstanceID: instanceID,
-		Protected:         h.isProtected(instanceID),
+		Protected:         h.isProtected(ctx, instanceID),
 		CreatedAt:         c.CreatedAt,
 	}
 }

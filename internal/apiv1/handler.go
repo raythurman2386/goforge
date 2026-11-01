@@ -1,6 +1,8 @@
 package apiv1
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
@@ -112,17 +115,69 @@ func (h *Handler) Routes() http.Handler {
 	return r
 }
 
-// isProtected reports whether a service instance is on the protected list.
-func (h *Handler) isProtected(instanceID string) bool {
+// envProtected reports whether a service instance is listed in
+// GOFORGE_PROTECTED_SERVICES.
+func (h *Handler) envProtected(instanceID string) bool {
 	return instanceID != "" && h.protected[instanceID]
 }
 
-// protectedList returns the configured protected IDs in a stable order.
-func (h *Handler) protectedList() []string {
+// instanceProtected reports whether inst is protected: listed in the env or
+// marked protected on its service page.
+func (h *Handler) instanceProtected(inst *models.ServiceInstance) bool {
+	if inst == nil {
+		return false
+	}
+	return inst.Protected || h.envProtected(inst.ID)
+}
+
+// isProtected reports whether the service instance behind instanceID is
+// protected (env list or the stored flag). It fails closed: if the instance
+// cannot be read for any reason but "not found", it answers true, so a
+// database error never lets a stop through on a protected service.
+func (h *Handler) isProtected(ctx context.Context, instanceID string) bool {
+	if instanceID == "" {
+		return false
+	}
+	if h.envProtected(instanceID) {
+		return true
+	}
+	if h.deps.Instances == nil {
+		return false
+	}
+	inst, err := h.deps.Instances.GetInstance(ctx, instanceID)
+	if errors.Is(err, repositories.ErrNotFound) || (err == nil && inst == nil) {
+		return false
+	}
+	if err != nil {
+		h.logger.Warn("api v1: protected check could not read the service; treating it as protected", "service_instance_id", instanceID, "error", err)
+		return true
+	}
+	return inst.Protected
+}
+
+// protectedList returns the env-listed protected IDs in their configured
+// order, then the caller's services marked protected in the UI.
+func (h *Handler) protectedList(ctx context.Context, userID string) []string {
 	out := make([]string, 0, len(h.deps.ProtectedServices))
+	seen := map[string]bool{}
 	for _, id := range h.deps.ProtectedServices {
-		if id = strings.TrimSpace(id); id != "" {
+		if id = strings.TrimSpace(id); id != "" && !seen[id] {
+			seen[id] = true
 			out = append(out, id)
+		}
+	}
+	if h.deps.Instances == nil || userID == "" {
+		return out
+	}
+	insts, err := h.deps.Instances.ListInstances(ctx, userID)
+	if err != nil {
+		h.logger.Warn("api v1: could not list services for the protected list", "error", err)
+		return out
+	}
+	for _, inst := range insts {
+		if inst != nil && inst.Protected && !seen[inst.ID] {
+			seen[inst.ID] = true
+			out = append(out, inst.ID)
 		}
 	}
 	return out

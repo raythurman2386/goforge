@@ -61,6 +61,12 @@ func (f *fakeInstanceRepo) UpdateIfStatus(_ context.Context, s *models.ServiceIn
 	f.saw = append(f.saw, *s)
 	return true, nil
 }
+func (f *fakeInstanceRepo) SetProtected(_ context.Context, _ string, protected bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.inst.Protected = protected
+	return nil
+}
 func (f *fakeInstanceRepo) Delete(context.Context, string) error { return nil }
 
 type fakeContainerRepo struct{}

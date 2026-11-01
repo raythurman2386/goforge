@@ -474,11 +474,9 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonDanger,
 					Attrs: templ.Attributes{
-						"hx-delete": "/projects/" + project.ID,
-						"hx-confirm": "Are you sure you want to delete this project?",
-						"data-ui-confirm-tone": "danger",
-						"data-ui-confirm-label": "Delete project",
-						"hx-headers": `{"X-CSRF-Token":"` + csrfToken + `"}`,
+						"data-ui-dialog-open": "delete-project-dialog",
+						"aria-haspopup": "dialog",
+						"data-testid": "delete-project-open",
 					},
 				}) {
 					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -489,6 +487,15 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 			</div>
 		</div>
 	}
+	@components.TypedDeleteDialog(components.TypedDeleteProps{
+		ID:      "delete-project-dialog",
+		Title:   "Delete project",
+		Kind:    "project",
+		Name:    project.Name,
+		URL:     "/projects/" + project.ID,
+		Warning: "All of this project's resources and deployments are removed. This cannot be undone.",
+		Label:   "Delete project",
+	})
 }
 
 

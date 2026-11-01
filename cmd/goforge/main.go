@@ -482,6 +482,7 @@ func runServer() error {
 		Redactor: func(extra ...config.BackupConfig) *backup.Redactor { return backup.RedactorFor(cfg, extra...) },
 	}
 	serviceHandler.WithRestorePoints(restorePoints)
+	serviceHandler.WithEnvProtected(cfg.ProtectedServices)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithNotifySettings(notifySettings).
 		WithRestorePoints(restorePoints).WithAudit(auditService).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
