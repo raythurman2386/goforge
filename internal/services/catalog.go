@@ -88,6 +88,12 @@ type DockerConfig struct {
 	// it: pass secrets through Environment and read them from the command,
 	// as templates/redis.yaml does. Empty keeps the image's CMD.
 	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
+	// Entrypoint replaces the image's ENTRYPOINT, rendered like Command and
+	// under the same rule: never render a secret into it. Docker drops the
+	// image's CMD when the entrypoint is replaced, so a template that sets
+	// it usually ends its script with exec of the image's own start script,
+	// as templates/gitea-runner.yaml does. Empty keeps the image ENTRYPOINT.
+	Entrypoint []string `yaml:"entrypoint,omitempty" json:"entrypoint,omitempty"`
 	// OptionalEnvironment is rendered like Environment, but a variable whose
 	// value renders empty is left out of the container instead of set to "".
 	OptionalEnvironment map[string]string `yaml:"optional_environment,omitempty" json:"optional_environment,omitempty"`

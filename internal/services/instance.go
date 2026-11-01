@@ -350,7 +350,11 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 		}
 	}
 
-	cmd, err := s.renderCommand(tmpl.Docker.Command, data)
+	cmd, err := s.renderCommand("command", tmpl.Docker.Command, data)
+	if err != nil {
+		return nil, err
+	}
+	entrypoint, err := s.renderCommand("entrypoint", tmpl.Docker.Entrypoint, data)
 	if err != nil {
 		return nil, err
 	}
@@ -373,6 +377,7 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 	opts := docker.ContainerOptions{
 		Name:          containerName,
 		Image:         image,
+		Entrypoint:    entrypoint,
 		Cmd:           cmd,
 		Env:           envVars,
 		NetworkName:   s.traefikNetwork,
@@ -406,9 +411,10 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 	return &containerSpec{instanceID: instance.ID, opts: opts, data: data, hooks: hooks, secrets: SecretValues(tmpl, config)}, nil
 }
 
-// renderCommand renders each docker.command element. An empty command
-// returns nil, which keeps the image's CMD.
-func (s *InstanceService) renderCommand(command []string, data map[string]interface{}) ([]string, error) {
+// renderCommand renders each element of docker.command or docker.entrypoint
+// (field names which one, for errors). An empty list returns nil, which keeps
+// the image default.
+func (s *InstanceService) renderCommand(field string, command []string, data map[string]interface{}) ([]string, error) {
 	if len(command) == 0 {
 		return nil, nil
 	}
@@ -416,7 +422,7 @@ func (s *InstanceService) renderCommand(command []string, data map[string]interf
 	for i, arg := range command {
 		val, err := s.interpolate(arg, data)
 		if err != nil {
-			return nil, fmt.Errorf("failed to interpolate command[%d]: %w", i, err)
+			return nil, fmt.Errorf("failed to interpolate %s[%d]: %w", field, i, err)
 		}
 		cmd = append(cmd, val)
 	}

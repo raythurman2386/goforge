@@ -25,6 +25,7 @@ const specGoldenPath = "testdata/spec_golden.json"
 // specSnapshot is the comparable part of docker.ContainerOptions.
 type specSnapshot struct {
 	Image         string            `json:"image"`
+	Entrypoint    []string          `json:"entrypoint,omitempty"`
 	Command       []string          `json:"command,omitempty"`
 	Env           []string          `json:"env"`
 	Labels        map[string]string `json:"labels"`
@@ -82,7 +83,7 @@ func renderSnapshots(t *testing.T) map[string]specSnapshot {
 			}
 			sort.Strings(env)
 			snap := specSnapshot{
-				Image: spec.opts.Image, Command: spec.opts.Cmd, Env: env, Labels: spec.opts.Labels, Binds: spec.opts.Binds,
+				Image: spec.opts.Image, Entrypoint: spec.opts.Entrypoint, Command: spec.opts.Cmd, Env: env, Labels: spec.opts.Labels, Binds: spec.opts.Binds,
 				NetworkName: spec.opts.NetworkName, RestartPolicy: spec.opts.RestartPolicy,
 				Memory: spec.opts.Memory, NanoCPUs: spec.opts.NanoCPUs,
 			}
@@ -136,7 +137,7 @@ func TestBuildContainerSpec_MatchesMain(t *testing.T) {
 			continue
 		}
 		w = wantSinceMain(key, w, g)
-		if !strings.HasPrefix(key, "gitea") {
+		if strings.TrimSuffix(key, "+domain") != "gitea" {
 			if gj, wj := mustJSON(t, g), mustJSON(t, w); gj != wj {
 				t.Errorf("%s: container options changed\n got: %s\nwant: %s", key, gj, wj)
 			}

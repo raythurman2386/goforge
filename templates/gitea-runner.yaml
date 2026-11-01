@@ -1,0 +1,195 @@
+name: gitea-runner
+display_name: Gitea Actions Runner
+description: Gitea Actions runner (official gitea/act_runner image) that registers with your Gitea and runs workflow jobs inside this one container, with Python 3, Node.js and npm, TypeScript (tsc), Go, and Rust (cargo, clippy, rustfmt) installed from Alpine packages on every container create. Jobs pick it with runs-on set to one of its labels (linux, alpine, python, node, typescript, go, rust by default), all in act_runner host mode. GoForge never mounts the Docker socket into service containers, so jobs cannot run docker build, docker:// labels, or container/services keys. To register, open Gitea Site Administration, Actions, Runners (or a repo or org Settings, Actions, Runners), click Create new Runner, copy the registration token, and paste it here with your Gitea URL. The token is used once; the registration is kept in the data volume. Build, module, and package caches live in the cache volume. Defaults to 2 CPUs and 4 GiB; raise them for big Rust builds.
+icon: gitea
+category: devtools
+
+versions:
+  - "0.6.1"
+  - "latest"
+default_version: "0.6.1"
+
+config:
+  # The URL the runner registers with and polls. Use Gitea's ROOT_URL (the
+  # https:// browser URL). actions/checkout clones from ROOT_URL too, so the
+  # runner needs to reach it either way.
+  - name: instance_url
+    label: Gitea URL (ROOT_URL, e.g. https://gitea-app.example.com)
+    type: text
+    required: true
+  # Only read when the runner is not registered yet. Create one in Gitea under
+  # Site Administration > Actions > Runners > Create new Runner.
+  - name: registration_token
+    label: Runner Registration Token (from Gitea)
+    type: password
+    required: true
+  - name: runner_name
+    label: Runner Name (shown in Gitea)
+    type: text
+    default: "goforge-runner"
+    required: true
+  # Comma-separated job labels. A bare name becomes <name>:host; only host
+  # labels work because the container has no Docker daemon or socket.
+  # Changing labels takes effect on the next container create without
+  # registering again.
+  - name: labels
+    label: Labels (comma-separated, used in runs-on)
+    type: text
+    default: "linux,alpine,python,node,typescript,go,rust"
+    required: true
+  - name: capacity
+    label: Concurrent Jobs
+    type: number
+    default: 1
+    min: 1
+    max: 8
+    required: true
+  # Extra Alpine packages installed before the runner starts, for example
+  # "uv postgresql-client". Space-separated.
+  - name: extra_packages
+    label: Extra Alpine Packages (space-separated)
+    type: text
+    default: ""
+    required: false
+  # Global npm packages installed before the runner starts.
+  - name: npm_globals
+    label: Global npm Packages (space-separated)
+    type: text
+    default: "typescript"
+    required: false
+
+resources:
+  cpu: "2"
+  memory: "4g"
+
+docker:
+  image: "gitea/act_runner:{{ .Version }}"
+  ports: []
+  environment:
+    GITEA_INSTANCE_URL: "{{ .Config.instance_url }}"
+    GITEA_RUNNER_NAME: "{{ .Config.runner_name }}"
+    RUNNER_LABELS: "{{ .Config.labels }}"
+    RUNNER_CAPACITY: "{{ .Config.capacity }}"
+    RUNNER_EXTRA_PACKAGES: "{{ .Config.extra_packages }}"
+    RUNNER_NPM_GLOBALS: "{{ .Config.npm_globals }}"
+    # Toolchain caches on the cache volume, so module downloads and build
+    # artifacts survive recreates. Jobs inherit the runner's environment.
+    GOPATH: "/cache/go"
+    GOCACHE: "/cache/go-build"
+    CARGO_HOME: "/cache/cargo"
+    npm_config_cache: "/cache/npm"
+    PIP_CACHE_DIR: "/cache/pip"
+    RUNNER_TOOL_CACHE: "/cache/toolcache"
+  optional_environment:
+    # The token sits in the container environment only until registration;
+    # run.sh unsets it before act_runner daemon starts. Blank after an edit
+    # is fine once the runner is registered.
+    GITEA_RUNNER_REGISTRATION_TOKEN: "{{ .Config.registration_token }}"
+  # The image entrypoint is tini -- run.sh. This keeps tini as PID 1, installs
+  # the toolchains, writes /data/config.yaml from the fields above, and then
+  # hands over to the image's run.sh, which registers once and starts
+  # act_runner daemon. No secret is rendered here: the token is read from the
+  # environment by run.sh.
+  entrypoint:
+    - /sbin/tini
+    - --
+    - sh
+    - -c
+    - |
+      set -eu
+      say() { echo "goforge-runner: $*"; }
+      die() { echo "goforge-runner: $*" >&2; exit 1; }
+
+      # Labels: bare names become <name>:host. Anything else is refused,
+      # because docker:// labels need a Docker daemon this container lacks.
+      labels=""
+      for l in $(printf '%s' "$RUNNER_LABELS" | tr ',' ' '); do
+        case "$l" in
+          *:host) name="${l%:host}" ;;
+          *:*) die "label $l: only host labels work here (no Docker socket); use a bare name such as python" ;;
+          *) name="$l" ;;
+        esac
+        case "$name" in
+          ''|*[!A-Za-z0-9._-]*) die "label $l: use letters, digits, dot, dash, or underscore" ;;
+        esac
+        labels="${labels:+$labels,}$name:host"
+      done
+      [ -n "$labels" ] || die "no labels configured"
+      case "$RUNNER_CAPACITY" in
+        ''|*[!0-9]*|0) die "Concurrent Jobs must be a positive number" ;;
+      esac
+
+      mkdir -p /data /cache/apk /cache/act /cache/actcache
+      cd /data
+      # Registered against another Gitea URL: with a token, keep the old
+      # registration aside and register again; without one, change nothing.
+      if [ -s .runner ] && ! grep -qF "\"address\": \"$GITEA_INSTANCE_URL\"" .runner; then
+        [ -n "${GITEA_RUNNER_REGISTRATION_TOKEN:-}" ] || die "Gitea URL differs from the registered one; add a registration token from that Gitea to register there"
+        say "Gitea URL changed; moving the old registration to .runner.previous"
+        mv -f .runner .runner.previous
+      fi
+      if [ ! -s .runner ]; then
+        [ -n "$GITEA_INSTANCE_URL" ] || die "Gitea URL is required to register"
+        [ -n "${GITEA_RUNNER_REGISTRATION_TOKEN:-}" ] || die "registration token is required to register (Gitea: Actions > Runners > Create new Runner)"
+      fi
+
+      # Toolchains. The apk cache on /cache keeps a recreate from downloading
+      # every package again.
+      ln -sfn /cache/apk /etc/apk/cache
+      say "installing toolchains"
+      apk add --update-cache --quiet \
+        bash git git-lfs openssh-client ca-certificates curl wget jq \
+        tar xz zstd gzip unzip make build-base pkgconf openssl-dev \
+        python3 py3-pip nodejs npm go rust cargo rust-clippy rustfmt \
+        $RUNNER_EXTRA_PACKAGES
+      if [ -n "$RUNNER_NPM_GLOBALS" ]; then
+        npm install --global --no-audit --no-fund --loglevel=error $RUNNER_NPM_GLOBALS
+      fi
+      export PATH="/cache/cargo/bin:/cache/go/bin:$PATH"
+      say "python $(python3 --version 2>&1 | cut -d' ' -f2), node $(node --version), go $(go env GOVERSION), $(rustc --version | cut -d' ' -f1-2)"
+
+      # act_runner config, rewritten on every create. Labels here override the
+      # ones stored at registration, so a label edit needs no new token.
+      {
+        echo "log:"
+        echo "  level: info"
+        echo "runner:"
+        echo "  file: .runner"
+        echo "  capacity: $RUNNER_CAPACITY"
+        echo "  timeout: 3h"
+        echo "  labels:"
+        for l in $(printf '%s' "$labels" | tr ',' ' '); do echo "    - \"$l\""; done
+        echo "cache:"
+        echo "  enabled: true"
+        echo "  dir: /cache/actcache"
+        echo "container:"
+        echo "  docker_host: \"-\""
+        echo "  require_docker: false"
+        echo "host:"
+        echo "  workdir_parent: /cache/act"
+        echo "metrics:"
+        echo "  enabled: true"
+        echo "  addr: 127.0.0.1:9101"
+      } > /data/config.yaml
+
+      export CONFIG_FILE=/data/config.yaml GITEA_RUNNER_LABELS="$labels"
+      say "starting act_runner with labels $labels"
+      exec run.sh
+  volumes:
+    # .runner (registration) and config.yaml.
+    - name: data
+      path: /data
+    # apk packages, Go/Cargo/npm/pip caches, actions/cache, job workdirs.
+    - name: cache
+      path: /cache
+  # act_runner serves /healthz on its loopback metrics listener once the
+  # daemon runs, which is after toolchain install and registration.
+  health_check:
+    test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9101/healthz"]
+    interval: 15s
+    timeout: 5s
+    retries: 20
+
+connection:
+  internal: "{{ .Config.instance_url }}"
+  external: "{{ .Config.instance_url }}"
