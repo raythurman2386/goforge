@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Network and block I/O are now filled in container metrics (they were always 0, also in `/api/v1` stats)
 
 ### Changed
+- UI typefaces are now **Geist Sans** (UI and body, `font-sans`) and **Geist Mono** (code, logs, IDs, `font-mono`), self-hosted as variable WOFF2 files in `static/fonts` (OFL-1.1), vendored from the npm `geist` package v1.9.0. Inter is removed; `font-mono` previously named JetBrains Mono, which was never shipped, so it fell back to the browser monospace (t1682u)
 - The version in `/api/v1/health`, startup logs, and backup manifests is now the build's tag (or `dev`) instead of the hard-coded `0.1.0`; the MCP server reports the same value instead of `1.0.0`
 - `docs/security.md` and `docs/guides/projects.md` say AES-GCM like the Secrets docs
 - Docs home page Secrets bullet now lists every value `ENCRYPTION_KEY` encrypts (also one-click service credentials and the backup S3 keys), says AES-GCM like `README.md` and `SECURITY.md`, and names the plaintext gaps; the architecture overview's Secrets line matches

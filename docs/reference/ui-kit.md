@@ -8,6 +8,10 @@ GoForge pages are built from one templ component kit in `internal/web/templates/
 
 With `GOFORGE_DEV_MODE=true`, `/dev/ui` renders every token and component, with keyboard demos for the dialog, the confirm, the overlays, the tabs, the tables, and the sheet. Without dev mode the route returns `404`. The `verify.sh drive-ui-a11y` drive (`.cursor/skills/verify-goforge/features/ui-a11y.md`) scans the gallery and the main pages with axe in light and dark, and runs the keyboard scripts.
 
+## Typography
+
+Text uses **Geist Sans** (`font-sans`, the default on every page) and **Geist Mono** (`font-mono`) for code, logs, commit SHAs, image tags, and IDs. Both are variable fonts (weights 100 to 900) self-hosted in `static/fonts` (`Geist-Variable.woff2`, `GeistMono-Variable.woff2`, OFL-1.1), vendored from the npm `geist` package, with `@font-face` rules in `static/css/input.css` and system fallbacks in `tailwind.config.js`. `Base` preloads the sans file. To update them, copy the two files from a newer `geist` package's `dist/fonts` and keep the file names.
+
 ## Shared helpers
 
 | Helper | Use |

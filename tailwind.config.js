@@ -68,8 +68,10 @@ module.exports = {
         'ui-lg': 'var(--gf-radius-lg)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        // Geist Sans for UI and body text, Geist Mono for code, logs, and IDs.
+        // Both are self-hosted in static/fonts (see static/css/input.css).
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out forwards',
