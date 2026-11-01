@@ -112,13 +112,13 @@ func tbodyClass() string {
 func thClass(compact bool, align CellAlign) string {
 	switch {
 	case compact && align == CellEnd:
-		return "py-1 pr-3 text-right font-medium text-muted-foreground"
+		return "py-1 pr-3 text-right font-medium text-foreground-secondary"
 	case compact:
-		return "py-1 pr-3 text-left font-medium text-muted-foreground"
+		return "py-1 pr-3 text-left font-medium text-foreground-secondary"
 	case align == CellEnd:
-		return "px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+		return "px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary"
 	default:
-		return "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+		return "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary"
 	}
 }
 

@@ -139,23 +139,23 @@ templ Detail(props DetailProps) {
 				@ui.CardContent(nil) {
 					<dl class="space-y-4">
 						<div>
-							<dt class="text-sm font-medium text-muted-foreground">Created</dt>
+							<dt class="text-sm font-medium text-foreground-secondary">Created</dt>
 							<dd class="mt-1 text-sm text-foreground">{ formatTimestamp(props.Deployment.CreatedAt) }</dd>
 						</div>
 						if props.Deployment.StartedAt.Valid {
 							<div>
-								<dt class="text-sm font-medium text-muted-foreground">Started</dt>
+								<dt class="text-sm font-medium text-foreground-secondary">Started</dt>
 								<dd class="mt-1 text-sm text-foreground">{ formatTimestamp(props.Deployment.StartedAt.Time) }</dd>
 							</div>
 						}
 						if props.Deployment.FinishedAt.Valid {
 							<div>
-								<dt class="text-sm font-medium text-muted-foreground">Finished</dt>
+								<dt class="text-sm font-medium text-foreground-secondary">Finished</dt>
 								<dd class="mt-1 text-sm text-foreground">{ formatTimestamp(props.Deployment.FinishedAt.Time) }</dd>
 							</div>
 						}
 						<div>
-							<dt class="text-sm font-medium text-muted-foreground">Duration</dt>
+							<dt class="text-sm font-medium text-foreground-secondary">Duration</dt>
 							<dd class="mt-1 text-sm text-foreground">{ formatDuration(props.Deployment.Duration()) }</dd>
 						</div>
 					</dl>
@@ -170,7 +170,7 @@ templ Detail(props DetailProps) {
 					Deployment Logs
 				}
 				if !props.Deployment.IsTerminal() {
-					<span class="inline-flex items-center gap-2 text-sm text-muted-foreground">
+					<span class="inline-flex items-center gap-2 text-sm text-foreground-secondary">
 						<span class="h-2 w-2 rounded-full bg-success animate-pulse" aria-hidden="true"></span>
 						Live
 					</span>
@@ -179,7 +179,7 @@ templ Detail(props DetailProps) {
 			<div id="deployment-logs" class="bg-terminal text-foreground font-mono text-sm p-4 max-h-96 overflow-y-auto">
 				<div id="deployment-log-lines" sse-swap="snapshot" hx-swap="innerHTML">
 					if len(props.Logs) == 0 {
-						<p class="text-muted-foreground italic">No logs available yet...</p>
+						<p class="text-foreground-secondary italic">No logs available yet...</p>
 					} else {
 						for _, log := range props.Logs {
 							@LogLine(log)
@@ -202,7 +202,7 @@ templ liveStatus(status models.DeploymentStatus) {
 
 templ infoRow(label string) {
 	<div class="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-		<dt class="text-sm font-medium text-muted-foreground">{ label }</dt>
+		<dt class="text-sm font-medium text-foreground-secondary">{ label }</dt>
 		<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2">
 			{ children... }
 		</dd>
@@ -211,7 +211,7 @@ templ infoRow(label string) {
 
 templ LogLine(log *models.DeploymentLog) {
 	<div class={ "py-0.5", logLevelClass(log.Level) }>
-		<span class="text-muted-foreground">{ formatLogTime(log.Timestamp) }</span>
+		<span class="text-foreground-secondary">{ formatLogTime(log.Timestamp) }</span>
 		<span class={ logLevelBadgeClass(log.Level) }>{ string(log.Level) }</span>
 		if log.Source.Valid {
 			<span class="text-primary-300">[{ log.Source.String }]</span>
@@ -255,9 +255,9 @@ func logLevelClass(level models.DeploymentLogLevel) string {
 	case models.LogLevelError:
 		return "text-danger"
 	case models.LogLevelWarn:
-		return "text-warning"
+		return "text-warning-foreground"
 	case models.LogLevelDebug:
-		return "text-muted-foreground"
+		return "text-foreground-secondary"
 	default:
 		return ""
 	}
@@ -268,7 +268,7 @@ func logLevelBadgeClass(level models.DeploymentLogLevel) string {
 	case models.LogLevelError:
 		return "px-1 rounded bg-danger/15 text-danger text-xs"
 	case models.LogLevelWarn:
-		return "px-1 rounded bg-warning/15 text-warning text-xs"
+		return "px-1 rounded bg-warning/15 text-warning-foreground text-xs"
 	case models.LogLevelDebug:
 		return "px-1 rounded bg-highlight text-foreground-secondary text-xs"
 	default:

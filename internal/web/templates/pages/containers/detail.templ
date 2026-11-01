@@ -70,7 +70,7 @@ templ Detail(containerID string, csrfToken string) {
 				@ui.CardTitle(3, nil) {
 					Container Logs
 				}
-				<span class="inline-flex items-center gap-2 text-sm text-muted-foreground">
+				<span class="inline-flex items-center gap-2 text-sm text-foreground-secondary">
 					<span class="h-2 w-2 rounded-full bg-success animate-pulse" aria-hidden="true"></span>
 					Live
 				</span>
@@ -83,7 +83,7 @@ templ Detail(containerID string, csrfToken string) {
 				sse-swap="log"
 				hx-swap="beforeend"
 			>
-				<p class="text-muted-foreground italic">Waiting for logs...</p>
+				<p class="text-foreground-secondary italic">Waiting for logs...</p>
 			</div>
 		}
 

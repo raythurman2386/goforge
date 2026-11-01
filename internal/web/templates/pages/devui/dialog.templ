@@ -64,7 +64,7 @@ templ dialogSection() {
 			Open static dialog
 		}
 	</div>
-	<p class="mt-3 text-sm text-muted-foreground">
+	<p class="mt-3 text-sm text-foreground-secondary">
 		Fragments come from { DemoDialogPath } and are appended to body. A backdrop click closes the first two kinds unless the dialog is non-dismissible. The static dialog lives in the page and is reused.
 	</p>
 	@ui.Dialog(ui.DialogProps{ID: "gallery-static-dialog", Static: true, Title: "Static dialog", Description: "Rendered in the page; ui.js does not remove it on close."}) {
@@ -89,7 +89,7 @@ templ dialogSection() {
 			}
 		</form>
 	</div>
-	<p class="mt-3 text-sm text-muted-foreground">
+	<p class="mt-3 text-sm text-foreground-secondary">
 		hx-confirm opens the kit confirm dialog instead of the browser prompt. Cancel, Escape, and the backdrop send nothing; Confirm sends one request. A plain form submit with hx-confirm is gated the same way.
 	</p>
 }

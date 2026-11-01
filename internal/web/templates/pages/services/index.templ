@@ -22,13 +22,13 @@ templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceIn
 	@layouts.AppLayout("Services", csrfToken) {
 		<div class="mb-12">
 			<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">Your Services</h2>
-			<p class="mt-2 text-sm text-muted-foreground">Currently active and pending instances.</p>
+			<p class="mt-2 text-sm text-foreground-secondary">Currently active and pending instances.</p>
 			@InstanceList(instances)
 		</div>
 
 		<div class="pt-12 border-t border-border">
 			<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl mb-2">Service Catalog</h2>
-			<p class="mb-8 text-sm text-muted-foreground">Ready-to-deploy application and database templates.</p>
+			<p class="mb-8 text-sm text-foreground-secondary">Ready-to-deploy application and database templates.</p>
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				for _, tmpl := range templates {
 					@ui.Card(ui.CardProps{
@@ -46,12 +46,12 @@ templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceIn
 							</div>
 							<div class="ml-4">
 								<h3 class="text-lg font-bold text-foreground tracking-tight">{ tmpl.DisplayName }</h3>
-								@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-[10px] font-bold uppercase tracking-widest leading-none text-muted-foreground"}) {
+								@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSubtle, Square: true, Class: "px-2 text-[10px] font-bold uppercase tracking-widest leading-none text-foreground-secondary"}) {
 									{ tmpl.Category }
 								}
 							</div>
 						</div>
-						<p class="text-sm text-muted-foreground leading-relaxed flex-1 line-clamp-2">{ tmpl.Description }</p>
+						<p class="text-sm text-foreground-secondary leading-relaxed flex-1 line-clamp-2">{ tmpl.Description }</p>
 						<div class="mt-8">
 							@ui.Button(ui.ButtonProps{
 								Variant: ui.ButtonPrimary,
@@ -83,7 +83,7 @@ templ InstanceList(instances []*models.ServiceInstance) {
 					</svg>
 				</div>
 				<h3 class="text-lg font-bold text-foreground">No services yet</h3>
-				<p class="mt-1 text-sm text-muted-foreground">Choose a template from the catalog below to get started.</p>
+				<p class="mt-1 text-sm text-foreground-secondary">Choose a template from the catalog below to get started.</p>
 			</div>
 		}
 	} else {
@@ -105,7 +105,7 @@ templ InstanceList(instances []*models.ServiceInstance) {
 						<h3 class="text-lg font-bold text-foreground tracking-tight">{ instance.Name }</h3>
 						@components.StatusBadge("service", string(instance.Status))
 					</div>
-					<div class="flex items-center text-sm text-muted-foreground">
+					<div class="flex items-center text-sm text-foreground-secondary">
 						<div class="w-6 h-6 bg-muted rounded flex items-center justify-center text-[10px] font-bold mr-2">
 							{ string(instance.TemplateName[0]) }
 						</div>

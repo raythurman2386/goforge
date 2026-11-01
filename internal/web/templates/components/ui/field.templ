@@ -46,7 +46,7 @@ templ Field(p FieldProps) {
 
 templ fieldMessages(id, help, errMsg string) {
 	if help != "" {
-		<p id={ HelpID(id) } class="mt-1.5 text-xs text-muted-foreground">{ help }</p>
+		<p id={ HelpID(id) } class="mt-1.5 text-xs text-foreground-secondary">{ help }</p>
 	}
 	if errMsg != "" {
 		<p id={ ErrorID(id) } class="mt-1.5 text-xs font-medium text-danger">{ errMsg }</p>

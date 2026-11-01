@@ -15,7 +15,7 @@ templ New(sources []*models.GitSource, serviceInstances []*models.ServiceInstanc
 					<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
 						Create Project
 					</h2>
-					<p class="mt-2 text-sm text-muted-foreground">Connect your repository to start deploying your application.</p>
+					<p class="mt-2 text-sm text-foreground-secondary">Connect your repository to start deploying your application.</p>
 				</div>
 			</div>
 
@@ -54,7 +54,7 @@ templ New(sources []*models.GitSource, serviceInstances []*models.ServiceInstanc
 						<div class="border-t border-divider pt-8">
 							<div class="mb-4">
 								<h4 id="project-services-title" class="text-xs font-semibold text-primary-700 uppercase tracking-wider dark:text-primary-400">Link Services</h4>
-								<p id="project-services-help" class="mt-1 text-sm text-muted-foreground">Optionally link running services to inject their connection strings as environment variables during deployment.</p>
+								<p id="project-services-help" class="mt-1 text-sm text-foreground-secondary">Optionally link running services to inject their connection strings as environment variables during deployment.</p>
 							</div>
 							<fieldset class="space-y-3" aria-labelledby="project-services-title" aria-describedby="project-services-help">
 								for _, inst := range serviceInstances {

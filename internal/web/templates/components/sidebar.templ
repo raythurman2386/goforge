@@ -90,7 +90,7 @@ templ sidebarNav(csrfToken string) {
 				<div class="min-w-0">
 					<p class="truncate text-sm font-medium text-foreground">{ UserDisplayName(user) }</p>
 					if UserDisplayName(user) != user.Email {
-						<p class="truncate text-xs text-muted-foreground">{ user.Email }</p>
+						<p class="truncate text-xs text-foreground-secondary">{ user.Email }</p>
 					}
 				</div>
 			</div>

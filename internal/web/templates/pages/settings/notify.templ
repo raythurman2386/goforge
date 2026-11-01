@@ -22,11 +22,11 @@ templ NotifyCard(v *notify.SettingsView, csrfToken string) {
 				@ui.Select(ui.SelectProps{ID: "notify-kind", Name: "kind", Label: "Type", Options: notifyKindOptions(), Selected: v.Kind})
 				<div class="sm:col-span-2">
 					@ui.Input(ui.InputProps{ID: "notify-url", Name: "url", Type: "url", Label: "URL", Autocomplete: "off", Placeholder: notifyURLPlaceholder(v), DescribedBy: "notify-url-state", Attrs: templ.Attributes{"spellcheck": "false"}})
-					<p id="notify-url-state" class="mt-1 text-xs text-muted-foreground" data-testid="notify-url-state">{ notifyURLState(v) }</p>
+					<p id="notify-url-state" class="mt-1 text-xs text-foreground-secondary" data-testid="notify-url-state">{ notifyURLState(v) }</p>
 				</div>
 				<div class="sm:col-span-2">
 					@ui.Input(ui.InputProps{ID: "notify-token", Name: "token", Type: "password", Label: "Access token", Autocomplete: "new-password", Placeholder: notifyTokenPlaceholder(v), DescribedBy: "notify-token-state"})
-					<p id="notify-token-state" class="mt-1 text-xs text-muted-foreground" data-testid="notify-token-state">{ notifyTokenState(v) }</p>
+					<p id="notify-token-state" class="mt-1 text-xs text-foreground-secondary" data-testid="notify-token-state">{ notifyTokenState(v) }</p>
 				</div>
 				if v.TokenSet {
 					@ui.Checkbox(ui.CheckboxProps{ID: "notify-clear-token", Name: "clear_token", Value: "true", Label: "Remove the stored token", Class: "sm:col-span-2"})
@@ -34,7 +34,7 @@ templ NotifyCard(v *notify.SettingsView, csrfToken string) {
 			</div>
 			<fieldset class="mt-6 border-t border-divider pt-4" data-testid="notify-smtp">
 				<legend class="text-sm font-medium text-foreground">Email (SMTP)</legend>
-				<p class="mt-1 text-xs text-muted-foreground">Used when Type is Email. URL and token above are used for ntfy and webhook.</p>
+				<p class="mt-1 text-xs text-foreground-secondary">Used when Type is Email. URL and token above are used for ntfy and webhook.</p>
 				<div class="mt-4 grid gap-4 sm:grid-cols-2">
 					@ui.Input(ui.InputProps{ID: "notify-smtp-host", Name: "smtp_host", Type: "text", Label: "SMTP host", Value: v.SMTPHost, Autocomplete: "off", Placeholder: "smtp.example.com", Attrs: templ.Attributes{"spellcheck": "false"}})
 					@ui.Input(ui.InputProps{ID: "notify-smtp-port", Name: "smtp_port", Type: "number", Label: "SMTP port", Value: notifySMTPPort(v), Placeholder: "587", Attrs: templ.Attributes{"min": "1", "max": "65535"}})
@@ -42,7 +42,7 @@ templ NotifyCard(v *notify.SettingsView, csrfToken string) {
 					@ui.Input(ui.InputProps{ID: "notify-smtp-username", Name: "smtp_username", Type: "text", Label: "SMTP username", Value: v.SMTPUsername, Autocomplete: "off", Attrs: templ.Attributes{"spellcheck": "false"}})
 					<div class="sm:col-span-2">
 						@ui.Input(ui.InputProps{ID: "notify-smtp-password", Name: "smtp_password", Type: "password", Label: "SMTP password", Autocomplete: "new-password", Placeholder: notifySMTPPasswordPlaceholder(v), DescribedBy: "notify-smtp-password-state"})
-						<p id="notify-smtp-password-state" class="mt-1 text-xs text-muted-foreground" data-testid="notify-smtp-password-state">{ notifySMTPPasswordState(v) }</p>
+						<p id="notify-smtp-password-state" class="mt-1 text-xs text-foreground-secondary" data-testid="notify-smtp-password-state">{ notifySMTPPasswordState(v) }</p>
 					</div>
 					if v.SMTPPasswordSet {
 						@ui.Checkbox(ui.CheckboxProps{ID: "notify-clear-smtp-password", Name: "clear_smtp_password", Value: "true", Label: "Remove the stored SMTP password", Class: "sm:col-span-2"})
@@ -51,7 +51,7 @@ templ NotifyCard(v *notify.SettingsView, csrfToken string) {
 					@ui.Input(ui.InputProps{ID: "notify-smtp-to", Name: "smtp_to", Type: "text", Label: "To", Value: v.SMTPTo, Autocomplete: "off", Placeholder: "ops@example.com, me@example.com", Help: "Up to 10 addresses, separated by commas."})
 				</div>
 			</fieldset>
-			<p class="mt-4 text-xs text-muted-foreground">Alerts carry the event, the resource, a redacted error, a link, and the audit id. Never passwords, tokens, or connection strings.</p>
+			<p class="mt-4 text-xs text-foreground-secondary">Alerts carry the event, the resource, a redacted error, a link, and the audit id. Never passwords, tokens, or connection strings.</p>
 			<div class="mt-4 flex justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonSecondary,

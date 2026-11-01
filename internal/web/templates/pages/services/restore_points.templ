@@ -20,7 +20,7 @@ templ restorePointsCard(instanceID string) {
 			hx-swap="innerHTML"
 		>
 			<h3 class="text-lg font-bold text-foreground tracking-tight">Restore points</h3>
-			<p class="mt-1 text-sm text-muted-foreground">Loading restore points…</p>
+			<p class="mt-1 text-sm text-foreground-secondary">Loading restore points…</p>
 		</div>
 	}
 }
@@ -33,17 +33,17 @@ templ RestorePoints(v *backup.InstanceRestorePointsView) {
 	if v.Error != "" {
 		<p class="mt-1 text-sm text-danger break-words" data-testid="service-restore-points-error">{ v.Error }</p>
 	} else if len(v.Points) == 0 {
-		<p class="mt-1 text-sm text-muted-foreground" data-testid="service-restore-points-empty">
+		<p class="mt-1 text-sm text-foreground-secondary" data-testid="service-restore-points-empty">
 			No backup run holds this service's data yet.
 			if v.Skipped > 0 {
 				{ fmt.Sprintf(" %d recent run(s) skipped it (for example, it was stopped).", v.Skipped) }
 			}
 		</p>
 	} else {
-		<p class="mt-1 text-sm text-muted-foreground">Backup runs that hold this service's data, newest first.</p>
+		<p class="mt-1 text-sm text-foreground-secondary">Backup runs that hold this service's data, newest first.</p>
 		@ui.Table(ui.TableProps{Caption: "Restore points for this service", Compact: true, WrapperClass: "mt-2", Attrs: templ.Attributes{"data-testid": "service-restore-point-table"}}) {
 			<thead>
-				@ui.TR(templ.Attributes{"class": "text-muted-foreground"}) {
+				@ui.TR(templ.Attributes{"class": "text-foreground-secondary"}) {
 					@ui.TH(ui.CellProps{Compact: true}) {
 						Run key 
 					}
@@ -72,12 +72,12 @@ templ RestorePoints(v *backup.InstanceRestorePointsView) {
 			</tbody>
 		}
 		if v.Restorable() {
-			<p class="mt-3 text-xs text-muted-foreground" data-testid="service-restore-howto">
+			<p class="mt-3 text-xs text-foreground-secondary" data-testid="service-restore-howto">
 				Restoring replaces this service's data and is done from the command line on the server. Preview with the first command, then run the second. The current data is kept in <code class="font-mono">{ v.KeptDir() }</code>.
 			</p>
 			<pre class="mt-1 overflow-x-auto rounded bg-code p-2 text-xs" data-testid="service-restore-command"><code>{ restoreServiceCommand(v) }</code></pre>
 		} else {
-			<p class="mt-3 text-xs text-muted-foreground" data-testid="service-restore-howto">
+			<p class="mt-3 text-xs text-foreground-secondary" data-testid="service-restore-howto">
 				This service type has no scripted restore; see docs/deployment/backup.md.
 			</p>
 		}

@@ -48,7 +48,7 @@ func alertToneClass(t AlertTone) string {
 	case AlertError:
 		return "border-danger/30 bg-danger/10 text-danger"
 	case AlertWarning:
-		return "border-warning/30 bg-warning/10 text-warning"
+		return "border-warning/30 bg-warning/10 text-warning-foreground"
 	case AlertSuccess:
 		return "border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200"
 	case AlertInfo:
@@ -63,7 +63,7 @@ func alertIconClass(t AlertTone) string {
 	case AlertError:
 		return "text-danger"
 	case AlertWarning:
-		return "text-warning"
+		return "text-warning-foreground"
 	case AlertSuccess:
 		return "text-primary-500"
 	case AlertInfo:

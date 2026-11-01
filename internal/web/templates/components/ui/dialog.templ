@@ -25,7 +25,7 @@ templ dialog(p DialogProps) {
 			<div class="min-w-0">
 				<h2 id={ DialogTitleID(p.ID) } class="text-xl font-bold tracking-tight text-foreground">{ p.Title }</h2>
 				if p.Description != "" {
-					<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-muted-foreground">{ p.Description }</p>
+					<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-foreground-secondary">{ p.Description }</p>
 				}
 			</div>
 			@Button(ButtonProps{Variant: ButtonGhost, Size: ButtonIcon, Label: "Close dialog", Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
@@ -59,7 +59,7 @@ templ ConfirmDialog() {
 	>
 		<div class="px-6 pt-6">
 			<h2 id={ DialogTitleID(ConfirmDialogID) } class="text-lg font-bold tracking-tight text-foreground">Please confirm</h2>
-			<p id={ DialogDescriptionID(ConfirmDialogID) } data-ui-confirm-message class="mt-2 text-sm text-muted-foreground"></p>
+			<p id={ DialogDescriptionID(ConfirmDialogID) } data-ui-confirm-message class="mt-2 text-sm text-foreground-secondary"></p>
 		</div>
 		<div class="flex justify-end gap-3 px-6 pb-6 pt-6">
 			@Button(ButtonProps{Variant: ButtonSecondary, Attrs: templ.Attributes{"data-ui-confirm-cancel": true, "autofocus": true}}) {

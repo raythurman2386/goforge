@@ -89,7 +89,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.FirstURL()),
-							Class: "!px-2 text-muted-foreground",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.FirstURL(),
 								"hx-target": "#content",
@@ -109,7 +109,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.PreviousURL()),
-							Class: "!px-2 text-muted-foreground",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.PreviousURL(),
 								"hx-target": "#content",
@@ -149,7 +149,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.NextURL()),
-							Class: "!px-2 text-muted-foreground",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.NextURL(),
 								"hx-target": "#content",
@@ -168,7 +168,7 @@ templ PaginationFull(p *pagination.Pagination) {
 							Variant: ui.ButtonSecondary,
 							Size: ui.ButtonSM,
 							Href: templ.URL(p.LastURL()),
-							Class: "!px-2 text-muted-foreground",
+							Class: "!px-2 text-foreground-secondary",
 							Attrs: templ.Attributes{
 								"hx-get": p.LastURL(),
 								"hx-target": "#content",

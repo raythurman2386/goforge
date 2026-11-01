@@ -18,7 +18,7 @@ templ Sheet(p SheetProps) {
 						<h2 id={ DialogTitleID(p.ID) } class="text-lg font-bold leading-7 tracking-tight text-foreground">{ p.Title }</h2>
 					</div>
 					if p.Description != "" {
-						<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-muted-foreground">{ p.Description }</p>
+						<p id={ DialogDescriptionID(p.ID) } class="mt-1 text-sm text-foreground-secondary">{ p.Description }</p>
 					}
 				</div>
 				@Button(ButtonProps{Variant: ButtonGhost, Size: ButtonIcon, Label: "Close " + p.Title, Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {

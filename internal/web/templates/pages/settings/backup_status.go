@@ -108,9 +108,9 @@ func backupOffLine(st *backup.Status, form *backup.SettingsView) string {
 
 func backupOffClass(form *backup.SettingsView) string {
 	if form != nil && form.KeysUnreadable {
-		return "text-warning"
+		return "text-warning-foreground"
 	}
-	return "text-muted-foreground"
+	return "text-foreground-secondary"
 }
 
 func accessKeyState(f *backup.SettingsView) string {

@@ -25,7 +25,7 @@ func TestInputFieldWiring(t *testing.T) {
 			[]string{`<label for="field-email" class="label">Email</label>`, `<input id="field-email" name="email" type="text" value="" class="input">`},
 			[]string{`id="email"`, "aria-describedby", "aria-invalid", "required"}},
 		{"help is described", InputProps{ID: "login-email", Name: "email", Type: "email", Label: "Email", Help: "Your login."},
-			[]string{`aria-describedby="login-email-help"`, `<p id="login-email-help" class="mt-1.5 text-xs text-muted-foreground">Your login.</p>`},
+			[]string{`aria-describedby="login-email-help"`, `<p id="login-email-help" class="mt-1.5 text-xs text-foreground-secondary">Your login.</p>`},
 			[]string{"aria-invalid"}},
 		{"error is described and invalid", InputProps{ID: "p", Name: "port", Label: "Port", Help: "h", Error: "Too big."},
 			[]string{`aria-describedby="p-help p-error"`, `aria-invalid="true"`, `<p id="p-error" class="mt-1.5 text-xs font-medium text-danger">Too big.</p>`},
@@ -88,7 +88,7 @@ func TestCheckboxVariants(t *testing.T) {
 	})
 	t.Run("description is described", func(t *testing.T) {
 		got := render(t, Checkbox(CheckboxProps{ID: "sec", Name: "is_secret", Label: "Secret", Description: "Masked."}), "")
-		assertHas(t, got, `aria-describedby="sec-description"`, `<p id="sec-description" class="text-xs text-muted-foreground">Masked.</p>`)
+		assertHas(t, got, `aria-describedby="sec-description"`, `<p id="sec-description" class="text-xs text-foreground-secondary">Masked.</p>`)
 	})
 	t.Run("ids from name and value never equal the name", func(t *testing.T) {
 		got := render(t, Checkbox(CheckboxProps{Name: "scopes", Value: "read", Label: "read"}), "")

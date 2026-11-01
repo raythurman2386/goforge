@@ -23,7 +23,7 @@ templ DeploymentList(props DeploymentListProps) {
 				@ui.CardTitle(3, nil) {
 					Deployment History
 				}
-				<p class="mt-1 text-sm text-muted-foreground">Recent deployments for this environment.</p>
+				<p class="mt-1 text-sm text-foreground-secondary">Recent deployments for this environment.</p>
 			</div>
 			if props.EnvID != "" {
 				@ui.Button(ui.ButtonProps{
@@ -80,7 +80,7 @@ templ DeploymentRow(d *models.Deployment, projectID string) {
 					</div>
 					<div class="flex items-center space-x-4">
 						@TriggerTypeBadge(d.TriggerType)
-						<div class="text-sm text-muted-foreground">
+						<div class="text-sm text-foreground-secondary">
 							{ formatDuration(d.Duration()) }
 						</div>
 					</div>
@@ -88,7 +88,7 @@ templ DeploymentRow(d *models.Deployment, projectID string) {
 				<div class="mt-2 sm:flex sm:justify-between">
 					<div class="sm:flex">
 						if d.Branch.Valid {
-							<p class="flex items-center text-sm text-muted-foreground">
+							<p class="flex items-center text-sm text-foreground-secondary">
 								<svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
 								</svg>
@@ -96,12 +96,12 @@ templ DeploymentRow(d *models.Deployment, projectID string) {
 							</p>
 						}
 						if d.CommitMessage.Valid {
-							<p class="mt-2 flex items-center text-sm text-muted-foreground sm:mt-0 sm:ml-6 truncate max-w-md">
+							<p class="mt-2 flex items-center text-sm text-foreground-secondary sm:mt-0 sm:ml-6 truncate max-w-md">
 								{ truncateMessage(d.CommitMessage.String, 60) }
 							</p>
 						}
 					</div>
-					<div class="mt-2 flex items-center text-sm text-muted-foreground sm:mt-0">
+					<div class="mt-2 flex items-center text-sm text-foreground-secondary sm:mt-0">
 						<svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 						</svg>

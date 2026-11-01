@@ -28,7 +28,7 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 					<h2 class="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
 						Edit { instance.Name }
 					</h2>
-					<p class="mt-2 text-sm text-muted-foreground">Change the configuration of this { tmpl.DisplayName } service.</p>
+					<p class="mt-2 text-sm text-foreground-secondary">Change the configuration of this { tmpl.DisplayName } service.</p>
 				</div>
 			</div>
 			<div class="mb-6">
@@ -54,7 +54,7 @@ templ Edit(instance *models.ServiceInstance, tmpl *services.ServiceTemplate, con
 					}
 					for _, field := range tmpl.Config {
 						if field.Immutable {
-							<p class="mb-4 text-xs text-muted-foreground">{ field.Label } is set once at deploy and cannot be changed here.</p>
+							<p class="mb-4 text-xs text-foreground-secondary">{ field.Label } is set once at deploy and cannot be changed here.</p>
 						} else if field.Type == "password" {
 							@ui.Input(ui.InputProps{ID: "svc-" + field.Name, Name: field.Name, Type: "password", Label: field.Label, Autocomplete: "new-password", Help: "Leave blank to keep the current value.", Class: "mb-4"})
 						} else if field.Type == services.FieldTypeBool {

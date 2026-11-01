@@ -14,9 +14,9 @@ func TestStatusBadge(t *testing.T) {
 		wantLabel    string
 		wantSpinner  bool
 	}{
-		{"deployment", "running", "bg-success/10 text-success", "Running", false},
+		{"deployment", "running", "bg-success/10 text-success-foreground", "Running", false},
 		{"deployment", "failed", "bg-danger/10 text-danger", "Failed", false},
-		{"deployment", "building", "bg-warning/10 text-warning", "Building", true},
+		{"deployment", "building", "bg-warning/10 text-warning-foreground", "Building", true},
 		{"deployment", "rolled_back", "bg-muted/50 text-foreground-secondary", "Rolled Back", false},
 		{"container", "exited", "bg-danger/10 text-danger", "Exited", false},
 		{"service", "stopped", "bg-muted/50 text-foreground-secondary", "Stopped", false},

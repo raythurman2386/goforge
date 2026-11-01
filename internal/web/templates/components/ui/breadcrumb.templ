@@ -11,7 +11,7 @@ type Crumb struct {
 // current page (aria-current="page"); separators are aria-hidden.
 templ Breadcrumb(items []Crumb) {
 	<nav class="mb-4" aria-label="Breadcrumb">
-		<ol class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+		<ol class="flex flex-wrap items-center gap-1.5 text-sm text-foreground-secondary">
 			for i, c := range items {
 				<li class="flex min-w-0 items-center gap-1.5">
 					if i > 0 {

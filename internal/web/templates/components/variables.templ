@@ -12,7 +12,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 				@ui.CardTitle(3, nil) {
 					Environment Variables
 				}
-				<p class="mt-1 max-w-2xl text-sm text-muted-foreground">Variables for this environment.</p>
+				<p class="mt-1 max-w-2xl text-sm text-foreground-secondary">Variables for this environment.</p>
 			</div>
 			<div class="flex items-center gap-2">
 				if projectID != "" {
@@ -43,14 +43,14 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 		
 		@ui.CardContent(nil) {
 			if len(variables) == 0 {
-				<p class="text-sm text-muted-foreground">No variables defined.</p>
+				<p class="text-sm text-foreground-secondary">No variables defined.</p>
 			} else {
 				<div class="space-y-2">
 					for _, v := range variables {
 						<div class="flex items-center gap-4 rounded-lg border border-divider p-3 hover:bg-muted/60">
 							<div class="flex-1 grid grid-cols-2 gap-4">
 								<div class="text-sm font-mono font-medium text-foreground">{ v.Key }</div>
-								<div class="text-sm font-mono text-muted-foreground truncate">
+								<div class="text-sm font-mono text-foreground-secondary truncate">
 									if v.IsSecret {
 										••••••••••••
 									} else {

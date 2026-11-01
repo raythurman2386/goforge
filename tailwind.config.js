@@ -72,8 +72,16 @@ module.exports = {
         code: token('code'),
         // Status and link roles (t1734u). Brand/accent stays primary (emerald).
         danger: token('danger'),
-        success: token('success'),
-        warning: token('warning'),
+        // Light success/warning text uses a darker AA step (t1737u); fills,
+        // tints, rings, and borders stay on the palette hex.
+        success: {
+          DEFAULT: token('success'),
+          foreground: token('success-foreground'),
+        },
+        warning: {
+          DEFAULT: token('warning'),
+          foreground: token('warning-foreground'),
+        },
         info: token('info'),
       },
       borderRadius: {

@@ -16,13 +16,13 @@ templ ResourceUsageCard(dockerID string, class string) {
 	@ui.Card(ui.CardProps{Flush: true, Class: ui.Class("overflow-hidden", class), Attrs: templ.Attributes{"data-resource-usage": true}}) {
 		<div class="px-6 py-5 border-b border-divider bg-muted/30">
 			<h3 class="text-lg font-bold text-foreground tracking-tight">Resource Usage</h3>
-			<p class="mt-1 text-sm text-muted-foreground">Real-time container performance metrics.</p>
+			<p class="mt-1 text-sm text-foreground-secondary">Real-time container performance metrics.</p>
 		</div>
 		<div class="p-6" id={ MetricsStreamID(dockerID) } hx-preserve="true" hx-ext="sse" sse-connect={ "/containers/" + dockerID + "/stats" }>
 			<div sse-swap="stats,unavailable" class="flex items-center justify-center py-12">
 				<div class="flex flex-col items-center">
 					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
-					<p class="text-sm text-muted-foreground font-medium">Connecting to metrics stream...</p>
+					<p class="text-sm text-foreground-secondary font-medium">Connecting to metrics stream...</p>
 				</div>
 			</div>
 		</div>
@@ -36,6 +36,6 @@ templ NoRunningContainer(class string) {
 		<div class="px-6 py-5 border-b border-divider bg-muted/30">
 			<h3 class="text-lg font-bold text-foreground tracking-tight">Resource Usage</h3>
 		</div>
-		<p class="px-6 py-8 text-sm text-center text-muted-foreground">No running container for this environment.</p>
+		<p class="px-6 py-8 text-sm text-center text-foreground-secondary">No running container for this environment.</p>
 	}
 }

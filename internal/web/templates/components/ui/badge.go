@@ -77,9 +77,9 @@ func badgeToneClass(v BadgeVariant, t BadgeTone) string {
 		case BadgePrimary:
 			return "bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
 		case BadgeSuccess:
-			return "bg-success/10 text-success"
+			return "bg-success/10 text-success-foreground"
 		case BadgeWarning:
-			return "bg-warning/10 text-warning"
+			return "bg-warning/10 text-warning-foreground"
 		case BadgeDanger:
 			return "bg-danger/10 text-danger"
 		case BadgeInfo:
@@ -111,9 +111,9 @@ func badgeToneClass(v BadgeVariant, t BadgeTone) string {
 		case BadgePrimary:
 			return "ring-1 ring-inset ring-primary-600/40 text-primary-700 dark:text-primary-300"
 		case BadgeSuccess:
-			return "ring-1 ring-inset ring-success/40 text-success"
+			return "ring-1 ring-inset ring-success/40 text-success-foreground"
 		case BadgeWarning:
-			return "ring-1 ring-inset ring-warning/40 text-warning"
+			return "ring-1 ring-inset ring-warning/40 text-warning-foreground"
 		case BadgeDanger:
 			return "ring-1 ring-inset ring-danger/40 text-danger"
 		case BadgeInfo:
@@ -128,9 +128,9 @@ func badgeToneClass(v BadgeVariant, t BadgeTone) string {
 		case BadgePrimary:
 			return "bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-900/30 dark:text-primary-300"
 		case BadgeSuccess:
-			return "bg-success/10 text-success ring-1 ring-inset ring-success/20"
+			return "bg-success/10 text-success-foreground ring-1 ring-inset ring-success/20"
 		case BadgeWarning:
-			return "bg-warning/10 text-warning ring-1 ring-inset ring-warning/20"
+			return "bg-warning/10 text-warning-foreground ring-1 ring-inset ring-warning/20"
 		case BadgeDanger:
 			return "bg-danger/10 text-danger ring-1 ring-inset ring-danger/20"
 		case BadgeInfo:

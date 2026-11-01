@@ -53,7 +53,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 						}
 						@components.StatusBadge("service", string(instance.Status))
 						if isPending(instance) {
-							<span class="inline-flex items-center text-xs text-warning">
+							<span class="inline-flex items-center text-xs text-warning-foreground">
 								<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3" fill="none" viewBox="0 0 24 24">
 									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -141,7 +141,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 		@ui.Card(ui.CardProps{Flush: true, Class: "overflow-hidden"}) {
 			<div class="px-6 py-5 border-b border-divider bg-muted/30">
 				<h3 class="text-lg font-bold text-foreground tracking-tight">Connection Details</h3>
-				<p class="mt-1 text-sm text-muted-foreground">Use these details to connect to and manage your service.</p>
+				<p class="mt-1 text-sm text-foreground-secondary">Use these details to connect to and manage your service.</p>
 			</div>
 			// A <dl>, so each row's dt/dd pair has a list parent (axe dlitem).
 			<dl class="divide-y divide-divider">
@@ -183,7 +183,7 @@ func secretURL(instanceID string, row services.DetailRow) string {
 
 templ detailRow(instanceID string, row services.DetailRow) {
 	<div class="px-6 py-5 sm:grid sm:grid-cols-3 sm:gap-4 hover:bg-muted/50 transition-colors">
-		<dt class="text-sm font-bold text-muted-foreground uppercase tracking-widest">{ row.Key }</dt>
+		<dt class="text-sm font-bold text-foreground-secondary uppercase tracking-widest">{ row.Key }</dt>
 		if row.Secret {
 			<dd
 				class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono bg-card p-2 border border-divider rounded-md shadow-sm flex items-center justify-between gap-3"
