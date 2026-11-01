@@ -20,6 +20,9 @@ const (
 	codeConflict          = "conflict"
 	codeUnavailable       = "unavailable"
 	codeInternal          = "internal_error"
+	// codeTimeout: a real run did not finish while the request waited. The
+	// change keeps running; follow audit_id for its outcome.
+	codeTimeout = "timeout"
 )
 
 const maxBodyBytes = 1 << 20
@@ -31,6 +34,9 @@ type errorBody struct {
 type errorDetail struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	// AuditID is set when the error belongs to an approved change that was
+	// already recorded, for example a timeout while it keeps running.
+	AuditID string `json:"audit_id,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

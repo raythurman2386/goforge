@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -79,16 +80,16 @@ func (h *Handler) triggerDeployment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	d := &models.Deployment{EnvironmentID: env.ID, Status: models.DeploymentStatusPending, TriggerType: models.TriggerTypeManual}
-	if err := h.deps.Deployments.CreateDeployment(ctx, d); err != nil {
-		h.finish(w, r, &req.gate, m, auditID, nil, err, http.StatusInternalServerError, "failed to create deployment")
-		return
-	}
-	if err := h.deps.Queue.Enqueue(ctx, d.ID); err != nil {
-		h.finish(w, r, &req.gate, m, auditID, nil, err, http.StatusInternalServerError, "failed to queue deployment "+d.ID)
-		return
-	}
-	h.finish(w, r, &req.gate, m, auditID, toDeployment(d), nil, 0, "")
+	h.run(w, r, &req.gate, m, auditID, func(ctx context.Context) outcome {
+		d := &models.Deployment{EnvironmentID: env.ID, Status: models.DeploymentStatusPending, TriggerType: models.TriggerTypeManual}
+		if err := h.deps.Deployments.CreateDeployment(ctx, d); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to create deployment")
+		}
+		if err := h.deps.Queue.Enqueue(ctx, d.ID); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to queue deployment "+d.ID)
+		}
+		return succeeded(toDeployment(d))
+	})
 }
 
 func (h *Handler) cancelDeployment(w http.ResponseWriter, r *http.Request) {
@@ -119,17 +120,17 @@ func (h *Handler) cancelDeployment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := r.Context()
-	if err := h.deps.Deployments.Cancel(ctx, d.ID, "canceled via API"); err != nil {
-		h.finish(w, r, g, m, auditID, nil, err, http.StatusInternalServerError, "failed to cancel deployment")
-		return
-	}
-	if h.deps.Queue != nil {
-		if err := h.deps.Queue.DropPending(ctx, d.ID); err != nil {
-			h.logger.Warn("api v1: drop pending failed", "deployment_id", d.ID, "error", err)
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		if err := h.deps.Deployments.Cancel(ctx, d.ID, "canceled via API"); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to cancel deployment")
 		}
-	}
-	h.finish(w, r, g, m, auditID, map[string]string{"deployment_id": d.ID, "status": string(models.DeploymentStatusCanceled)}, nil, 0, "")
+		if h.deps.Queue != nil {
+			if err := h.deps.Queue.DropPending(ctx, d.ID); err != nil {
+				h.logger.Warn("api v1: drop pending failed", "deployment_id", d.ID, "error", err)
+			}
+		}
+		return succeeded(map[string]string{"deployment_id": d.ID, "status": string(models.DeploymentStatusCanceled)})
+	})
 }
 
 type rollbackRequest struct {
@@ -175,15 +176,19 @@ func (h *Handler) rollbackDeployment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	info, err := h.deps.Rollback.Rollback(r.Context(), env.ID, reason)
-	if err != nil {
-		h.finish(w, r, &req.gate, m, auditID, nil, err, http.StatusInternalServerError, "rollback failed: "+err.Error())
-		return
-	}
-	h.finish(w, r, &req.gate, m, auditID, map[string]string{
-		"from_deployment_id": info.FromDeploymentID,
-		"to_deployment_id":   info.ToDeploymentID,
-	}, nil, 0, "")
+	// Rollback stops the current containers and then starts the target. It
+	// runs detached from the request so a timeout cannot stop it between
+	// the two and leave the environment down.
+	h.run(w, r, &req.gate, m, auditID, func(ctx context.Context) outcome {
+		info, err := h.deps.Rollback.Rollback(ctx, env.ID, reason)
+		if err != nil {
+			return failed(err, http.StatusInternalServerError, "rollback failed: "+err.Error())
+		}
+		return succeeded(map[string]string{
+			"from_deployment_id": info.FromDeploymentID,
+			"to_deployment_id":   info.ToDeploymentID,
+		})
+	})
 }
 
 // ---- environment variables ----
@@ -244,18 +249,20 @@ func (h *Handler) setEnvVar(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if existing != nil {
-		existing.Value = req.Value
-		existing.IsSecret = req.IsSecret
-		err = h.deps.Projects.UpdateEnvVariable(ctx, existing)
-	} else {
-		err = h.deps.Projects.AddEnvVariable(ctx, &models.EnvVariable{EnvironmentID: env.ID, Key: key, Value: req.Value, IsSecret: req.IsSecret})
-	}
-	if err != nil {
-		h.finish(w, r, &req.gate, m, auditID, nil, err, http.StatusInternalServerError, "failed to save variable")
-		return
-	}
-	h.finish(w, r, &req.gate, m, auditID, map[string]any{"key": key, "operation": op, "is_secret": req.IsSecret}, nil, 0, "")
+	h.run(w, r, &req.gate, m, auditID, func(ctx context.Context) outcome {
+		var err error
+		if existing != nil {
+			existing.Value = req.Value
+			existing.IsSecret = req.IsSecret
+			err = h.deps.Projects.UpdateEnvVariable(ctx, existing)
+		} else {
+			err = h.deps.Projects.AddEnvVariable(ctx, &models.EnvVariable{EnvironmentID: env.ID, Key: key, Value: req.Value, IsSecret: req.IsSecret})
+		}
+		if err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to save variable")
+		}
+		return succeeded(map[string]any{"key": key, "operation": op, "is_secret": req.IsSecret})
+	})
 }
 
 func (h *Handler) deleteEnvVar(w http.ResponseWriter, r *http.Request) {
@@ -300,11 +307,12 @@ func (h *Handler) deleteEnvVar(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.deps.Projects.DeleteEnvVariableScoped(ctx, target.ID, env.ID); err != nil {
-		h.finish(w, r, g, m, auditID, nil, err, http.StatusInternalServerError, "failed to delete variable")
-		return
-	}
-	h.finish(w, r, g, m, auditID, map[string]string{"key": key, "operation": "delete"}, nil, 0, "")
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		if err := h.deps.Projects.DeleteEnvVariableScoped(ctx, target.ID, env.ID); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to delete variable")
+		}
+		return succeeded(map[string]string{"key": key, "operation": "delete"})
+	})
 }
 
 func (h *Handler) syncEnvVars(w http.ResponseWriter, r *http.Request) {
@@ -331,12 +339,13 @@ func (h *Handler) syncEnvVars(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	n, err := h.deps.Projects.SeedEnvVarsFromRepo(r.Context(), env.ID, p.ID)
-	if err != nil {
-		h.finish(w, r, g, m, auditID, nil, err, http.StatusBadRequest, "failed to sync variables from the repository")
-		return
-	}
-	h.finish(w, r, g, m, auditID, map[string]int{"added": n}, nil, 0, "")
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		n, err := h.deps.Projects.SeedEnvVarsFromRepo(ctx, env.ID, p.ID)
+		if err != nil {
+			return failed(err, http.StatusBadRequest, "failed to sync variables from the repository")
+		}
+		return succeeded(map[string]int{"added": n})
+	})
 }
 
 // ---- service links ----
@@ -419,20 +428,21 @@ func (h *Handler) linkService(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.deps.Links.Link(ctx, p.ID, inst.ID); err != nil {
-		h.finish(w, r, &req.gate, m, auditID, nil, err, http.StatusInternalServerError, "failed to link service")
-		return
-	}
-	added := []string{}
-	for _, k := range inject {
-		v := &models.EnvVariable{EnvironmentID: env.ID, Key: k, Value: linkVars[k], IsSecret: true}
-		if addErr := h.deps.Projects.AddEnvVariable(ctx, v); addErr != nil {
-			h.logger.Warn("api v1: link env var not added", "key", k, "error", addErr)
-			continue
+	h.run(w, r, &req.gate, m, auditID, func(ctx context.Context) outcome {
+		if err := h.deps.Links.Link(ctx, p.ID, inst.ID); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to link service")
 		}
-		added = append(added, k)
-	}
-	h.finish(w, r, &req.gate, m, auditID, map[string]any{"linked": true, "added_keys": added}, nil, 0, "")
+		added := []string{}
+		for _, k := range inject {
+			v := &models.EnvVariable{EnvironmentID: env.ID, Key: k, Value: linkVars[k], IsSecret: true}
+			if addErr := h.deps.Projects.AddEnvVariable(ctx, v); addErr != nil {
+				h.logger.Warn("api v1: link env var not added", "key", k, "error", addErr)
+				continue
+			}
+			added = append(added, k)
+		}
+		return succeeded(map[string]any{"linked": true, "added_keys": added})
+	})
 }
 
 func (h *Handler) unlinkService(w http.ResponseWriter, r *http.Request) {
@@ -476,15 +486,16 @@ func (h *Handler) unlinkService(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.deps.Links.Unlink(r.Context(), p.ID, inst.ID); err != nil {
-		status, msg := http.StatusInternalServerError, "failed to unlink service"
-		if errors.Is(err, repositories.ErrNotFound) {
-			status, msg = http.StatusNotFound, "service link not found"
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		if err := h.deps.Links.Unlink(ctx, p.ID, inst.ID); err != nil {
+			status, msg := http.StatusInternalServerError, "failed to unlink service"
+			if errors.Is(err, repositories.ErrNotFound) {
+				status, msg = http.StatusNotFound, "service link not found"
+			}
+			return failed(err, status, msg)
 		}
-		h.finish(w, r, g, m, auditID, nil, err, status, msg)
-		return
-	}
-	h.finish(w, r, g, m, auditID, map[string]bool{"unlinked": true}, nil, 0, "")
+		return succeeded(map[string]bool{"unlinked": true})
+	})
 }
 
 // ---- service instances ----
@@ -569,16 +580,17 @@ func (h *Handler) deployService(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	inst, err := h.deps.Instances.DeployInstance(r.Context(), user.ID, tmpl.Name, config)
-	if err != nil {
-		status, msg := http.StatusInternalServerError, "failed to deploy service"
-		if errors.Is(err, services.ErrInvalidConfig) {
-			status, msg = http.StatusBadRequest, err.Error()
+	h.run(w, r, &req.gate, m, auditID, func(ctx context.Context) outcome {
+		inst, err := h.deps.Instances.DeployInstance(ctx, user.ID, tmpl.Name, config)
+		if err != nil {
+			status, msg := http.StatusInternalServerError, "failed to deploy service"
+			if errors.Is(err, services.ErrInvalidConfig) {
+				status, msg = http.StatusBadRequest, err.Error()
+			}
+			return failed(err, status, msg)
 		}
-		h.finish(w, r, &req.gate, m, auditID, nil, err, status, msg)
-		return
-	}
-	h.finish(w, r, &req.gate, m, auditID, h.toServiceSummary(inst), nil, 0, "")
+		return succeeded(h.toServiceSummary(inst))
+	})
 }
 
 func (h *Handler) restartService(w http.ResponseWriter, r *http.Request) {
@@ -603,11 +615,12 @@ func (h *Handler) restartService(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.deps.Instances.RestartInstance(r.Context(), inst.ID); err != nil {
-		h.finish(w, r, g, m, auditID, nil, err, http.StatusInternalServerError, "failed to restart service")
-		return
-	}
-	h.finish(w, r, g, m, auditID, map[string]string{"service_instance_id": inst.ID, "status": "restarted"}, nil, 0, "")
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		if err := h.deps.Instances.RestartInstance(ctx, inst.ID); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to restart service")
+		}
+		return succeeded(map[string]string{"service_instance_id": inst.ID, "status": "restarted"})
+	})
 }
 
 func (h *Handler) serviceTarget(inst *models.ServiceInstance) map[string]any {
@@ -667,15 +680,16 @@ func (h *Handler) updateServiceImage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := h.deps.Instances.UpdateInstanceImage(r.Context(), inst.ID); err != nil {
-		status, msg := http.StatusInternalServerError, "failed to update service image"
-		if errors.Is(err, services.ErrInstanceBusy) {
-			status, msg = http.StatusConflict, err.Error()
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		if _, err := h.deps.Instances.UpdateInstanceImage(ctx, inst.ID); err != nil {
+			status, msg := http.StatusInternalServerError, "failed to update service image"
+			if errors.Is(err, services.ErrInstanceBusy) {
+				status, msg = http.StatusConflict, err.Error()
+			}
+			return failed(err, status, msg)
 		}
-		h.finish(w, r, g, m, auditID, nil, err, status, msg)
-		return
-	}
-	h.finish(w, r, g, m, auditID, map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)}, nil, 0, "")
+		return succeeded(map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)})
+	})
 }
 
 type updateConfigRequest struct {
@@ -752,18 +766,19 @@ func (h *Handler) updateServiceConfig(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := h.deps.Instances.UpdateInstanceConfig(r.Context(), inst.ID, updates); err != nil {
-		status, msg := http.StatusInternalServerError, "failed to update service config"
-		switch {
-		case errors.Is(err, services.ErrInstanceBusy):
-			status, msg = http.StatusConflict, err.Error()
-		case errors.Is(err, services.ErrInvalidConfig):
-			status, msg = http.StatusBadRequest, err.Error()
+	h.run(w, r, &req.gate, m, auditID, func(ctx context.Context) outcome {
+		if _, err := h.deps.Instances.UpdateInstanceConfig(ctx, inst.ID, updates); err != nil {
+			status, msg := http.StatusInternalServerError, "failed to update service config"
+			switch {
+			case errors.Is(err, services.ErrInstanceBusy):
+				status, msg = http.StatusConflict, err.Error()
+			case errors.Is(err, services.ErrInvalidConfig):
+				status, msg = http.StatusBadRequest, err.Error()
+			}
+			return failed(err, status, msg)
 		}
-		h.finish(w, r, &req.gate, m, auditID, nil, err, status, msg)
-		return
-	}
-	h.finish(w, r, &req.gate, m, auditID, map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)}, nil, 0, "")
+		return succeeded(map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)})
+	})
 }
 
 // diffConfig validates requested edits against the template and returns the
@@ -850,15 +865,15 @@ func (h *Handler) stopContainer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := r.Context()
-	if err := h.deps.Docker.StopContainer(ctx, dockerID); err != nil {
-		h.finish(w, r, g, m, auditID, nil, err, http.StatusInternalServerError, "failed to stop container")
-		return
-	}
-	if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); err != nil {
-		h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
-	}
-	h.finish(w, r, g, m, auditID, map[string]string{"docker_id": dockerID, "status": string(models.ContainerStatusExited)}, nil, 0, "")
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		if err := h.deps.Docker.StopContainer(ctx, dockerID); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to stop container")
+		}
+		if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusExited); err != nil {
+			h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
+		}
+		return succeeded(map[string]string{"docker_id": dockerID, "status": string(models.ContainerStatusExited)})
+	})
 }
 
 func (h *Handler) restartContainer(w http.ResponseWriter, r *http.Request) {
@@ -886,15 +901,15 @@ func (h *Handler) restartContainer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := r.Context()
-	if err := h.deps.Docker.RestartContainer(ctx, dockerID); err != nil {
-		h.finish(w, r, g, m, auditID, nil, err, http.StatusInternalServerError, "failed to restart container")
-		return
-	}
-	if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusRunning); err != nil {
-		h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
-	}
-	h.finish(w, r, g, m, auditID, map[string]string{"docker_id": dockerID, "status": string(models.ContainerStatusRunning)}, nil, 0, "")
+	h.run(w, r, g, m, auditID, func(ctx context.Context) outcome {
+		if err := h.deps.Docker.RestartContainer(ctx, dockerID); err != nil {
+			return failed(err, http.StatusInternalServerError, "failed to restart container")
+		}
+		if err := h.deps.Containers.UpdateStatus(ctx, c.ID, models.ContainerStatusRunning); err != nil {
+			h.logger.Warn("api v1: container status not updated", "container_id", c.ID, "error", err)
+		}
+		return succeeded(map[string]string{"docker_id": dockerID, "status": string(models.ContainerStatusRunning)})
+	})
 }
 
 func (h *Handler) containerTarget(dockerID string, c *models.Container) map[string]any {

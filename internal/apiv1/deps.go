@@ -13,6 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 
@@ -174,4 +175,13 @@ type Deps struct {
 	// ProtectedServices lists service instance IDs whose stop, config edit,
 	// and image update need the protected scope. Restart does not.
 	ProtectedServices []string
+
+	// SyncWait is how long a real run waits for its change when the request
+	// has no deadline (default 12s). With a deadline, such as the router's
+	// write timeout, the wait ends shortly before it instead.
+	SyncWait time.Duration
+	// OpTimeout bounds a change once it is approved (default 10m). The
+	// change runs on a context detached from the request, so it finishes
+	// or fails on its own even when the caller stops waiting.
+	OpTimeout time.Duration
 }

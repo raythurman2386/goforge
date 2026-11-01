@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -16,6 +17,8 @@ type Handler struct {
 	deps      Deps
 	protected map[string]bool
 	logger    *slog.Logger
+	syncWait  time.Duration
+	opTimeout time.Duration
 }
 
 // New builds the API handler. Mount the result of Routes at /api/v1.
@@ -30,7 +33,14 @@ func New(deps Deps) *Handler {
 			protected[id] = true
 		}
 	}
-	return &Handler{deps: deps, protected: protected, logger: logger}
+	h := &Handler{deps: deps, protected: protected, logger: logger, syncWait: deps.SyncWait, opTimeout: deps.OpTimeout}
+	if h.syncWait <= 0 {
+		h.syncWait = defaultSyncWait
+	}
+	if h.opTimeout <= 0 {
+		h.opTimeout = defaultOpTimeout
+	}
+	return h
 }
 
 // Routes returns the /api/v1 router. Every route needs a bearer token; reads
