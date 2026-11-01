@@ -206,7 +206,7 @@ func (st settingsState) applySMTP(next models.NotifySettings, in SettingsInput) 
 		c.TLS = models.SMTPTLSStartTLS
 	}
 	if c.TLS != models.SMTPTLSStartTLS && c.TLS != models.SMTPTLSImplicit && c.TLS != models.SMTPTLSNone {
-		return next, &FieldError{Field: "smtp_tls", Message: "must be starttls, tls, or none"}
+		return next, &FieldError{Field: "smtp_tls", Message: "must be starttls, implicit, or none"}
 	}
 	host := strings.TrimSpace(in.SMTPHost)
 	if strings.ContainsAny(host, " \t\r\n/@:") && net.ParseIP(host) == nil {
