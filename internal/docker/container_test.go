@@ -188,3 +188,35 @@ func TestCreateContainer_Cmd(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateContainer_Entrypoint(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		entrypoint []string
+	}{
+		{name: "entrypoint replaces image ENTRYPOINT", entrypoint: []string{"/sbin/tini", "--", "sh", "-c", "exec run.sh"}},
+		{name: "no entrypoint keeps image ENTRYPOINT", entrypoint: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var got *container.Config
+			c := &Client{docker: &mockDockerAPI{
+				containerCreateFunc: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+					got = opts.Config
+					return client.ContainerCreateResult{ID: "c1"}, nil
+				},
+			}}
+			if _, err := c.CreateContainer(context.Background(), ContainerOptions{Name: "svc", Image: "gitea/act_runner:0.6.1", Entrypoint: tt.entrypoint}); err != nil {
+				t.Fatalf("CreateContainer() error = %v", err)
+			}
+			if got == nil {
+				t.Fatal("ContainerCreate was not called")
+			}
+			if !slices.Equal(got.Entrypoint, tt.entrypoint) {
+				t.Errorf("Config.Entrypoint = %q, want %q", got.Entrypoint, tt.entrypoint)
+			}
+		})
+	}
+}

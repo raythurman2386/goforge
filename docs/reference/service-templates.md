@@ -53,6 +53,7 @@ docker:
   optional_environment:   # Like environment, but left out when the value renders empty
     KEY: "{{ .Config.fieldname }}"
   command: [string]       # Replaces the image CMD (optional, Go templates). Never template a secret into it
+  entrypoint: [string]    # Replaces the image ENTRYPOINT and drops its CMD (optional, Go templates). Same secret rule as command
   volumes:                # Persistent volumes
     - name: string        # Volume name suffix
       path: string        # Mount path in container

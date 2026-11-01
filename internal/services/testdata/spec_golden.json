@@ -1121,5 +1121,92 @@
       "-fsS",
       "http://localhost:3000/api/heartbeat"
     ]
+  },
+  "gitea-runner": {
+    "image": "gitea/act_runner:0.6.1",
+    "entrypoint": [
+      "/sbin/tini",
+      "--",
+      "sh",
+      "-c",
+      "set -eu\nsay() { echo \"goforge-runner: $*\"; }\ndie() { echo \"goforge-runner: $*\" \u003e\u00262; exit 1; }\n\n# Labels: bare names become \u003cname\u003e:host. Anything else is refused,\n# because docker:// labels need a Docker daemon this container lacks.\nlabels=\"\"\nfor l in $(printf '%s' \"$RUNNER_LABELS\" | tr ',' ' '); do\n  case \"$l\" in\n    *:host) name=\"${l%:host}\" ;;\n    *:*) die \"label $l: only host labels work here (no Docker socket); use a bare name such as python\" ;;\n    *) name=\"$l\" ;;\n  esac\n  case \"$name\" in\n    ''|*[!A-Za-z0-9._-]*) die \"label $l: use letters, digits, dot, dash, or underscore\" ;;\n  esac\n  labels=\"${labels:+$labels,}$name:host\"\ndone\n[ -n \"$labels\" ] || die \"no labels configured\"\ncase \"$RUNNER_CAPACITY\" in\n  ''|*[!0-9]*|0) die \"Concurrent Jobs must be a positive number\" ;;\nesac\n\nmkdir -p /data /cache/apk /cache/act /cache/actcache\ncd /data\n# Registered against another Gitea URL: with a token, keep the old\n# registration aside and register again; without one, change nothing.\nif [ -s .runner ] \u0026\u0026 ! grep -qF \"\\\"address\\\": \\\"$GITEA_INSTANCE_URL\\\"\" .runner; then\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"Gitea URL differs from the registered one; add a registration token from that Gitea to register there\"\n  say \"Gitea URL changed; moving the old registration to .runner.previous\"\n  mv -f .runner .runner.previous\nfi\nif [ ! -s .runner ]; then\n  [ -n \"$GITEA_INSTANCE_URL\" ] || die \"Gitea URL is required to register\"\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"registration token is required to register (Gitea: Actions \u003e Runners \u003e Create new Runner)\"\nfi\n\n# Toolchains. The apk cache on /cache keeps a recreate from downloading\n# every package again.\nln -sfn /cache/apk /etc/apk/cache\nsay \"installing toolchains\"\napk add --update-cache --quiet \\\n  bash git git-lfs openssh-client ca-certificates curl wget jq \\\n  tar xz zstd gzip unzip make build-base pkgconf openssl-dev \\\n  python3 py3-pip nodejs npm go rust cargo rust-clippy rustfmt \\\n  $RUNNER_EXTRA_PACKAGES\nif [ -n \"$RUNNER_NPM_GLOBALS\" ]; then\n  npm install --global --no-audit --no-fund --loglevel=error $RUNNER_NPM_GLOBALS\nfi\nexport PATH=\"/cache/cargo/bin:/cache/go/bin:$PATH\"\nsay \"python $(python3 --version 2\u003e\u00261 | cut -d' ' -f2), node $(node --version), go $(go env GOVERSION), $(rustc --version | cut -d' ' -f1-2)\"\n\n# act_runner config, rewritten on every create. Labels here override the\n# ones stored at registration, so a label edit needs no new token.\n{\n  echo \"log:\"\n  echo \"  level: info\"\n  echo \"runner:\"\n  echo \"  file: .runner\"\n  echo \"  capacity: $RUNNER_CAPACITY\"\n  echo \"  timeout: 3h\"\n  echo \"  labels:\"\n  for l in $(printf '%s' \"$labels\" | tr ',' ' '); do echo \"    - \\\"$l\\\"\"; done\n  echo \"cache:\"\n  echo \"  enabled: true\"\n  echo \"  dir: /cache/actcache\"\n  echo \"container:\"\n  echo \"  docker_host: \\\"-\\\"\"\n  echo \"  require_docker: false\"\n  echo \"host:\"\n  echo \"  workdir_parent: /cache/act\"\n  echo \"metrics:\"\n  echo \"  enabled: true\"\n  echo \"  addr: 127.0.0.1:9101\"\n} \u003e /data/config.yaml\n\nexport CONFIG_FILE=/data/config.yaml GITEA_RUNNER_LABELS=\"$labels\"\nsay \"starting act_runner with labels $labels\"\nexec run.sh\n"
+    ],
+    "env": [
+      "CARGO_HOME=/cache/cargo",
+      "GITEA_INSTANCE_URL=",
+      "GITEA_RUNNER_NAME=goforge-runner",
+      "GOCACHE=/cache/go-build",
+      "GOPATH=/cache/go",
+      "PIP_CACHE_DIR=/cache/pip",
+      "RUNNER_CAPACITY=1",
+      "RUNNER_EXTRA_PACKAGES=",
+      "RUNNER_LABELS=linux,alpine,python,node,typescript,go,rust",
+      "RUNNER_NPM_GLOBALS=typescript",
+      "RUNNER_TOOL_CACHE=/cache/toolcache",
+      "npm_config_cache=/cache/npm"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data",
+      "goforge-vol-00000000-0000-0000-0000-000000000042-cache:/cache"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 4294967296,
+    "nano_cpus": 2000000000,
+    "health_check": [
+      "CMD-SHELL",
+      "wget -q -O /dev/null http://127.0.0.1:9101/healthz"
+    ]
+  },
+  "gitea-runner+domain": {
+    "image": "gitea/act_runner:0.6.1",
+    "entrypoint": [
+      "/sbin/tini",
+      "--",
+      "sh",
+      "-c",
+      "set -eu\nsay() { echo \"goforge-runner: $*\"; }\ndie() { echo \"goforge-runner: $*\" \u003e\u00262; exit 1; }\n\n# Labels: bare names become \u003cname\u003e:host. Anything else is refused,\n# because docker:// labels need a Docker daemon this container lacks.\nlabels=\"\"\nfor l in $(printf '%s' \"$RUNNER_LABELS\" | tr ',' ' '); do\n  case \"$l\" in\n    *:host) name=\"${l%:host}\" ;;\n    *:*) die \"label $l: only host labels work here (no Docker socket); use a bare name such as python\" ;;\n    *) name=\"$l\" ;;\n  esac\n  case \"$name\" in\n    ''|*[!A-Za-z0-9._-]*) die \"label $l: use letters, digits, dot, dash, or underscore\" ;;\n  esac\n  labels=\"${labels:+$labels,}$name:host\"\ndone\n[ -n \"$labels\" ] || die \"no labels configured\"\ncase \"$RUNNER_CAPACITY\" in\n  ''|*[!0-9]*|0) die \"Concurrent Jobs must be a positive number\" ;;\nesac\n\nmkdir -p /data /cache/apk /cache/act /cache/actcache\ncd /data\n# Registered against another Gitea URL: with a token, keep the old\n# registration aside and register again; without one, change nothing.\nif [ -s .runner ] \u0026\u0026 ! grep -qF \"\\\"address\\\": \\\"$GITEA_INSTANCE_URL\\\"\" .runner; then\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"Gitea URL differs from the registered one; add a registration token from that Gitea to register there\"\n  say \"Gitea URL changed; moving the old registration to .runner.previous\"\n  mv -f .runner .runner.previous\nfi\nif [ ! -s .runner ]; then\n  [ -n \"$GITEA_INSTANCE_URL\" ] || die \"Gitea URL is required to register\"\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"registration token is required to register (Gitea: Actions \u003e Runners \u003e Create new Runner)\"\nfi\n\n# Toolchains. The apk cache on /cache keeps a recreate from downloading\n# every package again.\nln -sfn /cache/apk /etc/apk/cache\nsay \"installing toolchains\"\napk add --update-cache --quiet \\\n  bash git git-lfs openssh-client ca-certificates curl wget jq \\\n  tar xz zstd gzip unzip make build-base pkgconf openssl-dev \\\n  python3 py3-pip nodejs npm go rust cargo rust-clippy rustfmt \\\n  $RUNNER_EXTRA_PACKAGES\nif [ -n \"$RUNNER_NPM_GLOBALS\" ]; then\n  npm install --global --no-audit --no-fund --loglevel=error $RUNNER_NPM_GLOBALS\nfi\nexport PATH=\"/cache/cargo/bin:/cache/go/bin:$PATH\"\nsay \"python $(python3 --version 2\u003e\u00261 | cut -d' ' -f2), node $(node --version), go $(go env GOVERSION), $(rustc --version | cut -d' ' -f1-2)\"\n\n# act_runner config, rewritten on every create. Labels here override the\n# ones stored at registration, so a label edit needs no new token.\n{\n  echo \"log:\"\n  echo \"  level: info\"\n  echo \"runner:\"\n  echo \"  file: .runner\"\n  echo \"  capacity: $RUNNER_CAPACITY\"\n  echo \"  timeout: 3h\"\n  echo \"  labels:\"\n  for l in $(printf '%s' \"$labels\" | tr ',' ' '); do echo \"    - \\\"$l\\\"\"; done\n  echo \"cache:\"\n  echo \"  enabled: true\"\n  echo \"  dir: /cache/actcache\"\n  echo \"container:\"\n  echo \"  docker_host: \\\"-\\\"\"\n  echo \"  require_docker: false\"\n  echo \"host:\"\n  echo \"  workdir_parent: /cache/act\"\n  echo \"metrics:\"\n  echo \"  enabled: true\"\n  echo \"  addr: 127.0.0.1:9101\"\n} \u003e /data/config.yaml\n\nexport CONFIG_FILE=/data/config.yaml GITEA_RUNNER_LABELS=\"$labels\"\nsay \"starting act_runner with labels $labels\"\nexec run.sh\n"
+    ],
+    "env": [
+      "CARGO_HOME=/cache/cargo",
+      "GITEA_INSTANCE_URL=",
+      "GITEA_RUNNER_NAME=goforge-runner",
+      "GOCACHE=/cache/go-build",
+      "GOPATH=/cache/go",
+      "PIP_CACHE_DIR=/cache/pip",
+      "RUNNER_CAPACITY=1",
+      "RUNNER_EXTRA_PACKAGES=",
+      "RUNNER_LABELS=linux,alpine,python,node,typescript,go,rust",
+      "RUNNER_NPM_GLOBALS=typescript",
+      "RUNNER_TOOL_CACHE=/cache/toolcache",
+      "npm_config_cache=/cache/npm"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`gitea-runner-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data",
+      "goforge-vol-00000000-0000-0000-0000-000000000042-cache:/cache"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 4294967296,
+    "nano_cpus": 2000000000,
+    "health_check": [
+      "CMD-SHELL",
+      "wget -q -O /dev/null http://127.0.0.1:9101/healthz"
+    ]
   }
 }

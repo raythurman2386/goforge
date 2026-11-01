@@ -118,6 +118,40 @@ Pick an **SSH Port** that nothing else on the host uses: not `22` (the host's ss
 !!! warning "Do not redeploy to change settings or upgrade"
     As with Vaultwarden, a new deploy is a new instance with a new, empty `/data` volume, so repositories and users are lost. Use **Edit configuration** or **Update image** on the service page instead: both recreate the container on the same volume and keep the secret key. Settings that come from the environment (domain, URLs, registration, install lock, secret key) are rewritten into `app.ini` on every container start, so change those in GoForge. Change everything else in **Site Administration**.
 
+### Gitea Actions Runner
+
+A [Gitea Actions](https://docs.gitea.com/usage/actions/overview) runner from the official `gitea/act_runner` image. Jobs run in act_runner host mode inside this one container, which has Python, Node.js, TypeScript, Go, and Rust installed.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Version | 0.6.1 | `gitea/act_runner` tag (the basic Alpine image, not `-dind`). `latest` is also offered |
+| Gitea URL | none | Gitea's `ROOT_URL`, for example `https://gitea-app.example.com`. The runner polls it, and `actions/checkout` clones from it |
+| Runner Registration Token | none | From Gitea, used once to register. Stored encrypted. Not needed after registration |
+| Runner Name | `goforge-runner` | Name shown in Gitea's runner list. Applied at registration |
+| Labels | `linux,alpine,python,node,typescript,go,rust` | Comma-separated `runs-on` labels. Each becomes `<name>:host` |
+| Concurrent Jobs | 1 | act_runner `capacity` |
+| Extra Alpine Packages | none | Space-separated `apk` packages added on every container create, for example `uv postgresql-client` |
+| Global npm Packages | `typescript` | Installed with `npm install --global` on every container create |
+| Resources | 2 CPU, 4GiB | Raise them for large Rust or Go builds |
+| Storage | Docker volumes | `data` at `/data` (`.runner` registration, generated `config.yaml`) and `cache` at `/cache` (apk packages, Go modules and build cache, Cargo registry, npm and pip caches, `actions/cache` data, job workdirs) |
+
+**Register.** In Gitea, open **Site Administration → Actions → Runners** for an instance-wide runner (or a repository's or organization's **Settings → Actions → Runners**), click **Create new Runner**, and copy the registration token. Deploy the runner with the Gitea URL and that token. On first start the image's `run.sh` registers the runner, stores the result in `/data/.runner`, and unsets the token before `act_runner daemon` starts. The runner then shows as online in that Runners list. Later creates (**Edit configuration**, **Update image**) reuse `/data/.runner` and need no token. If you change **Gitea URL**, add a new token from that Gitea as well: the old registration moves to `/data/.runner.previous` and the runner registers again. Without a token the container stops with a message in its logs and changes nothing.
+
+**Toolchains and labels.** On every container create, the entrypoint installs these Alpine packages before the runner starts: `python3`, `py3-pip`, `nodejs`, `npm`, `go`, `rust`, `cargo`, `rust-clippy`, `rustfmt`, `build-base`, `git`, `git-lfs`, `openssh-client`, `curl`, `jq`, and archive tools. It also installs the global npm packages, which is `tsc` by default. The packages come from the image's Alpine release (3.23 for 0.6.1: Python 3.12, Node 24, Go 1.25, Rust 1.91). The apk cache on the `cache` volume makes a recreate quick: a warm recreate was ready in about 8 seconds in testing. A cold first start downloads about 350MB. Every label maps to the same container, so a label names a toolchain for the workflow reader and does not pick a different environment. Pick one in a workflow:
+
+```yaml
+jobs:
+  test:
+    runs-on: go          # or python, node, typescript, rust, linux, alpine
+    steps:
+      - uses: actions/checkout@v4
+      - run: go test ./...
+```
+
+The entrypoint writes `/data/config.yaml` from the fields on every create, and act_runner declares the labels from it at startup. A label edit therefore takes effect on the next create without registering again.
+
+**Limits.** GoForge never mounts the Docker socket into service containers (see "Docker socket trust model" in `SECURITY.md`) and has no privileged option. Jobs therefore cannot run `docker build`, `docker://` labels, `container:`, or `services:`. The entrypoint refuses any label that is not a host label. Jobs run as root in the runner container and share its filesystem and caches, so register it only for repositories you trust. `actions/setup-node`, `setup-python`, and similar actions download glibc builds that do not run on Alpine (musl). Use the preinstalled toolchains instead. `actions/setup-go` works because Go binaries are static. Python packages install into a virtualenv (`python3 -m venv .venv`), because Alpine marks the system Python as externally managed. `actions/cache` works through act_runner's built-in cache server, with its data on the `cache` volume.
+
 ### Apps that need PostgreSQL (Umami, Listmonk, authentik)
 
 These templates run one container and keep their data in PostgreSQL. GoForge does not create the database for them. Before you deploy one:

@@ -26,6 +26,9 @@ const ManagedLabelFilter = ManagedLabelKey + "=" + ManagedLabelValue
 type ContainerOptions struct {
 	Name  string
 	Image string
+	// Entrypoint replaces the image's ENTRYPOINT (and with it the image's
+	// CMD, as docker run --entrypoint does). Empty keeps the image default.
+	Entrypoint []string
 	// Cmd replaces the image's CMD. Empty keeps the image default.
 	Cmd    []string
 	Env    []string
@@ -108,6 +111,7 @@ func (c *Client) CreateContainer(ctx context.Context, opts ContainerOptions) (st
 
 	config := &container.Config{
 		Image:        opts.Image,
+		Entrypoint:   opts.Entrypoint,
 		Cmd:          opts.Cmd,
 		ExposedPorts: exposed,
 		Env:          opts.Env,
