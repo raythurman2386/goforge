@@ -28,9 +28,9 @@ MCP token always expires).
 
 | For | Scopes | Tools |
 |-----|--------|-------|
-| Read-only agent | `read` | 23 read tools |
-| Agent that may deploy, restart, and edit variables | `read`, `write` | 23 read + 14 gated write tools (37) |
-| Agent that may also stop, reconfigure, or re-image protected services | `read`, `write`, `protected` | 37 |
+| Read-only agent | `read` | 24 read tools |
+| Agent that may deploy, restart, and edit variables | `read`, `write` | 24 read + 14 gated write tools (38) |
+| Agent that may also stop, reconfigure, or re-image protected services | `read`, `write`, `protected` | 38 |
 
 The token is shown once and starts with `gf_`. The token list shows a
 non-secret hint (`gf_…a1b2`) so you can tell tokens apart.
@@ -161,7 +161,15 @@ Read tools (always on, read-only):
 `list_containers`, `get_container`, `get_container_logs`,
 `get_container_stats`, `list_audit_log`, `list_git_sources`, `list_repos`,
 `list_branches`, `get_backup_status` (admin only; see
-[Backups](../deployment/backup.md)).
+[Backups](../deployment/backup.md)), `wait_for`.
+
+`wait_for` follows work a write tool started. Pass the `operation` from a
+write result (`kind` is `deployment` with `id` and `project_id`, or
+`service` with `id`). It polls once a second for up to `timeout_seconds`
+(default 10, at most 12, so it fits the request timeout) and returns
+`status`, `terminal`, `timed_out`, `error_message`, and the last
+`log_tail` log lines (default 20, at most 200). Call it again while
+`timed_out` is true.
 
 Write tools (on `/mcp`: listed when the token has `write`; stdio: only with
 `GOFORGE_MCP_ALLOW_WRITES=true` and a `write` token):
@@ -178,6 +186,32 @@ Every write tool takes `dry_run` (default `true`) and `approval_ref`:
 2. Get a human approval.
 3. Call it again with `dry_run: false` and `approval_ref` set to the approval's
    id. GoForge records the `approval_ref` in `audit_logs` before it acts.
+
+A retry with the same `approval_ref` on the same action and target does not
+run the change again. It returns the first run's result and `audit_id` with
+`"replayed": true`, the first run's error, or `in_progress` while the first
+run is still going. A new attempt needs a new `approval_ref`.
+
+A change that takes longer than the request may wait (about 12 seconds)
+keeps running. The tool returns the error code `timeout` with the
+`audit_id`; the outcome is written to the audit log as
+`api_v1.<action>.completed` or `api_v1.<action>.failed`. Queued work
+(`trigger_deployment`, `deploy_service`, `update_service_image`,
+`update_service_config`) returns an `operation` to pass to `wait_for`.
+
+### Results
+
+A success returns the API's JSON as text and, when it is a JSON object, as
+`structuredContent` too. An error (`isError` true) returns a readable
+message as text and `structuredContent`
+`{"status", "code", "message", "audit_id"}`: `status` is the HTTP status
+(0 when the API was not reached), and `code` is the API error code, for
+example `protected_resource`, `writes_disabled`, `bad_request`,
+`timeout`, `in_progress`, or `api_unreachable`.
+
+`link_service` returns `added_keys`, `failed_keys`, and `partial`: a key
+that could not be written is listed in `failed_keys` instead of failing the
+whole call.
 
 `stop_container`, `update_service_config`, and `update_service_image` on a
 protected service are refused unless the token has the `protected` scope. The

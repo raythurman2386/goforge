@@ -59,9 +59,14 @@ Errors are JSON with a stable code:
 | 403 | `protected_resource` | Stop, config edit, or image update of a protected service without the `protected` scope |
 | 404 | `not_found` | Missing route, or a missing or another user's project, environment, or deployment |
 | 409 | `conflict` | The deployment or service is busy or in the wrong state |
+| 409 | `in_progress` | The same `approval_ref` already started this change on this target and it has not finished; `audit_id` names it |
 | 422 | `immutable_field` | A config edit changes an immutable field |
 | 500 | `internal_error` | Includes a failed audit insert; nothing was changed |
 | 503 | `unavailable` | A dependency the route needs is not configured |
+| 504 | `timeout` | An approved change did not finish while the request waited; it keeps running and `audit_id` names it |
+
+Every answer under `/api/v1` and `/mcp` is JSON, including the router's
+own 15 second request timeout (`503`, code `timeout`).
 
 Ownership answers match the UI routes (#28): another user's project,
 environment, or deployment is `404`; another user's service instance or
@@ -84,11 +89,41 @@ Order of checks on every mutation:
    applies to dry runs too.
 4. Dry run: answer the plan.
 5. `approval_ref` check (`400 approval_ref_required`).
-6. Insert `audit_logs` row `api_v1.<action>` with `details` =
-   `{via, approval_ref, token_id, token_name, target, changes}`. If the insert
-   fails the API answers `500` and does nothing.
-7. Run the change. If it fails, a best-effort `api_v1.<action>.failed` row is
-   added with the same `approval_ref`.
+6. Replay check: if this user already ran this action on this target with
+   this `approval_ref`, answer as that run (see Retries) and do nothing.
+7. Insert `audit_logs` row `api_v1.<action>` with `details` =
+   `{via, approval_ref, idempotency_key, token_id, token_name, target, changes}`.
+   If the insert fails the API answers `500` and does nothing.
+8. Run the change on a context of its own, so a client that leaves or a
+   request timeout does not stop it halfway. When it ends, an
+   `api_v1.<action>.completed` row (with `result` and `operation`) or an
+   `api_v1.<action>.failed` row (with `error` and `status`) is added with
+   `details.audit_id` set to the row from step 7.
+
+If the change is still running about 12 seconds in (2 seconds before the
+request deadline), the API answers `504` with code `timeout` and the
+`audit_id`. The change keeps running (up to 10 minutes) and writes its
+outcome row as above.
+
+### Retries
+
+One `approval_ref` runs a given action on a given target once. The target is
+the resource id plus, where present, the variable `key`, the linked
+`service_instance_id`, or the `template` and `name` of a new service, so one
+approval may still cover several variables. A retry with the same
+`approval_ref` answers:
+
+- `200` with the first run's `result`, `operation`, and `audit_id`, and
+  `"replayed": true`, when the first run finished;
+- the first run's error status and code, with its `audit_id` and
+  `"replayed": true`, when it failed;
+- `409 in_progress` with its `audit_id` while it is still running.
+
+A unique index (migration 023) keeps two concurrent retries from both
+running. A new attempt needs a new `approval_ref`. The replay check runs
+after the handler's own state checks, so a retry of a change that moved the
+target on (a cancel, a rollback) may answer `409 conflict` instead of the
+replay; it still runs nothing.
 
 `audit_logs.resource_id` is a UUID column, so a Docker container id is stored
 in `details.resource_ref` instead.
@@ -106,6 +141,17 @@ A mutation answers:
   "result": {"service_instance_id": "…", "status": "restarted"}
 }
 ```
+
+Work that goes on after the answer adds an `operation` to pass to the MCP
+`wait_for` tool, or to poll with the matching read route:
+
+```json
+"operation": {"kind": "deployment", "id": "…", "project_id": "…", "poll_tool": "wait_for"}
+```
+
+`trigger_deployment` returns a `deployment` operation; `deploy_service`,
+`update_service_image`, and `update_service_config` return a `service`
+operation.
 
 `target` and `changes` never hold a secret value.
 
@@ -139,7 +185,7 @@ server-side list. `GET /services` and `GET /services/{id}` show
 | `GET` | `/api/v1/service-templates` | Templates |
 | `GET` | `/api/v1/service-templates/{name}` | One template; secret defaults are omitted |
 | `GET` | `/api/v1/services` | Your service instances with a `protected` flag |
-| `GET` | `/api/v1/services/{id}` | Masked config and connection info, immutable fields, named volumes, container state |
+| `GET` | `/api/v1/services/{id}` | Masked config and connection info, immutable fields, named volumes, container state, and `last_error` (why the last deploy, start, or recreate failed; known secrets redacted, at most 500 characters; cleared on the next success) |
 | `GET` | `/api/v1/containers` | Your tracked containers |
 | `GET` | `/api/v1/containers/{id}` | State, ports, mounts, limits, networks. No env, no command, labels limited to Traefik routing |
 | `GET` | `/api/v1/containers/{id}/logs?tail=&since=` | Last log lines (200, max 5000, 2 MB). Known service secrets are redacted |
@@ -160,7 +206,7 @@ server-side list. `GET /services` and `GET /services/{id}` show
 | `POST` | `/api/v1/projects/{id}/environments/{envId}/variables` | `key`, `value`, `is_secret` | Creates or updates by key. The value is write-only: never echoed or audited |
 | `POST` | `/api/v1/projects/{id}/environments/{envId}/variables/sync` | | Adds keys from the repo's `.env.example` |
 | `DELETE` | `/api/v1/projects/{id}/environments/{envId}/variables/{key}` | | |
-| `POST` | `/api/v1/projects/{id}/services` | `service_instance_id` | Links and injects connection variables; the plan lists keys added or skipped |
+| `POST` | `/api/v1/projects/{id}/services` | `service_instance_id` | Links and injects connection variables; the plan lists keys added or skipped. The result has `linked`, `added_keys`, `failed_keys`, and `partial` (true when a key could not be written) |
 | `DELETE` | `/api/v1/projects/{id}/services/{serviceId}` | | Unlinks; the service keeps running |
 | `POST` | `/api/v1/services` | `template`, `name`, `domain`, `config` | Unknown config fields are `400`. Secrets show as `(write-only)` or `(generated)` in the plan |
 | `POST` | `/api/v1/services/{id}/restart` | | Restart in place. Allowed on protected services |

@@ -1,14 +1,16 @@
 # GoForge MCP tools (stdio fallback)
 
-The main MCP endpoint is `/mcp` on serve; see [mcp-http.md](./mcp-http.md). This file covers the fallback: `goforge-mcp` speaks MCP over stdio and calls `/api/v1` with a scoped token. A client sees 23 read tools, plus 14 write tools when `GOFORGE_MCP_ALLOW_WRITES=true`. Write tools are dry runs by default, need `approval_ref` to run, and refuse protected services for stop, config edit, and image update unless the token has the `protected` scope.
+The main MCP endpoint is `/mcp` on serve; see [mcp-http.md](./mcp-http.md). This file covers the fallback: `goforge-mcp` speaks MCP over stdio and calls `/api/v1` with a scoped token. A client sees 24 read tools (including `wait_for`), plus 14 write tools when `GOFORGE_MCP_ALLOW_WRITES=true`. Write tools are dry runs by default, need `approval_ref` to run, and refuse protected services for stop, config edit, and image update unless the token has the `protected` scope.
 
 ## Sub-features
 
-- `mcp-read-inventory` lists 23 read-only tools when writes are off.
-- `mcp-write-inventory` lists 37 tools when writes are on, each write tool with `dry_run` and `approval_ref` inputs, and no project, service, or volume delete, no prune, and no secret-reveal tool. `delete_env_var` and `unlink_service` are the only deleting tools, and they are gated writes like the rest.
+- `mcp-read-inventory` lists 24 read-only tools when writes are off.
+- `mcp-write-inventory` lists 38 tools when writes are on, each write tool with `dry_run` and `approval_ref` inputs, and no project, service, or volume delete, no prune, and no secret-reveal tool. `delete_env_var` and `unlink_service` are the only deleting tools, and they are gated writes like the rest.
 - `mcp-read-call` returns the API JSON for `whoami` and `list_services`.
 - `mcp-dry-run` returns a plan for `restart_service` without `dry_run`, and nothing changes.
-- `mcp-protected-refusal` returns an error result for `stop_container` or `update_service_config` on a protected service with a `write` token.
+- `mcp-protected-refusal` returns an error result for `stop_container` or `update_service_config` on a protected service with a `write` token. Its `structuredContent` is `{"status":403,"code":"protected_resource",...}`.
+- `mcp-structured-error` gives every error result `structuredContent` `{status, code, message}` (plus `audit_id` for a timeout or replay); a refusal before any API call has `status` 0 or the matching HTTP status, and `api_unreachable` when the API cannot be reached.
+- `mcp-wait-for` follows the `operation` a write tool returned and reports `status`, `terminal`, `timed_out`, `error_message`, and `log_tail`.
 
 ## How to get to it (user POV)
 
@@ -23,7 +25,7 @@ Preconditions:
 - The [api-v1.md](./api-v1.md) preconditions, with `token-read`, `token-write`, and the protected `verify-pg` service in place.
 - `make build-mcp` has produced `bin/goforge-mcp`.
 
-- **Inventory.** Pipe `initialize`, `notifications/initialized`, and `tools/list` JSON-RPC lines into `GOFORGE_MCP_TOKEN_FILE=/tmp/goforge-verify/state/token-read bin/goforge-mcp`. The list has 23 tools, each with `readOnlyHint` true. With `GOFORGE_MCP_ALLOW_WRITES=true` it has 37, and every write tool's `inputSchema.properties` has `dry_run` and `approval_ref`.
+- **Inventory.** Pipe `initialize`, `notifications/initialized`, and `tools/list` JSON-RPC lines into `GOFORGE_MCP_TOKEN_FILE=/tmp/goforge-verify/state/token-read bin/goforge-mcp`. The list has 24 tools, each with `readOnlyHint` true. With `GOFORGE_MCP_ALLOW_WRITES=true` it has 38, and every write tool's `inputSchema.properties` has `dry_run` and `approval_ref`.
 - **Read call.** `tools/call` `whoami` returns text holding `"scopes":["read"]`.
 - **Dry run.** With `token-write` and writes on, `tools/call` `restart_service` with `{"service_id":"$ID"}` returns `"dry_run": true` and the container's `StartedAt` is unchanged.
 - **Protected.** With `token-write`, `tools/call` `update_service_config` with `{"service_id":"$ID","config":{"name":"verify-pg-renamed"}}` returns `isError` true and text naming `protected`. `stop_container` with `{"container_id":"<verify-pg docker id>"}` does the same.
@@ -35,5 +37,6 @@ Preconditions:
 - stdout is the MCP stream. Logs go to stderr; do not mix them when parsing.
 - The MCP refuses protected actions itself first (its own `GOFORGE_MCP_PROTECTED` list plus the server's list from `whoami`). The server checks again, so both layers must agree.
 - `restart_service` and `restart_container` are allowed on protected services.
-- API errors arrive as tool results with `isError` true, not as JSON-RPC errors.
+- API errors arrive as tool results with `isError` true, not as JSON-RPC errors. Branch on `structuredContent.code`, not on the text.
+- `wait_for` waits at most 12 s per call so it fits the 15 s request timeout. Call it again while `timed_out` is true.
 - Tool inputs are `service_id` for service tools and `container_id` for container tools, never `id`. The schemas set `additionalProperties: false`, so a wrong name is rejected before any API call.
