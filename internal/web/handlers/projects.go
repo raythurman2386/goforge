@@ -39,6 +39,14 @@ type ProjectHandler struct {
 	instanceService        *services.InstanceService
 	inspector              containerInspector
 	logger                 *slog.Logger
+	audit                  uiAudit
+}
+
+// WithAudit records project create, update, settings, delete, and service
+// link changes in the audit log (via=ui).
+func (h *ProjectHandler) WithAudit(rec UIAuditRecorder) *ProjectHandler {
+	h.audit = uiAudit{rec: rec}
+	return h
 }
 
 // NewProjectHandler creates a new ProjectHandler.
@@ -191,6 +199,9 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	h.audit.record(r, models.AuditActionProjectCreate, models.ResourceTypeProject, created.ID,
+		map[string]interface{}{"name": created.Name, "project_id": created.ID})
 
 	http.Redirect(w, r, "/projects/"+created.ID, http.StatusSeeOther)
 }
@@ -374,6 +385,8 @@ func (h *ProjectHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete project", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionProjectDelete, models.ResourceTypeProject, p.ID,
+		map[string]interface{}{"name": p.Name})
 
 	w.Header().Set("HX-Redirect", "/projects")
 	w.WriteHeader(http.StatusOK)
@@ -402,6 +415,8 @@ func (h *ProjectHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to update project", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionProjectUpdate, models.ResourceTypeProject, p.ID,
+		map[string]interface{}{"project_id": p.ID, "custom_domain": customDomain})
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -478,6 +493,8 @@ func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
+	h.audit.record(r, models.AuditActionProjectSettingsUpdate, models.ResourceTypeProject, p.ID,
+		map[string]interface{}{"project_id": p.ID, "env_id": envID, "custom_domain": customDomain})
 
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusOK)
@@ -516,6 +533,8 @@ func (h *ProjectHandler) LinkService(w http.ResponseWriter, r *http.Request) {
 	if h.instanceService != nil {
 		h.injectServiceEnvVars(r.Context(), p.ID, serviceID)
 	}
+	h.audit.record(r, models.AuditActionProjectLinkService, models.ResourceTypeProject, p.ID,
+		map[string]interface{}{"project_id": p.ID, "service_instance_id": serviceID})
 
 	w.Header().Set("HX-Redirect", "/projects/"+p.ID+"/services")
 	w.WriteHeader(http.StatusOK)
@@ -603,6 +622,8 @@ func (h *ProjectHandler) UnlinkService(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to unlink service", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionProjectUnlinkService, models.ResourceTypeProject, p.ID,
+		map[string]interface{}{"project_id": p.ID, "service_instance_id": serviceID})
 
 	w.Header().Set("HX-Redirect", "/projects/"+p.ID+"/services")
 	w.WriteHeader(http.StatusOK)

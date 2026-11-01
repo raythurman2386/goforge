@@ -29,14 +29,15 @@ func (r *QueueRepository) Enqueue(ctx context.Context, item *models.QueueItem) e
 	item.Status = models.QueueStatusPending
 
 	query := `
-		INSERT INTO deployment_queue (id, deployment_id, status, created_at)
-		VALUES ($1, $2, $3, $4)`
+		INSERT INTO deployment_queue (id, deployment_id, status, created_at, audit_id)
+		VALUES ($1, $2, $3, $4, $5)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		item.ID,
 		item.DeploymentID,
 		item.Status,
 		item.CreatedAt,
+		item.AuditID,
 	)
 	return err
 }
@@ -54,7 +55,7 @@ func (r *QueueRepository) Dequeue(ctx context.Context) (*models.QueueItem, error
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		)
-		RETURNING id, deployment_id, status, created_at, started_at, finished_at, error_message`
+		RETURNING id, deployment_id, status, created_at, started_at, finished_at, error_message, audit_id`
 
 	item := &models.QueueItem{}
 	err := r.db.QueryRowContext(ctx, query,
@@ -69,6 +70,7 @@ func (r *QueueRepository) Dequeue(ctx context.Context) (*models.QueueItem, error
 		&item.StartedAt,
 		&item.FinishedAt,
 		&item.ErrorMessage,
+		&item.AuditID,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -196,7 +198,7 @@ func (r *QueueRepository) GetStats(ctx context.Context) (*models.QueueStats, err
 // GetByID retrieves a queue item by ID.
 func (r *QueueRepository) GetByID(ctx context.Context, id string) (*models.QueueItem, error) {
 	query := `
-		SELECT id, deployment_id, status, created_at, started_at, finished_at, error_message
+		SELECT id, deployment_id, status, created_at, started_at, finished_at, error_message, audit_id
 		FROM deployment_queue WHERE id = $1`
 
 	item := &models.QueueItem{}
@@ -208,6 +210,7 @@ func (r *QueueRepository) GetByID(ctx context.Context, id string) (*models.Queue
 		&item.StartedAt,
 		&item.FinishedAt,
 		&item.ErrorMessage,
+		&item.AuditID,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -227,7 +230,7 @@ func (r *QueueRepository) DeletePendingByDeploymentID(ctx context.Context, deplo
 // GetByDeploymentID retrieves a queue item by deployment ID.
 func (r *QueueRepository) GetByDeploymentID(ctx context.Context, deploymentID string) (*models.QueueItem, error) {
 	query := `
-		SELECT id, deployment_id, status, created_at, started_at, finished_at, error_message
+		SELECT id, deployment_id, status, created_at, started_at, finished_at, error_message, audit_id
 		FROM deployment_queue WHERE deployment_id = $1`
 
 	item := &models.QueueItem{}
@@ -239,6 +242,7 @@ func (r *QueueRepository) GetByDeploymentID(ctx context.Context, deploymentID st
 		&item.StartedAt,
 		&item.FinishedAt,
 		&item.ErrorMessage,
+		&item.AuditID,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound

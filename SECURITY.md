@@ -48,7 +48,7 @@ Checked against `main` on 2026-10-30.
 
 - [ ] **Database encryption at rest.** `ENCRYPTION_KEY` encrypts these values with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, one-click service `config` and `connection_info`, and the S3 access key ID and secret saved in Settings → Profile → Backups. API tokens and session tokens are stored only as SHA-256 hashes. Gaps: rows written in plaintext by an older version stay plaintext until they are updated, non-secret project variables are plaintext, and there is no `ENCRYPTION_KEY` rotation.
 - [ ] **Role-based access control.** Accounts have a role of `admin` or `user`. Every account is created as `user`, and only the address in `GOFORGE_ADMIN_EMAIL` becomes `admin` (matching ignores case). The admin role gates host operations such as Docker prune and the backup settings. Projects, deployments, and services are scoped to the owning account, and another account's project or deployment returns `404`. Gaps: no teams, invites, or per-project roles.
-- [ ] **Audit logging.** `audit_logs` records login (password and GitHub), registration, logout, API token create, rotate, and revoke, backup settings saves, `goforge backup restore`, and every `/api/v1` and `/mcp` write (recorded before it acts). Changes made in the web UI to projects, deployments, variables, and services are not recorded.
+- [ ] **Audit logging.** `audit_logs` records login (password and GitHub), registration, logout, API token create, rotate, and revoke, backup settings saves, `goforge backup restore`, every `/api/v1` and `/mcp` write (recorded before it acts), and web UI changes to projects, deployments, environments, variables (key only), services, and containers. Queued deploys and service operations write a `.completed`, `.failed`, or `.canceled` outcome row linked to the row that started them. Settings → Activity shows the log. Gaps: Git source changes, profile and password changes, and webhook-triggered deploys are not recorded, and the log has no retention setting or tamper protection.
 - [ ] **Sessions.** Each login creates a new random session token, so a session cookie set before login is never promoted. Gaps: changing the password does not end the account's other sessions, and there is no limit on concurrent sessions.
 
 ### Not started
@@ -104,7 +104,7 @@ What reduces the blast radius:
 - [ ] Regular security updates and patches
 
 ### Recommended Hardening
-- [ ] Review audit log coverage (web UI changes are not recorded today)
+- [ ] Review audit log coverage in Settings → Activity (Git source, profile, and webhook changes are not recorded today)
 - [ ] Implement network segmentation
 - [ ] Use secrets management (Vault, AWS Secrets Manager, etc.)
 - [ ] Regular penetration testing

@@ -35,6 +35,7 @@ func Router(
 	sseHandler *handlers.SSEHandler,
 	healthHandler *handlers.HealthHandler,
 	containerHandler *handlers.ContainerHandler,
+	activityHandler *handlers.ActivityHandler,
 	apiV1 http.Handler,
 	mcpHTTP http.Handler,
 ) http.Handler {
@@ -146,6 +147,7 @@ func Router(
 
 					r.Get("/dashboard", dashboardHandler.Dashboard)
 					r.Get("/dashboard/stats", dashboardHandler.DashboardStats)
+					r.Get("/dashboard/activity", activityHandler.Recent)
 					r.Post("/dashboard/prune", dashboardHandler.Prune)
 
 					// Git API
@@ -222,6 +224,7 @@ func Router(
 					// Settings
 					r.Route("/settings", func(r chi.Router) {
 						r.Get("/profile", settingsHandler.Profile)
+						r.Get("/activity", activityHandler.Page)
 						r.Put("/profile", settingsHandler.UpdateProfile)
 						r.Put("/password", settingsHandler.UpdatePassword)
 						r.Post("/prune", settingsHandler.PruneSystem)

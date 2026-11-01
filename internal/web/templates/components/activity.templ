@@ -1,0 +1,90 @@
+package components
+
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
+// ActivityTable lists audit rows newest first. Failed rows are tinted red and
+// show their error. compact drops the approval and error columns (dashboard).
+templ ActivityTable(id string, rows []ActivityRow, compact bool) {
+	@ui.Table(ui.TableProps{ID: id, Caption: "Activity"}) {
+		@ui.THead(nil) {
+			@ui.TR(nil) {
+				@ui.TH(ui.CellProps{Class: "pl-6"}) { Time }
+				@ui.TH(ui.CellProps{}) { Source }
+				@ui.TH(ui.CellProps{}) { Action }
+				@ui.TH(ui.CellProps{}) { Token }
+				@ui.TH(ui.CellProps{}) { Resource }
+				if !compact {
+					@ui.TH(ui.CellProps{}) { Approval }
+					@ui.TH(ui.CellProps{Class: "pr-6"}) { Error }
+				}
+			}
+		}
+		@ui.TBody(nil) {
+			if len(rows) == 0 {
+				@ui.TableEmpty(activityColumns(compact)) {
+					@EmptyState(EmptyStateProps{
+						Title:       "No activity yet",
+						Description: "Changes made in the UI, through the API, or by an MCP agent show up here.",
+						Icon:        "server",
+						Compact:     true,
+					})
+				}
+			}
+			for _, r := range rows {
+				@ui.TR(templ.Attributes{"class": activityRowClass(r), "data-activity-id": r.ID, "data-failed": boolAttr(r.Failed)}) {
+					@ui.TD(ui.CellProps{Class: "pl-6 whitespace-nowrap text-gray-600 dark:text-gray-400"}) {
+						<time datetime={ r.When.UTC().Format("2006-01-02T15:04:05Z") }>{ activityTime(r.When) }</time>
+					}
+					@ui.TD(ui.CellProps{}) {
+						@ui.Badge(ui.BadgeProps{Tone: activitySourceTone(r.Source)}) {
+							{ activitySourceLabel(r.Source) }
+						}
+					}
+					@ui.TD(ui.CellProps{Class: "font-mono text-xs"}) {
+						<a href={ r.RelatedURL } class="hover:text-primary-700 dark:hover:text-primary-300">{ r.Action }</a>
+						if r.Failed {
+							@ui.Badge(ui.BadgeProps{Tone: ui.BadgeDanger, Class: "ml-2"}) { failed }
+						}
+					}
+					@ui.TD(ui.CellProps{Class: "text-gray-700 dark:text-gray-300"}) {
+						{ r.TokenName }
+					}
+					@ui.TD(ui.CellProps{}) {
+						if r.ResourceURL != "" {
+							<a href={ r.ResourceURL } class="text-primary-700 hover:underline dark:text-primary-300">{ r.Resource }</a>
+						} else {
+							<span class="text-gray-600 dark:text-gray-400">{ r.Resource }</span>
+						}
+					}
+					if !compact {
+						@ui.TD(ui.CellProps{Class: "font-mono text-xs text-gray-600 dark:text-gray-400"}) {
+							{ r.ApprovalRef }
+						}
+						@ui.TD(ui.CellProps{Class: "pr-6 text-xs text-red-700 dark:text-red-300 break-words"}) {
+							{ r.Error }
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// ActivityCard is the dashboard's recent agent actions card: the latest
+// MCP and API changes, with a link to the full activity page.
+templ ActivityCard(rows []ActivityRow) {
+	@ui.Card(ui.CardProps{Flush: true, Class: "mt-8 overflow-hidden", Attrs: templ.Attributes{"id": "recent-agent-actions"}}) {
+		@ui.CardHeader(nil) {
+			<div class="flex items-center justify-between gap-4">
+				<div>
+					@ui.CardTitle(2, nil) { Recent agent actions }
+					@ui.CardDescription(nil) { Changes made through the API or by an MCP agent. }
+				</div>
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Href: "/settings/activity?source=agent"}) {
+					View all
+				}
+			</div>
+		}
+		@ActivityTable("recent-agent-actions-table", rows, true)
+	}
+}

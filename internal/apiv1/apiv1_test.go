@@ -102,6 +102,8 @@ type fakeInstances struct {
 	restarted []string
 	updated   []string
 	imaged    []string
+	// imageAuditIDs is models.AuditIDFrom(ctx) for each UpdateInstanceImage.
+	imageAuditIDs []string
 	// updateErr, when set, is what UpdateInstanceConfig returns.
 	updateErr error
 }
@@ -139,8 +141,9 @@ func (f *fakeInstances) UpdateInstanceConfig(_ context.Context, id string, _ map
 	return &models.ServiceInstance{ID: id}, nil
 }
 
-func (f *fakeInstances) UpdateInstanceImage(_ context.Context, id string) (*models.ServiceInstance, error) {
+func (f *fakeInstances) UpdateInstanceImage(ctx context.Context, id string) (*models.ServiceInstance, error) {
 	f.imaged = append(f.imaged, id)
+	f.imageAuditIDs = append(f.imageAuditIDs, models.AuditIDFrom(ctx))
 	return &models.ServiceInstance{ID: id}, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sort"
 
 	"github.com/go-chi/chi/v5"
 
@@ -19,6 +20,16 @@ type ServiceHandler struct {
 	instanceService *services.InstanceService
 	inspector       containerInspector
 	logger          *slog.Logger
+	audit           uiAudit
+}
+
+// WithAudit records service deploys, config and image changes, restarts, and
+// deletes in the audit log (via=ui). Deploys and recreates also get a
+// service.run.completed or service.run.failed row when the background work
+// ends.
+func (h *ServiceHandler) WithAudit(rec UIAuditRecorder) *ServiceHandler {
+	h.audit = uiAudit{rec: rec}
+	return h
 }
 
 // WithInspector lets service detail show the Container card from Docker
@@ -121,7 +132,11 @@ func (h *ServiceHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := h.instanceService.DeployInstance(r.Context(), user.ID, templateName, config); err != nil {
+	// Only the template name is recorded: config may hold passwords.
+	auditID := h.audit.start(r, models.AuditActionServiceDeploy, models.ResourceTypeServiceInstance, "",
+		map[string]interface{}{"template": templateName})
+	if _, err := h.instanceService.DeployInstance(models.WithAuditID(r.Context(), auditID), user.ID, templateName, config); err != nil {
+		h.audit.fail(r, auditID, models.AuditActionServiceDeploy, models.ResourceTypeServiceInstance, "", err)
 		if errors.Is(err, services.ErrInvalidConfig) {
 			RenderError(w, r, http.StatusBadRequest, err.Error())
 			return
@@ -264,7 +279,19 @@ func (h *ServiceHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := h.instanceService.UpdateInstanceConfig(r.Context(), id, updates); err != nil {
+	// Record submitted field names only, never their values.
+	fields := make([]string, 0, len(updates))
+	for key := range updates {
+		if key == "csrf_token" || key == "gorilla.csrf.Token" {
+			continue
+		}
+		fields = append(fields, key)
+	}
+	sort.Strings(fields)
+	auditID := h.audit.start(r, models.AuditActionServiceUpdateConfig, models.ResourceTypeServiceInstance, id,
+		map[string]interface{}{"name": instance.Name, "fields": fields})
+	if _, err := h.instanceService.UpdateInstanceConfig(models.WithAuditID(r.Context(), auditID), id, updates); err != nil {
+		h.audit.fail(r, auditID, models.AuditActionServiceUpdateConfig, models.ResourceTypeServiceInstance, id, err)
 		if errors.Is(err, services.ErrInstanceBusy) {
 			RenderError(w, r, http.StatusConflict, err.Error())
 			return
@@ -298,7 +325,10 @@ func (h *ServiceHandler) UpdateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.instanceService.UpdateInstanceImage(r.Context(), id); err != nil {
+	auditID := h.audit.start(r, models.AuditActionServiceUpdateImage, models.ResourceTypeServiceInstance, id,
+		map[string]interface{}{"name": instance.Name})
+	if _, err := h.instanceService.UpdateInstanceImage(models.WithAuditID(r.Context(), auditID), id); err != nil {
+		h.audit.fail(r, auditID, models.AuditActionServiceUpdateImage, models.ResourceTypeServiceInstance, id, err)
 		if errors.Is(err, services.ErrInstanceBusy) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
@@ -334,6 +364,8 @@ func (h *ServiceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete service instance", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionServiceDelete, models.ResourceTypeServiceInstance, id,
+		map[string]interface{}{"name": instance.Name, "template": instance.TemplateName})
 
 	w.Header().Set("HX-Redirect", "/services")
 	w.WriteHeader(http.StatusOK)
@@ -364,6 +396,8 @@ func (h *ServiceHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to restart service: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionServiceRestart, models.ResourceTypeServiceInstance, id,
+		map[string]interface{}{"name": instance.Name})
 
 	w.WriteHeader(http.StatusOK)
 }

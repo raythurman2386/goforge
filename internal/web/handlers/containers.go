@@ -21,6 +21,14 @@ type ContainerHandler struct {
 	serviceInstanceRepo *repositories.ServiceInstanceRepository
 	dockerClient        *docker.Client
 	logger              *slog.Logger
+	audit               uiAudit
+}
+
+// WithAudit records container stop and restart in the audit log (via=ui).
+// The Docker id is not a UUID, so it lands in details.resource_ref.
+func (h *ContainerHandler) WithAudit(rec UIAuditRecorder) *ContainerHandler {
+	h.audit = uiAudit{rec: rec}
+	return h
 }
 
 // NewContainerHandler creates a new container handler.
@@ -137,6 +145,8 @@ func (h *ContainerHandler) Stop(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.audit.record(r, models.AuditActionContainerStop, models.ResourceTypeContainer, containerID, nil)
+
 	w.Header().Set("HX-Trigger", "containerStopped")
 	w.WriteHeader(http.StatusOK)
 }
@@ -169,6 +179,8 @@ func (h *ContainerHandler) Restart(w http.ResponseWriter, r *http.Request) {
 			h.logger.Warn("failed to update container status in DB", "container_id", trackedContainer.ID, "error", err)
 		}
 	}
+
+	h.audit.record(r, models.AuditActionContainerRestart, models.ResourceTypeContainer, containerID, nil)
 
 	w.Header().Set("HX-Trigger", "containerRestarted")
 	w.WriteHeader(http.StatusOK)

@@ -336,6 +336,17 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 			}
 			
 			@DashboardStatsLoader()
+			@RecentAgentActionsLoader()
 		</div>
 	}
+}
+
+// RecentAgentActionsLoader is swapped for the recent agent actions card
+// (components.ActivityCard) once /dashboard/activity answers.
+templ RecentAgentActionsLoader() {
+	<div id="recent-agent-actions-loader" hx-get="/dashboard/activity" hx-trigger="load" hx-swap="outerHTML">
+		<div role="status" aria-label="Loading recent agent actions" aria-busy="true" class="mt-8">
+			@ui.Skeleton(ui.SkeletonLine, "h-7 w-48")
+		</div>
+	</div>
 }

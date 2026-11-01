@@ -39,6 +39,16 @@ type DeploymentHandler struct {
 	rollbackManager *deploy.RollbackManager
 	worker          *deploy.Worker
 	logger          *slog.Logger
+	audit           uiAudit
+}
+
+// WithAudit records deployment trigger, rollback, and cancel in the audit
+// log (via=ui). A triggered deployment carries the row's id through the
+// queue, so the worker writes deployment.run.completed or .failed linked to
+// it when the pipeline ends.
+func (h *DeploymentHandler) WithAudit(rec UIAuditRecorder) *DeploymentHandler {
+	h.audit = uiAudit{rec: rec}
+	return h
 }
 
 // NewDeploymentHandler creates a new DeploymentHandler.
@@ -97,7 +107,10 @@ func (h *DeploymentHandler) TriggerDeployment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.worker.Enqueue(r.Context(), d.ID); err != nil {
+	auditID := h.audit.start(r, models.AuditActionDeploymentTrigger, models.ResourceTypeDeployment, d.ID,
+		map[string]interface{}{"project_id": projectID, "environment_id": envID})
+	if err := h.worker.Enqueue(models.WithAuditID(r.Context(), auditID), d.ID); err != nil {
+		h.audit.fail(r, auditID, models.AuditActionDeploymentTrigger, models.ResourceTypeDeployment, d.ID, err)
 		http.Error(w, "failed to enqueue deployment", http.StatusInternalServerError)
 		return
 	}
@@ -185,9 +198,13 @@ func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Re
 	// HX-Redirect reloads the deployment page, so a toast sent with this
 	// response would be lost. ROADMAP.md tracks surfacing it.
 	if _, err := h.rollbackManager.Rollback(r.Context(), deployment.EnvironmentID, "manual rollback"); err != nil {
+		h.audit.record(r, models.AuditActionDeploymentRollback+".failed", models.ResourceTypeDeployment, deploymentID,
+			map[string]interface{}{"project_id": projectID, "error": err.Error()})
 		http.Error(w, "rollback failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionDeploymentRollback, models.ResourceTypeDeployment, deploymentID,
+		map[string]interface{}{"project_id": projectID, "environment_id": deployment.EnvironmentID})
 
 	// Redirect back to the deployment detail page.
 	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID)
@@ -232,6 +249,8 @@ func (h *DeploymentHandler) CancelDeployment(w http.ResponseWriter, r *http.Requ
 			h.logger.Error("failed to drop pending deployment", "deployment_id", deploymentID, "error", dropErr)
 		}
 	}
+	h.audit.record(r, models.AuditActionDeploymentCancel, models.ResourceTypeDeployment, deploymentID,
+		map[string]interface{}{"project_id": projectID})
 
 	// Redirect back to deployment detail page
 	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID)
