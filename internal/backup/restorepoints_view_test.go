@@ -58,8 +58,11 @@ func TestRestorePointLister_ListInstance(t *testing.T) {
 	if p.RunKey != svcRunKey || p.Artifacts != 2 || p.Bytes != int64(len("gitea-db")+len("gitea-tar")) || p.StartedAt.IsZero() {
 		t.Errorf("g1 point = %+v", p)
 	}
-	if v := l.ListInstance(context.Background(), "p1"); len(v.Points) != 1 || v.Restorable() {
+	if v := l.ListInstance(context.Background(), "p1"); len(v.Points) != 1 || !v.Restorable() || v.KeptDir() != "/var/lib/postgresql/data/.goforge-pre-restore-<time>" {
 		t.Errorf("postgres view = %+v", v)
+	}
+	if v := l.ListInstance(context.Background(), "x1"); len(v.Points) != 1 || v.Restorable() {
+		t.Errorf("redis view = %+v", v)
 	}
 	if v := l.ListInstance(context.Background(), "off"); len(v.Points) != 0 || v.Skipped != 1 {
 		t.Errorf("skipped view = %+v", v)
