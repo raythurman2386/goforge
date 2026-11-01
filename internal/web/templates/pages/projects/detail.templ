@@ -41,7 +41,7 @@ templ Detail(project *models.Project, envs []*models.Environment, currentEnv *mo
 							"hx-indicator": "find .htmx-indicator",
 						},
 					}) {
-						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
 						</svg>
 						Deploy Now
@@ -388,7 +388,7 @@ templ Services(project *models.Project, linkedServices []*models.ServiceInstance
 					<form hx-post={ "/projects/" + project.ID + "/services" } hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator" class="flex items-end space-x-4">
 						@ui.Select(ui.SelectProps{ID: "attach-service", Name: "service_instance_id", Label: "Service", Options: serviceOptions(availableServices), Blank: true, BlankLabel: "Select a service...", Required: true, Class: "flex-1"})
 						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
-							<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"></path>
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101"></path>
 							</svg>
@@ -479,7 +479,7 @@ templ ProjectSettings(project *models.Project, currentEnv *models.Environment, c
 						"data-testid": "delete-project-open",
 					},
 				}) {
-					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
 					</svg>
 					Delete Project

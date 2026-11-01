@@ -1694,6 +1694,88 @@ async function touchTargetChecks(scheme, page) {
   await page.setViewportSize(before);
 }
 
+// t1742u: at rest, the visible content of every text and icon button (text
+// nodes and child elements, not a hidden Spinner and not an sr-only child)
+// is centered in the button within 1px. Before the fix a Spinner kept its
+// 24px in the flex row at opacity 0 and pushed the label 12px left. Buttons
+// whose own justify-content is not center (none today) are counted as
+// exempt, not measured. Checked at 1280 and 375 px in the drive's scheme.
+async function buttonCenteringChecks(scheme, page, routes) {
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  const before = page.viewportSize();
+  const measure = () =>
+    page.evaluate(() => {
+      const out = { n: 0, exempt: 0, off: [], max: 0 };
+      const variant = /(^|\s)btn-(primary|secondary|danger|warning|ghost|ghost-primary|ghost-warning|ghost-danger|link)(\s|$)/;
+      for (const el of document.querySelectorAll("[class*='btn-']")) {
+        const cls = typeof el.className === "string" ? el.className : "";
+        if (!variant.test(cls) || /(^|\s)btn-inline(\s|$)/.test(cls)) continue;
+        if (el.closest("dialog:not([open]), [popover]:not(:popover-open), template")) continue;
+        const b = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        if (b.width === 0 || b.height === 0 || cs.visibility === "hidden" || cs.display === "none") continue;
+        if (cs.justifyContent !== "center" && cs.justifyContent !== "normal") {
+          out.exempt++;
+          continue;
+        }
+        let left = Infinity;
+        let right = -Infinity;
+        const add = (r) => {
+          if (r.width === 0 && r.height === 0) return;
+          left = Math.min(left, r.left);
+          right = Math.max(right, r.right);
+        };
+        for (const node of el.childNodes) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            if (!node.textContent.trim()) continue;
+            const rg = document.createRange();
+            rg.selectNodeContents(node);
+            for (const r of rg.getClientRects()) add(r);
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.classList.contains("htmx-indicator")) continue;
+            const ncs = getComputedStyle(node);
+            if (ncs.display === "none" || ncs.visibility === "hidden" || ncs.position === "absolute" || ncs.position === "fixed") continue;
+            add(node.getBoundingClientRect());
+          }
+        }
+        if (!Number.isFinite(left)) continue;
+        out.n++;
+        const dx = Math.round(((left + right) / 2 - (b.left + b.right) / 2) * 10) / 10;
+        if (Math.abs(dx) > Math.abs(out.max)) out.max = dx;
+        if (Math.abs(dx) > 1) {
+          const label = (el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 24);
+          out.off.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}"${label}"=${dx}`);
+        }
+      }
+      return out;
+    });
+  for (const route of routes) {
+    await t(`button-centering ${route}`, async () => {
+      const res = {};
+      for (const width of [1280, 375]) {
+        await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
+        const resp = await page.goto(BASE + route, { waitUntil: "load" });
+        if (route === "/dev/ui" && resp && resp.status() === 404) {
+          res.skip = true;
+          break;
+        }
+        await page.waitForTimeout(500);
+        res[width] = await measure();
+      }
+      await page.setViewportSize(before);
+      if (res.skip) {
+        lines.push(`check ${scheme} button-centering ${route} skip status=404 reason=GOFORGE_DEV_MODE-not-true`);
+        return;
+      }
+      const d = res[1280];
+      const m = res[375];
+      const fmt = (x) => `buttons=${x.n} off-center=${x.off.length} max-dx=${x.max}${x.exempt ? " exempt=" + x.exempt : ""}${x.off.length ? " [" + x.off.slice(0, 6).join(",") + "]" : ""}`;
+      check(scheme, `button-centering ${route}`, d.n + m.n > 0 && d.off.length === 0 && m.off.length === 0, `1280px ${fmt(d)}; 375px ${fmt(m)}`);
+    });
+  }
+  await page.setViewportSize(before);
+}
+
 // Sign in by posting the real login form from the browser context, so the
 // session cookie lands in the context's jar. drive-register stores the
 // password with a trailing newline (curl --data-urlencode @file sends it
@@ -1773,6 +1855,7 @@ async function main() {
           lines.push(`detail-ids ${scheme} service=${ids.service ? "yes" : "none"} container=${ids.container ? "yes" : "none"} deployment=${ids.deployment ? "yes" : "none"}`);
           await appDetailChecks(scheme, page, ids);
           await touchTargetChecks(scheme, page);
+          await buttonCenteringChecks(scheme, page, ["/dev/ui", "/settings/profile", "/settings/git", "/projects/new", ...projectTabs, ...detailRouteList(ids)]);
           await agentActionsCardCheck(scheme, page);
           const routes = AUTH_ROUTES.concat(projectTabs, detailRouteList(ids));
           for (const route of routes) results.push(await scan(page, scheme, route));
