@@ -67,17 +67,46 @@ type mutationResponse struct {
 	ApprovalRef string         `json:"approval_ref,omitempty"`
 	AuditID     string         `json:"audit_id,omitempty"`
 	Result      any            `json:"result,omitempty"`
+	// Operation is set when the change goes on in the background after the
+	// answer (a queued deployment, a service deploy or recreate).
+	Operation *operation `json:"operation,omitempty"`
+}
+
+// pollTool is the MCP tool that waits on an operation.
+const pollTool = "wait_for"
+
+// operation points at background work a mutation started, so a client can
+// wait for it with the wait_for MCP tool, or poll the matching read.
+type operation struct {
+	// Kind is "deployment" or "service".
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+	// ProjectID is set for a deployment; get_deployment needs it.
+	ProjectID string `json:"project_id,omitempty"`
+	PollTool  string `json:"poll_tool"`
+}
+
+func deploymentOp(projectID, deploymentID string) *operation {
+	return &operation{Kind: "deployment", ID: deploymentID, ProjectID: projectID, PollTool: pollTool}
+}
+
+func serviceOp(instanceID string) *operation {
+	return &operation{Kind: "service", ID: instanceID, PollTool: pollTool}
 }
 
 // outcome is what a gated change returns. Err nil means success.
 type outcome struct {
 	Result any
+	Op     *operation
 	Err    error
 	Status int
 	Msg    string
 }
 
 func succeeded(result any) outcome { return outcome{Result: result} }
+
+// started is a success whose work goes on in the background.
+func started(result any, op *operation) outcome { return outcome{Result: result, Op: op} }
 
 func failed(err error, status int, msg string) outcome {
 	return outcome{Err: err, Status: status, Msg: msg}
@@ -249,8 +278,13 @@ func (h *Handler) recordOutcome(origin origin, userID, ref string, m *mutation, 
 		details["error"] = out.Msg
 		details["status"] = out.Status
 		h.logger.Error("api v1: mutation failed", "action", m.Action, "resource_id", m.ResourceID, "error", out.Err)
-	} else if out.Result != nil {
-		details["result"] = out.Result
+	} else {
+		if out.Result != nil {
+			details["result"] = out.Result
+		}
+		if out.Op != nil {
+			details["operation"] = out.Op
+		}
 	}
 	entry := h.auditEntry(origin, userID, action, m.ResourceType, m.ResourceID, details)
 	ctx, cancel := context.WithTimeout(context.Background(), outcomeWriteTimeout)
@@ -268,7 +302,7 @@ func (h *Handler) answer(w http.ResponseWriter, g *gate, m *mutation, auditID st
 	}
 	writeJSON(w, http.StatusOK, mutationResponse{
 		Action: m.Action, DryRun: false, Target: m.Target, Plan: m.Plan, Changes: m.Changes,
-		ApprovalRef: strings.TrimSpace(g.ApprovalRef), AuditID: auditID, Result: out.Result,
+		ApprovalRef: strings.TrimSpace(g.ApprovalRef), AuditID: auditID, Result: out.Result, Operation: out.Op,
 	})
 }
 

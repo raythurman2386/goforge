@@ -88,7 +88,7 @@ func (h *Handler) triggerDeployment(w http.ResponseWriter, r *http.Request) {
 		if err := h.deps.Queue.Enqueue(ctx, d.ID); err != nil {
 			return failed(err, http.StatusInternalServerError, "failed to queue deployment "+d.ID)
 		}
-		return succeeded(toDeployment(d))
+		return started(toDeployment(d), deploymentOp(p.ID, d.ID))
 	})
 }
 
@@ -597,7 +597,7 @@ func (h *Handler) deployService(w http.ResponseWriter, r *http.Request) {
 			}
 			return failed(err, status, msg)
 		}
-		return succeeded(h.toServiceSummary(inst))
+		return started(h.toServiceSummary(inst), serviceOp(inst.ID))
 	})
 }
 
@@ -696,7 +696,7 @@ func (h *Handler) updateServiceImage(w http.ResponseWriter, r *http.Request) {
 			}
 			return failed(err, status, msg)
 		}
-		return succeeded(map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)})
+		return started(map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)}, serviceOp(inst.ID))
 	})
 }
 
@@ -785,7 +785,7 @@ func (h *Handler) updateServiceConfig(w http.ResponseWriter, r *http.Request) {
 			}
 			return failed(err, status, msg)
 		}
-		return succeeded(map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)})
+		return started(map[string]string{"service_instance_id": inst.ID, "status": string(models.ServiceStatusPending)}, serviceOp(inst.ID))
 	})
 }
 

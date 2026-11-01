@@ -24,6 +24,7 @@ var readTools = []string{
 	"list_service_templates", "get_service_template", "list_services", "get_service",
 	"list_containers", "get_container", "get_container_logs", "get_container_stats",
 	"list_audit_log", "list_git_sources", "list_repos", "list_branches", "get_backup_status",
+	"wait_for",
 }
 
 var writeTools = []string{
@@ -94,6 +95,12 @@ func connect(t *testing.T, cfg *Config, api *fakeAPI) *mcp.ClientSession {
 	t.Helper()
 	ts := httptest.NewServer(api)
 	t.Cleanup(ts.Close)
+	return connectTo(t, cfg, ts)
+}
+
+// connectTo connects an MCP client to a server that calls the API at ts.
+func connectTo(t *testing.T, cfg *Config, ts *httptest.Server) *mcp.ClientSession {
+	t.Helper()
 	cfg.BaseURL = ts.URL
 	cfg.Token = testToken
 	srv := New(cfg, ts.Client())
