@@ -57,7 +57,7 @@
     --gf-border: 222 222 222;              /* highlight #dedede */
     --gf-divider: 228 228 228;             /* code #e4e4e4 */
     --gf-muted: 228 228 228;               /* code #e4e4e4 */
-    --gf-muted-foreground: 118 118 118;    /* muted #767676 */
+    --gf-muted-foreground: 68 68 68;       /* text secondary #444444 (t1736u option b, AA) */
     --gf-label: 68 68 68;                  /* secondary #444444 */
     --gf-field: 245 245 245;               /* terminal #f5f5f5 */
     --gf-field-border: 222 222 222;        /* highlight #dedede */
@@ -77,8 +77,8 @@
 
     /* GrokDay status and link roles */
     --gf-danger: 205 48 72;                /* error #CD3048 */
-    --gf-success: 55 142 35;               /* success #378E23 */
-    --gf-warning: 162 118 18;              /* warn #A27612 */
+    --gf-success: 41 106 26;               /* #296A1A, darker step of success #378E23 for AA (t1736u) */
+    --gf-warning: 121 88 13;               /* #79580D, darker step of warn #A27612 for AA (t1736u) */
     --gf-info: 47 100 210;                 /* system/links #2F64D2 */
 
     --gf-radius: 0.5rem;                   /* rounded-lg */
@@ -96,7 +96,7 @@
       --gf-border: 36 36 36;               /* highlight #242424 */
       --gf-divider: 36 36 36;              /* highlight #242424 */
       --gf-muted: 36 36 36;                /* highlight #242424 */
-      --gf-muted-foreground: 108 108 108;  /* muted #6c6c6c */
+      --gf-muted-foreground: 200 200 200;  /* text secondary #c8c8c8 (t1736u option b, AA) */
       --gf-label: 200 200 200;             /* text secondary #c8c8c8 */
       --gf-field: 10 10 10;                /* terminal #0a0a0a */
       --gf-field-border: 36 36 36;         /* highlight #242424 */
@@ -295,12 +295,12 @@
 
   /*
    * components/ui Switch: a native checkbox (role="switch") drawn as a track
-   * with the thumb as ::before. The unchecked track is muted-foreground
-   * (#767676 light, #6c6c6c dark), at least 3:1 against the card in light
-   * and dark (WCAG 1.4.11).
+   * with the thumb as ::before. The unchecked track is field-placeholder,
+   * the palette muted (#767676 light, #6c6c6c dark), at least 3:1 against
+   * the card in light and dark (WCAG 1.4.11).
    */
   .switch {
-    @apply relative inline-flex h-6 w-11 shrink-0 cursor-pointer appearance-none items-center rounded-full border-2 border-transparent bg-muted-foreground transition-colors duration-200 ui-focus-ring disabled:cursor-not-allowed disabled:opacity-50;
+    @apply relative inline-flex h-6 w-11 shrink-0 cursor-pointer appearance-none items-center rounded-full border-2 border-transparent bg-field-placeholder transition-colors duration-200 ui-focus-ring disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .switch::before {
