@@ -103,7 +103,9 @@ instance IDs, see [Configuration](../configuration/index.md#api-v1-and-mcp)):
 GOFORGE_PROTECTED_SERVICES=<shared-pg-id>,<shared-redis-id>,<gitea-id>,<vaultwarden-id>,<solidcraft-id>
 ```
 
-It takes effect when the GoForge container next starts.
+It takes effect when the GoForge container next starts. To protect a service
+without a restart, turn on **Protected** on its service page instead; see
+[Protected services](services.md#protected-services).
 
 ## 4. Turn it off
 

@@ -1,0 +1,54 @@
+package pages_services
+
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
+// Protection is what the Protected card shows for one service.
+type Protection struct {
+	InstanceID string
+	// Stored is the flag set with this card.
+	Stored bool
+	// Env is true when GOFORGE_PROTECTED_SERVICES lists the service; the
+	// card then stays on and cannot be turned off here.
+	Env bool
+}
+
+// On reports whether the service is protected from either source.
+func (p Protection) On() bool { return p.Stored || p.Env }
+
+func protectionStatus(p Protection) string {
+	switch {
+	case p.Env:
+		return "Protected by GOFORGE_PROTECTED_SERVICES. Remove it from that list to turn this off."
+	case p.Stored:
+		return "Protected. API and MCP tokens need the protected scope to stop, reconfigure, or re-image this service."
+	default:
+		return "Not protected. Tokens with the write scope can stop, reconfigure, or re-image this service."
+	}
+}
+
+// ProtectedCard is the service page's Protected toggle. Changing the switch
+// posts the form; the response is this card again.
+templ ProtectedCard(p Protection) {
+	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "service-protected"}}) {
+		<form
+			hx-post={ "/services/" + p.InstanceID + "/protected" }
+			hx-trigger="change"
+			hx-target="#service-protected"
+			hx-swap="outerHTML"
+			data-testid="service-protected-form"
+		>
+			@ui.Switch(ui.CheckboxProps{
+				ID:          "service-protected-switch",
+				Name:        "protected",
+				Value:       "true",
+				Label:       "Protected",
+				Description: "Agents and API tokens cannot stop, reconfigure, or re-image a protected service without the protected scope. Restart stays allowed. Nothing about the running container changes.",
+				Checked:     p.On(),
+				Disabled:    p.Env,
+				HiddenFalse: true,
+				Attrs:       templ.Attributes{"data-testid": "service-protected-switch"},
+			})
+			<p class="mt-3 text-xs text-muted-foreground" role="status" aria-live="polite" data-testid="service-protected-status">{ protectionStatus(p) }</p>
+		</form>
+	}
+}

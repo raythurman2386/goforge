@@ -157,9 +157,14 @@ operation.
 
 ## Protected services
 
-`GOFORGE_PROTECTED_SERVICES` (comma-separated service instance IDs) is the
-server-side list. `GET /services` and `GET /services/{id}` show
-`"protected": true`, and `GET /whoami` returns the list.
+A service is protected when its ID is in `GOFORGE_PROTECTED_SERVICES`
+(comma-separated service instance IDs, read at start) or when the
+**Protected** switch on its service page is on (stored on the service,
+applies at once, audited as `service.set_protected`). `GET /services` and
+`GET /services/{id}` show `"protected": true`, and `GET /whoami` returns the
+environment list followed by the caller's services protected with the
+switch. If GoForge cannot read a service while checking, it treats the
+service as protected.
 
 | Action | Needs |
 |--------|-------|

@@ -1,0 +1,58 @@
+package components
+
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
+// TypedDeleteProps configures TypedDeleteDialog.
+type TypedDeleteProps struct {
+	// ID is the static dialog id; the opener uses data-ui-dialog-open=ID.
+	ID string
+	// Title is the dialog heading, for example "Delete service".
+	Title string
+	// Kind is "service" or "project", used in the prompt.
+	Kind string
+	// Name is the exact name the user must type.
+	Name string
+	// URL receives the DELETE with confirm_name set.
+	URL string
+	// Warning says what is lost.
+	Warning string
+	// Label is the delete button text.
+	Label string
+}
+
+// TypedDeleteDialog is a static dialog that asks for the resource name
+// before a delete. The server checks confirm_name too, so a request without
+// the right name is refused (400, shown in the dialog's error node). Render
+// it outside any polled region and open it with
+// data-ui-dialog-open=ID.
+templ TypedDeleteDialog(p TypedDeleteProps) {
+	@ui.Dialog(ui.DialogProps{ID: p.ID, Static: true, Title: p.Title, Description: p.Warning}) {
+		<form
+			hx-delete={ p.URL }
+			hx-swap="none"
+			hx-disabled-elt="find button[type=submit]"
+			autocomplete="off"
+			data-testid={ p.ID + "-form" }
+		>
+			<p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
+				Type <strong class="font-mono font-semibold text-gray-900 dark:text-gray-100">{ p.Name }</strong> to confirm.
+			</p>
+			@ui.Input(ui.InputProps{
+				ID:           p.ID + "-name",
+				Name:         "confirm_name",
+				Label:        "The " + p.Kind + " name",
+				Autocomplete: "off",
+				Required:     true,
+				Attrs:        templ.Attributes{"spellcheck": "false", "data-testid": p.ID + "-input"},
+			})
+			<div class="mt-6 flex justify-end gap-3">
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
+					Cancel
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonDanger, Type: "submit", Attrs: templ.Attributes{"data-testid": p.ID + "-submit"}}) {
+					{ p.Label }
+				}
+			</div>
+		</form>
+	}
+}

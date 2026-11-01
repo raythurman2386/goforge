@@ -79,6 +79,8 @@ Secret variables are encrypted at rest using AES-GCM.
 
 ## Deleting a Project
 
+**Delete Project** on the Settings tab opens a dialog that asks you to type the project name. The server checks it too: a delete without the exact name answers `400` and removes nothing.
+
 Deleting a project will:
 
 1. Stop and remove all running containers

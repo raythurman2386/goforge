@@ -47,7 +47,7 @@ func TestServiceHandler_Delete_WritesAuditRow(t *testing.T) {
 	h.WithAudit(rec)
 
 	rr := httptest.NewRecorder()
-	h.Delete(rr, editRequest(http.MethodDelete, "owner", nil))
+	h.Delete(rr, editRequest(http.MethodDelete, "owner", url.Values{"confirm_name": {"vw"}}))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d", rr.Code)
 	}
@@ -71,7 +71,7 @@ func TestServiceHandler_Delete_RefusedWritesNothing(t *testing.T) {
 	h.WithAudit(rec)
 
 	rr := httptest.NewRecorder()
-	h.Delete(rr, editRequest(http.MethodDelete, "intruder", nil))
+	h.Delete(rr, editRequest(http.MethodDelete, "intruder", url.Values{"confirm_name": {"vw"}}))
 	if rr.Code != http.StatusForbidden {
 		t.Fatalf("status = %d", rr.Code)
 	}

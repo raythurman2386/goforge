@@ -98,7 +98,7 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*models.ServiceInstance, error) {
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
-			domain, status, connection_info, created_at, updated_at, last_error
+			domain, status, connection_info, created_at, updated_at, last_error, protected
 		FROM service_instances WHERE id = $1`
 
 	s := &models.ServiceInstance{}
@@ -115,6 +115,7 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 		&s.CreatedAt,
 		&s.UpdatedAt,
 		&s.LastError,
+		&s.Protected,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -130,7 +131,7 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID string) ([]*models.ServiceInstance, error) {
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
-			domain, status, connection_info, created_at, updated_at, last_error
+			domain, status, connection_info, created_at, updated_at, last_error, protected
 		FROM service_instances WHERE user_id = $1
 		ORDER BY created_at DESC
 		LIMIT 1000`
@@ -157,6 +158,7 @@ func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID str
 			&s.CreatedAt,
 			&s.UpdatedAt,
 			&s.LastError,
+			&s.Protected,
 		)
 		if err != nil {
 			return nil, err
@@ -252,6 +254,25 @@ func (r *ServiceInstanceRepository) UpdateIfStatus(ctx context.Context, s *model
 	}
 	s.UpdatedAt = updatedAt
 	return true, nil
+}
+
+// SetProtected sets the protected flag of a service instance. It touches
+// nothing else, so a concurrent Update of config or status cannot undo it.
+func (r *ServiceInstanceRepository) SetProtected(ctx context.Context, id string, protected bool) error {
+	result, err := r.db.ExecContext(ctx,
+		`UPDATE service_instances SET protected = $2, updated_at = $3 WHERE id = $1`,
+		id, protected, time.Now())
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Delete deletes a service instance.

@@ -220,7 +220,13 @@ GoForge will:
 | **Edit configuration** | Change name, domain, or template settings and recreate the container on the same volumes |
 | **Update image** | Pull the service's image again and recreate the container with the same config and volumes |
 | **Restart** | Restart the service container |
-| **Delete** | Stop and remove the service and its data |
+| **Delete** | Stop and remove the service and its data. A dialog asks you to type the service name; the server refuses the delete (`400`) without the exact name |
+
+### Protected services
+
+The **Protected** switch on a service page keeps agents and API tokens away from it: through `/api/v1` and the MCP server, stopping its container, editing its configuration, or updating its image needs a token with the `protected` scope, and anything else answers `403 protected_resource` before any Docker call. Restart is still allowed with `write`. The switch changes nothing about the running container, and the web UI itself is not restricted.
+
+The flag is stored on the service (migration `026_service_instances_protected`) and applies at once, with no restart. Each change is an audit row, `service.set_protected`, with `details.protected`, `details.previous`, and `via` = `ui`. A service listed in `GOFORGE_PROTECTED_SERVICES` shows the switch on and locked; remove it from that variable to turn protection off. GoForge protects a service when either the switch or the variable says so.
 
 A service runs one **Edit configuration** or **Update image** at a time. While one is recreating the container, the service is `pending`, and another edit or update is refused with `409 Conflict`, even one sent at the same moment.
 

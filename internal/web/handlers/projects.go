@@ -381,6 +381,10 @@ func (h *ProjectHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !requireTypedName(w, r, "project", p.Name) {
+		return
+	}
+
 	if err := h.projectService.DeleteProject(r.Context(), p.ID); err != nil {
 		http.Error(w, "failed to delete project", http.StatusInternalServerError)
 		return

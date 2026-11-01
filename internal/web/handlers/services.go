@@ -23,6 +23,9 @@ type ServiceHandler struct {
 	logger          *slog.Logger
 	audit           uiAudit
 	restorePoints   ServiceRestorePointLister
+	// envProtected holds GOFORGE_PROTECTED_SERVICES. The service page shows
+	// those as protected and does not let the toggle turn them off.
+	envProtected map[string]bool
 }
 
 // WithAudit records service deploys, config and image changes, restarts, and
@@ -182,7 +185,7 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	showRestorePoints := h.restorePoints != nil && user.IsAdmin() && backup.BacksUpTemplate(instance.TemplateName)
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages_services.Detail(instance, container, inspectSummary(r.Context(), h.inspector, container, h.logger), tmpl, showRestorePoints, csrfToken)
+	component := pages_services.Detail(instance, container, inspectSummary(r.Context(), h.inspector, container, h.logger), tmpl, showRestorePoints, h.protection(instance), csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render detail page")
 	}
@@ -360,6 +363,10 @@ func (h *ServiceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	user, ok := val.(*models.User)
 	if !ok || user.ID != instance.UserID {
 		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+
+	if !requireTypedName(w, r, "service", instance.Name) {
 		return
 	}
 

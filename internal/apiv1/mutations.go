@@ -637,12 +637,22 @@ func (h *Handler) serviceTarget(inst *models.ServiceInstance) map[string]any {
 		"service":             inst.Name,
 		"template":            inst.TemplateName,
 		"status":              string(inst.Status),
-		"protected":           h.isProtected(inst.ID),
+		"protected":           h.instanceProtected(inst),
 	}
 }
 
-func (h *Handler) protectedID(instanceID string) string {
-	if h.isProtected(instanceID) {
+// protectedID returns inst.ID when inst is protected, else "".
+func (h *Handler) protectedID(inst *models.ServiceInstance) string {
+	if h.instanceProtected(inst) {
+		return inst.ID
+	}
+	return ""
+}
+
+// protectedContainerID returns the service instance behind a container
+// when that service is protected, else "".
+func (h *Handler) protectedContainerID(ctx context.Context, instanceID string) string {
+	if h.isProtected(ctx, instanceID) {
 		return instanceID
 	}
 	return ""
@@ -675,7 +685,7 @@ func (h *Handler) updateServiceImage(w http.ResponseWriter, r *http.Request) {
 		Target:       h.serviceTarget(inst),
 		Plan:         "pull " + image + " again and recreate the container of " + inst.Name + " with the same config; named volumes are kept",
 		Changes:      map[string]any{"image": image, "keeps_volumes": volumes},
-		ProtectedID:  h.protectedID(inst.ID),
+		ProtectedID:  h.protectedID(inst),
 	}
 	if h.refuseProtected(w, r, m.ProtectedID, m.Action) {
 		return
@@ -727,7 +737,7 @@ func (h *Handler) updateServiceConfig(w http.ResponseWriter, r *http.Request) {
 		unavailable(w, "service template "+inst.TemplateName)
 		return
 	}
-	pid := h.protectedID(inst.ID)
+	pid := h.protectedID(inst)
 	// Refuse before computing anything about a protected service.
 	if h.refuseProtected(w, r, pid, "update_service_config") {
 		return
@@ -865,9 +875,9 @@ func (h *Handler) stopContainer(w http.ResponseWriter, r *http.Request) {
 		Action:       "stop_container",
 		ResourceType: "container",
 		ResourceID:   dockerID,
-		Target:       h.containerTarget(dockerID, c),
+		Target:       h.containerTarget(r.Context(), dockerID, c),
 		Plan:         "stop container " + containerName(dockerID, c) + "; it stays stopped until started or restarted",
-		ProtectedID:  h.protectedID(instanceID),
+		ProtectedID:  h.protectedContainerID(r.Context(), instanceID),
 	}
 	auditID, ok := h.begin(w, r, g, m)
 	if !ok {
@@ -902,7 +912,7 @@ func (h *Handler) restartContainer(w http.ResponseWriter, r *http.Request) {
 		Action:       "restart_container",
 		ResourceType: "container",
 		ResourceID:   dockerID,
-		Target:       h.containerTarget(dockerID, c),
+		Target:       h.containerTarget(r.Context(), dockerID, c),
 		Plan:         "restart container " + containerName(dockerID, c) + " in place (no recreate)",
 	}
 	auditID, ok := h.begin(w, r, g, m)
@@ -920,13 +930,13 @@ func (h *Handler) restartContainer(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) containerTarget(dockerID string, c *models.Container) map[string]any {
+func (h *Handler) containerTarget(ctx context.Context, dockerID string, c *models.Container) map[string]any {
 	instanceID := containerInstanceID(c)
 	return map[string]any{
 		"docker_id":           dockerID,
 		"name":                containerName(dockerID, c),
 		"service_instance_id": instanceID,
-		"protected":           h.isProtected(instanceID),
+		"protected":           h.isProtected(ctx, instanceID),
 	}
 }
 

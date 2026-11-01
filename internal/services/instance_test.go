@@ -63,6 +63,8 @@ func (m *mockInstanceRepository) UpdateIfStatus(ctx context.Context, s *models.S
 	return true, nil
 }
 
+func (m *mockInstanceRepository) SetProtected(context.Context, string, bool) error { return nil }
+
 func (m *mockInstanceRepository) Delete(ctx context.Context, id string) error {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, id)

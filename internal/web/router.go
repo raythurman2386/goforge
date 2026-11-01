@@ -218,6 +218,7 @@ func Router(
 							r.Get("/edit", serviceHandler.EditConfig)
 							r.Post("/edit", serviceHandler.UpdateConfig)
 							r.Post("/update", serviceHandler.UpdateImage)
+							r.Post("/protected", serviceHandler.SetProtected)
 							r.Get("/restore-points", serviceHandler.RestorePoints)
 						})
 					})
