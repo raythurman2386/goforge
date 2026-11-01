@@ -61,7 +61,7 @@ func TestProfile_MCPCard(t *testing.T) {
 }
 
 func TestAddAPITokenModal_MCPPreset(t *testing.T) {
-	got := renderMCP(t, AddAPITokenModal("csrf", true))
+	got := renderMCP(t, AddAPITokenModal("csrf", true, nil))
 	for _, want := range []string{
 		"Generate MCP Token", `name="preset" value="mcp"`, `value="90" selected`,
 		`value="read" checked`, `value="write" checked`,
@@ -73,7 +73,7 @@ func TestAddAPITokenModal_MCPPreset(t *testing.T) {
 	if strings.Contains(got, `value="0"`) || strings.Contains(got, `value="protected" checked`) {
 		t.Error("MCP preset offers never-expiring or pre-checks protected")
 	}
-	plain := renderMCP(t, AddAPITokenModal("csrf", false))
+	plain := renderMCP(t, AddAPITokenModal("csrf", false, nil))
 	if strings.Contains(plain, `name="preset"`) || !strings.Contains(plain, `value="0"`) || strings.Contains(plain, `value="read" checked`) {
 		t.Error("plain modal changed")
 	}
@@ -82,14 +82,14 @@ func TestAddAPITokenModal_MCPPreset(t *testing.T) {
 func TestAPITokenRow_HintAndRotate(t *testing.T) {
 	tok := &models.APIToken{ID: "tid", Name: "agent", TokenHint: "gf_\u2026abcd", Scopes: []string{"read"},
 		CreatedAt: time.Now(), ExpiresAt: sql.NullTime{Time: time.Now().Add(time.Hour), Valid: true}}
-	got := renderMCP(t, APITokenRow(tok))
+	got := renderMCP(t, APITokenRow(tok, nil))
 	for _, want := range []string{"gf_\u2026abcd", `hx-post="/settings/tokens/tid/rotate"`, `hx-delete="/settings/tokens/tid"`, "Revoke"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("row missing %q", want)
 		}
 	}
 	tok.TokenHint = ""
-	if strings.Contains(renderMCP(t, APITokenRow(tok)), "data-token-hint") {
+	if strings.Contains(renderMCP(t, APITokenRow(tok, nil)), "data-token-hint") {
 		t.Error("legacy token without hint shows an empty hint")
 	}
 }
@@ -108,7 +108,7 @@ func TestTokenCreatedModal(t *testing.T) {
 // (no fixed #modal id), and the shown-once token is not dismissed by a
 // stray backdrop click.
 func TestTokenDialogs_KitContract(t *testing.T) {
-	add := renderMCP(t, AddAPITokenModal("csrf", false))
+	add := renderMCP(t, AddAPITokenModal("csrf", false, nil))
 	for _, want := range []string{` id="dialog-`, `data-ui-dialog="ephemeral"`, `hx-target="closest dialog"`, `hx-swap="outerHTML"`, `data-ui-dialog-close`} {
 		if !strings.Contains(add, want) {
 			t.Errorf("AddAPITokenModal missing %q", want)
@@ -122,7 +122,7 @@ func TestTokenDialogs_KitContract(t *testing.T) {
 		t.Errorf("TokenCreatedModal = %s", created)
 	}
 	tok := &models.APIToken{ID: "tid", Name: "agent", CreatedAt: time.Now()}
-	row := renderMCP(t, APITokenRow(tok))
+	row := renderMCP(t, APITokenRow(tok, nil))
 	for _, want := range []string{`aria-haspopup="dialog"`, `data-ui-confirm-label="Rotate"`, `data-ui-confirm-tone="danger"`, `data-ui-confirm-label="Revoke"`} {
 		if !strings.Contains(row, want) {
 			t.Errorf("token row missing %q", want)

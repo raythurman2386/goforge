@@ -42,6 +42,13 @@ non-secret hint (`gf_…a1b2`) so you can tell tokens apart.
   `api_token.rotate`, `api_token.revoke`) with the name, scopes, and expiry,
   never the token or its hint.
 
+To limit an agent to some of your projects and services, check them under
+**Restrict to (optional)** in the same form. The agent then only sees and
+changes those (a project includes its deployments and containers); anything
+else is `403 resource_out_of_scope`, and the `whoami` tool shows the lists.
+Leave them unchecked for every project and service. See
+[Restricting a token](../reference/api-v1.md#restricting-a-token-to-projects-and-services).
+
 Tokens without scopes (legacy **full** tokens) keep working on the web
 routes and `/api/v1`, but `/mcp` answers `403 insufficient_scope`. Create a
 scoped MCP token instead.

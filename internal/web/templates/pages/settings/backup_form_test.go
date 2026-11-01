@@ -143,7 +143,7 @@ func TestBackupCard_SwitchesAndCheckboxes(t *testing.T) {
 func TestAddAPITokenModal_FormFields(t *testing.T) {
 	for _, mcp := range []bool{false, true} {
 		var b bytes.Buffer
-		if err := AddAPITokenModal("tok", mcp).Render(context.Background(), &b); err != nil {
+		if err := AddAPITokenModal("tok", mcp, nil).Render(context.Background(), &b); err != nil {
 			t.Fatal(err)
 		}
 		got := b.String()

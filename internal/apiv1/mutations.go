@@ -369,6 +369,12 @@ func (h *Handler) linkService(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "service_instance_id is required")
 		return
 	}
+	// A link reaches the service too (its connection values land in the
+	// project), so a restricted token needs both on its lists.
+	if !allowsService(r, req.ServiceInstanceID) {
+		outOfScope(w, "service "+req.ServiceInstanceID)
+		return
+	}
 	if h.deps.Links == nil {
 		unavailable(w, "service linking")
 		return
@@ -456,6 +462,10 @@ func (h *Handler) linkService(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) unlinkService(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.loadProject(w, r)
 	if !ok {
+		return
+	}
+	if serviceID := chi.URLParam(r, "serviceId"); !allowsService(r, serviceID) {
+		outOfScope(w, "service "+serviceID)
 		return
 	}
 	g, ok := readGate(w, r)

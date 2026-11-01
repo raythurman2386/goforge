@@ -41,6 +41,40 @@ A scoped token (`read`, `write`, `protected`) only works on `/api/v1` and
 insufficient_scope`) and tokens with only `protected`. Migration `018_api_token_scopes` adds
 `api_tokens.scopes` and sets every existing token to `{full}`.
 
+### Restricting a token to projects and services
+
+The token form also has **Restrict to (optional)**: check any of your
+projects and services. With nothing checked the token is host-wide, as
+before. With something checked the token only reaches:
+
+- the listed projects, with their environments, variables, deployments,
+  deployment logs, and deployment containers;
+- the listed services and their containers.
+
+Scopes still decide what kind of action is allowed, and a protected service
+still needs `protected`. A restricted token needs explicit scopes (`full` is
+refused) and works only on `/api/v1` and `/mcp`. Only your own projects and
+services can be picked; the lists are checked again on every request (a
+resource that changed owner is `404` or `403`, then the list applies).
+
+A restricted token gets `403 resource_out_of_scope` for anything off its
+lists, before any dry run, audit row, or Docker call:
+
+- `GET`, mutations, and logs of an unlisted project, deployment, service, or
+  container (another user's resources still answer `404`/`403` first);
+- `POST /projects/{id}/services` and `DELETE /projects/{id}/services/{serviceId}`
+  unless both the project and the service are listed;
+- host-wide routes: `GET /dashboard/stats`, `GET /backups`, `GET /git-sources`
+  (and its repos and branches), and `POST /services`;
+- `GET /audit-log` without a listed `resource_id`, or with `all_users=true`.
+
+List routes (`/projects`, `/services`, `/containers`) return only listed
+items, and `whoami` reports `token.restricted`, `token.project_ids`,
+`token.service_ids`, and only listed services under `protected_services`.
+Existing tokens are host-wide (`{}` lists, migration
+`027_api_token_resource_scope`). There is no edit form: revoke and create a
+new token to change the lists. Rotate keeps them.
+
 ## Errors
 
 Errors are JSON with a stable code:
@@ -57,6 +91,7 @@ Errors are JSON with a stable code:
 | 403 | `insufficient_scope` | The token lacks the route's scope |
 | 403 | `forbidden` | Another user's service instance, container, or git source |
 | 403 | `protected_resource` | Stop, config edit, or image update of a protected service without the `protected` scope |
+| 403 | `resource_out_of_scope` | The token is restricted and the project, service, or container is not on its lists, or the route is host-wide (see [Restricting a token](#restricting-a-token-to-projects-and-services)) |
 | 404 | `not_found` | Missing route, or a missing or another user's project, environment, or deployment |
 | 409 | `conflict` | The deployment or service is busy or in the wrong state |
 | 409 | `in_progress` | The same `approval_ref` already started this change on this target and it has not finished; `audit_id` names it |
@@ -84,7 +119,8 @@ Every mutation body accepts:
 Order of checks on every mutation:
 
 1. Bearer token, then the `write` scope.
-2. Ownership of the target (`404` or `403`).
+2. Ownership of the target (`404` or `403`), then a restricted token's
+   lists (`403 resource_out_of_scope`).
 3. Protected refusal (`403 protected_resource`), before any Docker call. This
    applies to dry runs too.
 4. Dry run: answer the plan.
@@ -178,7 +214,7 @@ service as protected.
 | Method | Path | Returns |
 |--------|------|---------|
 | `GET` | `/api/v1/health` | Status, version, database and Docker health |
-| `GET` | `/api/v1/whoami` | User, token scopes, grants, protected list |
+| `GET` | `/api/v1/whoami` | User, token scopes and resource lists (`restricted`, `project_ids`, `service_ids`), grants, protected list |
 | `GET` | `/api/v1/dashboard/stats` | Your project, service, and container totals |
 | `GET` | `/api/v1/projects` | Your projects |
 | `GET` | `/api/v1/projects/{id}` | One project with environments and linked services |

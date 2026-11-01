@@ -31,8 +31,8 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 	}
 
 	query := `
-		INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at, scopes, token_hint)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at, scopes, token_hint, project_ids, service_ids)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -44,6 +44,8 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 		token.CreatedAt,
 		pq.Array(token.Scopes),
 		token.TokenHint,
+		pq.Array(idList(token.ProjectIDs)),
+		pq.Array(idList(token.ServiceIDs)),
 	)
 	return err
 }
@@ -51,7 +53,7 @@ func (r *APITokenRepository) Create(ctx context.Context, token *models.APIToken)
 // GetByID retrieves an API token by ID.
 func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint, project_ids, service_ids
 		FROM api_tokens
 		WHERE id = $1
 	`
@@ -67,6 +69,8 @@ func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.AP
 		&token.CreatedAt,
 		pq.Array(&token.Scopes),
 		&token.TokenHint,
+		pq.Array(&token.ProjectIDs),
+		pq.Array(&token.ServiceIDs),
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -80,7 +84,7 @@ func (r *APITokenRepository) GetByID(ctx context.Context, id string) (*models.AP
 // GetByTokenHash retrieves an API token by its hash (for authentication).
 func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint, project_ids, service_ids
 		FROM api_tokens
 		WHERE token_hash = $1
 	`
@@ -96,6 +100,8 @@ func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*
 		&token.CreatedAt,
 		pq.Array(&token.Scopes),
 		&token.TokenHint,
+		pq.Array(&token.ProjectIDs),
+		pq.Array(&token.ServiceIDs),
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -109,7 +115,7 @@ func (r *APITokenRepository) GetByTokenHash(ctx context.Context, hash string) (*
 // ListByUserID retrieves all API tokens for a user.
 func (r *APITokenRepository) ListByUserID(ctx context.Context, userID string) ([]*models.APIToken, error) {
 	query := `
-		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint
+		SELECT id, user_id, name, token_hash, last_used_at, expires_at, created_at, scopes, token_hint, project_ids, service_ids
 		FROM api_tokens
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -134,6 +140,8 @@ func (r *APITokenRepository) ListByUserID(ctx context.Context, userID string) ([
 			&token.CreatedAt,
 			pq.Array(&token.Scopes),
 			&token.TokenHint,
+			pq.Array(&token.ProjectIDs),
+			pq.Array(&token.ServiceIDs),
 		)
 		if err != nil {
 			return nil, err
@@ -175,4 +183,13 @@ func (r *APITokenRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM api_tokens WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
+}
+
+// idList returns ids, or an empty non-nil slice: pq.Array(nil) is NULL,
+// which the NOT NULL project_ids and service_ids columns refuse.
+func idList(ids []string) []string {
+	if ids == nil {
+		return []string{}
+	}
+	return ids
 }
