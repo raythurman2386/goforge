@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sort"
 
 	"github.com/go-chi/chi/v5"
 
@@ -278,8 +279,17 @@ func (h *ServiceHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Record submitted field names only, never their values.
+	fields := make([]string, 0, len(updates))
+	for key := range updates {
+		if key == "csrf_token" || key == "gorilla.csrf.Token" {
+			continue
+		}
+		fields = append(fields, key)
+	}
+	sort.Strings(fields)
 	auditID := h.audit.start(r, models.AuditActionServiceUpdateConfig, models.ResourceTypeServiceInstance, id,
-		map[string]interface{}{"name": instance.Name})
+		map[string]interface{}{"name": instance.Name, "fields": fields})
 	if _, err := h.instanceService.UpdateInstanceConfig(models.WithAuditID(r.Context(), auditID), id, updates); err != nil {
 		h.audit.fail(r, auditID, models.AuditActionServiceUpdateConfig, models.ResourceTypeServiceInstance, id, err)
 		if errors.Is(err, services.ErrInstanceBusy) {

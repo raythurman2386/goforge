@@ -100,6 +100,18 @@ func TestServiceHandler_UpdateConfig_WritesAuditRowWithoutValues(t *testing.T) {
 	if s := fmt.Sprint(rows[0].details); strings.Contains(s, "new-secret-token") || strings.Contains(s, "keep-me") {
 		t.Fatalf("audit details leaked a config value: %s", s)
 	}
+	fields, ok := rows[0].details["fields"].([]string)
+	if !ok {
+		t.Fatalf("details.fields missing or wrong type: %#v", rows[0].details["fields"])
+	}
+	if want := []string{"admin_token", "domain", "name", "signups_allowed"}; fmt.Sprint(fields) != fmt.Sprint(want) {
+		t.Fatalf("details.fields = %v, want %v", fields, want)
+	}
+	for _, f := range fields {
+		if f == "vw.example.com" || f == "false" || f == "new-secret-token" {
+			t.Fatalf("details.fields contains a value: %v", fields)
+		}
+	}
 }
 
 // A refused config edit (busy instance) gets a linked .failed row.
