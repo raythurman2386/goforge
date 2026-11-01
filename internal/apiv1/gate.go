@@ -2,7 +2,10 @@ package apiv1
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
@@ -70,6 +74,9 @@ type mutationResponse struct {
 	// Operation is set when the change goes on in the background after the
 	// answer (a queued deployment, a service deploy or recreate).
 	Operation *operation `json:"operation,omitempty"`
+	// Replayed is true when this approval_ref already ran this change on
+	// this target: nothing ran again and the first run's result is returned.
+	Replayed bool `json:"replayed,omitempty"`
 }
 
 // pollTool is the MCP tool that waits on an operation.
@@ -178,13 +185,120 @@ func (h *Handler) begin(w http.ResponseWriter, r *http.Request, g *gate, m *muta
 	if m.Changes != nil {
 		details["changes"] = m.Changes
 	}
+	key := idempotencyKey(m)
+	details["idempotency_key"] = key
+	if h.replay(w, r, user.ID, ref, m, key) {
+		return "", false
+	}
 	entry := h.auditEntry(h.originOf(r), user.ID, "api_v1."+m.Action, m.ResourceType, m.ResourceID, details)
 	if err := h.deps.Audit.Create(r.Context(), entry); err != nil {
+		// A concurrent request with the same approval_ref won the insert
+		// (unique index from migration 023); answer as that run.
+		if errors.Is(err, repositories.ErrAlreadyExists) && h.replay(w, r, user.ID, ref, m, key) {
+			return "", false
+		}
 		h.logger.Error("api v1: audit insert failed; mutation refused", "action", m.Action, "error", err)
 		internalError(w, "could not write the audit record; nothing was changed")
 		return "", false
 	}
 	return entry.ID, true
+}
+
+// idempotencyTargetFields are the target fields that tell two changes on
+// the same resource apart: the variable key, the linked service, or the
+// template and name of a new service. Fields that a change itself alters
+// (a deployment status) are left out so a retry still matches.
+var idempotencyTargetFields = []string{"key", "service_instance_id", "template", "name"}
+
+// idempotencyKey names the target of an approved change. One approval_ref
+// runs a given action on a given target at most once.
+func idempotencyKey(m *mutation) string {
+	parts := []string{m.ResourceType, m.ResourceID}
+	for _, f := range idempotencyTargetFields {
+		if v, ok := m.Target[f].(string); ok && v != "" {
+			parts = append(parts, f+"="+v)
+		}
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(sum[:16])
+}
+
+// replay answers a retry of an approved change and returns true when this
+// approval_ref already started the same action on the same target:
+//
+//   - finished: 200 with the first run's result, operation, and audit_id,
+//     and "replayed": true
+//   - failed: the first run's error status and message with its audit_id
+//   - still running: 409 in_progress with its audit_id
+//
+// Nothing runs again in any of these cases; a new attempt needs a new
+// approval_ref. A failed lookup answers 500 and nothing runs.
+func (h *Handler) replay(w http.ResponseWriter, r *http.Request, userID, ref string, m *mutation, key string) bool {
+	action := "api_v1." + m.Action
+	prior, err := h.deps.Audit.FindApproval(r.Context(), userID, action, ref, key)
+	if err == nil && prior != nil {
+		var done *models.AuditLog
+		done, err = h.deps.Audit.FindOutcome(r.Context(), userID, action, prior.ID)
+		if err == nil {
+			h.answerReplay(w, ref, m, prior.ID, done)
+			return true
+		}
+	}
+	if err != nil {
+		h.logger.Error("api v1: approval_ref lookup failed; mutation refused", "action", m.Action, "error", err)
+		internalError(w, "could not check whether this approval_ref already ran; nothing was changed")
+		return true
+	}
+	return false
+}
+
+func (h *Handler) answerReplay(w http.ResponseWriter, ref string, m *mutation, auditID string, done *models.AuditLog) {
+	h.logger.Info("api v1: approval_ref already used for this change; returning the first run",
+		"action", m.Action, "resource_id", m.ResourceID, "audit_id", auditID)
+	if done == nil {
+		writeJSON(w, http.StatusConflict, errorBody{Error: errorDetail{
+			Code: codeInProgress,
+			Message: fmt.Sprintf("approval_ref %q already started %s on this target and it has not finished; "+
+				"its outcome is written to the audit log with this audit_id. Nothing was run again", ref, m.Action),
+			AuditID:  auditID,
+			Replayed: true,
+		}})
+		return
+	}
+	var d struct {
+		Result    json.RawMessage `json:"result"`
+		Operation *operation      `json:"operation"`
+		Error     string          `json:"error"`
+		Status    int             `json:"status"`
+	}
+	if err := json.Unmarshal(done.Details, &d); err != nil {
+		h.logger.Warn("api v1: unreadable outcome audit row", "audit_id", auditID, "error", err)
+	}
+	if strings.HasSuffix(done.Action, ".failed") {
+		status := d.Status
+		if status < 400 || status > 599 {
+			status = http.StatusInternalServerError
+		}
+		msg := d.Error
+		if msg == "" {
+			msg = m.Action + " failed"
+		}
+		writeJSON(w, status, errorBody{Error: errorDetail{
+			Code:     codeForStatus(status),
+			Message:  msg + " (this approval_ref already ran this change and it failed; nothing was run again, a new attempt needs a new approval_ref)",
+			AuditID:  auditID,
+			Replayed: true,
+		}})
+		return
+	}
+	resp := mutationResponse{
+		Action: m.Action, DryRun: false, Target: m.Target, Plan: m.Plan, Changes: m.Changes,
+		ApprovalRef: ref, AuditID: auditID, Operation: d.Operation, Replayed: true,
+	}
+	if len(d.Result) > 0 {
+		resp.Result = d.Result
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // run performs an approved change and answers the request.

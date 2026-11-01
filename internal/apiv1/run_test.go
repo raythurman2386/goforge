@@ -113,7 +113,18 @@ func (s *slowRollback) state() (stopped, started bool, ctxErr error) {
 // a short wait so tests can push a change past it.
 func newRunHarness(t *testing.T, rb Rollbacker, syncWait time.Duration) (*harness, *fakeDeployments) {
 	t.Helper()
+	return newRunHarnessWith(t, rb, syncWait, nil)
+}
+
+// newRunHarnessWith is newRunHarness with audit wrapped by wrap (nil keeps
+// the plain fake).
+func newRunHarnessWith(t *testing.T, rb Rollbacker, syncWait time.Duration, wrap func(*fakeAudit) AuditStore) (*harness, *fakeDeployments) {
+	t.Helper()
 	h := newHarness(t)
+	var audit AuditStore = h.audit
+	if wrap != nil {
+		audit = wrap(h.audit)
+	}
 	tokens := &fakeTokens{byHash: map[string]*models.APIToken{}}
 	tokens.byHash[auth.HashAPIToken("tok-write")] = &models.APIToken{ID: "id-tok-write", UserID: ownerID, Name: "tok-write", Scopes: []string{models.ScopeWrite}}
 	deps := &fakeDeployments{}
@@ -124,7 +135,7 @@ func newRunHarness(t *testing.T, rb Rollbacker, syncWait time.Duration) (*harnes
 		Instances:   h.instances,
 		Containers:  fakeContainers{},
 		Docker:      h.docker,
-		Audit:       h.audit,
+		Audit:       audit,
 		Deployments: deps,
 		Queue:       fakeQueue{},
 		Rollback:    rb,

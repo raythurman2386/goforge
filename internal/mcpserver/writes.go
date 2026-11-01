@@ -17,7 +17,7 @@ var writeToolNames = []string{
 // Gate is part of every mutation input.
 type Gate struct {
 	DryRun      *bool  `json:"dry_run,omitempty" jsonschema:"default true: only return the plan. Set false to run the change."`
-	ApprovalRef string `json:"approval_ref,omitempty" jsonschema:"required when dry_run is false: the id of the human approval (for example a Tater message id). Written to the audit log."`
+	ApprovalRef string `json:"approval_ref,omitempty" jsonschema:"required when dry_run is false: the id of the human approval (for example a Tater message id). Written to the audit log. A retry with the same approval_ref on the same target does not run the change again; it returns the first result and audit_id."`
 }
 
 func (g Gate) body(extra map[string]any) map[string]any {

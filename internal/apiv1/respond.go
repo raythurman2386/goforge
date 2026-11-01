@@ -23,6 +23,9 @@ const (
 	// codeTimeout: a real run did not finish while the request waited. The
 	// change keeps running; follow audit_id for its outcome.
 	codeTimeout = "timeout"
+	// codeInProgress: the same approval_ref already started this change on
+	// this target and it has not finished. Nothing ran again.
+	codeInProgress = "in_progress"
 )
 
 const maxBodyBytes = 1 << 20
@@ -37,6 +40,9 @@ type errorDetail struct {
 	// AuditID is set when the error belongs to an approved change that was
 	// already recorded, for example a timeout while it keeps running.
 	AuditID string `json:"audit_id,omitempty"`
+	// Replayed is true when the error is the stored outcome of an earlier
+	// run with the same approval_ref; nothing ran again.
+	Replayed bool `json:"replayed,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

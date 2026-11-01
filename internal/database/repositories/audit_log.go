@@ -3,9 +3,12 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -49,7 +52,57 @@ func (r *AuditLogRepository) Create(ctx context.Context, l *models.AuditLog) err
 		l.UserAgent,
 		l.CreatedAt,
 	)
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && string(pqErr.Code) == pgUniqueViolation {
+		return fmt.Errorf("%w: %w", ErrAlreadyExists, err)
+	}
 	return err
+}
+
+// pgUniqueViolation is the Postgres error code for a unique index clash.
+const pgUniqueViolation = "23505"
+
+const auditColumns = `id, user_id, action, resource_type, resource_id,
+			details, ip_address, user_agent, created_at`
+
+func (r *AuditLogRepository) findOne(ctx context.Context, query string, args ...any) (*models.AuditLog, error) {
+	l := &models.AuditLog{}
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&l.ID, &l.UserID, &l.Action, &l.ResourceType, &l.ResourceID,
+		&l.Details, &l.IPAddress, &l.UserAgent, &l.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil //nolint:nilnil // nil, nil means no row.
+	}
+	if err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
+// FindApproval returns the first row of userID with this action whose
+// details hold approval_ref and idempotency_key, or nil when there is none.
+// API v1 uses it so one approval_ref runs a change on a target at most once.
+func (r *AuditLogRepository) FindApproval(ctx context.Context, userID, action, approvalRef, idempotencyKey string) (*models.AuditLog, error) {
+	return r.findOne(ctx, `
+		SELECT `+auditColumns+`
+		FROM audit_logs
+		WHERE user_id = $1 AND action = $2
+			AND details->>'approval_ref' = $3
+			AND details->>'idempotency_key' = $4
+		ORDER BY created_at
+		LIMIT 1`, userID, action, approvalRef, idempotencyKey)
+}
+
+// FindOutcome returns the <action>.completed or <action>.failed row whose
+// details.audit_id is auditID, or nil when the change has not finished.
+func (r *AuditLogRepository) FindOutcome(ctx context.Context, userID, action, auditID string) (*models.AuditLog, error) {
+	return r.findOne(ctx, `
+		SELECT `+auditColumns+`
+		FROM audit_logs
+		WHERE user_id = $1 AND action IN ($2, $3)
+			AND details->>'audit_id' = $4
+		ORDER BY created_at
+		LIMIT 1`, userID, action+".completed", action+".failed", auditID)
 }
 
 // List retrieves audit log entries with pagination.

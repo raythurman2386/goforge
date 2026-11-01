@@ -120,6 +120,12 @@ type Stats interface {
 type AuditStore interface {
 	Create(ctx context.Context, l *models.AuditLog) error
 	ListFiltered(ctx context.Context, f repositories.AuditFilter) ([]*models.AuditLog, error)
+	// FindApproval returns the first approved-change row of userID with
+	// this action, approval_ref, and idempotency_key, or nil when none.
+	FindApproval(ctx context.Context, userID, action, approvalRef, idempotencyKey string) (*models.AuditLog, error)
+	// FindOutcome returns the <action>.completed or <action>.failed row
+	// written for auditID, or nil while the change is still running.
+	FindOutcome(ctx context.Context, userID, action, auditID string) (*models.AuditLog, error)
 }
 
 // GitSources reads the user's git sources. Credentials are never returned.

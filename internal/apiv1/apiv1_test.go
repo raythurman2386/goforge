@@ -192,6 +192,10 @@ func (f *fakeAudit) Create(_ context.Context, l *models.AuditLog) error {
 	if f.fail {
 		return errors.New("db down")
 	}
+	// Mirror the unique index from migration 023.
+	if d := detailsOf(l); d.IdempotencyKey != "" && f.findApprovalLocked(l.UserID.String, l.Action, d.ApprovalRef, d.IdempotencyKey) != nil {
+		return repositories.ErrAlreadyExists
+	}
 	f.rows = append(f.rows, l)
 	return nil
 }
@@ -206,6 +210,45 @@ func (f *fakeAudit) snapshot() []*models.AuditLog {
 
 func (f *fakeAudit) ListFiltered(context.Context, repositories.AuditFilter) ([]*models.AuditLog, error) {
 	return f.rows, nil
+}
+
+type auditDetails struct {
+	ApprovalRef    string `json:"approval_ref"`
+	IdempotencyKey string `json:"idempotency_key"`
+	AuditID        string `json:"audit_id"`
+}
+
+func detailsOf(l *models.AuditLog) auditDetails {
+	var d auditDetails
+	_ = json.Unmarshal(l.Details, &d)
+	return d
+}
+
+func (f *fakeAudit) FindApproval(_ context.Context, userID, action, ref, key string) (*models.AuditLog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.findApprovalLocked(userID, action, ref, key), nil
+}
+
+func (f *fakeAudit) findApprovalLocked(userID, action, ref, key string) *models.AuditLog {
+	for _, l := range f.rows {
+		d := detailsOf(l)
+		if l.UserID.String == userID && l.Action == action && d.ApprovalRef == ref && d.IdempotencyKey == key {
+			return l
+		}
+	}
+	return nil
+}
+
+func (f *fakeAudit) FindOutcome(_ context.Context, userID, action, auditID string) (*models.AuditLog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, l := range f.rows {
+		if l.UserID.String == userID && (l.Action == action+".completed" || l.Action == action+".failed") && detailsOf(l).AuditID == auditID {
+			return l, nil
+		}
+	}
+	return nil, nil
 }
 
 // ---- harness ----
