@@ -18,7 +18,8 @@ func isPending(instance *models.ServiceInstance) bool {
 
 // Detail renders a service instance. summary is the Docker inspect summary
 // of container, or nil when there is no container or inspect failed.
-templ Detail(instance *models.ServiceInstance, container *models.Container, summary *docker.InspectSummary, tmpl *services.ServiceTemplate, csrfToken string) {
+// restorePoints adds the Restore points card (admins, backed-up templates).
+templ Detail(instance *models.ServiceInstance, container *models.Container, summary *docker.InspectSummary, tmpl *services.ServiceTemplate, restorePoints bool, csrfToken string) {
 	@layouts.AppLayout(instance.Name, csrfToken) {
 		// Outside the polled region: the poll selects #service-detail-content
 		// only, so the trail is rendered once.
@@ -147,6 +148,10 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 			</div>
 		}
 		</div>
+		// Outside the polled region, so pending polls do not reload it.
+		if restorePoints {
+			@restorePointsCard(instance.ID)
+		}
 		@secretControlsScript()
 	}
 }

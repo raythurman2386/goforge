@@ -1,0 +1,115 @@
+package pages_services
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/raythurman2386/goforge/internal/backup"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// restorePointsCard loads this instance's restore points after the page,
+// so a slow bucket never delays it. Admins only.
+templ restorePointsCard(instanceID string) {
+	@ui.Card(ui.CardProps{Class: "mt-8"}) {
+		<div
+			id="service-restore-points"
+			data-testid="service-restore-points"
+			hx-get={ "/services/" + instanceID + "/restore-points" }
+			hx-trigger="load"
+			hx-swap="innerHTML"
+		>
+			<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Restore points</h3>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading restore points…</p>
+		</div>
+	}
+}
+
+// RestorePoints lists the backup runs that hold this instance's data, with
+// the CLI command that restores it. There is no restore button: restoring
+// is CLI-only.
+templ RestorePoints(v *backup.InstanceRestorePointsView) {
+	<h3 class="text-lg font-bold text-gray-900 tracking-tight dark:text-gray-100">Restore points</h3>
+	if v.Error != "" {
+		<p class="mt-1 text-sm text-red-700 break-words dark:text-red-300" data-testid="service-restore-points-error">{ v.Error }</p>
+	} else if len(v.Points) == 0 {
+		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400" data-testid="service-restore-points-empty">
+			No backup run holds this service's data yet.
+			if v.Skipped > 0 {
+				{ fmt.Sprintf(" %d recent run(s) skipped it (for example, it was stopped).", v.Skipped) }
+			}
+		</p>
+	} else {
+		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Backup runs that hold this service's data, newest first.</p>
+		@ui.Table(ui.TableProps{Caption: "Restore points for this service", Compact: true, WrapperClass: "mt-2", Attrs: templ.Attributes{"data-testid": "service-restore-point-table"}}) {
+			<thead>
+				@ui.TR(templ.Attributes{"class": "text-gray-500 dark:text-gray-400"}) {
+					@ui.TH(ui.CellProps{Compact: true}) {
+						Run key 
+					}
+					@ui.TH(ui.CellProps{Compact: true}) {
+						Taken 
+					}
+					@ui.TH(ui.CellProps{Compact: true}) {
+						Size 
+					}
+				}
+			</thead>
+			<tbody>
+				for _, p := range v.Points {
+					@ui.TR(templ.Attributes{"class": "border-t border-gray-100 text-gray-700 dark:border-gray-800 dark:text-gray-300", "data-testid": "service-restore-point"}) {
+						@ui.TD(ui.CellProps{Compact: true, Class: "font-mono"}) {
+							{ p.RunKey }
+						}
+						@ui.TD(ui.CellProps{Compact: true}) {
+							{ restorePointTime(v, p.StartedAt) }
+						}
+						@ui.TD(ui.CellProps{Compact: true}) {
+							{ restorePointBytes(p.Bytes) }
+						}
+					}
+				}
+			</tbody>
+		}
+		if v.Restorable() {
+			<p class="mt-3 text-xs text-gray-500 dark:text-gray-400" data-testid="service-restore-howto">
+				Restoring replaces this service's data and is done from the command line on the server. Preview with the first command, then run the second. The current data is kept in <code class="font-mono">/data/.goforge-pre-restore-&lt;time&gt;</code>.
+			</p>
+			<pre class="mt-1 overflow-x-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800" data-testid="service-restore-command"><code>{ restoreServiceCommand(v) }</code></pre>
+		} else {
+			<p class="mt-3 text-xs text-gray-500 dark:text-gray-400" data-testid="service-restore-howto">
+				This service's databases are restored by hand with <code class="font-mono">pg_restore</code>; see the Postgres runbook in docs/deployment/backup.md.
+			</p>
+		}
+	}
+}
+
+const restorePointLayout = "Jan 2, 2006 15:04 MST"
+
+func restorePointTime(v *backup.InstanceRestorePointsView, t time.Time) string {
+	return t.In(v.Location()).Format(restorePointLayout)
+}
+
+func restorePointBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for m := n / unit; m >= unit; m /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
+}
+
+// restoreServiceCommand is the dry run, then the real restore, for the
+// newest point.
+func restoreServiceCommand(v *backup.InstanceRestorePointsView) string {
+	key := "<run key>"
+	if len(v.Points) > 0 {
+		key = v.Points[0].RunKey
+	}
+	cmd := backup.RestoreServiceCommand(key, v.InstanceID)
+	return cmd + "\n" + cmd + " --yes"
+}

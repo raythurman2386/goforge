@@ -360,39 +360,50 @@ func (r *Restorer) clients() (pgRestore, psql string, err error) {
 // download writes the dump to a mode 600 temp file and checks its size and
 // SHA-256 against the manifest.
 func (r *Restorer) download(ctx context.Context, plan *RestorePlan) (string, error) {
-	rc, err := r.Store.Get(ctx, plan.ObjectKey)
-	if errors.Is(err, ErrObjectNotFound) {
-		return "", fmt.Errorf("%w: %s is missing from the bucket", ErrRestoreIntegrity, AppDumpKey)
-	}
+	path, n, err := fetchVerified(ctx, r.Store, plan.ObjectKey, plan.Dump, r.TempDir, r.Redactor)
 	if err != nil {
-		return "", fmt.Errorf("download %s: %s", AppDumpKey, r.Redactor.Redact(err.Error()))
-	}
-	defer rc.Close()
-	f, err := os.CreateTemp(r.TempDir, "goforge-restore-*.dump")
-	if err != nil {
-		return "", fmt.Errorf("failed to create a temp file: %w", err)
-	}
-	path := f.Name()
-	h := sha256.New()
-	n, cerr := io.Copy(io.MultiWriter(f, h), rc)
-	if err := f.Close(); cerr == nil {
-		cerr = err
-	}
-	if cerr != nil {
-		os.Remove(path)
-		return "", fmt.Errorf("download %s: %s", AppDumpKey, r.Redactor.Redact(cerr.Error()))
-	}
-	sum := hex.EncodeToString(h.Sum(nil))
-	switch {
-	case n != plan.Dump.Bytes:
-		os.Remove(path)
-		return "", fmt.Errorf("%w: %s is %d bytes, manifest says %d", ErrRestoreIntegrity, AppDumpKey, n, plan.Dump.Bytes)
-	case sum != plan.Dump.SHA256:
-		os.Remove(path)
-		return "", fmt.Errorf("%w: %s SHA-256 is %s, manifest says %s", ErrRestoreIntegrity, AppDumpKey, sum, plan.Dump.SHA256)
+		return "", err
 	}
 	r.progress("downloaded %s: %d bytes, SHA-256 matches the manifest", AppDumpKey, n)
 	return path, nil
+}
+
+// fetchVerified downloads objectKey to a mode 600 temp file in dir and
+// checks its size and SHA-256 against the manifest entry a. On any error the
+// temp file is removed. Integrity failures wrap ErrRestoreIntegrity.
+func fetchVerified(ctx context.Context, store Store, objectKey string, a ManifestArtifact, dir string, red *Redactor) (path string, n int64, err error) {
+	rc, err := store.Get(ctx, objectKey)
+	if errors.Is(err, ErrObjectNotFound) {
+		return "", 0, fmt.Errorf("%w: %s is missing from the bucket", ErrRestoreIntegrity, a.Key)
+	}
+	if err != nil {
+		return "", 0, fmt.Errorf("download %s: %s", a.Key, red.Redact(err.Error()))
+	}
+	defer rc.Close()
+	f, err := os.CreateTemp(dir, "goforge-restore-*")
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to create a temp file: %w", err)
+	}
+	path = f.Name()
+	h := sha256.New()
+	n, cerr := io.Copy(io.MultiWriter(f, h), rc)
+	if closeErr := f.Close(); cerr == nil {
+		cerr = closeErr
+	}
+	if cerr != nil {
+		os.Remove(path)
+		return "", 0, fmt.Errorf("download %s: %s", a.Key, red.Redact(cerr.Error()))
+	}
+	sum := hex.EncodeToString(h.Sum(nil))
+	switch {
+	case n != a.Bytes:
+		os.Remove(path)
+		return "", 0, fmt.Errorf("%w: %s is %d bytes, manifest says %d", ErrRestoreIntegrity, a.Key, n, a.Bytes)
+	case sum != a.SHA256:
+		os.Remove(path)
+		return "", 0, fmt.Errorf("%w: %s SHA-256 is %s, manifest says %s", ErrRestoreIntegrity, a.Key, sum, a.SHA256)
+	}
+	return path, n, nil
 }
 
 // load runs pg_restore --file=- | filterRestoreSQL | psql --single-transaction

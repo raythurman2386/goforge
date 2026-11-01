@@ -219,6 +219,10 @@ func (t *PostgresTarget) Plan(ctx context.Context) ([]Artifact, error) {
 // stopped and nothing in the volume is written except the temp file in /tmp.
 type GiteaTarget struct{ instanceTarget }
 
+// giteaIniDBPath prints [database] PATH from the app.ini in "$ini". Backup
+// and restore-service find the SQLite file the same way.
+const giteaIniDBPath = `awk -F= '/^[[:space:]]*\[/{s=$0; gsub(/[[:space:]]/,"",s)} s=="[database]" && $1 ~ /^[[:space:]]*PATH[[:space:]]*$/ {v=$2; gsub(/^[[:space:]]+|[[:space:]]+$/,"",v); print v; exit}' "$ini"`
+
 // giteaSnapshot runs as the git user so it cannot change file ownership in
 // the volume.
 const giteaSnapshot = `set -eu
@@ -226,7 +230,7 @@ db="${GITEA__database__PATH:-}"
 if [ -z "$db" ]; then
   ini="${GITEA_APP_INI:-/data/gitea/conf/app.ini}"
   if [ -r "$ini" ]; then
-    db=$(awk -F= '/^[[:space:]]*\[/{s=$0; gsub(/[[:space:]]/,"",s)} s=="[database]" && $1 ~ /^[[:space:]]*PATH[[:space:]]*$/ {v=$2; gsub(/^[[:space:]]+|[[:space:]]+$/,"",v); print v; exit}' "$ini")
+    db=$(` + giteaIniDBPath + `)
   fi
 fi
 db="${db:-/data/gitea/gitea.db}"
@@ -237,11 +241,12 @@ sqlite3 -bail -cmd ".timeout 30000" "$db" ".backup '$t'"
 cat "$t"`
 
 // giteaTar runs as root (the ssh host keys under /data are root-only) and
-// only reads.
+// only reads. The pre-restore and failed-restore copies that
+// restore-service keeps in the volume are left out.
 const giteaTar = `exec tar -C /data -czf - \
   --exclude=./gitea/gitea.db --exclude=./gitea/gitea.db-journal \
   --exclude=./gitea/gitea.db-wal --exclude=./gitea/gitea.db-shm \
-  --exclude=./gitea/indexers --exclude=./gitea/queues .`
+  --exclude=./gitea/indexers --exclude=./gitea/queues ` + restoreAsideExcludes + ` .`
 
 // Plan implements Target.
 func (t *GiteaTarget) Plan(context.Context) ([]Artifact, error) {
@@ -281,7 +286,7 @@ cat -- "$p"`
 const vaultwardenTar = `rc=0
 tar -C /data --warning=no-file-changed -czf - \
   --exclude=./db.sqlite3 --exclude=./db.sqlite3-wal --exclude=./db.sqlite3-shm \
-  --exclude='./db_*.sqlite3' --exclude=./icon_cache --exclude=./tmp . || rc=$?
+  --exclude='./db_*.sqlite3' --exclude=./icon_cache --exclude=./tmp ` + restoreAsideExcludes + ` . || rc=$?
 [ "$rc" -le 1 ] || exit "$rc"`
 
 // Plan implements Target.

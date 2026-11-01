@@ -52,6 +52,14 @@ type mockDockerAPI struct {
 	execCreateFunc       func(ctx context.Context, containerID string, options client.ExecCreateOptions) (client.ExecCreateResult, error)
 	execAttachFunc       func(ctx context.Context, execID string, options client.ExecAttachOptions) (client.ExecAttachResult, error)
 	execInspectFunc      func(ctx context.Context, execID string) (client.ExecInspectResult, error)
+	copyToContainerFunc  func(ctx context.Context, containerID string, options client.CopyToContainerOptions) (client.CopyToContainerResult, error)
+}
+
+func (m *mockDockerAPI) CopyToContainer(ctx context.Context, containerID string, options client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+	if m.copyToContainerFunc != nil {
+		return m.copyToContainerFunc(ctx, containerID, options)
+	}
+	return client.CopyToContainerResult{}, nil
 }
 
 func (m *mockDockerAPI) ImageInspect(ctx context.Context, imageID string, _ ...client.ImageInspectOption) (client.ImageInspectResult, error) {

@@ -19,7 +19,7 @@ func renderDetail(t *testing.T, status models.ServiceInstanceStatus, c *models.C
 	t.Helper()
 	inst := &models.ServiceInstance{ID: "inst-1", Name: "verify-pg", Status: status}
 	var buf bytes.Buffer
-	if err := Detail(inst, c, s, &services.ServiceTemplate{DisplayName: "PostgreSQL"}, "csrf").Render(context.Background(), &buf); err != nil {
+	if err := Detail(inst, c, s, &services.ServiceTemplate{DisplayName: "PostgreSQL"}, false, "csrf").Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	return buf.String()
@@ -135,7 +135,7 @@ func TestDetailShowsLastError(t *testing.T) {
 	inst := &models.ServiceInstance{ID: "inst-1", Name: "verify-pg", Status: models.ServiceStatusFailed,
 		LastError: sql.NullString{String: "image pull failed for example/img:1: manifest unknown", Valid: true}}
 	var buf bytes.Buffer
-	if err := Detail(inst, nil, nil, &services.ServiceTemplate{DisplayName: "PostgreSQL"}, "csrf").Render(context.Background(), &buf); err != nil {
+	if err := Detail(inst, nil, nil, &services.ServiceTemplate{DisplayName: "PostgreSQL"}, false, "csrf").Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), `id="service-last-error"`) || !strings.Contains(buf.String(), "manifest unknown") {
