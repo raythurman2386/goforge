@@ -266,11 +266,11 @@ func TestToolInventoryByScope(t *testing.T) {
 	srv, _ := newServer(t)
 	read := listTools(t, connect(t, srv.URL, rawRead))
 	write := listTools(t, connect(t, srv.URL, rawWrite))
-	if len(read) != 23 {
-		t.Errorf("read token lists %d tools, want 23", len(read))
+	if len(read) != 24 {
+		t.Errorf("read token lists %d tools, want 24", len(read))
 	}
-	if len(write) != 37 {
-		t.Errorf("write token lists %d tools, want 37", len(write))
+	if len(write) != 38 {
+		t.Errorf("write token lists %d tools, want 38", len(write))
 	}
 	if read["set_env_var"] || !write["set_env_var"] {
 		t.Errorf("set_env_var: read=%v write=%v, want false/true", read["set_env_var"], write["set_env_var"])

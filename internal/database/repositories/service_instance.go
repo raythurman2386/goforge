@@ -74,8 +74,8 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 
 	query := `
 		INSERT INTO service_instances (id, user_id, template_name, name, version, 
-			config, domain, status, connection_info, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+			config, domain, status, connection_info, created_at, updated_at, last_error)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 
 	_, err = r.db.ExecContext(ctx, query,
 		s.ID,
@@ -89,6 +89,7 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 		connection,
 		s.CreatedAt,
 		s.UpdatedAt,
+		s.LastError,
 	)
 	return err
 }
@@ -97,7 +98,7 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*models.ServiceInstance, error) {
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
-			domain, status, connection_info, created_at, updated_at
+			domain, status, connection_info, created_at, updated_at, last_error
 		FROM service_instances WHERE id = $1`
 
 	s := &models.ServiceInstance{}
@@ -113,6 +114,7 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 		&s.ConnectionInfo,
 		&s.CreatedAt,
 		&s.UpdatedAt,
+		&s.LastError,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -128,7 +130,7 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID string) ([]*models.ServiceInstance, error) {
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
-			domain, status, connection_info, created_at, updated_at
+			domain, status, connection_info, created_at, updated_at, last_error
 		FROM service_instances WHERE user_id = $1
 		ORDER BY created_at DESC
 		LIMIT 1000`
@@ -154,6 +156,7 @@ func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID str
 			&s.ConnectionInfo,
 			&s.CreatedAt,
 			&s.UpdatedAt,
+			&s.LastError,
 		)
 		if err != nil {
 			return nil, err
@@ -179,7 +182,7 @@ func (r *ServiceInstanceRepository) Update(ctx context.Context, s *models.Servic
 	query := `
 		UPDATE service_instances SET 
 			name = $1, version = $2, config = $3, domain = $4, 
-			status = $5, connection_info = $6, updated_at = $7
+			status = $5, connection_info = $6, updated_at = $7, last_error = $9
 		WHERE id = $8`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -191,6 +194,7 @@ func (r *ServiceInstanceRepository) Update(ctx context.Context, s *models.Servic
 		connection,
 		s.UpdatedAt,
 		s.ID,
+		s.LastError,
 	)
 	if err != nil {
 		return err
@@ -220,7 +224,7 @@ func (r *ServiceInstanceRepository) UpdateIfStatus(ctx context.Context, s *model
 	query := `
 		UPDATE service_instances SET
 			name = $1, version = $2, config = $3, domain = $4,
-			status = $5, connection_info = $6, updated_at = $7
+			status = $5, connection_info = $6, updated_at = $7, last_error = $10
 		WHERE id = $8 AND status = $9`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -233,6 +237,7 @@ func (r *ServiceInstanceRepository) UpdateIfStatus(ctx context.Context, s *model
 		updatedAt,
 		s.ID,
 		expected,
+		s.LastError,
 	)
 	if err != nil {
 		return false, err

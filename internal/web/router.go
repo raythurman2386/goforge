@@ -72,7 +72,9 @@ func Router(
 	// JSON API v1: bearer token only, scope-checked, outside the CSRF group.
 	if apiV1 != nil {
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.Timeout(writeTimeout))
+			// JSON on timeout. Approved mutations answer their own JSON
+			// timeout before this fires and keep running (apiv1.run).
+			r.Use(middleware.TimeoutJSON(writeTimeout))
 			r.Mount("/api/v1", apiV1)
 		})
 	}
@@ -82,7 +84,7 @@ func Router(
 	// GOFORGE_MCP_HTTP=false.
 	if mcpHTTP != nil {
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.Timeout(writeTimeout))
+			r.Use(middleware.TimeoutJSON(writeTimeout))
 			r.Handle("/mcp", mcpHTTP)
 		})
 	}

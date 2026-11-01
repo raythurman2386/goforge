@@ -113,6 +113,9 @@ func (f *fakeInstances) GetInstance(_ context.Context, id string) (*models.Servi
 		return &models.ServiceInstance{ID: id, UserID: ownerID, TemplateName: "pg", Name: "db", Config: cfg, Status: models.ServiceStatusRunning}, nil
 	case foreignSvc:
 		return &models.ServiceInstance{ID: id, UserID: otherID, TemplateName: "pg", Name: "x", Config: cfg}, nil
+	case failedSvcID:
+		return &models.ServiceInstance{ID: id, UserID: ownerID, TemplateName: "pg", Name: "broken", Config: cfg,
+			Status: models.ServiceStatusFailed, LastError: sql.NullString{String: failedSvcLastError, Valid: true}}, nil
 	}
 	return nil, repositories.ErrNotFound
 }
@@ -178,20 +181,74 @@ func (f *fakeDocker) RestartContainer(_ context.Context, id string) error {
 }
 
 type fakeAudit struct {
+	mu   sync.Mutex
 	rows []*models.AuditLog
 	fail bool
 }
 
 func (f *fakeAudit) Create(_ context.Context, l *models.AuditLog) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.fail {
 		return errors.New("db down")
+	}
+	// Mirror the unique index from migration 023.
+	if d := detailsOf(l); d.IdempotencyKey != "" && f.findApprovalLocked(l.UserID.String, l.Action, d.ApprovalRef, d.IdempotencyKey) != nil {
+		return repositories.ErrAlreadyExists
 	}
 	f.rows = append(f.rows, l)
 	return nil
 }
 
+// snapshot returns the rows written so far; safe while a detached change
+// is still writing its outcome.
+func (f *fakeAudit) snapshot() []*models.AuditLog {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]*models.AuditLog(nil), f.rows...)
+}
+
 func (f *fakeAudit) ListFiltered(context.Context, repositories.AuditFilter) ([]*models.AuditLog, error) {
 	return f.rows, nil
+}
+
+type auditDetails struct {
+	ApprovalRef    string `json:"approval_ref"`
+	IdempotencyKey string `json:"idempotency_key"`
+	AuditID        string `json:"audit_id"`
+}
+
+func detailsOf(l *models.AuditLog) auditDetails {
+	var d auditDetails
+	_ = json.Unmarshal(l.Details, &d)
+	return d
+}
+
+func (f *fakeAudit) FindApproval(_ context.Context, userID, action, ref, key string) (*models.AuditLog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.findApprovalLocked(userID, action, ref, key), nil
+}
+
+func (f *fakeAudit) findApprovalLocked(userID, action, ref, key string) *models.AuditLog {
+	for _, l := range f.rows {
+		d := detailsOf(l)
+		if l.UserID.String == userID && l.Action == action && d.ApprovalRef == ref && d.IdempotencyKey == key {
+			return l
+		}
+	}
+	return nil
+}
+
+func (f *fakeAudit) FindOutcome(_ context.Context, userID, action, auditID string) (*models.AuditLog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, l := range f.rows {
+		if l.UserID.String == userID && (l.Action == action+".completed" || l.Action == action+".failed") && detailsOf(l).AuditID == auditID {
+			return l, nil
+		}
+	}
+	return nil, nil
 }
 
 // ---- harness ----
@@ -438,8 +495,13 @@ func TestRealRunWritesAuditBeforeExecuting(t *testing.T) {
 	if rec.Code != http.StatusOK || out["audit_id"] == "" {
 		t.Fatalf("got %d %v", rec.Code, out)
 	}
-	if len(h.docker.restarted) != 1 || len(h.audit.rows) != 1 {
+	// The approval row first, then the outcome row written by the change.
+	if len(h.docker.restarted) != 1 || len(h.audit.rows) != 2 {
 		t.Fatalf("restarted=%v audit=%d", h.docker.restarted, len(h.audit.rows))
+	}
+	if done := h.audit.rows[1]; done.Action != "api_v1.restart_container.completed" ||
+		!strings.Contains(string(done.Details), out["audit_id"].(string)) {
+		t.Errorf("outcome row %s %s", done.Action, done.Details)
 	}
 	row := h.audit.rows[0]
 	if row.Action != "api_v1.restart_container" || !row.UserID.Valid || row.UserID.String != ownerID {
@@ -597,8 +659,13 @@ func TestSetEnvVarValueNeverEchoedOrAudited(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "plaintext-pass") {
 		t.Fatal("value echoed")
 	}
-	if len(h.audit.rows) != 1 || strings.Contains(string(h.audit.rows[0].Details), "plaintext-pass") {
-		t.Fatal("value audited")
+	if len(h.audit.rows) != 2 {
+		t.Fatalf("audit rows = %d, want approval and outcome", len(h.audit.rows))
+	}
+	for _, row := range h.audit.rows {
+		if strings.Contains(string(row.Details), "plaintext-pass") {
+			t.Fatalf("value audited in %s", row.Action)
+		}
 	}
 	if len(h.projects.added) != 1 || h.projects.added[0].Value != "plaintext-pass" {
 		t.Fatal("variable not saved")

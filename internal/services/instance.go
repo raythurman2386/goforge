@@ -207,7 +207,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 
 		if err := s.ensureServiceImage(bgCtx, image, pullPreferRemote, logAttrs); err != nil {
 			s.logger.Error("failed to pull service image", append(logAttrs, "error", err)...)
-			s.setInstanceStatus(bgCtx, instanceID, models.ServiceStatusFailed)
+			s.setInstanceStatus(bgCtx, instanceID, models.ServiceStatusFailed, lastErrorText("image pull failed for "+image, err, spec))
 			return
 		}
 
@@ -500,7 +500,7 @@ func hookOutputTail(out string) string {
 func (s *InstanceService) startServiceContainer(ctx context.Context, tmpl *ServiceTemplate, spec *containerSpec, replaced *models.Container, logAttrs []any) {
 	dockerID, err := s.createServiceContainer(ctx, spec, logAttrs)
 	if err != nil {
-		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed)
+		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed, lastErrorText("container did not start", err, spec))
 		return
 	}
 	s.finishServiceContainer(ctx, tmpl, spec, dockerID, replaced, logAttrs)
@@ -549,9 +549,11 @@ func (s *InstanceService) finishServiceContainer(ctx context.Context, tmpl *Serv
 	}
 
 	status := models.ServiceStatusRunning
+	lastErr := ""
 	if len(spec.hooks) > 0 {
 		if hookErr := s.runPostStartHooks(ctx, dockerID, spec, logAttrs); hookErr != nil {
 			status = models.ServiceStatusFailed
+			lastErr = lastErrorText("post_start hook failed; container and volumes left in place", hookErr, spec)
 		}
 	}
 
@@ -568,6 +570,7 @@ func (s *InstanceService) finishServiceContainer(ctx context.Context, tmpl *Serv
 	}
 
 	inst.Status = status
+	inst.LastError = sql.NullString{String: lastErr, Valid: lastErr != ""}
 
 	// Render connection string templates and store in ConnectionInfo
 	if connJSON := s.renderConnectionInfo(tmpl, spec.data, instanceID); connJSON != nil {
@@ -715,6 +718,8 @@ func (s *InstanceService) UpdateInstanceImage(ctx context.Context, id string) (*
 // database lets one swap the status, and the other gets ErrInstanceBusy
 // before it starts a second recreate (#48).
 func (s *InstanceService) claimForRecreate(ctx context.Context, instance *models.ServiceInstance, prevStatus models.ServiceInstanceStatus) error {
+	// A new attempt starts; the previous failure no longer describes it.
+	instance.LastError = sql.NullString{}
 	swapped, err := s.instanceRepo.UpdateIfStatus(ctx, instance, prevStatus)
 	if err != nil {
 		return fmt.Errorf("failed to save instance: %w", err)
@@ -737,7 +742,10 @@ func (s *InstanceService) recreateContainer(ctx context.Context, tmpl *ServiceTe
 	logAttrs := []any{"instance_id", spec.instanceID, "template", tmpl.Name, "image", spec.opts.Image, "domain", domain}
 	if err := s.ensureServiceImage(ctx, spec.opts.Image, policy, logAttrs); err != nil {
 		s.logger.Error("failed to pull service image; existing container left in place", append(logAttrs, "error", err)...)
-		s.setInstanceStatus(ctx, spec.instanceID, prevStatus)
+		// The old container still runs, so the status goes back, but the
+		// failed update is still reported.
+		s.setInstanceStatus(ctx, spec.instanceID, prevStatus,
+			lastErrorText("image pull failed for "+spec.opts.Image+"; existing container left in place", err, spec))
 		return
 	}
 
@@ -791,7 +799,11 @@ func (s *InstanceService) replaceParked(ctx context.Context, tmpl *ServiceTempla
 		if restored {
 			s.logger.Error("new container did not start; previous container restored and running with the previous configuration", append(logAttrs, "docker_id", old.DockerID, "error", err)...)
 		}
-		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed)
+		msg := "new container did not start; the edit was not applied"
+		if restored {
+			msg += " and the previous container is running again"
+		}
+		s.setInstanceStatus(ctx, spec.instanceID, models.ServiceStatusFailed, lastErrorText(msg, err, spec))
 		return true
 	}
 
@@ -893,14 +905,16 @@ func (s *InstanceService) ensureServiceImage(ctx context.Context, image string, 
 	return nil
 }
 
-// setInstanceStatus fetches the instance and updates its status.
-func (s *InstanceService) setInstanceStatus(ctx context.Context, instanceID string, status models.ServiceInstanceStatus) {
+// setInstanceStatus fetches the instance and updates its status and
+// last_error. lastErr is already redacted (see lastErrorText); empty clears it.
+func (s *InstanceService) setInstanceStatus(ctx context.Context, instanceID string, status models.ServiceInstanceStatus, lastErr string) {
 	inst, err := s.instanceRepo.GetByID(ctx, instanceID)
 	if err != nil {
 		s.logger.Error("failed to fetch instance for status update", "error", err, "instance_id", instanceID)
 		return
 	}
 	inst.Status = status
+	inst.LastError = sql.NullString{String: lastErr, Valid: lastErr != ""}
 	if err = s.instanceRepo.Update(ctx, inst); err != nil {
 		s.logger.Error("failed to update instance status", "error", err, "instance_id", instanceID, "status", status)
 	}
@@ -1027,6 +1041,7 @@ func (s *InstanceService) StartInstance(ctx context.Context, id string) error {
 	}
 
 	instance.Status = models.ServiceStatusRunning
+	instance.LastError = sql.NullString{}
 	return s.instanceRepo.Update(ctx, instance)
 }
 
@@ -1047,6 +1062,7 @@ func (s *InstanceService) RestartInstance(ctx context.Context, id string) error 
 	}
 
 	instance.Status = models.ServiceStatusRunning
+	instance.LastError = sql.NullString{}
 	return s.instanceRepo.Update(ctx, instance)
 }
 
@@ -1095,4 +1111,26 @@ func (s *InstanceService) Template(name string) *ServiceTemplate {
 		return nil
 	}
 	return tmpl
+}
+
+// maxLastErrorLen caps last_error so a long pull or hook message cannot
+// bloat the row or the API answer.
+const maxLastErrorLen = 500
+
+// lastErrorText is the last_error stored for a failure: what failed, then
+// the error, with every secret config value and hook env value redacted,
+// capped at maxLastErrorLen.
+func lastErrorText(what string, err error, spec *containerSpec) string {
+	msg := what
+	if err != nil {
+		msg += ": " + err.Error()
+	}
+	if spec != nil {
+		msg = RedactSecrets(msg, hookRedactions(spec))
+	}
+	msg = strings.TrimSpace(msg)
+	if len(msg) > maxLastErrorLen {
+		msg = strings.ToValidUTF8(msg[:maxLastErrorLen-3], "") + "..."
+	}
+	return msg
 }

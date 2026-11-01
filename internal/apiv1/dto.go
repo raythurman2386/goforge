@@ -146,13 +146,15 @@ func toDeployment(d *models.Deployment) deploymentDTO {
 }
 
 type serviceSummaryDTO struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Template  string    `json:"template"`
-	Version   string    `json:"version,omitempty"`
-	Domain    string    `json:"domain,omitempty"`
-	Status    string    `json:"status"`
-	Protected bool      `json:"protected"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Template  string `json:"template"`
+	Version   string `json:"version,omitempty"`
+	Domain    string `json:"domain,omitempty"`
+	Status    string `json:"status"`
+	Protected bool   `json:"protected"`
+	// LastError says why the service last failed (secrets redacted).
+	LastError string    `json:"last_error,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -166,6 +168,7 @@ func (h *Handler) toServiceSummary(inst *models.ServiceInstance) serviceSummaryD
 		Domain:    nullString(inst.Domain),
 		Status:    string(inst.Status),
 		Protected: h.isProtected(inst.ID),
+		LastError: nullString(inst.LastError),
 		CreatedAt: inst.CreatedAt,
 		UpdatedAt: inst.UpdatedAt,
 	}

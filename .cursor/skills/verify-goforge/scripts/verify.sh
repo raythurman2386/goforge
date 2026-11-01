@@ -1151,8 +1151,8 @@ cmd_drive_mcp_http() {
   R[write-list-status]=$s
   R[write-tool-count]=$(jq -r '.result.tools | length' "$out" 2>/dev/null || echo 0)
   R[write-tools-gated]=$(jq -r '[.result.tools[] | select(.annotations.readOnlyHint != true) | (.inputSchema.properties | has("dry_run") and has("approval_ref"))] | (length == 14 and all)' "$out" 2>/dev/null || echo false)
-  R[mcp-read-inventory]=$([[ "${R[read-tool-count]}" == "23" && "${R[read-all-readonly]}" == "true" ]] && echo pass || echo fail)
-  R[mcp-write-inventory]=$([[ "${R[write-tool-count]}" == "37" && "${R[write-tools-gated]}" == "true" ]] && echo pass || echo fail)
+  R[mcp-read-inventory]=$([[ "${R[read-tool-count]}" == "24" && "${R[read-all-readonly]}" == "true" ]] && echo pass || echo fail)
+  R[mcp-write-inventory]=$([[ "${R[write-tool-count]}" == "38" && "${R[write-tools-gated]}" == "true" ]] && echo pass || echo fail)
 
   # mcp-read-call: whoami answers as the caller's token.
   s=$(mcp_call read "$out" whoami '{}')

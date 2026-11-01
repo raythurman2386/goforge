@@ -33,8 +33,11 @@ type ServiceInstance struct {
 	Domain         sql.NullString
 	Status         ServiceInstanceStatus
 	ConnectionInfo json.RawMessage // encrypted connection strings
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// LastError says why the instance last failed, with secret values
+	// redacted. It is cleared when the instance runs again.
+	LastError sql.NullString
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // GetConfig parses the config JSON into a map.

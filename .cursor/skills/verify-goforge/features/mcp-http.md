@@ -1,6 +1,6 @@
 # GoForge MCP over HTTP
 
-`goforge serve` answers MCP at `POST /mcp`, beside `/api/v1`. A client such as Cursor sends a Profile API token as `Authorization: Bearer`. A read token sees 23 read tools, and a token with `write` sees 37. Write tools are dry runs by default, need `approval_ref` to run, and the audit row records the caller's IP. Legacy `full` tokens, cookies, and cross-site browser requests are refused. Settings → Profile has an MCP card with the endpoint, an `mcp.json` snippet that reads the token from `${env:GOFORGE_MCP_TOKEN}`, and a Generate MCP token button. Token rows show a `gf_…` hint and can be rotated or revoked, and each of those writes an audit row.
+`goforge serve` answers MCP at `POST /mcp`, beside `/api/v1`. A client such as Cursor sends a Profile API token as `Authorization: Bearer`. A read token sees 24 read tools (23 API reads plus `wait_for`), and a token with `write` sees 38. Write tools are dry runs by default, need `approval_ref` to run, and the audit row records the caller's IP. Legacy `full` tokens, cookies, and cross-site browser requests are refused. Settings → Profile has an MCP card with the endpoint, an `mcp.json` snippet that reads the token from `${env:GOFORGE_MCP_TOKEN}`, and a Generate MCP token button. Token rows show a `gf_…` hint and can be rotated or revoked, and each of those writes an audit row.
 
 ## Sub-features
 
@@ -13,8 +13,8 @@
 - `mcp-full-refused`: a legacy `full` token is `403`, JSON `error.code` `insufficient_scope`, and `WWW-Authenticate` holding `error="insufficient_scope"`.
 - `mcp-get-405`: `GET /mcp` is `405`. The endpoint is stateless and has no server-sent stream.
 - `mcp-initialize`: `initialize` is `200` `application/json` with `serverInfo.name` `goforge`. No session id is needed for later calls.
-- `mcp-read-inventory`: `tools/list` with a read token has 23 tools, each `readOnlyHint` true.
-- `mcp-write-inventory`: with a `write` token it has 37. The 14 write tools each take `dry_run` and `approval_ref`.
+- `mcp-read-inventory`: `tools/list` with a read token has 24 tools, each `readOnlyHint` true.
+- `mcp-write-inventory`: with a `write` token it has 38. The 14 write tools each take `dry_run` and `approval_ref`.
 - `mcp-read-call`: `whoami` answers with the caller's own token (`token.scopes` `read`, or `read,write`).
 - `mcp-read-token-write-refused`: a read token calling `set_env_var` gets a tool result with `isError` true and text starting `insufficient_scope`. Nothing reaches `/api/v1`.
 - `mcp-dry-run`: `set_env_var` without `dry_run` returns `"dry_run": true` and writes no `env_variables` row.
@@ -26,7 +26,14 @@
 - `token-revoke`: `DELETE /settings/tokens/{id}` is `200`, and the token is `401` on `/mcp` after that.
 - `token-audit`: `audit_logs` has `api_token.create`, `api_token.rotate`, and `api_token.revoke` rows, and no token value appears in any `details`.
 
-Covered by unit tests, not by the drive: `GOFORGE_MCP_HTTP=false` leaves `/mcp` unmounted (`internal/config`, `internal/web` `TestRouter_MCPOutsideCSRFAndSession`). The 15 s timeout and the shared rate limiter come from the router group. The in-process hop ignoring the outer chi route is `TestInProcessIgnoresOuterRoute`.
+Covered by unit tests, not by the drive:
+
+- `mcp-structured-results`: every tool error has `structuredContent` `{status, code, message, audit_id?}`; an object success is also `structuredContent` (`internal/mcpserver` `structured_test.go`).
+- `mcp-wait-for`: `trigger_deployment` returns `operation`; `wait_for` on it returns `status`, `terminal`, `error_message`, and `log_tail`, and `timed_out` true when the wait runs out (`wait_test.go`).
+- `mcp-json-timeout`: the 15 s router timeout on `/mcp` and `/api/v1` answers JSON `{"error":{"code":"timeout"}}` (`internal/web/middleware` `timeout_test.go`).
+- `mcp-idempotent-approval`: the same `approval_ref` on the same tool and target runs once; see [api-v1.md](./api-v1.md) `api-idempotent-approval`.
+
+Also unit-tested: `GOFORGE_MCP_HTTP=false` leaves `/mcp` unmounted (`internal/config`, `internal/web` `TestRouter_MCPOutsideCSRFAndSession`). The 15 s timeout and the shared rate limiter come from the router group. The in-process hop ignoring the outer chi route is `TestInProcessIgnoresOuterRoute`.
 
 ## How to get to it (user POV)
 

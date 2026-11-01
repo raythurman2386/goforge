@@ -60,6 +60,11 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 							</span>
 						}
 					</div>
+					if instance.LastError.Valid && instance.LastError.String != "" {
+						<p id="service-last-error" class="mt-2 text-sm text-red-700 dark:text-red-400 break-words">
+							<span class="font-semibold">Last error:</span> { instance.LastError.String }
+						</p>
+					}
 				</div>
 				<div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
 					if !isPending(instance) {

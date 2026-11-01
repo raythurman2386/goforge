@@ -61,7 +61,7 @@ func refuseWrites(msg string) mcp.Middleware {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
 			if method == "tools/call" {
 				if ctr, ok := req.(*mcp.CallToolRequest); ok && ctr.Params != nil && writes[ctr.Params.Name] {
-					return errorResult(msg), nil
+					return errorResult(&toolError{Status: http.StatusForbidden, Code: codeWritesDisabled, Message: msg}), nil
 				}
 			}
 			return next(ctx, method, req)
@@ -99,13 +99,15 @@ var (
 )
 
 // addTool registers a tool whose handler turns its input into one API call
-// and returns the API's JSON as text. API errors become tool errors.
+// and returns the API's JSON as text. A JSON object answer is also returned
+// as structuredContent. Failures are tool errors whose structuredContent is
+// {status, code, message} (see errorResult).
 func addTool[In any](s *Server, name, desc string, ann *mcp.ToolAnnotations, build func(ctx context.Context, in In) (*call, error)) {
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: name, Description: desc, Annotations: ann},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in In) (*mcp.CallToolResult, any, error) {
 			c, err := build(ctx, in)
 			if err != nil {
-				return errorResult(err.Error()), nil, nil
+				return errorResult(err), nil, nil
 			}
 			q := make(map[string][]string, len(c.query))
 			for k, v := range c.query {
@@ -115,25 +117,111 @@ func addTool[In any](s *Server, name, desc string, ann *mcp.ToolAnnotations, bui
 			}
 			raw, err := s.api.do(ctx, c.method, c.path, q, c.body)
 			if err != nil {
-				var ae *apiError
-				if errors.As(err, &ae) {
-					return errorResult(ae.Error()), nil, nil
-				}
-				return errorResult(err.Error()), nil, nil
+				return errorResult(err), nil, nil
 			}
-			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}}, nil, nil
+			return okResult(raw), nil, nil
 		})
 }
 
-func errorResult(msg string) *mcp.CallToolResult {
-	return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: msg}}}
+// Tool error codes set by the MCP server itself. Codes from the API
+// (not_found, protected_resource, timeout, ...) pass through unchanged.
+const (
+	codeBadRequest     = "bad_request"
+	codeProtected      = "protected_resource"
+	codeWritesDisabled = "writes_disabled"
+	codeUnreachable    = "api_unreachable"
+)
+
+// toolError is a failure the MCP server finds before calling the API, such
+// as a missing argument or a client-side protected refusal.
+type toolError struct {
+	Status  int
+	Code    string
+	Message string
+}
+
+func (e *toolError) Error() string { return e.Message }
+
+// errorPayload is the structuredContent of every tool error.
+type errorPayload struct {
+	Status  int    `json:"status"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	AuditID string `json:"audit_id,omitempty"`
+}
+
+// okResult returns raw as text and, when it is a JSON object, as
+// structuredContent too.
+func okResult(raw json.RawMessage) *mcp.CallToolResult {
+	res := &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}}
+	var obj map[string]any
+	if json.Unmarshal(raw, &obj) == nil && obj != nil {
+		res.StructuredContent = obj
+	}
+	return res
+}
+
+// errorResult is a tool error. The text is the message a model reads; the
+// structuredContent {status, code, message} is for clients that branch on
+// the failure. An API error keeps the API's own code and message.
+func errorResult(err error) *mcp.CallToolResult {
+	p := errorPayloadOf(err)
+	return &mcp.CallToolResult{
+		IsError:           true,
+		Content:           []mcp.Content{&mcp.TextContent{Text: err.Error()}},
+		StructuredContent: p,
+	}
+}
+
+func errorPayloadOf(err error) errorPayload {
+	var te *toolError
+	if errors.As(err, &te) {
+		return errorPayload{Status: te.Status, Code: te.Code, Message: te.Message}
+	}
+	var ae *apiError
+	if errors.As(err, &ae) {
+		p := errorPayload{Status: ae.Status, Code: codeForHTTPStatus(ae.Status), Message: ae.Body}
+		var body struct {
+			Error struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+				AuditID string `json:"audit_id"`
+			} `json:"error"`
+		}
+		if json.Unmarshal([]byte(ae.Body), &body) == nil && body.Error.Code != "" {
+			p.Code, p.Message, p.AuditID = body.Error.Code, body.Error.Message, body.Error.AuditID
+		}
+		return p
+	}
+	return errorPayload{Code: codeUnreachable, Message: err.Error()}
+}
+
+// codeForHTTPStatus names an API answer that carried no JSON error body,
+// for example a proxy's 502.
+func codeForHTTPStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return codeBadRequest
+	case http.StatusUnauthorized:
+		return "unauthorized"
+	case http.StatusForbidden:
+		return "forbidden"
+	case http.StatusNotFound:
+		return "not_found"
+	case http.StatusConflict:
+		return "conflict"
+	case http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return "timeout"
+	default:
+		return "api_error"
+	}
 }
 
 // required takes name, value pairs and reports the first empty value.
 func required(nameValue ...string) error {
 	for i := 0; i+1 < len(nameValue); i += 2 {
 		if nameValue[i+1] == "" {
-			return fmt.Errorf("%s is required", nameValue[i])
+			return &toolError{Status: http.StatusBadRequest, Code: codeBadRequest, Message: nameValue[i] + " is required"}
 		}
 	}
 	return nil
@@ -174,7 +262,11 @@ func (s *Server) refuseProtected(ctx context.Context, serviceID, action string) 
 	}
 	s.loadWhoami(ctx)
 	if s.protected[serviceID] && !s.grantsProt {
-		return fmt.Errorf("service %s is protected; %s needs a token with the protected scope", serviceID, action)
+		return &toolError{
+			Status:  http.StatusForbidden,
+			Code:    codeProtected,
+			Message: fmt.Sprintf("service %s is protected; %s needs a token with the protected scope", serviceID, action),
+		}
 	}
 	return nil
 }

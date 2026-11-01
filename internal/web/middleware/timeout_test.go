@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -106,5 +107,39 @@ func TestTimeout_SSERouteExcluded(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(body), "data: 2") {
 		t.Errorf("SSE stream truncated, expected both events but got:\n%s", body)
+	}
+}
+
+func TestTimeoutJSON_ExceedsDeadlineIsJSON(t *testing.T) {
+	handler := TimeoutJSON(50 * time.Millisecond)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/v1/x", nil))
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("content type %q, want application/json", ct)
+	}
+	var out struct {
+		Error struct{ Code, Message string } `json:"error"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil || out.Error.Code != "timeout" || out.Error.Message == "" {
+		t.Errorf("body %q (%v), want JSON error code timeout", rr.Body.String(), err)
+	}
+}
+
+func TestTimeoutJSON_KeepsHandlerAnswer(t *testing.T) {
+	handler := TimeoutJSON(time.Second)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/mcp", nil))
+	if rr.Code != http.StatusAccepted || rr.Header().Get("Content-Type") != "text/event-stream" || rr.Body.String() != "ok" {
+		t.Errorf("got %d %q %q", rr.Code, rr.Header().Get("Content-Type"), rr.Body.String())
 	}
 }
