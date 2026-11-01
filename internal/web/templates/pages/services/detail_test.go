@@ -171,3 +171,26 @@ func TestDetailRowsInsideDescriptionList(t *testing.T) {
 		i = at + 3
 	}
 }
+
+// The header actions wrap instead of forcing horizontal scroll on narrow
+// viewports: flex-wrap with gap (not space-x, which leaves a stray left
+// margin on wrapped rows), matching the shared pageHeader actions row.
+func TestDetailActionsWrapOnNarrowViewports(t *testing.T) {
+	html := renderDetail(t, models.ServiceStatusRunning, &models.Container{DockerID: "abc123"}, nil)
+	start, end := innerRange(t, html, `data-testid="service-detail-actions"`)
+	open := html[start : start+strings.Index(html[start:], ">")]
+	for _, want := range []string{"flex-wrap", "gap-3"} {
+		if !strings.Contains(open, want) {
+			t.Fatalf("actions row %q is missing %q", open, want)
+		}
+	}
+	if strings.Contains(open, "space-x-") {
+		t.Fatalf("actions row %q uses space-x, which misaligns wrapped buttons", open)
+	}
+	row := html[start:end]
+	for _, label := range []string{"Edit configuration", "Update image", "Restart"} {
+		if !strings.Contains(row, label) {
+			t.Fatalf("actions row is missing %q", label)
+		}
+	}
+}
