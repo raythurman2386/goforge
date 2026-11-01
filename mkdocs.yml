@@ -94,6 +94,7 @@ nav:
     - Monitoring: guides/monitoring.md
     - MCP Server: guides/mcp.md
     - Activity & Audit Log: guides/activity.md
+    - Notifications: guides/notifications.md
   - Deployment:
     - Production Setup: deployment/index.md
     - Docker Compose: deployment/docker-compose.md

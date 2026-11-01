@@ -17,6 +17,7 @@ erDiagram
     users ||--o{ audit_logs : generates
     users ||--o{ api_tokens : owns
     users |o--o| backup_settings : updates
+    users |o--o| notify_settings : updates
     projects ||--o{ environments : has
     projects }o--o| git_sources : uses
     environments ||--o{ env_variables : has
@@ -402,6 +403,25 @@ The backup destination and policy an admin saves in Settings → Profile. At mos
 
 ---
 
+### notify_settings
+
+The outbound notifier an admin saves in Settings → Profile → Notifications. At most one row (`id = 1`). See [Notifications](../guides/notifications.md).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `SMALLINT` | PK, default `1`, CHECK `id = 1` | Single row |
+| `enabled` | `BOOLEAN` | NOT NULL, default `FALSE` | Off stops every alert and the container health watch, and keeps the other columns |
+| `kind` | `TEXT` | NOT NULL, default `'ntfy'`, CHECK in (`ntfy`, `webhook`) | ntfy topic (plain text) or webhook (JSON POST) |
+| `url_sealed` | `TEXT` | NOT NULL, default `''` | Notifier URL encrypted with `ENCRYPTION_KEY` (AES-GCM, base64); the topic or webhook path is a secret. `''` when unset |
+| `token_sealed` | `TEXT` | NOT NULL, default `''` | Optional bearer token encrypted with `ENCRYPTION_KEY`; never sent to the browser |
+| `updated_by` | `UUID` | FK -> users(id) ON DELETE SET NULL | Admin who last saved |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Creation time |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Last save |
+
+**Migration**: `025_notify_settings`
+
+---
+
 ## Database Functions
 
 ### cleanup_old_data()
@@ -447,5 +467,6 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 022 | `service_last_error` | `service_instances.last_error` |
 | 023 | `audit_approval_idempotency` | One API v1 run per `approval_ref` and target; index on outcome `audit_id` |
 | 024 | `deployment_queue_audit_id` | `deployment_queue.audit_id` (UUID, nullable, no FK): the audit row that queued the deploy, so its outcome row links back |
+| 025 | `notify_settings` | Admin-edited outbound notifier (ntfy or webhook), URL and token sealed with `ENCRYPTION_KEY` |
 
 All migrations have corresponding `.down.sql` files for rollback support.

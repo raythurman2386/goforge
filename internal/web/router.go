@@ -232,6 +232,8 @@ func Router(
 						r.Put("/backups", settingsHandler.UpdateBackupSettings)
 						r.Post("/backups/test", settingsHandler.TestBackupConnection)
 						r.Get("/backups/restore-points", settingsHandler.RestorePoints)
+						r.Put("/notifications", settingsHandler.UpdateNotifySettings)
+						r.Post("/notifications/test", settingsHandler.TestNotifySettings)
 						r.Route("/tokens", func(r chi.Router) {
 							r.Get("/", settingsHandler.ListAPITokens)
 							r.Get("/new", settingsHandler.NewAPITokenModal)

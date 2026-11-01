@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/notify"
 )
 
 // RunRecorder is the backup_runs storage the runner needs.
@@ -40,6 +41,8 @@ type Runner struct {
 	Redactor *Redactor
 	Logger   *slog.Logger
 	Now      func() time.Time
+	// Notifier, when set, gets a backup.failed alert for every failed run.
+	Notifier notify.Notifier
 }
 
 func (r *Runner) now() time.Time {
@@ -174,7 +177,22 @@ func (r *Runner) Run(ctx context.Context, trigger models.BackupTrigger) (*models
 	}
 	log.Info("backup run finished", "status", run.Status, "objects", run.Objects, "bytes", run.Bytes,
 		"skipped", run.Skipped, "pruned", run.Pruned)
+	r.notifyFailed(finishCtx, run)
 	return run, nil
+}
+
+// notifyFailed sends a backup.failed alert when the run failed.
+func (r *Runner) notifyFailed(ctx context.Context, run *models.BackupRun) {
+	if run.Status != models.BackupRunFailed || r.Notifier == nil {
+		return
+	}
+	r.Notifier.Notify(ctx, notify.Event{
+		Kind:     notify.EventBackupFailed,
+		Resource: notify.Resource{Type: models.ResourceTypeBackupRun, ID: run.ID, Name: run.RunKey},
+		Error:    run.ErrorSummary.String,
+		Path:     "/settings/profile#backup-status",
+		Time:     r.now(),
+	})
 }
 
 func summarize(failures []string) string {

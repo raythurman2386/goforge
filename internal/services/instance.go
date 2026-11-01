@@ -17,6 +17,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/notify"
 	"github.com/raythurman2386/goforge/internal/proxy"
 )
 
@@ -84,6 +85,7 @@ type InstanceService struct {
 	healthPoll          time.Duration
 	bgTimeout           time.Duration
 	audit               AuditRunStore
+	notifier            notify.Notifier
 }
 
 // WithAudit makes background deploys, config edits, and image updates write
@@ -95,11 +97,13 @@ func (s *InstanceService) WithAudit(store AuditRunStore) *InstanceService {
 	return s
 }
 
-// recordRunOutcome writes service.run.<result> for auditID from the
-// instance's final status and last_error. It does nothing without an audit
-// store or id.
+// recordRunOutcome runs when background work on an instance ends. It
+// writes service.run.<result> for auditID from the instance's final status
+// and last_error (when there is an audit store and id), and sends a
+// service.failed alert when the work failed (when there is a notifier).
 func (s *InstanceService) recordRunOutcome(auditID, instanceID string) {
-	if auditID == "" || s.audit == nil {
+	wantAudit := auditID != "" && s.audit != nil
+	if !wantAudit && s.notifier == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), statusWriteTimeout)
@@ -110,11 +114,13 @@ func (s *InstanceService) recordRunOutcome(auditID, instanceID string) {
 		ResourceID:   instanceID,
 		Result:       models.AuditRunCompleted,
 	}
+	name := ""
 	inst, err := s.instanceRepo.GetByID(ctx, instanceID)
 	switch {
 	case err != nil:
 		out.Result, out.Error = models.AuditRunFailed, "could not read the service status after the change"
 	default:
+		name = inst.Name
 		out.Status = string(inst.Status)
 		if inst.LastError.Valid && inst.LastError.String != "" {
 			out.Result, out.Error = models.AuditRunFailed, inst.LastError.String
@@ -122,7 +128,31 @@ func (s *InstanceService) recordRunOutcome(auditID, instanceID string) {
 			out.Result = models.AuditRunFailed
 		}
 	}
-	RecordRunOutcome(s.audit, s.logger, auditID, out)
+	if wantAudit {
+		RecordRunOutcome(s.audit, s.logger, auditID, out)
+	}
+	// An unreadable instance (deleted mid-run) is audited but not alerted.
+	if s.notifier != nil && err == nil && out.Result == models.AuditRunFailed {
+		msg := out.Error
+		if msg == "" {
+			msg = "service status is failed"
+		}
+		s.notifier.Notify(ctx, notify.Event{
+			Kind:     notify.EventServiceFailed,
+			Resource: notify.Resource{Type: models.ResourceTypeServiceInstance, ID: instanceID, Name: name},
+			Error:    msg,
+			Path:     "/services/" + instanceID,
+			AuditID:  auditID,
+			Time:     time.Now(),
+		})
+	}
+}
+
+// WithNotifier makes background deploys, config edits, and image updates
+// send a service.failed alert (with last_error) when they fail.
+func (s *InstanceService) WithNotifier(n notify.Notifier) *InstanceService {
+	s.notifier = n
+	return s
 }
 
 // NewInstanceService creates a new instance service.

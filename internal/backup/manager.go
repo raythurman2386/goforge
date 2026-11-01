@@ -9,6 +9,7 @@ import (
 
 	"github.com/raythurman2386/goforge/internal/config"
 	"github.com/raythurman2386/goforge/internal/docker"
+	"github.com/raythurman2386/goforge/internal/notify"
 )
 
 // Manager owns the nightly scheduler inside serve and swaps it when an admin
@@ -23,6 +24,7 @@ type Manager struct {
 	build  func(cfg config.BackupConfig) (*Setup, error)
 	log    *slog.Logger
 	red    func(extra ...config.BackupConfig) *Redactor
+	notify notify.Notifier
 
 	mu     sync.Mutex
 	cfg    config.BackupConfig
@@ -41,6 +43,15 @@ func NewManager(parent context.Context, app *config.Config, db *sql.DB, dockerCl
 		log: log,
 		red: func(extra ...config.BackupConfig) *Redactor { return RedactorFor(app, extra...) },
 	}
+}
+
+// WithNotifier makes every scheduled run started after this call send a
+// backup.failed alert when it fails. Call it before the first Apply.
+func (m *Manager) WithNotifier(n notify.Notifier) *Manager {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.notify = n
+	return m
 }
 
 // Current returns the config in effect and where it came from.
@@ -83,6 +94,7 @@ func (m *Manager) Apply(cfg config.BackupConfig, source string) {
 		log.Info("backups enabled, nightly schedule off; use goforge backup run")
 		return
 	}
+	setup.Runner.Notifier = m.notify
 	loopCtx, cancel := context.WithCancel(m.parent)
 	m.cancel = cancel
 	m.wg.Add(1)
