@@ -397,6 +397,13 @@ The backup destination and policy an admin saves in Settings → Profile. At mos
 | `schedule` | `TEXT` | NOT NULL, default `'02:00 America/Chicago'` | `HH:MM Zone/Name` or `off` |
 | `retention_daily` | `INTEGER` | NOT NULL, default `7`, CHECK 1-366 | Complete days kept |
 | `timeout_seconds` | `BIGINT` | NOT NULL, default `7200`, CHECK > 0 | Upper limit for one run |
+| `smtp_host_sealed` | `TEXT` | NOT NULL, default `''` | SMTP host encrypted with `ENCRYPTION_KEY`. `''` when unset |
+| `smtp_port` | `INTEGER` | NOT NULL, default `0`, CHECK 0–65535 | SMTP port; a save sets the TLS mode's default (587, 465, 25) when blank |
+| `smtp_tls` | `TEXT` | NOT NULL, default `'starttls'`, CHECK in (`starttls`, `implicit`, `none`) | STARTTLS, implicit TLS (SMTPS), or none (no username unless the host is loopback) |
+| `smtp_username_sealed` | `TEXT` | NOT NULL, default `''` | SMTP AUTH PLAIN username, encrypted |
+| `smtp_password_sealed` | `TEXT` | NOT NULL, default `''` | SMTP password, encrypted; never sent to the browser |
+| `smtp_from_sealed` | `TEXT` | NOT NULL, default `''` | From address, encrypted |
+| `smtp_to_sealed` | `TEXT` | NOT NULL, default `''` | Comma-separated To list (at most 10), encrypted |
 | `updated_by` | `UUID` | FK -> users(id) ON DELETE SET NULL | Admin who last saved |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Creation time |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Last save |
@@ -413,14 +420,14 @@ The outbound notifier an admin saves in Settings → Profile → Notifications. 
 |--------|------|-------------|-------------|
 | `id` | `SMALLINT` | PK, default `1`, CHECK `id = 1` | Single row |
 | `enabled` | `BOOLEAN` | NOT NULL, default `FALSE` | Off stops every alert and the container health watch, and keeps the other columns |
-| `kind` | `TEXT` | NOT NULL, default `'ntfy'`, CHECK in (`ntfy`, `webhook`) | ntfy topic (plain text) or webhook (JSON POST) |
+| `kind` | `TEXT` | NOT NULL, default `'ntfy'`, CHECK in (`ntfy`, `webhook`, `email`) | ntfy topic (plain text), webhook (JSON POST), or email over SMTP (`email` since migration 028) |
 | `url_sealed` | `TEXT` | NOT NULL, default `''` | Notifier URL encrypted with `ENCRYPTION_KEY` (AES-GCM, base64); the topic or webhook path is a secret. `''` when unset |
 | `token_sealed` | `TEXT` | NOT NULL, default `''` | Optional bearer token encrypted with `ENCRYPTION_KEY`; never sent to the browser |
 | `updated_by` | `UUID` | FK -> users(id) ON DELETE SET NULL | Admin who last saved |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Creation time |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Last save |
 
-**Migration**: `025_notify_settings`
+**Migration**: `025_notify_settings`, `028_notify_smtp`
 
 ---
 
@@ -470,5 +477,6 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 023 | `audit_approval_idempotency` | One API v1 run per `approval_ref` and target; index on outcome `audit_id` |
 | 024 | `deployment_queue_audit_id` | `deployment_queue.audit_id` (UUID, nullable, no FK): the audit row that queued the deploy, so its outcome row links back |
 | 025 | `notify_settings` | Admin-edited outbound notifier (ntfy or webhook), URL and token sealed with `ENCRYPTION_KEY` |
+| 028 | `notify_smtp` | `notify_settings.kind` may be `email`; sealed SMTP host, username, password, From, To, plus `smtp_port` and `smtp_tls`. Down turns an email notifier off (kind `ntfy`) |
 
 All migrations have corresponding `.down.sql` files for rollback support.

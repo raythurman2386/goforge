@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -163,5 +164,59 @@ func TestNotifyForm_AdminOnly(t *testing.T) {
 	}
 	if (&SettingsHandler{}).notifyForm(req, adminUser) != nil {
 		t.Error("form shown without notification settings wired")
+	}
+}
+
+func TestNotifySettings_EmailSaveAndTestHideThePassword(t *testing.T) {
+	const pass = "smtp-SECRET-never-in-html" //nolint:gosec // throwaway test value
+	srv := notifytest.NewSMTPServer(t, models.SMTPTLSStartTLS, "alerts@example.test", pass)
+	h, _, st, a := notifyHandler(t)
+	h.notifySettings.(*notify.SettingsService).SMTPTLS = srv.ClientTLS
+	form := url.Values{
+		"enabled": {"true"}, "kind": {"email"}, "smtp_host": {srv.Host}, "smtp_port": {strconv.Itoa(srv.Port)},
+		"smtp_tls": {"starttls"}, "smtp_username": {"alerts@example.test"}, "smtp_password": {pass},
+		"smtp_from": {"goforge@example.test"}, "smtp_to": {"ops@example.test"},
+	}
+	rr := httptest.NewRecorder()
+	h.UpdateNotifySettings(rr, backupReq(http.MethodPut, notifyPath, form, adminUser))
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Notification settings saved") {
+		t.Fatalf("save: %d %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, pass) || !strings.Contains(body, `value="email" selected`) || !strings.Contains(body, "Remove the stored SMTP password") {
+		t.Fatalf("card after email save: leak=%v", strings.Contains(body, pass))
+	}
+	if r := st.Row(); r == nil || r.SMTP.Password != pass || r.Kind != models.NotifyKindEmail {
+		t.Fatal("email settings not stored")
+	}
+	for _, v := range a.details[0] {
+		if s, ok := v.(string); ok && strings.Contains(s, pass) {
+			t.Fatal("audit details carry the password")
+		}
+	}
+
+	// Test with a blank password uses the stored one.
+	form.Del("smtp_password")
+	rr = httptest.NewRecorder()
+	h.TestNotifySettings(rr, backupReq(http.MethodPost, notifyPath+"/test", form, adminUser))
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Test email sent via "+srv.Addr()) || len(srv.Messages()) != 1 {
+		t.Fatalf("test: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// A wrong password is a 502 that names neither it nor the server's reply.
+	form.Set("smtp_password", "wrong-SECRET-never-in-html")
+	rr = httptest.NewRecorder()
+	h.TestNotifySettings(rr, backupReq(http.MethodPost, notifyPath+"/test", form, adminUser))
+	if rr.Code != http.StatusBadGateway || !strings.Contains(rr.Body.String(), "rejected the username or password") ||
+		strings.Contains(rr.Body.String(), "wrong-SECRET") || strings.Contains(rr.Body.String(), "got password") {
+		t.Fatalf("bad auth: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// A field error names the field.
+	form.Set("smtp_to", "not-an-address")
+	rr = httptest.NewRecorder()
+	h.UpdateNotifySettings(rr, backupReq(http.MethodPut, notifyPath, form, adminUser))
+	if rr.Code != http.StatusBadRequest || !strings.Contains(rr.Body.String(), "To must be email addresses") {
+		t.Fatalf("bad To: %d %s", rr.Code, rr.Body.String())
 	}
 }

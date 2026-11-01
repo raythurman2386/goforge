@@ -3,6 +3,7 @@ package notify
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,7 @@ type Target struct {
 	Kind  string
 	URL   string
 	Token string
+	SMTP  models.SMTPSettings
 }
 
 // Payload is the JSON body a generic webhook receives. It has no field for
@@ -131,8 +133,14 @@ func newRequest(ctx context.Context, tgt Target, p Payload) (*http.Request, erro
 	return req, nil
 }
 
-// deliver posts one payload. Errors are *SendError and never name the URL.
-func deliver(ctx context.Context, client *http.Client, tgt Target, p Payload) error {
+// deliver sends one payload: an HTTP POST for ntfy and webhook, SMTP for
+// email (tlsCfg, when set, is the base TLS config; tests use it to trust a
+// fake server). Errors are *SendError and never name the URL path, the
+// token, or SMTP credentials.
+func deliver(ctx context.Context, client *http.Client, tlsCfg *tls.Config, tgt Target, p Payload) error {
+	if tgt.Kind == models.NotifyKindEmail {
+		return deliverEmail(ctx, tlsCfg, tgt.SMTP, p)
+	}
 	req, err := newRequest(ctx, tgt, p)
 	if err != nil {
 		return &SendError{Message: "could not build the request"}

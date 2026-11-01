@@ -284,7 +284,7 @@ func TestSettingsValidation(t *testing.T) {
 		field string
 	}{
 		{notify.SettingsInput{Enabled: true, Kind: "ntfy"}, "url"},
-		{notify.SettingsInput{Kind: "email", URL: "https://ntfy.sh/x"}, "kind"},
+		{notify.SettingsInput{Kind: "sms", URL: "https://ntfy.sh/x"}, "kind"},
 		{notify.SettingsInput{Kind: "ntfy", URL: "ftp://ntfy.sh/x"}, "url"},
 		{notify.SettingsInput{Kind: "ntfy", URL: "ntfy.sh/x"}, "url"},
 		{notify.SettingsInput{Kind: "ntfy", URL: "https://user:pw@ntfy.sh/x"}, "url"},
