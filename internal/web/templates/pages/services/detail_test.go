@@ -3,6 +3,7 @@ package pages_services //nolint:revive,stylecheck // matches the templ package n
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"regexp"
 	"strings"
 	"testing"
@@ -127,5 +128,20 @@ func TestDetailContainerCard(t *testing.T) {
 	}
 	if noCtr := renderDetail(t, models.ServiceStatusPending, nil, nil); strings.Contains(noCtr, "data-container-card") || strings.Contains(noCtr, "sse-connect") {
 		t.Error("no container should render no card and no stream")
+	}
+}
+
+func TestDetailShowsLastError(t *testing.T) {
+	inst := &models.ServiceInstance{ID: "inst-1", Name: "verify-pg", Status: models.ServiceStatusFailed,
+		LastError: sql.NullString{String: "image pull failed for example/img:1: manifest unknown", Valid: true}}
+	var buf bytes.Buffer
+	if err := Detail(inst, nil, nil, &services.ServiceTemplate{DisplayName: "PostgreSQL"}, "csrf").Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `id="service-last-error"`) || !strings.Contains(buf.String(), "manifest unknown") {
+		t.Error("failed service page does not show last_error")
+	}
+	if html := renderDetail(t, models.ServiceStatusRunning, nil, nil); strings.Contains(html, "service-last-error") {
+		t.Error("last error block shown without an error")
 	}
 }

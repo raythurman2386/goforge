@@ -113,6 +113,9 @@ func (f *fakeInstances) GetInstance(_ context.Context, id string) (*models.Servi
 		return &models.ServiceInstance{ID: id, UserID: ownerID, TemplateName: "pg", Name: "db", Config: cfg, Status: models.ServiceStatusRunning}, nil
 	case foreignSvc:
 		return &models.ServiceInstance{ID: id, UserID: otherID, TemplateName: "pg", Name: "x", Config: cfg}, nil
+	case failedSvcID:
+		return &models.ServiceInstance{ID: id, UserID: ownerID, TemplateName: "pg", Name: "broken", Config: cfg,
+			Status: models.ServiceStatusFailed, LastError: sql.NullString{String: failedSvcLastError, Valid: true}}, nil
 	}
 	return nil, repositories.ErrNotFound
 }
