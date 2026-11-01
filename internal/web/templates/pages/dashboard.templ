@@ -342,11 +342,23 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 }
 
 // RecentAgentActionsLoader is swapped for the recent agent actions card
-// (components.ActivityCard) once /dashboard/activity answers.
+// (components.ActivityCard) once /dashboard/activity answers. It reserves the
+// same Flush card shell (header, then body) so the swap does not jump.
 templ RecentAgentActionsLoader() {
 	<div id="recent-agent-actions-loader" hx-get="/dashboard/activity" hx-trigger="load" hx-swap="outerHTML">
-		<div role="status" aria-label="Loading recent agent actions" aria-busy="true" class="mt-8">
-			@ui.Skeleton(ui.SkeletonLine, "h-7 w-48")
+		<div role="status" aria-label="Loading recent agent actions" aria-busy="true">
+			@ui.Card(ui.CardProps{Flush: true, Class: "mt-8 overflow-hidden"}) {
+				@ui.CardHeader(nil) {
+					<div class="space-y-2">
+						@ui.Skeleton(ui.SkeletonLine, "h-5 w-44")
+						@ui.Skeleton(ui.SkeletonLine, "h-4 w-72")
+					</div>
+					@ui.Skeleton(ui.SkeletonLine, "h-8 w-20")
+				}
+				@ui.CardContent(nil) {
+					@ui.Skeleton(ui.SkeletonBlock, "h-24 w-full")
+				}
+			}
 		</div>
 	</div>
 }
