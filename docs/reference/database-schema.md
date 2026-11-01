@@ -322,9 +322,11 @@ Tracks user actions for auditing and compliance.
 | `user_agent` | `TEXT` | Nullable | Client user agent |
 | `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Action timestamp |
 
-**Indexes**: `idx_audit_logs_user_id` (user_id), `idx_audit_logs_resource` (resource_type, resource_id), `idx_audit_logs_created_at` (created_at DESC)
+**Indexes**: `idx_audit_logs_user_id` (user_id), `idx_audit_logs_resource` (resource_type, resource_id), `idx_audit_logs_created_at` (created_at DESC), `idx_audit_logs_api_v1_idempotency` (unique on user_id, action, `details->>'approval_ref'`, `details->>'idempotency_key'`), `idx_audit_logs_outcome_audit_id` (`details->>'audit_id'`)
 
-**Migration**: `010_create_audit_logs`
+**Details keys**: `via` (`ui` or `api_v1`), `approval_ref`, `token_id`, `token_name`, `audit_id` (on outcome rows: the row that started the change), `error` (500 characters at most), `resource_ref` (a non-UUID resource id such as a Docker container id). Settings → Activity reads them; see [Activity and audit log](../guides/activity.md).
+
+**Migrations**: `010_create_audit_logs`, `023_audit_approval_idempotency`
 
 ---
 
@@ -441,5 +443,9 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 018 | `api_token_scopes` | `api_tokens.scopes` (`full`, `read`, `write`, `protected`) |
 | 019 | `backup_runs` | One row per backup run |
 | 020 | `backup_settings` | Admin-edited backup settings, keys sealed with `ENCRYPTION_KEY` |
+| 021 | `api_token_hint` | `api_tokens.token_hint`, a non-secret hint per token |
+| 022 | `service_last_error` | `service_instances.last_error` |
+| 023 | `audit_approval_idempotency` | One API v1 run per `approval_ref` and target; index on outcome `audit_id` |
+| 024 | `deployment_queue_audit_id` | `deployment_queue.audit_id` (UUID, nullable, no FK): the audit row that queued the deploy, so its outcome row links back |
 
 All migrations have corresponding `.down.sql` files for rollback support.

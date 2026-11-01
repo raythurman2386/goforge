@@ -93,6 +93,7 @@ nav:
     - Git Integration: guides/git-integration.md
     - Monitoring: guides/monitoring.md
     - MCP Server: guides/mcp.md
+    - Activity & Audit Log: guides/activity.md
   - Deployment:
     - Production Setup: deployment/index.md
     - Docker Compose: deployment/docker-compose.md
