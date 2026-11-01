@@ -1,4 +1,6 @@
-// GoForge shell behavior: sidebar active link, toasts, and HTMX error toasts.
+// GoForge shell behavior: sidebar active link, toasts, HTMX error toasts, and
+// the few page behaviors the kit does not cover (data-* hooks below). Pages
+// carry no inline <script> or on*= handlers (TestPagesUseKit).
 // Dialogs and the hx-confirm prompt live in static/js/ui.js (components/ui).
 // Loaded from layouts.Base after htmx. No build step; plain ES2017.
 (function () {
@@ -120,6 +122,119 @@
 		showToast("Could not reach GoForge. Check your connection and try again.", "error");
 	});
 
+	// --- Page hooks ----------------------------------------------------------
+	// Delegated listeners keyed on data-* attributes, so they survive htmx
+	// swaps and need no inline script.
+
+	// Project form (components.GitRepositoryBrowser): with no git source the
+	// manual URL input is named repository_url and required; with a source the
+	// repo select carries that name instead.
+	function syncGitSource(source) {
+		var manualInput = document.getElementById("project-repo-manual");
+		var repoSelect = document.getElementById("project-repo-select");
+		var manualContainer = document.getElementById("manual-repo-input");
+		var selectContainer = document.getElementById("repo-select-container");
+		if (!manualInput || !repoSelect || !manualContainer || !selectContainer) return;
+		if (!source.value) {
+			manualContainer.style.display = "block";
+			selectContainer.style.display = "none";
+			manualInput.setAttribute("name", "repository_url");
+			manualInput.required = true;
+			repoSelect.setAttribute("name", "repository_url_select_disabled");
+		} else {
+			manualContainer.style.display = "none";
+			selectContainer.style.display = "block";
+			manualInput.removeAttribute("name");
+			manualInput.required = false;
+			repoSelect.setAttribute("name", "repository_url");
+		}
+	}
+
+	function initGitSources(root) {
+		var scope = root && root.querySelectorAll ? root : document;
+		if (scope.matches && scope.matches("[data-git-source-toggle]")) syncGitSource(scope);
+		scope.querySelectorAll("[data-git-source-toggle]").forEach(syncGitSource);
+	}
+
+	document.addEventListener("change", function (evt) {
+		var el = evt.target;
+		if (el && el.matches && el.matches("[data-git-source-toggle]")) syncGitSource(el);
+	});
+
+	document.addEventListener("htmx:load", function (evt) {
+		initGitSources(evt.target);
+	});
+
+	// Container detail: the stop and restart responses send HX-Trigger
+	// containerStopped / containerRestarted; swap in the matching badge from
+	// the page's <template id="container-status-{state}">.
+	function setContainerStatus(state) {
+		var el = document.getElementById("container-status");
+		var tpl = document.getElementById("container-status-" + state);
+		if (el && tpl) el.innerHTML = tpl.innerHTML;
+	}
+
+	document.addEventListener("containerStopped", function () {
+		setContainerStatus("exited");
+	});
+	document.addEventListener("containerRestarted", function () {
+		setContainerStatus("running");
+	});
+
+	// Service detail masked rows ([data-secret]): Show fetches the value on
+	// demand (never rendered into the page) and Copy writes it to the
+	// clipboard. Delegated, so the pending-state poll swap keeps working.
+	function fetchSecret(row) {
+		return fetch(row.getAttribute("data-secret-url"), { credentials: "same-origin", cache: "no-store" }).then(function (r) {
+			if (!r.ok) throw new Error("HTTP " + r.status);
+			return r.text();
+		});
+	}
+
+	function flash(btn, text, restore) {
+		btn.textContent = text;
+		setTimeout(function () {
+			btn.textContent = restore;
+		}, 2000);
+	}
+
+	document.addEventListener("click", function (evt) {
+		var btn = evt.target && evt.target.closest && evt.target.closest("[data-secret-action]");
+		if (!btn) return;
+		var row = btn.closest("[data-secret]");
+		var out = row && row.querySelector("[data-secret-value]");
+		if (!out) return;
+		if (btn.getAttribute("data-secret-action") === "toggle") {
+			if (out.getAttribute("data-revealed") === "true") {
+				out.textContent = row.getAttribute("data-secret-mask");
+				out.removeAttribute("data-revealed");
+				btn.textContent = "Show";
+				return;
+			}
+			fetchSecret(row)
+				.then(function (v) {
+					out.textContent = v;
+					out.setAttribute("data-revealed", "true");
+					btn.textContent = "Hide";
+				})
+				.catch(function () {
+					flash(btn, "Error", "Show");
+				});
+			return;
+		}
+		fetchSecret(row)
+			.then(function (v) {
+				if (!navigator.clipboard) throw new Error("clipboard unavailable");
+				return navigator.clipboard.writeText(v);
+			})
+			.then(function () {
+				flash(btn, "Copied!", "Copy");
+			})
+			.catch(function () {
+				flash(btn, "Copy failed", "Copy");
+			});
+	});
+
 	// --- Sidebar active link ------------------------------------------------
 
 	// Mark the [data-nav] links with the longest prefix match for the current
@@ -146,6 +261,7 @@
 	function init() {
 		markActiveNav();
 		watchToastRegion();
+		initGitSources(document);
 	}
 
 	if (document.readyState === "loading") {

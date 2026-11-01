@@ -87,7 +87,7 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 - [ ] **Navigation** *(Partial)*
   - [x] Hamburger menu for mobile sidebar (`#mobile-menu-btn` opens the `ui.Sheet` navigation in `layouts/base.templ`; UI kit PR6)
   - [ ] Bottom tab bar for primary actions
-  - [ ] Touch-friendly button sizing (min 44px) *(Partial, UI kit: every icon-only button (`ui.ButtonIcon`, Alert and toast dismiss) is 44 px below `md`; text buttons (`ButtonSM` about 32 px) and inputs (about 38 px) are smaller and not yet changed)*
+  - [x] Touch-friendly button sizing (min 44px) *(UI kit: below `md` every icon-only button (`ui.ButtonIcon`, Alert and toast dismiss) is 44 by 44 px, and text buttons, inputs, selects, and textareas are at least 44 px tall; desktop sizes are unchanged. `drive-ui-a11y` `touch-targets` measures it at 375 px)*
 - [ ] **Form Layouts**
   - Stack form fields on mobile
   - Full-width buttons on small screens
@@ -180,7 +180,7 @@ The focus for the next release is hardening the platform and improving the devel
 - [x] **Navigation:** Hamburger menu and slide-over sidebar on small screens. *(Bottom tab bar is still open in the Critical Phase)*
 - [x] **Dashboard Cards:** Ensure stackable layouts for project/service stats on small screens.
 - [ ] **Tables:** Add horizontal scroll or card view for deployments/containers lists on mobile. *(Moved to Critical Phase. Partial: `ui.Table` wraps every table in a keyboard-scrollable region; no card view)*
-- [ ] **Touch Targets:** Verify button and input sizes meet accessibility standards (min 44px). *(Moved to Critical Phase. Partial: icon-only buttons meet it below `md`)*
+- [x] **Touch Targets:** Verify button and input sizes meet accessibility standards (min 44px). *(Moved to Critical Phase. Done below `md` for icon-only buttons, text buttons, and fields)*
 
 ## 🛠 Code Review Findings (Priority Fixes)
 

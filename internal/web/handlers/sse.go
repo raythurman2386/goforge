@@ -409,7 +409,7 @@ func writeDeploymentLog(w http.ResponseWriter, flusher http.Flusher, r *http.Req
 func writeDeploymentSnapshot(w http.ResponseWriter, flusher http.Flusher, r *http.Request, logs []*models.DeploymentLog) {
 	var buf bytes.Buffer
 	if len(logs) == 0 {
-		buf.WriteString(`<p class="text-gray-500 italic dark:text-gray-400">No logs available yet...</p>`)
+		buf.WriteString(`<p class="text-gray-400 italic">No logs available yet...</p>`)
 	}
 	for _, entry := range logs {
 		if err := deployments.LogLine(entry).Render(r.Context(), &buf); err != nil {

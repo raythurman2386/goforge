@@ -116,8 +116,13 @@
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset;
   }
 
+  /*
+   * Touch targets (ROADMAP item 5): every button and text field is at least
+   * 44px tall below md (min-h-11) and keeps its padding-driven height from
+   * md up. btn-inline opts out, since it sits inside running text.
+   */
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:cursor-not-allowed active:scale-[0.98];
+    @apply min-h-11 md:min-h-0 inline-flex items-center justify-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:cursor-not-allowed active:scale-[0.98];
   }
 
   .btn-primary {
@@ -176,8 +181,10 @@
 
   /*
    * Size modifiers come after every variant so they win on padding:
-   * class="btn-primary btn-sm". btn-icon is a square icon-only target, 44px
-   * below md (touch, ROADMAP item 5) and 32px from md up.
+   * class="btn-primary btn-sm". btn-sm keeps the 44px minimum height from
+   * .btn below md and is about 32px from md up. btn-icon is a square
+   * icon-only target, 44px below md (touch, ROADMAP item 5) and 32px from
+   * md up. btn-inline drops the minimum so a ButtonLink in text stays inline.
    */
   .btn-sm {
     @apply px-3 py-1.5 text-sm;
@@ -188,7 +195,7 @@
   }
 
   .btn-inline {
-    @apply p-0;
+    @apply min-h-0 p-0;
   }
 
   /*
@@ -207,8 +214,9 @@
     @apply h-24 w-full rounded-ui-lg;
   }
 
+  /* Text fields, selects, and textareas: 44px minimum below md (touch). */
   .input {
-    @apply block w-full px-3 py-2 bg-field border border-field-border rounded-ui shadow-sm placeholder-field-placeholder transition-all focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring sm:text-sm;
+    @apply block w-full min-h-11 md:min-h-0 px-3 py-2 bg-field border border-field-border rounded-ui shadow-sm placeholder-field-placeholder transition-all focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring sm:text-sm;
     @apply dark:focus:ring-ring/30;
   }
 

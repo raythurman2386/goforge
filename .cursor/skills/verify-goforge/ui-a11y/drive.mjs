@@ -9,6 +9,9 @@
 //   GOFORGE_UI_PASSWORD_FILE  password from drive-register; empty = public pages only
 //   GOFORGE_UI_SCHEMES        default "light,dark"
 //   GOFORGE_UI_ROUTES         optional comma list that replaces the route list
+//   GOFORGE_UI_SERVICE_ID     optional service instance id (else first on /services)
+//   GOFORGE_UI_CONTAINER_ID   optional docker id (else first on /containers)
+//   GOFORGE_UI_DEPLOYMENT_PATH optional /projects/{id}/deployments/{id} path
 //   GOFORGE_VERIFY_CHROMIUM   optional Chromium executable path
 //
 // Writes ui-a11y-verdict.txt, ui-a11y-report.json, and screenshots under
@@ -35,14 +38,19 @@ const PASSWORD_FILE = process.env.GOFORGE_UI_PASSWORD_FILE || "";
 const SCHEMES = (process.env.GOFORGE_UI_SCHEMES || "light,dark").split(",").map((s) => s.trim()).filter(Boolean);
 
 const PUBLIC_ROUTES = ["/login", "/auth/register", "/dev/ui", "/ui-a11y-missing-page"];
+// /settings/profile also carries the backup restore points (#104/#105) and
+// the notifier form with its SMTP fields (#106/#109). Service, container,
+// and deployment detail routes are added per run (detailIDs below).
 const AUTH_ROUTES = [
   "/dashboard",
   "/projects",
   "/projects/new",
   "/services",
+  "/services/postgres/configure",
   "/containers",
   "/settings/profile",
   "/settings/git",
+  "/settings/activity",
   "/ui-a11y-missing-page",
 ];
 const PROJECT_TABS = ["", "/deployments", "/settings", "/services"];
@@ -93,6 +101,20 @@ async function scan(page, scheme, route) {
   }
   // Polling and SSE pages never go network-idle; give htmx a moment instead.
   await page.waitForTimeout(400);
+  // Let finite entrance animations end first: #dashboard-stats fades in for
+  // 0.5s, and a scan mid-fade reads its labels at about 4.3:1. Infinite ones
+  // (the spinner) are skipped; the wait is capped at 2s.
+  await page.evaluate(() =>
+    Promise.race([
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => Number.isFinite(a.effect && a.effect.getComputedTiming().endTime))
+          .map((a) => a.finished.catch(() => {})),
+      ),
+      new Promise((r) => setTimeout(r, 2000)),
+    ]),
+  );
   await page.evaluate(AXE_SOURCE);
   const result = await page.evaluate(
     (tags) => window.axe.run(document, { runOnly: { type: "tag", values: tags }, resultTypes: ["violations"] }),
@@ -1405,11 +1427,301 @@ async function appNavTabsChecks(scheme, page, projectTabs) {
   page.setDefaultTimeout(30000);
 }
 
+// t1681u: detail and post-PR7 pages. Ids come from env, else from links on
+// the list pages (service instances, containers, the project's
+// Deployments tab). A missing id is a skip line, not a fail, so a drive
+// without seed rows still runs; ui-a11y.md has the host-mode seed SQL.
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+async function firstHref(page, url, re) {
+  await page.goto(BASE + url, { waitUntil: "load" });
+  await page.waitForTimeout(600);
+  return page.evaluate((src) => {
+    const rx = new RegExp(src);
+    const a = Array.from(document.querySelectorAll("a[href]")).find((x) => rx.test(x.getAttribute("href")));
+    return a ? a.getAttribute("href") : null;
+  }, re.source);
+}
+
+async function detailIDs(page, projectHref) {
+  const env = process.env;
+  let service = env.GOFORGE_UI_SERVICE_ID || "";
+  if (!service) {
+    const h = await firstHref(page, "/services", new RegExp(`^/services/${UUID}$`));
+    service = h ? h.split("/")[2] : "";
+  }
+  let container = env.GOFORGE_UI_CONTAINER_ID || "";
+  if (!container) {
+    const h = await firstHref(page, "/containers", /^\/containers\/[0-9a-f]{12,64}$/);
+    container = h ? h.split("/")[2] : "";
+  }
+  let deployment = env.GOFORGE_UI_DEPLOYMENT_PATH || "";
+  if (!deployment && projectHref) {
+    deployment = (await firstHref(page, projectHref + "/deployments", new RegExp(`^/projects/${UUID}/deployments/${UUID}$`))) || "";
+  }
+  return { service, container, deployment };
+}
+
+function detailRouteList(ids) {
+  const routes = [];
+  if (ids.service) routes.push(`/services/${ids.service}`, `/services/${ids.service}/edit`);
+  if (ids.container) routes.push(`/containers/${ids.container}`);
+  if (ids.deployment) routes.push(ids.deployment);
+  return routes;
+}
+
+async function axeIn(page, sel) {
+  await page.evaluate(AXE_SOURCE);
+  const r = await page.evaluate(
+    ([tags, sel]) => window.axe.run({ include: [[sel]] }, { runOnly: { type: "tag", values: tags }, resultTypes: ["violations"] }),
+    [AXE_TAGS, sel],
+  );
+  return r.violations.filter((v) => GATE_IMPACTS.has(v.impact)).map((v) => `${v.id}(${v.impact},${v.nodes.length})`);
+}
+
+// Service detail (#107, #104/#105) and the page hooks app.js took over from
+// inline scripts (t1681u gap 3). Never types the real service name, so the
+// typed delete only ever sends a refused request.
+async function appDetailChecks(scheme, page, ids) {
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  page.setDefaultTimeout(8000);
+  const settle = () => page.waitForTimeout(350);
+  const active = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return { id: a ? a.id : "", tag: a ? a.tagName : "", dialog: a && a.closest("dialog") ? a.closest("dialog").id : "", testid: a ? a.getAttribute("data-testid") || "" : "" };
+    });
+
+  await t("app-git-source-toggle", async () => {
+    await page.goto(BASE + "/projects/new", { waitUntil: "load" });
+    const s = await page.evaluate(() => {
+      const m = document.getElementById("project-repo-manual");
+      const sel = document.getElementById("project-repo-select");
+      const src = document.getElementById("project-git-source");
+      return {
+        hook: src ? src.hasAttribute("data-git-source-toggle") : false,
+        inline: src ? Array.from(src.attributes).filter((a) => /^on/.test(a.name)).length : -1,
+        manualName: m ? m.getAttribute("name") : "",
+        manualRequired: m ? m.required : false,
+        selectName: sel ? sel.getAttribute("name") : "",
+        selectShown: sel ? getComputedStyle(document.getElementById("repo-select-container")).display !== "none" : true,
+      };
+    });
+    check(
+      scheme,
+      "app-git-source-toggle",
+      s.hook && s.inline === 0 && s.manualName === "repository_url" && s.manualRequired && s.selectName === "repository_url_select_disabled" && !s.selectShown,
+      `hook=${s.hook} on*=${s.inline} manual name=${s.manualName} required=${s.manualRequired} select name=${s.selectName} selectShown=${s.selectShown}`,
+    );
+  });
+
+  if (ids.container) {
+    await t("app-container-status-swap", async () => {
+      await page.goto(BASE + `/containers/${ids.container}`, { waitUntil: "load" });
+      const read = () => page.$eval("#container-status", (el) => el.textContent.replace(/\s+/g, " ").trim().toLowerCase());
+      const before = await read();
+      // The same event the stop/restart HX-Trigger header raises; no Docker call.
+      await page.evaluate(() => document.body.dispatchEvent(new CustomEvent("containerStopped", { bubbles: true })));
+      const stopped = await read();
+      await page.evaluate(() => document.body.dispatchEvent(new CustomEvent("containerRestarted", { bubbles: true })));
+      const running = await read();
+      const scripts = await page.$$eval("script:not([src])", (s) => s.length);
+      check(scheme, "app-container-status-swap", /exited/.test(stopped) && /running/.test(running) && scripts === 0, `before=${before} stopped=${stopped} restarted=${running} inline-scripts=${scripts}`);
+    });
+  } else {
+    lines.push(`check ${scheme} app-container-status-swap skip reason=no-container-id`);
+  }
+
+  if (!ids.service) {
+    lines.push(`check ${scheme} app-typed-delete skip reason=no-service-id`);
+    page.setDefaultTimeout(30000);
+    return;
+  }
+  const svc = `/services/${ids.service}`;
+
+  await t("app-secret-show-hide", async () => {
+    await page.goto(BASE + svc, { waitUntil: "load" });
+    const row = "[data-secret]";
+    if (!(await page.$(row))) {
+      lines.push(`check ${scheme} app-secret-show-hide skip reason=no-masked-row`);
+      return;
+    }
+    const mask = await page.$eval(row, (el) => el.getAttribute("data-secret-mask"));
+    await page.focus(`${row} [data-secret-action="toggle"]`);
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(`${row} [data-secret-value][data-revealed="true"]`);
+    const shown = await page.$eval(row, (el) => ({ differs: el.querySelector("[data-secret-value]").textContent !== el.getAttribute("data-secret-mask"), btn: el.querySelector('[data-secret-action="toggle"]').textContent.trim() }));
+    await page.keyboard.press("Enter");
+    await settle();
+    const hidden = await page.$eval(row, (el) => ({ masked: el.querySelector("[data-secret-value]").textContent === el.getAttribute("data-secret-mask"), btn: el.querySelector('[data-secret-action="toggle"]').textContent.trim() }));
+    const scripts = await page.$$eval("script:not([src])", (s) => s.length);
+    // The value itself is never written to evidence.
+    check(scheme, "app-secret-show-hide", Boolean(mask) && shown.differs && shown.btn === "Hide" && hidden.masked && hidden.btn === "Show" && scripts === 0, `revealed=${shown.differs} btn=${shown.btn} re-masked=${hidden.masked} btn=${hidden.btn} inline-scripts=${scripts}`);
+  });
+
+  await t("app-typed-delete", async () => {
+    await page.goto(BASE + svc, { waitUntil: "load" });
+    let deletes = 0;
+    const onReq = (r) => {
+      if (r.method() === "DELETE") deletes++;
+    };
+    page.on("request", onReq);
+    const opener = '[data-ui-dialog-open="delete-service-dialog"]';
+    const dlg = "#delete-service-dialog";
+    await page.focus(opener);
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(dlg + "[open]");
+    await settle();
+    const a = await active();
+    let escaped = 0;
+    for (let i = 0; i < 14; i++) {
+      await page.keyboard.press(i % 3 === 2 ? "Shift+Tab" : "Tab");
+      const x = await active();
+      if (x.dialog !== "delete-service-dialog" && x.tag !== "BODY") escaped++;
+    }
+    const axeBad = await axeIn(page, dlg);
+    // Empty name: the required input blocks the submit, so no DELETE.
+    await page.click(`${dlg} [data-testid="delete-service-dialog-submit"]`);
+    await settle();
+    const emptyDeletes = deletes;
+    // Wrong name: the server refuses (400) and the dialog shows its error.
+    await page.fill(`${dlg} [data-testid="delete-service-dialog-input"]`, "ui-a11y-wrong-name");
+    await page.click(`${dlg} [data-testid="delete-service-dialog-submit"]`);
+    await page.waitForSelector(`${dlg} [data-ui-dialog-error]:not(.hidden)`);
+    const err = await page.$eval(`${dlg} [data-ui-dialog-error]`, (el) => el.textContent.trim().length > 0);
+    const stillOpen = await page.$eval(dlg, (d) => d.open);
+    await page.keyboard.press("Escape");
+    await settle();
+    const closed = await page.$eval(dlg, (d) => !d.open);
+    const back = await active();
+    const stays = new URL(page.url()).pathname === svc;
+    page.off("request", onReq);
+    check(
+      scheme,
+      "app-typed-delete",
+      a.dialog === "delete-service-dialog" && escaped === 0 && axeBad.length === 0 && emptyDeletes === 0 && deletes === 1 && err && stillOpen && closed && back.dialog === "" && stays,
+      `focus in=${a.dialog} trap-escaped=${escaped} axe serious/critical=${axeBad.length}${axeBad.length ? " " + axeBad.join(",") : ""} empty-name DELETEs=${emptyDeletes} wrong-name DELETEs=${deletes} error-shown=${err} open-after-error=${stillOpen} esc-closed=${closed} focus-return=${back.tag}${back.testid ? "[" + back.testid + "]" : ""} still-on-page=${stays}`,
+    );
+  });
+
+  await t("app-protected-switch", async () => {
+    await page.goto(BASE + svc, { waitUntil: "load" });
+    const sw = "#service-protected-switch";
+    if (await page.$eval(sw, (el) => el.disabled)) {
+      lines.push(`check ${scheme} app-protected-switch skip reason=env-locked`);
+      return;
+    }
+    const before = await page.$eval(sw, (el) => el.checked);
+    const toggle = async () => {
+      await page.focus(sw);
+      await Promise.all([page.waitForResponse((r) => r.url().endsWith(`${svc}/protected`) && r.request().method() === "POST"), page.keyboard.press("Space")]);
+      await settle();
+      return page.$eval(sw, (el) => ({ checked: el.checked, role: el.getAttribute("role"), focused: document.activeElement === el }));
+    };
+    const one = await toggle();
+    const two = await toggle();
+    const axeBad = await axeIn(page, "#service-protected");
+    check(
+      scheme,
+      "app-protected-switch",
+      one.checked === !before && two.checked === before && one.role === "switch" && axeBad.length === 0,
+      `start=${before} after-space=${one.checked} after-second-space=${two.checked} role=${one.role} focus-kept=${one.focused}/${two.focused} axe serious/critical=${axeBad.length}`,
+    );
+  });
+
+  await t("app-restore-points", async () => {
+    await page.goto(BASE + svc, { waitUntil: "load" });
+    const card = await page.$("#service-restore-points");
+    if (!card) {
+      lines.push(`check ${scheme} app-restore-points skip reason=card-not-rendered (needs admin and a backed-up template)`);
+      return;
+    }
+    await page.waitForFunction(() => !/Loading restore points/.test(document.getElementById("service-restore-points").textContent), null, { timeout: 8000 });
+    const state = await page.evaluate(() => {
+      const el = document.getElementById("service-restore-points");
+      return el.querySelector('[data-testid="service-restore-point-table"]') ? "table" : el.querySelector('[data-testid="service-restore-points-empty"]') ? "empty" : el.querySelector('[data-testid="service-restore-points-error"]') ? "error" : "other";
+    });
+    const axeBad = await axeIn(page, "#service-restore-points");
+    check(scheme, "app-restore-points", axeBad.length === 0 && state !== "other", `state=${state} axe serious/critical=${axeBad.length}${axeBad.length ? " " + axeBad.join(",") : ""}`);
+  });
+  page.setDefaultTimeout(30000);
+}
+
+// ROADMAP item 5 (t1681u gap 2): below md every visible text button and
+// field is at least 44px tall; from md up ButtonSM keeps its compact size.
+// ButtonInline (prose links) and checkboxes are out of scope.
+async function touchTargetChecks(scheme, page) {
+  const t = (name, fn) => fn().catch((e) => check(scheme, name, false, "threw " + String(e.message || e).split("\n")[0]));
+  const before = page.viewportSize();
+  const measure = () =>
+    page.evaluate(() => {
+      const sel = ".btn, [class*='btn-'], .input, .select, input.input, select.select, textarea.input";
+      const out = { n: 0, small: [], sm: [] };
+      for (const el of document.querySelectorAll(sel)) {
+        const cls = el.className && el.className.baseVal === undefined ? el.className : "";
+        if (!/(^|\s)(btn-(primary|secondary|danger|warning|ghost|ghost-primary|ghost-warning|ghost-danger|link)|input|select)(\s|$)/.test(cls)) continue;
+        if (/(^|\s)btn-inline(\s|$)/.test(cls)) continue;
+        if (el.closest("dialog:not([open]), [popover]:not(:popover-open), template")) continue;
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        if (r.width === 0 || r.height === 0 || cs.visibility === "hidden" || cs.display === "none") continue;
+        out.n++;
+        const h = Math.round(r.height * 10) / 10;
+        if (h < 44) out.small.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}=${h}`);
+        if (/(^|\s)btn-sm(\s|$)/.test(cls)) out.sm.push(h);
+      }
+      return out;
+    });
+  for (const route of ["/settings/profile", "/projects/new", "/dashboard"]) {
+    await t(`touch-targets ${route}`, async () => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.goto(BASE + route, { waitUntil: "load" });
+      await page.waitForTimeout(500);
+      const mobile = await measure();
+      await page.setViewportSize(before);
+      await page.goto(BASE + route, { waitUntil: "load" });
+      await page.waitForTimeout(500);
+      const desk = await measure();
+      const deskSmMax = desk.sm.length ? Math.max(...desk.sm) : 0;
+      check(
+        scheme,
+        `touch-targets ${route}`,
+        mobile.n > 0 && mobile.small.length === 0 && deskSmMax < 44,
+        `375px controls=${mobile.n} under-44=${mobile.small.length}${mobile.small.length ? " [" + mobile.small.slice(0, 8).join(",") + "]" : ""} desktop btn-sm=${desk.sm.length} max=${deskSmMax}`,
+      );
+    });
+  }
+  await page.setViewportSize(before);
+}
+
 // Sign in by posting the real login form from the browser context, so the
 // session cookie lands in the context's jar. drive-register stores the
 // password with a trailing newline (curl --data-urlencode @file sends it
 // as is), and a browser strips line breaks from password inputs, so typing
 // it cannot work. The CSRF token is read from the form and never written out.
+// t1683u: the dashboard's Recent agent actions card. Empty, it shows the
+// message with "View all activity" under it and no header action or table;
+// with rows, "View all" sits in the header. axe inside the card is clean.
+async function agentActionsCardCheck(scheme, page) {
+  try {
+    await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+    await page.waitForSelector("#recent-agent-actions", { timeout: 8000 });
+    const s = await page.$eval("#recent-agent-actions", (c) => {
+      const empty = c.querySelector('[data-testid="recent-agent-actions-empty"]');
+      const header = c.firstElementChild;
+      const headerLink = header ? header.querySelector('a[href^="/settings/activity"]') : null;
+      const emptyLink = empty ? empty.querySelector('a[href="/settings/activity"]') : null;
+      const below = empty && emptyLink ? emptyLink.getBoundingClientRect().top >= empty.querySelector("h3").getBoundingClientRect().bottom : false;
+      return { empty: Boolean(empty), table: Boolean(c.querySelector("table")), headerLink: Boolean(headerLink), emptyLink: Boolean(emptyLink), below };
+    });
+    const axeBad = await axeIn(page, "#recent-agent-actions");
+    const ok = (s.empty ? !s.table && !s.headerLink && s.emptyLink && s.below : s.table && s.headerLink) && axeBad.length === 0;
+    check(scheme, "app-agent-actions-card", ok, `state=${s.empty ? "empty" : "rows"} table=${s.table} header-view-all=${s.headerLink} empty-view-all=${s.emptyLink} link-below-message=${s.below} axe serious/critical=${axeBad.length}`);
+  } catch (e) {
+    check(scheme, "app-agent-actions-card", false, "threw " + String(e.message || e).split("\n")[0]);
+  }
+}
+
 async function login(page) {
   await page.goto(BASE + "/login", { waitUntil: "load" });
   const csrf = await page.$eval('form[action="/auth/login"] input[name="csrf_token"]', (el) => el.value).catch(() => "");
@@ -1457,7 +1769,12 @@ async function main() {
           await appEnvMenuChecks(scheme, page, projectTabs[0]);
           await appNavTabsChecks(scheme, page, projectTabs);
           await appSheetChecks(scheme, page);
-          const routes = AUTH_ROUTES.concat(projectTabs);
+          const ids = await detailIDs(page, projectTabs[0]);
+          lines.push(`detail-ids ${scheme} service=${ids.service ? "yes" : "none"} container=${ids.container ? "yes" : "none"} deployment=${ids.deployment ? "yes" : "none"}`);
+          await appDetailChecks(scheme, page, ids);
+          await touchTargetChecks(scheme, page);
+          await agentActionsCardCheck(scheme, page);
+          const routes = AUTH_ROUTES.concat(projectTabs, detailRouteList(ids));
           for (const route of routes) results.push(await scan(page, scheme, route));
         } else {
           lines.push(`login ${scheme} ${canLogin ? "fail" : "skip reason=no-register-password"}`);

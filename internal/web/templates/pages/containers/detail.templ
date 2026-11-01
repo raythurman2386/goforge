@@ -83,11 +83,11 @@ templ Detail(containerID string, csrfToken string) {
 				sse-swap="log"
 				hx-swap="beforeend"
 			>
-				<p class="text-gray-500 italic dark:text-gray-400">Waiting for logs...</p>
+				<p class="text-gray-400 italic">Waiting for logs...</p>
 			</div>
 		}
 
-		<!-- Status badges swapped in by the script below on HX-Trigger events -->
+		<!-- Status badges app.js swaps into #container-status on the containerStopped and containerRestarted HX-Trigger events -->
 		<template id="container-status-exited">
 			@components.StatusBadge("container", "exited")
 		</template>
@@ -95,18 +95,6 @@ templ Detail(containerID string, csrfToken string) {
 			@components.StatusBadge("container", "running")
 		</template>
 	}
-
-	<script>
-		(function () {
-			function setStatus(state) {
-				var el = document.getElementById('container-status');
-				var tpl = document.getElementById('container-status-' + state);
-				if (el && tpl) el.innerHTML = tpl.innerHTML;
-			}
-			document.body.addEventListener('containerStopped', function () { setStatus('exited'); });
-			document.body.addEventListener('containerRestarted', function () { setStatus('running'); });
-		})();
-	</script>
 }
 
 templ containerStatus() {
