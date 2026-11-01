@@ -192,25 +192,53 @@ type AuditFilter struct {
 	ResourceType string
 	ResourceID   string
 	Action       string
-	Limit        int
-	Offset       int
+	// ActionContains matches actions that contain it, ignoring case.
+	ActionContains string
+	// Source is models.AuditSourceMCP, AuditSourceAPI, AuditSourceUI, or
+	// AuditSourceAgent (MCP or API); see models.AuditLog.Source.
+	Source string
+	// TokenName matches details.token_name, the API token that made the
+	// change.
+	TokenName string
+	// AuditID matches the row with this id and every row whose
+	// details.audit_id points at it (its outcomes).
+	AuditID string
+	Limit   int
+	Offset  int
 }
+
+// auditSourceSQL classifies a row like models.AuditLog.Source. $8 is the
+// wanted source (its ListFiltered parameter).
+const auditSourceSQL = `(
+	$8 = ''
+	OR ($8 = 'mcp' AND COALESCE(user_agent, '') LIKE 'goforge-mcp%')
+	OR ($8 = 'agent' AND (COALESCE(user_agent, '') LIKE 'goforge-mcp%'
+		OR left(action, 7) = 'api_v1.' OR details->>'via' = 'api_v1'))
+	OR ($8 = 'api' AND COALESCE(user_agent, '') NOT LIKE 'goforge-mcp%'
+		AND (left(action, 7) = 'api_v1.' OR details->>'via' = 'api_v1'))
+	OR ($8 = 'ui' AND COALESCE(user_agent, '') NOT LIKE 'goforge-mcp%'
+		AND left(action, 7) <> 'api_v1.' AND COALESCE(details->>'via', '') <> 'api_v1')
+)`
 
 // ListFiltered retrieves audit log entries matching every non-empty filter
 // field, newest first.
 func (r *AuditLogRepository) ListFiltered(ctx context.Context, f AuditFilter) ([]*models.AuditLog, error) {
 	query := `
-		SELECT id, user_id, action, resource_type, resource_id,
-			details, ip_address, user_agent, created_at
+		SELECT ` + auditColumns + `
 		FROM audit_logs
 		WHERE ($1 = '' OR user_id::text = $1)
 			AND ($2 = '' OR resource_type = $2)
 			AND ($3 = '' OR resource_id::text = $3)
 			AND ($4 = '' OR action = $4)
-		ORDER BY created_at DESC
-		LIMIT $5 OFFSET $6`
+			AND ($5 = '' OR strpos(lower(action), lower($5)) > 0)
+			AND ($6 = '' OR details->>'token_name' = $6)
+			AND ($7 = '' OR id::text = $7 OR details->>'audit_id' = $7)
+			AND ` + auditSourceSQL + `
+		ORDER BY created_at DESC, id DESC
+		LIMIT $9 OFFSET $10`
 
-	rows, err := r.db.QueryContext(ctx, query, f.UserID, f.ResourceType, f.ResourceID, f.Action, f.Limit, f.Offset)
+	rows, err := r.db.QueryContext(ctx, query, f.UserID, f.ResourceType, f.ResourceID, f.Action,
+		f.ActionContains, f.TokenName, f.AuditID, f.Source, f.Limit, f.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -238,4 +266,18 @@ func (r *AuditLogRepository) ListFiltered(ctx context.Context, f AuditFilter) ([
 		return nil, err
 	}
 	return logs, nil
+}
+
+// GetByID returns the audit row with this id, or nil when there is none.
+func (r *AuditLogRepository) GetByID(ctx context.Context, id string) (*models.AuditLog, error) {
+	if !isUUID(id) {
+		return nil, nil //nolint:nilnil // nil, nil means no row.
+	}
+	return r.findOne(ctx, `SELECT `+auditColumns+` FROM audit_logs WHERE id = $1`, id)
+}
+
+// isUUID reports whether s parses as a UUID; audit ids always do.
+func isUUID(s string) bool {
+	_, err := uuid.Parse(s)
+	return err == nil
 }

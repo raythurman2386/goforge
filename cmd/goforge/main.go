@@ -400,7 +400,9 @@ func runServer() error {
 	)
 
 	// Initialize deployment worker
-	deployWorker := deploy.NewWorker(deployService, queueRepo, 0, 0, cfg.BuildTimeout)
+	// WithAudit before Start: deployments queued with an audit id write
+	// deployment.run.completed/failed/canceled linked to it when they end.
+	deployWorker := deploy.NewWorker(deployService, queueRepo, 0, 0, cfg.BuildTimeout).WithAudit(auditLogRepo)
 	deployWorker.Start()
 	defer deployWorker.Stop()
 	// Finish redeploy cleanups whose in-memory grace timer died with the
@@ -419,7 +421,8 @@ func runServer() error {
 	if err := catalog.LoadTemplates(); err != nil {
 		log.Error("failed to load service templates", "error", err)
 	}
-	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog, cfg.TraefikNetwork, cfg.CloudflareProxyMode, logger.WithComponent(log, "instance"))
+	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog, cfg.TraefikNetwork, cfg.CloudflareProxyMode, logger.WithComponent(log, "instance")).
+		WithAudit(auditLogRepo)
 
 	// Initialize handlers
 	sseHandler := handlers.NewSSEHandler(sseHub, dockerClient, monitorCollector, containerRepo, instanceRepo, deployService, projectService, logger.WithComponent(log, "sse"))
@@ -430,10 +433,12 @@ func runServer() error {
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, cfg.EnableRegistration, logger.WithComponent(log, "auth")).
 		WithLoginThrottle(loginThrottle)
 	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService, projectRepo, gitSourceRepo, logger.WithComponent(log, "dashboard"))
-	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService, logger.WithComponent(log, "projects"))
-	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments"))
-	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments"))
-	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services"))
+	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService, logger.WithComponent(log, "projects")).
+		WithAudit(auditService)
+	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments")).WithAudit(auditService)
+	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments")).
+		WithAudit(auditService)
+	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services")).WithAudit(auditService)
 	projectHandler.WithInspector(dockerClient)
 	serviceHandler.WithInspector(dockerClient)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
@@ -445,7 +450,8 @@ func runServer() error {
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
-	containerHandler := handlers.NewContainerHandler(containerRepo, instanceRepo, dockerClient, logger.WithComponent(log, "containers"))
+	containerHandler := handlers.NewContainerHandler(containerRepo, instanceRepo, dockerClient, logger.WithComponent(log, "containers")).
+		WithAudit(auditService)
 
 	// Rate limiter (stopped during graceful shutdown)
 	// CF-Connecting-IP is only read with CLOUDFLARE_PROXY_MODE (see httputil.ProxyTrust).

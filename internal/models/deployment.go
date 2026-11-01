@@ -134,6 +134,10 @@ type QueueItem struct {
 	StartedAt    sql.NullTime
 	FinishedAt   sql.NullTime
 	ErrorMessage sql.NullString
+	// AuditID is the audit row that queued the deployment (an API v1
+	// approval or a UI deployment.trigger), if any. The worker writes
+	// deployment.run.<result> with details.audit_id set to it.
+	AuditID sql.NullString
 }
 
 // QueueStats holds statistics about the deployment queue.

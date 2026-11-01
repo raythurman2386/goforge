@@ -18,6 +18,14 @@ import (
 type EnvironmentHandler struct {
 	projectService *project.Service
 	logger         *slog.Logger
+	audit          uiAudit
+}
+
+// WithAudit records environment and variable changes in the audit log
+// (via=ui). Rows name the variable key, never its value.
+func (h *EnvironmentHandler) WithAudit(rec UIAuditRecorder) *EnvironmentHandler {
+	h.audit = uiAudit{rec: rec}
+	return h
 }
 
 // NewEnvironmentHandler creates a new EnvironmentHandler.
@@ -109,6 +117,8 @@ func (h *EnvironmentHandler) CreateEnvironment(w http.ResponseWriter, r *http.Re
 		http.Error(w, "failed to create environment", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionEnvironmentCreate, models.ResourceTypeEnvironment, env.ID,
+		map[string]interface{}{"project_id": p.ID, "name": name})
 
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusCreated)
@@ -158,6 +168,8 @@ func (h *EnvironmentHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Re
 		http.Error(w, "failed to update environment", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionEnvironmentUpdate, models.ResourceTypeEnvironment, env.ID,
+		map[string]interface{}{"project_id": env.ProjectID, "name": env.Name})
 
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusOK)
@@ -243,6 +255,8 @@ func (h *EnvironmentHandler) AddVariable(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "failed to add variable", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionEnvVarSet, models.ResourceTypeEnvironment, envID,
+		map[string]interface{}{"project_id": env.ProjectID, "key": key, "is_secret": isSecret})
 
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusCreated)
@@ -294,11 +308,13 @@ func (h *EnvironmentHandler) SyncEnvFromRepo(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	_, err := h.projectService.SeedEnvVarsFromRepo(r.Context(), envID, p.ID)
+	added, err := h.projectService.SeedEnvVarsFromRepo(r.Context(), envID, p.ID)
 	if err != nil {
 		http.Error(w, "failed to sync environment variables from repository", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionEnvVarSync, models.ResourceTypeEnvironment, envID,
+		map[string]interface{}{"project_id": p.ID, "added": added})
 
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusOK)
@@ -324,6 +340,8 @@ func (h *EnvironmentHandler) DeleteVariable(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "failed to delete variable", http.StatusInternalServerError)
 		return
 	}
+	h.audit.record(r, models.AuditActionEnvVarDelete, models.ResourceTypeEnvironment, envID,
+		map[string]interface{}{"project_id": env.ProjectID, "variable_id": varID})
 
 	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusOK)

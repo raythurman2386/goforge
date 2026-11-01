@@ -314,11 +314,17 @@ func (h *Handler) answerReplay(w http.ResponseWriter, ref string, m *mutation, a
 // answers 504 with the JSON error code "timeout" and the audit_id to follow;
 // the change keeps running and records its outcome when it ends.
 func (h *Handler) run(w http.ResponseWriter, r *http.Request, g *gate, m *mutation, auditID string, op func(ctx context.Context) outcome) {
-	user, _ := caller(r)
+	user, token := caller(r)
 	ref := strings.TrimSpace(g.ApprovalRef)
 	origin := h.originOf(r)
+	if token != nil {
+		origin.tokenID, origin.tokenName = token.ID, token.Name
+	}
 
-	opCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), h.opTimeout)
+	// The audit id rides on the op context so queued work (a deployment
+	// in the queue, a service deploy or recreate) can write its final
+	// deployment.run.* or service.run.* row linked to this audit row.
+	opCtx, cancel := context.WithTimeout(models.WithAuditID(context.WithoutCancel(r.Context()), auditID), h.opTimeout)
 	done := make(chan outcome, 1)
 	go func() {
 		defer cancel()
@@ -386,6 +392,9 @@ func (h *Handler) recordOutcome(origin origin, userID, ref string, m *mutation, 
 		return
 	}
 	details := map[string]any{"via": "api_v1", "approval_ref": ref, "audit_id": auditID}
+	if origin.tokenName != "" {
+		details["token_id"], details["token_name"] = origin.tokenID, origin.tokenName
+	}
 	action := "api_v1." + m.Action + ".completed"
 	if out.Err != nil {
 		action = "api_v1." + m.Action + ".failed"
@@ -439,6 +448,9 @@ func codeForStatus(status int) string {
 // captured while the request is live so later outcome rows can reuse it.
 type origin struct {
 	ip, userAgent string
+	// tokenID and tokenName name the API token on outcome rows so the
+	// activity page can filter them by token like the request row.
+	tokenID, tokenName string
 }
 
 func (h *Handler) originOf(r *http.Request) origin {

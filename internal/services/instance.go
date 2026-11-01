@@ -83,6 +83,46 @@ type InstanceService struct {
 	logger              *slog.Logger
 	healthPoll          time.Duration
 	bgTimeout           time.Duration
+	audit               AuditRunStore
+}
+
+// WithAudit makes background deploys, config edits, and image updates write
+// service.run.completed or service.run.failed when they end, if the call's
+// context carries an audit id (models.WithAuditID). details.audit_id is that
+// id.
+func (s *InstanceService) WithAudit(store AuditRunStore) *InstanceService {
+	s.audit = store
+	return s
+}
+
+// recordRunOutcome writes service.run.<result> for auditID from the
+// instance's final status and last_error. It does nothing without an audit
+// store or id.
+func (s *InstanceService) recordRunOutcome(auditID, instanceID string) {
+	if auditID == "" || s.audit == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), statusWriteTimeout)
+	defer cancel()
+	out := RunOutcome{
+		Run:          models.AuditRunService,
+		ResourceType: models.ResourceTypeServiceInstance,
+		ResourceID:   instanceID,
+		Result:       models.AuditRunCompleted,
+	}
+	inst, err := s.instanceRepo.GetByID(ctx, instanceID)
+	switch {
+	case err != nil:
+		out.Result, out.Error = models.AuditRunFailed, "could not read the service status after the change"
+	default:
+		out.Status = string(inst.Status)
+		if inst.LastError.Valid && inst.LastError.String != "" {
+			out.Result, out.Error = models.AuditRunFailed, inst.LastError.String
+		} else if inst.Status == models.ServiceStatusFailed {
+			out.Result = models.AuditRunFailed
+		}
+	}
+	RecordRunOutcome(s.audit, s.logger, auditID, out)
 }
 
 // NewInstanceService creates a new instance service.
@@ -200,8 +240,10 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	// Run deployment in background
 	// We do not pass ctx to the goroutine because it is a request context that
 	// will be canceled when the HTTP handler returns.
+	auditID := models.AuditIDFrom(ctx)
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
+		defer s.recordRunOutcome(auditID, instanceID)
 		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 
@@ -654,8 +696,10 @@ func (s *InstanceService) UpdateInstanceConfig(ctx context.Context, id string, u
 		return nil, claimErr
 	}
 
+	auditID := models.AuditIDFrom(ctx)
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
+		defer s.recordRunOutcome(auditID, instance.ID)
 		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 		s.recreateContainer(bgCtx, tmpl, spec, pullPreferRemote, prevStatus)
@@ -702,8 +746,10 @@ func (s *InstanceService) UpdateInstanceImage(ctx context.Context, id string) (*
 	}
 	s.logger.Info("service image update requested", "instance_id", instance.ID, "template", tmpl.Name, "image", spec.opts.Image)
 
+	auditID := models.AuditIDFrom(ctx)
 	//nolint:contextcheck // Intentional use of background context for async work
 	go func() {
+		defer s.recordRunOutcome(auditID, instance.ID)
 		bgCtx, cancel := context.WithTimeout(context.Background(), s.bgTimeout)
 		defer cancel()
 		s.recreateContainer(bgCtx, tmpl, spec, pullRequired, prevStatus)
