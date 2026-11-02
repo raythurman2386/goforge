@@ -1,6 +1,6 @@
 # UI kit reference
 
-GoForge pages are built from one templ component kit in `internal/web/templates/components/ui` (package `ui`). It runs on Tailwind 3.4.17, htmx 2, native `<dialog>`, and the native `popover` attribute. One delegated script, `static/js/ui.js`, adds keyboard and focus behavior. There is no React, no JS build step, and no client framework.
+GoForge pages are built from one templ component kit in `internal/web/templates/components/ui` (package `ui`). It runs on Tailwind 3.4.19, htmx 2.0.11, native `<dialog>`, and the native `popover` attribute. One delegated script, `static/js/ui.js`, adds keyboard and focus behavior. There is no React, no JS build step, and no client framework.
 
 **Rule:** pages and shared components use `components/ui`. Do not write `class="btn…"`, `class="card…"`, `class="input"`, `class="select"`, or `class="label"` by hand. Do not add `confirm(...)` or the old `id="modal"` and `id="menu-button"` contracts. `TestPagesUseKit` in `internal/web/templates/components/sweep_gate_test.go` fails on any of those outside `components/ui`. Do not add inline event handlers (any `on…=` attribute, an `"on…":` key in `templ.Attributes`, or `hx-on`) or an inline `<script>` anywhere, `components/ui` included. `TestNoInlineHandlersOrScripts` in the same file fails on them; page behavior goes in a delegated `data-*` listener in `static/js/app.js`.
 

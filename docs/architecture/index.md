@@ -145,8 +145,8 @@ stateDiagram-v2
 | Language | Go 1.26 | Backend, CLI, all server-side logic |
 | Router | go-chi/chi/v5 | HTTP routing and middleware |
 | Templates | a-h/templ | Type-safe server-side HTML templates |
-| Frontend | HTMX 2 | Dynamic UI without JavaScript frameworks |
-| Styling | TailwindCSS 3.4.17 | Utility-first CSS, with design tokens as CSS variables in `static/css/input.css` |
+| Frontend | HTMX 2.0.11 (htmx-ext-sse 2.2.4) | Dynamic UI without JavaScript frameworks |
+| Styling | TailwindCSS 3.4.19 | Utility-first CSS, with design tokens as CSS variables in `static/css/input.css` |
 | Database | PostgreSQL | Primary data store |
 | Docker | Docker SDK | Container management |
 | Git | go-git/v5 | Git clone/pull operations |
