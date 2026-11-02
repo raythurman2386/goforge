@@ -1,6 +1,24 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+
+/*
+ * Tailwind 4 is configured here, in CSS (@source, @custom-variant, @theme);
+ * there is no JavaScript config file.
+ * source(none) turns off automatic detection, so only these files are
+ * scanned for class names (the same set scripts/class_check.py checks).
+ * Paths are relative to this file.
+ */
+@source "../../internal/web/templates/**/*.templ";
+@source "../../internal/web/templates/**/*.go";
+@source "../../internal/web/handlers/**/*.go";
+@source "../js/app.js";
+@source "../js/ui.js";
+
+/*
+ * Dark mode follows the OS setting only. There is deliberately no theme
+ * toggle and no stored preference: every dark: variant compiles to
+ * @media (prefers-color-scheme: dark).
+ */
+@custom-variant dark (@media (prefers-color-scheme: dark));
 
 /*
  * Geist Sans and Geist Mono, self-hosted variable fonts (OFL-1.1, see
@@ -25,8 +43,118 @@
 }
 
 /*
- * Design tokens. Each color is space-separated RGB channels so Tailwind can
- * apply opacity: tailwind.config.js maps them as rgb(var(--gf-x) / <alpha-value>).
+ * Theme: Tailwind color, radius, font, and animation names mapped onto the
+ * --gf-* tokens below. The tokens stay space-separated RGB channels, so
+ * every color here is rgb(var(--gf-x)); opacity modifiers such as
+ * bg-primary-500/20 work through Tailwind 4's color-mix(). Semantic colors
+ * need no dark: variant, because the tokens switch under
+ * prefers-color-scheme.
+ */
+@theme {
+  /* Emerald brand palette, read from tokens. */
+  --color-primary-50: rgb(var(--gf-primary-50));
+  --color-primary-100: rgb(var(--gf-primary-100));
+  --color-primary-200: rgb(var(--gf-primary-200));
+  --color-primary-300: rgb(var(--gf-primary-300));
+  --color-primary-400: rgb(var(--gf-primary-400));
+  --color-primary-500: rgb(var(--gf-primary-500));
+  --color-primary-600: rgb(var(--gf-primary-600));
+  --color-primary-700: rgb(var(--gf-primary-700));
+  --color-primary-800: rgb(var(--gf-primary-800));
+  --color-primary-900: rgb(var(--gf-primary-900));
+  --color-primary-950: rgb(var(--gf-primary-950));
+
+  /* Semantic tokens. */
+  --color-background: rgb(var(--gf-background));
+  --color-foreground: rgb(var(--gf-foreground));
+  --color-foreground-secondary: rgb(var(--gf-foreground-secondary));
+  --color-card: rgb(var(--gf-card));
+  --color-card-border: rgb(var(--gf-card-border));
+  --color-border: rgb(var(--gf-border));
+  --color-divider: rgb(var(--gf-divider));
+  --color-muted: rgb(var(--gf-muted));
+  --color-muted-foreground: rgb(var(--gf-muted-foreground));
+  --color-label: rgb(var(--gf-label));
+  --color-field: rgb(var(--gf-field));
+  --color-field-border: rgb(var(--gf-field-border));
+  --color-field-placeholder: rgb(var(--gf-field-placeholder));
+  --color-secondary: rgb(var(--gf-secondary));
+  --color-secondary-foreground: rgb(var(--gf-secondary-foreground));
+  --color-secondary-hover: rgb(var(--gf-secondary-hover));
+  --color-secondary-border: rgb(var(--gf-secondary-border));
+  --color-ring: rgb(var(--gf-ring));
+  --color-ring-offset: rgb(var(--gf-ring-offset));
+
+  /* Surfaces (t1734u GrokDay/GrokNight). */
+  --color-sidebar: rgb(var(--gf-sidebar));
+  --color-terminal: rgb(var(--gf-terminal));
+  --color-highlight: rgb(var(--gf-highlight));
+  --color-code: rgb(var(--gf-code));
+
+  /*
+   * Status and link roles (t1734u). Brand/accent stays primary (emerald).
+   * Light success/warning text uses a darker AA step (t1737u); fills,
+   * tints, rings, and borders stay on the palette hex.
+   */
+  --color-danger: rgb(var(--gf-danger));
+  --color-success: rgb(var(--gf-success));
+  --color-success-foreground: rgb(var(--gf-success-foreground));
+  --color-warning: rgb(var(--gf-warning));
+  --color-warning-foreground: rgb(var(--gf-warning-foreground));
+  --color-info: rgb(var(--gf-info));
+
+  --radius-ui: var(--gf-radius);
+  --radius-ui-lg: var(--gf-radius-lg);
+
+  /*
+   * Geist Sans for UI and body text, Geist Mono for code, logs, and IDs.
+   * Both are self-hosted in static/fonts (@font-face above).
+   */
+  --font-sans: Geist, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --animate-fade-in: fadeIn 0.5s ease-out forwards;
+
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/*
+ * Tailwind 4 compatibility (t1792u).
+ * - Border color: v4's default border color is currentcolor (v3 was
+ *   gray-200). Every GoForge border sets a color (toast, Alert, and the
+ *   app.js toast add a tone class), so this only backs up a bare border
+ *   width with the GoForge border token.
+ * - Cursor: v4 preflight dropped v3's button { cursor: pointer }. Restore it
+ *   for every enabled button, kit or not (tabs, menu items, toggles).
+ */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border, currentcolor);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/*
+ * Design tokens. Each color is space-separated RGB channels; @theme above
+ * maps them as rgb(var(--gf-x)), and ui-a11y/drive.mjs reads the raw
+ * triplets (--gf-background).
  * Light values (GrokDay) first, dark values (GrokNight) under
  * prefers-color-scheme (dark mode stays OS-only, no toggle). Neutral, status,
  * and surface values are the locked t1734u palette; the brand/accent stays
@@ -127,11 +255,7 @@
   }
 }
 
-/*
- * Dark mode follows the OS setting only (tailwind.config.js darkMode: 'media').
- * There is deliberately no theme toggle and no stored preference: every dark:
- * variant compiles to @media (prefers-color-scheme: dark).
- */
+/* Page defaults. */
 @layer base {
   html {
     @apply antialiased scroll-smooth;
@@ -146,7 +270,7 @@
   /*
    * Keyboard focus for links, summaries, and custom tabindex targets that set
    * no focus style of their own. :where() keeps specificity at zero, so any
-   * focus:outline-none or focus-visible:ring utility still wins.
+   * focus:outline-hidden or focus-visible:ring utility still wins.
    */
   :where(a, summary, [tabindex]):focus-visible {
     outline: 2px solid rgb(var(--gf-ring));
@@ -154,38 +278,60 @@
   }
 }
 
+/*
+ * UI kit classes (components/ui). They stay in the components layer as plain
+ * selectors, not @utility: Tailwind 4 puts the components layer before the
+ * utilities layer, so a caller's utility (p-0, h-*, w-*, rounded-*, px-2!)
+ * always overrides a kit class, as in Tailwind 3. Rules @apply Tailwind
+ * utilities only. A shared base (.btn, .input, .ui-focus-ring) is a grouped
+ * selector or inlined, because Tailwind 4 cannot @apply a non-utility class.
+ * Order inside the layer matters: base, then variants, then sizes.
+ */
 @layer components {
   /*
    * Shared keyboard focus ring for components/ui: visible only for keyboard
    * focus (focus-visible), offset from the control on the page background.
+   * .checkbox and .switch inline the same utilities.
    */
   .ui-focus-ring {
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset;
+    @apply focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset;
   }
 
   /*
+   * Button base, shared by .btn and every variant (Tailwind 3 did this with
+   * @apply btn in each variant).
    * Touch targets (ROADMAP item 5): every button and text field is at least
    * 44px tall below md (min-h-11) and keeps its padding-driven height from
    * md up. btn-inline opts out, since it sits inside running text.
    * text-center centers a wrapped label in a link button too: an <a> or
    * <span> (ui.Button with Href) does not get the UA text-align a <button>
-   * does.
+   * does. cursor-pointer: Tailwind 4 preflight no longer sets it on buttons,
+   * and a link or span button needs it too.
    */
-  .btn {
-    @apply min-h-11 md:min-h-0 inline-flex items-center justify-center text-center px-4 py-2 rounded-ui font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:cursor-not-allowed active:scale-[0.98];
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-warning,
+  .btn-ghost,
+  .btn-ghost-primary,
+  .btn-ghost-warning,
+  .btn-ghost-danger,
+  .btn-link {
+    @apply min-h-11 md:min-h-0 inline-flex items-center justify-center text-center px-4 py-2 rounded-ui font-medium cursor-pointer transition-all duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:cursor-not-allowed active:scale-[0.98];
   }
 
   .btn-primary {
-    @apply btn bg-primary-700 text-white hover:bg-primary-800 focus-visible:ring-primary-500 shadow-sm hover:shadow-primary-200/50 hover:shadow-lg;
+    @apply bg-primary-700 text-white hover:bg-primary-800 focus-visible:ring-primary-500 shadow-xs hover:shadow-primary-200/50 hover:shadow-lg;
     @apply dark:bg-primary-700 dark:hover:bg-primary-800 dark:hover:shadow-primary-900/40;
   }
 
   .btn-secondary {
-    @apply btn bg-secondary text-secondary-foreground border border-secondary-border hover:bg-secondary-hover focus-visible:ring-ring shadow-sm;
+    @apply bg-secondary text-secondary-foreground border border-secondary-border hover:bg-secondary-hover focus-visible:ring-ring shadow-xs;
   }
 
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 shadow-sm hover:shadow-red-200/50 hover:shadow-lg;
+    @apply bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 shadow-xs hover:shadow-red-200/50 hover:shadow-lg;
     @apply dark:hover:bg-red-500 dark:hover:shadow-red-900/40;
   }
 
@@ -194,7 +340,7 @@
    * hover (7.1:1) in both schemes. amber-500/600 under white text fail AA.
    */
   .btn-warning {
-    @apply btn bg-amber-700 text-white hover:bg-amber-800 focus-visible:ring-amber-500 shadow-sm;
+    @apply bg-amber-700 text-white hover:bg-amber-800 focus-visible:ring-amber-500 shadow-xs;
   }
 
   /*
@@ -204,25 +350,25 @@
    * card and background, so labelled ghost buttons pass, not only icon ones.
    */
   .btn-ghost {
-    @apply btn bg-transparent text-foreground-secondary hover:bg-highlight hover:text-foreground focus-visible:ring-ring;
+    @apply bg-transparent text-foreground-secondary hover:bg-highlight hover:text-foreground focus-visible:ring-ring;
   }
 
   .btn-ghost-primary {
-    @apply btn bg-transparent text-foreground-secondary hover:bg-primary-50 hover:text-primary-700 focus-visible:ring-ring;
+    @apply bg-transparent text-foreground-secondary hover:bg-primary-50 hover:text-primary-700 focus-visible:ring-ring;
     @apply dark:hover:bg-primary-900/30 dark:hover:text-primary-300;
   }
 
   .btn-ghost-warning {
-    @apply btn bg-transparent text-foreground-secondary hover:bg-warning/10 hover:text-warning-foreground focus-visible:ring-ring;
+    @apply bg-transparent text-foreground-secondary hover:bg-warning/10 hover:text-warning-foreground focus-visible:ring-ring;
   }
 
   .btn-ghost-danger {
-    @apply btn bg-transparent text-foreground-secondary hover:bg-danger/10 hover:text-danger focus-visible:ring-ring;
+    @apply bg-transparent text-foreground-secondary hover:bg-danger/10 hover:text-danger focus-visible:ring-ring;
   }
 
   /* Text-style button (components/ui ButtonLink). Pair with btn-inline in prose. */
   .btn-link {
-    @apply btn bg-transparent text-primary-700 underline-offset-4 hover:text-primary-900 hover:underline focus-visible:ring-ring;
+    @apply bg-transparent text-primary-700 underline-offset-4 hover:text-primary-900 hover:underline focus-visible:ring-ring;
     @apply dark:text-primary-300 dark:hover:text-primary-100;
   }
 
@@ -261,14 +407,18 @@
     @apply h-24 w-full rounded-ui-lg;
   }
 
-  /* Text fields, selects, and textareas: 44px minimum below md (touch). */
-  .input {
-    @apply block w-full min-h-11 md:min-h-0 px-3 py-2 bg-field border border-field-border rounded-ui shadow-sm placeholder-field-placeholder transition-all focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring sm:text-sm;
+  /*
+   * Text fields, selects, and textareas: 44px minimum below md (touch).
+   * .select shares the .input base (Tailwind 3 did this with @apply input).
+   */
+  .input,
+  .select {
+    @apply block w-full min-h-11 md:min-h-0 px-3 py-2 bg-field border border-field-border rounded-ui shadow-xs placeholder-field-placeholder transition-all focus:outline-hidden focus:ring-2 focus:ring-ring/20 focus:border-ring sm:text-sm;
     @apply dark:focus:ring-ring/30;
   }
 
   .select {
-    @apply input appearance-none bg-no-repeat transition-all;
+    @apply appearance-none bg-no-repeat;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
     background-position: right 0.5rem center;
     background-size: 1.25em 1.25em;
@@ -287,7 +437,8 @@
   }
 
   /* components/ui Field error: the control turns red with aria-invalid="true". */
-  .input[aria-invalid="true"] {
+  .input[aria-invalid="true"],
+  .select[aria-invalid="true"] {
     @apply border-danger focus:border-danger focus:ring-danger/20;
   }
 
@@ -296,7 +447,8 @@
    * kit focus ring. 16px box; the label next to it is the larger target.
    */
   .checkbox {
-    @apply h-4 w-4 shrink-0 cursor-pointer rounded border-field-border accent-primary-600 ui-focus-ring disabled:cursor-not-allowed disabled:opacity-50;
+    @apply h-4 w-4 shrink-0 cursor-pointer rounded-sm border-field-border accent-primary-600 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset;
     @apply dark:accent-primary-500;
   }
 
@@ -307,12 +459,13 @@
    * the card in light and dark (WCAG 1.4.11).
    */
   .switch {
-    @apply relative inline-flex h-6 w-11 shrink-0 cursor-pointer appearance-none items-center rounded-full border-2 border-transparent bg-muted-foreground transition-colors duration-200 ui-focus-ring disabled:cursor-not-allowed disabled:opacity-50;
+    @apply relative inline-flex h-6 w-11 shrink-0 cursor-pointer appearance-none items-center rounded-full border-2 border-transparent bg-muted-foreground transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ring-offset;
   }
 
   .switch::before {
     content: "";
-    @apply pointer-events-none inline-block h-5 w-5 translate-x-0 rounded-full bg-white shadow transition-transform duration-200;
+    @apply pointer-events-none inline-block h-5 w-5 translate-x-0 rounded-full bg-white shadow-sm transition-transform duration-200;
   }
 
   .switch:checked {
@@ -324,7 +477,7 @@
   }
 
   .card {
-    @apply bg-card rounded-ui-lg shadow-sm border border-card-border p-6;
+    @apply bg-card rounded-ui-lg shadow-xs border border-card-border p-6;
     @apply dark:shadow-none;
   }
 
@@ -341,6 +494,12 @@
     @apply text-base font-semibold leading-6 text-foreground;
   }
 }
+
+/*
+ * Unlayered rules below. Tailwind 4 emits native cascade layers, so these
+ * beat every Tailwind utility on the same element regardless of
+ * specificity. Keep them to states utilities do not set.
+ */
 
 /* HTMX loading indicator */
 .htmx-request .htmx-indicator,
@@ -374,9 +533,9 @@
 /*
  * Dialog (components/ui Dialog and ConfirmDialog, opened by static/js/ui.js
  * with showModal()). The backdrop and the enter and exit transitions are
- * plain CSS because Tailwind 3.4 has no utilities for ::backdrop,
- * @starting-style, or transition-behavior. Evergreen browsers only; an
- * older browser skips the transition and still opens the dialog.
+ * plain CSS, written before Tailwind 4 (which adds backdrop: and starting:
+ * variants); moving them to utilities is optional. Evergreen browsers only;
+ * an older browser skips the transition and still opens the dialog.
  */
 dialog[data-ui-dialog] {
   opacity: 0;
@@ -473,8 +632,8 @@ dialog[data-ui-sheet][open] {
  * Overlays (components/ui Dropdown, Popover, Tooltip) on the popover
  * attribute. The browser puts an open panel in the top layer; ui.js sets
  * its top and left next to the trigger. Without JS the panel still opens
- * (popovertarget), at the UA's centered position. Plain CSS because
- * Tailwind 3.4 has no utilities for :popover-open or @starting-style.
+ * (popovertarget), at the UA's centered position. Plain CSS, written
+ * before Tailwind 4 (which adds open: and starting: variants).
  */
 [data-ui-overlay][popover] {
   position: fixed;
