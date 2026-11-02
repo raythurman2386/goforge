@@ -57,6 +57,10 @@ const (
 	// Notifications form. Details hold {"changed": [field names]}, never
 	// the URL or token.
 	AuditActionNotifySettingsUpdate = "notify.settings.update"
+	// AuditActionErrorReportingSettingsUpdate records a save of the admin
+	// Error reporting (Sentry) form. Details hold {"changed": [field
+	// names]}, never the DSN.
+	AuditActionErrorReportingSettingsUpdate = "error_reporting.settings.update"
 )
 
 // Common resource types
@@ -71,6 +75,8 @@ const (
 	ResourceTypeAPIToken        = "api_token"
 	ResourceTypeBackupRun       = "backup_run"
 	ResourceTypeNotifySettings  = "notify_settings"
+	// ResourceTypeErrorReportingSettings is the Sentry settings row.
+	ResourceTypeErrorReportingSettings = "error_reporting_settings"
 )
 
 // Audit sources. Source classifies a row by who made the change; the

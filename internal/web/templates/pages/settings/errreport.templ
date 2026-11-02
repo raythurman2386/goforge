@@ -1,0 +1,57 @@
+package settings
+
+import (
+	"github.com/raythurman2386/goforge/internal/errreport"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// ErrorReportingCard is the admin-only Error reporting (Sentry) card. The
+// form never contains the DSN key; it only says whether a DSN is set, its
+// scheme://host/project, and where it comes from.
+templ ErrorReportingCard(v *errreport.SettingsView, csrfToken string) {
+	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "error-reporting-settings"}}) {
+		@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
+			Error reporting (Sentry)
+		}
+		<p class="text-sm text-foreground-secondary" data-testid="errreport-status">{ errReportStatusLine(v) }</p>
+		<form class="mt-6 border-t border-divider pt-4" data-testid="errreport-settings-form" hx-put="/settings/error-reporting" hx-target="#error-reporting-settings" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+			<input type="hidden" name="csrf_token" value={ csrfToken }/>
+			<div class="grid gap-4 sm:grid-cols-2">
+				<div class="sm:col-span-2">
+					@ui.Input(ui.InputProps{ID: "errreport-dsn", Name: "dsn", Type: "password", Label: "DSN", Autocomplete: "new-password", Placeholder: errReportDSNPlaceholder(v), DescribedBy: "errreport-dsn-state", Attrs: templ.Attributes{"spellcheck": "false"}})
+					<p id="errreport-dsn-state" class="mt-1 text-xs text-foreground-secondary" data-testid="errreport-dsn-state">{ errReportDSNState(v) }</p>
+				</div>
+				if v.DSNSet && v.Source == errreport.SourceSettings {
+					@ui.Checkbox(ui.CheckboxProps{ID: "errreport-clear-dsn", Name: "clear_dsn", Value: "true", Label: "Remove the DSN (turns error reporting off)", Class: "sm:col-span-2"})
+				}
+				@ui.Input(ui.InputProps{ID: "errreport-environment", Name: "environment", Type: "text", Label: "Environment", Value: v.Environment, Autocomplete: "off", Placeholder: v.EffectiveEnvironment, Help: "Blank uses " + v.EffectiveEnvironment + " (development in dev mode, otherwise production).", Attrs: templ.Attributes{"spellcheck": "false"}})
+			</div>
+			<p class="mt-4 text-xs text-foreground-secondary">Sends handler panics and server errors (5xx) from GoForge itself, tagged with the route and the GoForge version. No tracing. Cookies, Authorization and CSRF headers, request bodies, query strings, and client IPs are removed, and passwords, tokens, and connection strings are redacted. Your deployed apps are not affected.</p>
+			<div class="mt-4 flex justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonSecondary,
+					Attrs: templ.Attributes{
+						"data-testid": "errreport-test",
+						"hx-post": "/settings/error-reporting/test",
+						"hx-include": "closest form",
+						"hx-swap": "none",
+						"hx-target": "this",
+					},
+				}) {
+					Send test event
+				}
+				@ui.Button(ui.ButtonProps{
+					Variant: ui.ButtonPrimary,
+					Type: "submit",
+					Attrs: templ.Attributes{
+						"data-testid": "errreport-save",
+					},
+				}) {
+					Save error reporting
+					@components.Spinner()
+				}
+			</div>
+		</form>
+	}
+}

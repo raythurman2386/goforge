@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
+	"github.com/raythurman2386/goforge/internal/errreport"
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
@@ -363,6 +364,7 @@ func (h *Handler) safely(ctx context.Context, action string, op func(ctx context
 	defer func() {
 		if p := recover(); p != nil {
 			h.logger.Error("api v1: mutation panicked", "action", action, "panic", p)
+			errreport.CapturePanic(ctx, "api_v1."+action, p)
 			out = failed(fmt.Errorf("panic: %v", p), http.StatusInternalServerError, "internal error while running "+action)
 		}
 	}()

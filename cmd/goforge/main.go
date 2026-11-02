@@ -23,6 +23,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/deploy"
 	"github.com/raythurman2386/goforge/internal/docker"
+	"github.com/raythurman2386/goforge/internal/errreport"
 	"github.com/raythurman2386/goforge/internal/git"
 	"github.com/raythurman2386/goforge/internal/logger"
 	"github.com/raythurman2386/goforge/internal/mcphttp"
@@ -374,6 +375,29 @@ func runServer() error {
 	// on shutdown still get their 10s to send.
 	defer notifier.Wait()
 	notifySettings := &notify.SettingsService{Store: notifySettingsRepo, BaseURL: cfg.BaseURL, Redactor: notifyRedactor}
+	// Optional Sentry (Settings → Profile → Error reporting, or SENTRY_DSN
+	// while no row is saved). Off without a DSN; a save rebinds the client
+	// without a restart. Events go through the same redaction as alerts.
+	errReportEnv := "production"
+	if cfg.DevMode {
+		errReportEnv = "development"
+	}
+	errReporter := &errreport.Reporter{
+		Release: version, DefaultEnvironment: errReportEnv, Redact: notifyRedactor.Redact,
+		Logger: logger.WithComponent(log, "errreport"),
+	}
+	errReportSettings := &errreport.SettingsService{
+		Store: repositories.NewErrorReportingSettingsRepository(db.DB, secretService),
+		Live:  errReporter, EnvDSN: cfg.SentryDSN, DefaultEnvironment: errReportEnv,
+	}
+	if erc, src, erErr := errReportSettings.Effective(context.Background()); erErr != nil {
+		log.Error("failed to read error reporting settings; error reporting is off", "error", erErr)
+	} else if erErr = errReporter.Apply(erc); erErr != nil {
+		log.Error("error reporting did not start", "source", src, "error", erErr)
+	}
+	// Runs after srv.Shutdown returns, so events from the last requests
+	// get 2s to send.
+	defer errReporter.Flush(2 * time.Second)
 	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version).WithNotifier(notifier)
 	notifyRedactor.WithFunc(func(s string) string {
 		bc, _ := backupManager.Current()
@@ -484,7 +508,7 @@ func runServer() error {
 	serviceHandler.WithRestorePoints(restorePoints)
 	serviceHandler.WithEnvProtected(cfg.ProtectedServices)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
-	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithTokenResources(projectService, instanceService).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithNotifySettings(notifySettings).
+	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithTokenResources(projectService, instanceService).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithNotifySettings(notifySettings).WithErrorReporting(errReportSettings).
 		WithRestorePoints(restorePoints).WithAudit(auditService).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))

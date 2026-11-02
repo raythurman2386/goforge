@@ -150,6 +150,18 @@ The variables below are read from the process environment. Use them when you run
 !!! danger "ENCRYPTION_KEY is not backed up"
     The database dump holds secrets encrypted with `ENCRYPTION_KEY`. The key is never written to a backup. Keep a copy of it outside the server.
 
+## Error reporting (Sentry)
+
+Optional. An admin sets it in **Settings → Profile → Error reporting (Sentry)**: paste the project's DSN (Sentry → Project settings → Client Keys), optionally an environment name, press **Send test event**, then **Save error reporting**. A save applies at once, with no restart; a blank DSN (or **Remove the stored DSN**) turns it off. The DSN is stored encrypted with `ENCRYPTION_KEY` and never shown again.
+
+When it is on, GoForge sends panics in web, `/api/v1`, and in-process `/mcp` handlers, and every `5xx` error page it renders. Each event carries the route pattern (`/projects/{id}`, not the id), method, and status, and the release `goforge@<version>`. It never carries cookies, `Authorization` or other credential headers, the query string, the request body, the client IP, or who the user is; error text goes through the same redactor as notifications. Performance tracing is off. Background job panics are not reported.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SENTRY_DSN` | (empty) | Used only while nothing is saved in Settings. Once an admin saves the card (even blank), the saved value wins. Must be `https://` (`http://` only for `localhost`, `127.0.0.1`, or `::1`) with no secret key |
+
+The environment defaults to `production` (`development` with `GOFORGE_DEV_MODE=true`). `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE` are not read. `docker-compose.yml` passes `SENTRY_DSN` through from `.env`.
+
 ## Logging
 
 | Variable | Default | Description |

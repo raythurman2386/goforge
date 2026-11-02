@@ -118,6 +118,11 @@ Accounts have a `role` of `admin` or `user`. Registration creates users, includi
 - One-click service `config` and `connection_info` (generated passwords included) are encrypted with the same key
 - The S3 access key ID and secret saved in Settings → Profile → Backups are sealed with `ENCRYPTION_KEY` and never sent back to the browser. `ENCRYPTION_KEY` itself is never uploaded with a backup
 - API tokens and session tokens are stored only as SHA-256 hashes
+- The Sentry DSN saved in Settings → Profile → Error reporting is sealed with `ENCRYPTION_KEY` and never sent back to the browser (only scheme, host, and project)
+
+### Error reporting (Sentry)
+
+Error reporting is off unless an admin saves a DSN (or `SENTRY_DSN` is set and nothing is saved). When it is on, every event is scrubbed before it leaves the process (`internal/errreport/scrub.go`): request cookies, body, query string, environment, and the `Cookie`, `Set-Cookie`, `Authorization`, `Proxy-Authorization`, `X-CSRF-Token`, `X-API-Key`, `X-Forwarded-For`, `X-Real-IP`, `CF-Connecting-IP`, and `Forwarded` headers are removed; the URL loses its query and fragment; no user is attached (no id, email, name, or IP; only an id an SDK integration set would be kept); messages, exception values, and breadcrumbs go through the notification redactor (connection strings, `password=`, bearer tokens, and known secrets). `SendDefaultPII` is off and tracing is off. A DSN with a secret key, or plain `http://` to a non-loopback host, is refused. The test event uses a separate client, so it changes nothing that is live.
 
 ### Recommendations
 

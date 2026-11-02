@@ -73,6 +73,11 @@ type Config struct {
 	LogLevel  string
 	LogFormat string
 
+	// SentryDSN is SENTRY_DSN: optional Sentry error reporting for the
+	// control plane, used only while no admin has saved Settings → Profile
+	// → Error reporting (a saved row, even a blank one, wins).
+	SentryDSN string
+
 	// Trusted Proxies - CIDR ranges whose X-Forwarded-For / X-Real-IP headers
 	// are read (see httputil.ClientIP: rightmost untrusted X-Forwarded-For hop,
 	// never the leftmost alone). CF-Connecting-IP is also read from these peers
@@ -162,6 +167,7 @@ func Load() (*Config, error) {
 		// Logging
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: getEnv("LOG_FORMAT", "json"),
+		SentryDSN: getEnv("SENTRY_DSN", ""),
 
 		// Trusted proxies (comma-separated CIDRs or IPs)
 		TrustedProxies: getEnvStringSlice("TRUSTED_PROXIES"),
