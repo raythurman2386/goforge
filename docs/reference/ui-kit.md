@@ -1,6 +1,6 @@
 # UI kit reference
 
-GoForge pages are built from one templ component kit in `internal/web/templates/components/ui` (package `ui`). It runs on Tailwind 3.4.19, htmx 4.0.1, native `<dialog>`, and the native `popover` attribute. One delegated script, `static/js/ui.js`, adds keyboard and focus behavior. There is no React, no JS build step, and no client framework.
+GoForge pages are built from one templ component kit in `internal/web/templates/components/ui` (package `ui`). It runs on Tailwind 4.3.3, htmx 4.0.1, native `<dialog>`, and the native `popover` attribute. One delegated script, `static/js/ui.js`, adds keyboard and focus behavior. There is no React, no JS build step, and no client framework.
 
 **Rule:** pages and shared components use `components/ui`. Do not write `class="btn…"`, `class="card…"`, `class="input"`, `class="select"`, or `class="label"` by hand. Do not add `confirm(...)` or the old `id="modal"` and `id="menu-button"` contracts. `TestPagesUseKit` in `internal/web/templates/components/sweep_gate_test.go` fails on any of those outside `components/ui`. Do not add inline event handlers (any `on…=` attribute, an `"on…":` key in `templ.Attributes`, or `hx-on`) or an inline `<script>` anywhere, `components/ui` included. `TestNoInlineHandlersOrScripts` in the same file fails on them; page behavior goes in a delegated `data-*` listener in `static/js/app.js`.
 
@@ -10,7 +10,7 @@ With `GOFORGE_DEV_MODE=true`, `/dev/ui` renders every token and component, with 
 
 ## Typography
 
-Text uses **Geist Sans** (`font-sans`, the default on every page) and **Geist Mono** (`font-mono`) for code, logs, commit SHAs, image tags, and IDs. Both are variable fonts (weights 100 to 900) self-hosted in `static/fonts` (`Geist-Variable.woff2`, `GeistMono-Variable.woff2`, OFL-1.1), vendored from the npm `geist` package, with `@font-face` rules in `static/css/input.css` and system fallbacks in `tailwind.config.js`. `Base` preloads the sans file. To update them, copy the two files from a newer `geist` package's `dist/fonts` and keep the file names.
+Text uses **Geist Sans** (`font-sans`, the default on every page) and **Geist Mono** (`font-mono`) for code, logs, commit SHAs, image tags, and IDs. Both are variable fonts (weights 100 to 900) self-hosted in `static/fonts` (`Geist-Variable.woff2`, `GeistMono-Variable.woff2`, OFL-1.1), vendored from the npm `geist` package, with `@font-face` rules in `static/css/input.css` and system fallbacks in its `@theme` (`--font-sans`, `--font-mono`). `Base` preloads the sans file. To update them, copy the two files from a newer `geist` package's `dist/fonts` and keep the file names.
 
 ## Shared helpers
 
@@ -151,7 +151,7 @@ The 20 components of Path A, with their variants.
 2. **Init once.** Markup that needs setup is `data-ui="<name>"`. It is initialized on the first load and on every `htmx:after:process` (htmx 4's `htmx:load`), then marked `data-ui-ready`, so a second pass is a no-op. Components register with `GoForgeUI.register(name, {init, events})`.
 3. **Overlays outside polled regions.** Dialogs go to `<body>` and popovers to the top layer. Before htmx updates the history entry (`htmx:before:history:update`), every open dialog and popover closes. A swap that replaces an open overlay's anchor closes it first, so focus returns while the trigger exists.
 4. **Toasts stay in `app.js`.** Do not duplicate `LEVEL_CLASSES` in `ui.js`.
-5. **Literal classes.** Every class string in `ui.js` and `app.js` is a complete literal. Both files are in `tailwind.config.js` `content` and in `scripts/class_check.py`.
+5. **Literal classes.** Every class string in `ui.js` and `app.js` is a complete literal. Both files are `@source` entries in `static/css/input.css` and are read by `scripts/class_check.py`.
 6. **Motion** respects `prefers-reduced-motion` (CSS in `static/css/input.css`).
 
 The attributes `ui.js` reads:
@@ -170,7 +170,7 @@ The attributes `ui.js` reads:
 
 ## Styling
 
-Tokens are CSS variables in `static/css/input.css` (`--gf-*`, RGB triplets with light and dark values under `prefers-color-scheme`). `tailwind.config.js` maps them to utilities such as `bg-card`, `text-muted-foreground`, `border-field-border`, `ring-ring`, and `rounded-ui`. Dark mode is OS-only; there is no toggle.
+Tokens are CSS variables in `static/css/input.css` (`--gf-*`, RGB triplets with light and dark values under `prefers-color-scheme`). The `@theme` block in the same file maps them (`--color-card: rgb(var(--gf-card))`) to utilities such as `bg-card`, `text-muted-foreground`, `border-field-border`, `ring-ring`, and `rounded-ui`. Dark mode is OS-only; there is no toggle.
 
 The neutral, surface, and status values are the locked t1734u palette (GrokDay light, GrokNight dark). The brand and accent stay GoForge emerald (`primary-50` to `primary-950`, the same in both schemes), not the Grok assistant purple.
 

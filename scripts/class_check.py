@@ -26,12 +26,12 @@ Checked sources:
 Known gap (intentional): a class built from a runtime value that never appears
 as a literal (for example "w-" + width) cannot be checked statically. Keep such
 classes as complete literal strings in one of the sources above; Tailwind's
-content globs (tailwind.config.js) also need the full literal to compile it.
+@source globs (static/css/input.css) also need the full literal to compile it.
 
 Usage (from the repo root):
     make css-check
 or
-    npx --yes tailwindcss@3.4.19 -i static/css/input.css -o static/css/output.css
+    sh scripts/tailwindcss-npx.sh 4.3.3 -i static/css/input.css -o static/css/output.css
     python3 scripts/class_check.py static/css/output.css
 
 Exits 1 and prints "token [sources]" lines when anything is undefined.
@@ -149,7 +149,7 @@ def main():
     sel = {m.group(1).replace('\\', '') for m in re.finditer(r'\.((?:\\.|[A-Za-z0-9_-])+)', css)}
     if len(sel) < MIN_SELECTORS:
         print(f'class_check: output.css has only {len(sel)} selectors; '
-              'it is a placeholder or a failed build. Rebuild with Tailwind v3.4.19 (make css).',
+              'it is a placeholder or a failed build. Rebuild with Tailwind v4.3.3 (make css).',
               file=sys.stderr)
         sys.exit(1)
 

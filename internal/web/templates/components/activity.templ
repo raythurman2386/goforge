@@ -60,7 +60,7 @@ templ ActivityTable(id string, rows []ActivityRow, compact bool) {
 						@ui.TD(ui.CellProps{Class: "font-mono text-xs text-foreground-secondary"}) {
 							{ r.ApprovalRef }
 						}
-						@ui.TD(ui.CellProps{Class: "pr-6 text-xs text-danger break-words"}) {
+						@ui.TD(ui.CellProps{Class: "pr-6 text-xs text-danger wrap-break-word"}) {
 							{ r.Error }
 						}
 					}

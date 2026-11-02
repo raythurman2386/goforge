@@ -292,5 +292,4 @@ templates/
 | `.air.toml` | Hot reload configuration for development |
 | `.env.example` | Environment variable template |
 | `.editorconfig` | Editor formatting settings |
-| `tailwind.config.js` | TailwindCSS configuration |
 | `tools.go` | Go tool dependency pinning |

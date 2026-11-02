@@ -19,7 +19,7 @@ templ EnvironmentSwitcher(projectID string, envs []*models.Environment, currentE
 		@ui.DropdownTrigger(ui.DropdownProps{
 			ID:      EnvironmentMenuID,
 			Variant: ui.ButtonSecondary,
-			Class:   "!py-1.5 !px-3 font-bold flex items-center shadow-sm",
+			Class:   "py-1.5! px-3! font-bold flex items-center shadow-xs",
 			Attrs:   templ.Attributes{"aria-label": "Environment: " + currentEnvName(envs, currentEnvID)},
 		}) {
 			<span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" aria-hidden="true"></span>

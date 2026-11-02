@@ -146,7 +146,7 @@ stateDiagram-v2
 | Router | go-chi/chi/v5 | HTTP routing and middleware |
 | Templates | a-h/templ | Type-safe server-side HTML templates |
 | Frontend | htmx 4.0.1 (bundled hx-sse extension) | Dynamic UI without JavaScript frameworks |
-| Styling | TailwindCSS 3.4.19 | Utility-first CSS, with design tokens as CSS variables in `static/css/input.css` |
+| Styling | TailwindCSS 4.3.3 | Utility-first CSS, configured in `static/css/input.css` (`@theme`, `@source`), with design tokens as CSS variables |
 | Database | PostgreSQL | Primary data store |
 | Docker | Docker SDK | Container management |
 | Git | go-git/v5 | Git clone/pull operations |

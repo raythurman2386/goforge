@@ -69,11 +69,12 @@ go install github.com/a-h/templ/cmd/templ@v0.3.1001
 
 ### TailwindCSS
 
-Required for rebuilding the CSS. The development server and Docker build handle this automatically if installed. Use v3.4.19, the version the Dockerfile and CI use; the v4 CLI does not read `tailwind.config.js`.
+Required for rebuilding the CSS. The development server and Docker build handle this automatically if installed. Use v4.3.3, the version the Dockerfile and CI use. Without the standalone CLI, `make css` falls back to `npx @tailwindcss/cli@4.3.3` when Node is installed.
 
 ```bash
-# Install standalone CLI (v3.4.19, not "latest", which is v4)
-curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.19/tailwindcss-linux-x64
+# Install standalone CLI (v4.3.3, the pinned version, not "latest")
+curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-x64
+echo "dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a  tailwindcss-linux-x64" | sha256sum -c -
 chmod +x tailwindcss-linux-x64
 sudo mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 ```

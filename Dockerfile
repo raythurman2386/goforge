@@ -4,9 +4,13 @@ FROM golang:1.26.10 AS builder
 # Install build dependencies
 RUN apt-get update && apt-get install -y git make curl
 
-# Install TailwindCSS
-# Using the same method as in the Makefile
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.19/tailwindcss-linux-x64 && \
+# Install the TailwindCSS standalone CLI, pinned to the Makefile's
+# TAILWIND_VERSION and checked against the release's sha256sums.txt
+# (x64 only, as before).
+ARG TAILWIND_VERSION=4.3.3
+ARG TAILWIND_SHA256=dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a
+RUN curl -fsSLO https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64 && \
+    echo "${TAILWIND_SHA256}  tailwindcss-linux-x64" | sha256sum -c - && \
     chmod +x tailwindcss-linux-x64 && \
     mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 

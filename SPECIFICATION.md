@@ -77,8 +77,8 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **1.5** Implement config loading from environment variables with sensible defaults
 - [x] **1.6** Create `cmd/goforge/main.go` entry point with config loading and graceful shutdown
 - [x] **1.7** Set up structured logging with `log/slog` in `internal/logger/logger.go`
-- [x] **1.8** Download TailwindCSS standalone CLI, create build script `scripts/tailwind.sh`
-- [x] **1.9** Create `tailwind.config.js` with content paths for templ files
+- [x] **1.8** Download TailwindCSS standalone CLI, create build script `scripts/tailwind.sh` (since replaced by `make css`)
+- [x] **1.9** Create the Tailwind config with content paths for templ files (now `@source` and `@theme` in `static/css/input.css`, Tailwind 4)
 - [x] **1.10** Create base layout template `internal/web/templates/layouts/base.templ`
 - [x] **1.11** Add HTMX 2.x to `static/js/htmx.min.js`
 - [x] **1.12** Create HTTP router in `internal/web/router.go` using chi
@@ -857,11 +857,10 @@ goforge/
 │       └── traefik.yml                # Traefik base config
 ├── scripts/
 │   ├── build.sh                       # Build binary
-│   ├── tailwind.sh                    # Compile CSS
+│   ├── tailwindcss-npx.sh             # Tailwind CLI via npx (make css fallback)
 │   └── dev.sh                         # Development server
 ├── go.mod
 ├── go.sum
-├── tailwind.config.js
 ├── Makefile
 ├── .env.example
 ├── .gitignore
@@ -1152,7 +1151,7 @@ dev:
 
 # Compile TailwindCSS
 css:
-	./scripts/tailwind.sh
+	tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify
 
 # Generate templ files
 templ:

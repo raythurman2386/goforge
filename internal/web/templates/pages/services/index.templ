@@ -35,7 +35,7 @@ templ Index(templates []*services.ServiceTemplate, instances []*models.ServiceIn
 						Class: "hover:shadow-lg hover:shadow-primary-100/30 transition-all duration-300 flex flex-col group",
 					}) {
 						<div class="flex items-center mb-6">
-							<div class="h-12 w-12 bg-primary-50 rounded-xl flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm dark:bg-primary-900/30 dark:text-primary-400">
+							<div class="h-12 w-12 bg-primary-50 rounded-xl flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-xs dark:bg-primary-900/30 dark:text-primary-400">
 								if tmpl.Icon != "" {
 									<span class="text-xl font-bold">{ string(tmpl.DisplayName[0]) }</span>
 								} else {
@@ -106,7 +106,7 @@ templ InstanceList(instances []*models.ServiceInstance) {
 						@components.StatusBadge("service", string(instance.Status))
 					</div>
 					<div class="flex items-center text-sm text-foreground-secondary">
-						<div class="w-6 h-6 bg-muted rounded flex items-center justify-center text-[10px] font-bold mr-2">
+						<div class="w-6 h-6 bg-muted rounded-sm flex items-center justify-center text-[10px] font-bold mr-2">
 							{ string(instance.TemplateName[0]) }
 						</div>
 						{ instance.TemplateName }

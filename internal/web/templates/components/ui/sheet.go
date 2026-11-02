@@ -45,7 +45,8 @@ func sheetSide(s SheetSide) string {
 
 // sheetClass is the panel look. Position, size, and the slide live in
 // input.css (dialog[data-ui-sheet]), because the UA <dialog> styles need
-// overriding and Tailwind 3.4 has no @starting-style.
+// overriding and the slide uses @starting-style (plain CSS, kept as is
+// under Tailwind 4).
 func sheetClass(s SheetSide) string {
 	if s == SheetRight {
 		return "border-l border-border bg-card p-0 text-left text-foreground shadow-2xl"

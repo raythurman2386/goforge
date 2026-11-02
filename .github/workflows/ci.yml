@@ -72,7 +72,7 @@ jobs:
           fail_ci_if_error: false
 
   css:
-    name: CSS classes (Tailwind 3.4.19)
+    name: CSS classes (Tailwind 4.3.3)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -83,9 +83,11 @@ jobs:
         with:
           node-version: "22"
 
-      # Pinned to the same Tailwind version as the Dockerfile. Do not move to v4 here.
-      - name: Build CSS (Tailwind 3.4.19)
-        run: npx --yes tailwindcss@3.4.19 -i static/css/input.css -o static/css/output.css --minify
+      # Pinned to the same Tailwind version as the Makefile and Dockerfile.
+      # The wrapper runs npx @tailwindcss/cli@4.3.3 with NODE_PATH set, so
+      # `@import "tailwindcss"` resolves without a package.json.
+      - name: Build CSS (Tailwind 4.3.3)
+        run: sh scripts/tailwindcss-npx.sh 4.3.3 -i static/css/input.css -o static/css/output.css --minify
 
       - name: Fail on undefined classes
         run: python3 scripts/class_check.py static/css/output.css

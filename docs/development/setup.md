@@ -104,7 +104,7 @@ make test-coverage # Generate HTML coverage report
 
 # Code Generation
 make templ         # Generate templ templates
-make css           # Compile TailwindCSS v3.4.19 (standalone CLI or npx); fails without it
+make css           # Compile TailwindCSS v4.3.3 (standalone CLI or npx); fails without it
 make css-check     # rebuild output.css, then fail on undefined class tokens (CI css job)
 
 # Database

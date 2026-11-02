@@ -55,8 +55,9 @@ docker build -f Dockerfile.docs -t goforge-docs .   # static site image, nginx o
 
 # Code generation
 make templ                          # Generate templ templates (*_templ.go files)
-make css                            # Compile TailwindCSS v3.4.19 (standalone CLI if it is
-                                    # v3.4.19, else npx tailwindcss@3.4.19); fails otherwise
+make css                            # Compile TailwindCSS v4.3.3 (standalone CLI if it is
+                                    # v4.3.3, else scripts/tailwindcss-npx.sh, which runs
+                                    # npx @tailwindcss/cli@4.3.3); fails otherwise
 make css-check                      # Rebuild output.css, then scripts/class_check.py: fails on
                                     # class tokens (class="...", class={ ... }, *Class() helpers,
                                     # ui.Class()/"class" attrs, app.js and ui.js class
@@ -136,7 +137,7 @@ return errors.New("Connection failed.") // wrong
   `layouts.AppLayout(title, csrfToken)`.
 - Behavior goes in the delegated runtimes: `static/js/ui.js` (kit, `data-ui*`
   attributes) or `static/js/app.js` (toasts, htmx error toasts, active nav).
-  Both are class sources for `tailwind.config.js` `content` and
+  Both are class sources for the `@source` lines in `static/css/input.css` and
   `scripts/class_check.py`; keep every class a complete literal.
 - Dark mode is OS-only (`prefers-color-scheme`); there is no toggle.
 
@@ -326,6 +327,6 @@ The Cloud Agent VM has no systemd. PostgreSQL 16, Docker, and the dev server are
 - App: `http://127.0.0.1:8080` via `make dev` (`GOFORGE_DEV_MODE=true`). `/health` and `/health/ready` report database and Docker. If port 8080 is already healthy, do not start a second server.
 - Database: `postgres://goforge:password@localhost:5432/goforge?sslmode=disable` (the dev default). `make test` uses this database when `DATABASE_URL` is unset. Postgres is started with `pg_ctlcluster`, not `service`.
 - Docker uses `fuse-overlayfs` and legacy iptables (`/etc/docker/daemon.json`). One-click services join the `traefik` network; create it with `docker network create traefik` if it is missing.
-- `internal/web/templates/**/*_templ.go` and `static/css/output.css` are gitignored. Regenerate with `make templ` and `make css`. The Tailwind CLI on `PATH` is v3.4.19; the v4 binary does not read `tailwind.config.js`.
+- `internal/web/templates/**/*_templ.go` and `static/css/output.css` are gitignored. Regenerate with `make templ` and `make css`. `make css` needs Tailwind v4.3.3: the standalone CLI on `PATH`, or Node for `npx @tailwindcss/cli@4.3.3` (through `scripts/tailwindcss-npx.sh`). Tailwind is configured in `static/css/input.css` (`@source`, `@custom-variant dark`, `@theme`); there is no JS config file.
 - Use `/usr/local/go/bin/go`, and it must be Go 1.26.x: `go.mod` says `go 1.26.0`. `/usr/bin/go` is Ubuntu's Go 1.22 and cannot read the `tool` directive in `go.mod`. `make test` needs the full 1.26 toolchain; an older Go auto-downloads a toolchain module that is missing `covdata`.
 - `air` is `/usr/local/bin/air` (v1.67.0). `templ` and `golangci-lint` run through `go tool`. Local registration works without GitHub OAuth secrets.

@@ -32,7 +32,7 @@ templ EmptyState(p EmptyStateProps) {
 
 templ emptyStateBody(p EmptyStateProps) {
 	<div
-		class={ "bg-card rounded-2xl shadow-sm border border-divider flex items-center justify-center mx-auto",
+		class={ "bg-card rounded-2xl shadow-xs border border-divider flex items-center justify-center mx-auto",
 			templ.KV("w-16 h-16 mb-5", !p.Compact),
 			templ.KV("w-12 h-12 mb-3", p.Compact) }
 	>
