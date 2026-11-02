@@ -1,12 +1,40 @@
 # Roadmap
 
-This roadmap tracks the development of GoForge. Last brought up to date through #91 (2026-10-30).
+This roadmap tracks the development of GoForge. Last brought up to date through #124 and the v0.3.0 tag (2026-11-02). [CHANGELOG.md](CHANGELOG.md) has the detail for every release.
+
+Version names: releases are tagged v0.x (v0.1.0, v0.2.0, v0.2.1, v0.3.0). Headings that used to say "V1.0", "V1.0.x", and "V1.1" were internal milestone labels from before tagging started, not releases; they are renamed below. The next cycles are in [Release plan](#release-plan), and what still stands between v0.3.0 and v1.0 is in [Path to v1.0](#path-to-v10).
+
+## Release plan
+
+The cycle order is locked. This section records the order only: each cycle is scoped and approved on its own before any work starts, and parked items below still need Raymond's OK.
+
+| Cycle | Focus | Candidate scope |
+|-------|-------|-----------------|
+| **v0.4.0** | Docs truth | ROADMAP, README, SPECIFICATION, and the docs site match what shipped through v0.3.0; the [production validation plan](docs/deployment/production-validation.md) is written |
+| **v0.5.0** | Trust and security | HEALTH-READY-PUBLIC, session revoke on password change, the remaining audit gaps, 2FA |
+| **v0.6.0** | PaaS: DNS and deploy feel | Wire the custom domain DNS check into the domain forms; deploy feedback such as the rollback result and progress for long operations |
+| **v0.7.0** | UX polish | Back navigation, client-side validation, inline errors, mobile card views |
+| **v0.8.0 to v0.9.x** | Validation drills | Run the [production validation plan](docs/deployment/production-validation.md) on a throwaway stack and commit dated records |
+| **v1.0.0** | Release | Every [Path to v1.0](#path-to-v10) item closed, or accepted in writing by Raymond |
+
+## Path to v1.0
+
+Open blockers between v0.3.0 and v1.0. Each line says where the gap is recorded today.
+
+- [ ] **2FA** for local accounts. Not started (`SECURITY.md`, Not started); there is no TOTP or WebAuthn code.
+- [ ] **HEALTH-READY-PUBLIC**: `/health/ready` is unauthenticated and its JSON includes database and Docker error text (`SECURITY.md`). It is on the parked list below and needs Raymond's OK before work starts.
+- [ ] **Session revoke on password change**: changing the password does not end the account's other sessions (`SECURITY.md`, Sessions).
+- [ ] **Remaining audit gaps**: Git source changes, profile and password changes, and webhook-triggered deploys write no audit row, and the log has no retention setting or tamper protection. Web UI writes are covered since #103.
+- [ ] **Custom domain DNS check**: `DomainValidator` in `internal/proxy/acme.go` (`IsDomainRoutable`, `VerifyDNSRecord`, `VerifyDomainFull`) is tested but nothing outside its tests calls it. The project and environment forms check only the name format. The SSL certificate dashboard matters for direct installs that use Let's Encrypt through Traefik; on the recommended Cloudflare Tunnel path Traefik holds no certificate to watch, so whether the dashboard blocks v1.0 is Raymond's call.
+- [ ] **Production validation record**: no load test, resource limit check, or restore drill against a full GoForge stack has been run and written down. The plan is in [docs/deployment/production-validation.md](docs/deployment/production-validation.md). Raymond runs GoForge every day (Gitea and about 14 containers), but that use is not a recorded validation, and the README "Not Production-Ready" note stays until the record exists.
+
+Also open, not yet called blockers: the main `goforge` image runs as root (parked below; low gain while the container holds the read-write Docker socket), and the QA and docs items in the [v1.0 readiness checklist](#v10-readiness-checklist).
 
 ## 🚨 CRITICAL: User Flow & Experience Gaps (Immediate Priority)
 
-Based on comprehensive user flow analysis, the following must be addressed before V1.0 can be considered complete:
+Based on comprehensive user flow analysis, the following must be addressed before v1.0 (see [Path to v1.0](#path-to-v10)):
 
-### Phase 1: Critical User Experience (Blocking V1.0)
+### Phase 1: Critical User Experience (Blocking v1.0)
 
 #### 1. User Account Management (Completed Mar 2026)
 - [x] **User Profile Page** (`/settings/profile`)
@@ -27,7 +55,7 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 - [x] **Empty State Improvements**
   - Prompt to add Git Source when creating project (if none exist)
   - Guided tour for first-time project creation
-  - Quick-start wizard for common stacks (Deferred to V1.1)
+  - Quick-start wizard for common stacks (Deferred)
 
 #### 3. Container & Runtime Management (Completed Mar 2026)
 - [x] **Container Logs Viewer** (`/containers/{id}/logs`)
@@ -47,10 +75,12 @@ Based on comprehensive user flow analysis, the following must be addressed befor
   - Certificate status and expiration dates
   - Force renew/refresh certificates
   - Domain validation status
+  - *Not built. Applies to direct installs (Let's Encrypt through Traefik); see [Path to v1.0](#path-to-v10).*
 - [ ] **Domain Configuration Validation**
   - DNS verification before adding custom domain
   - Error messages for misconfigured domains
   - Auto-generated subdomain preview
+  - *Code present, not wired: `DomainValidator` in `internal/proxy/acme.go` does the DNS checks, but nothing outside its tests calls it, and the forms check only the name format. Planned for v0.6.0.*
 
 ### Phase 2: UX Polish & Edge Cases
 
@@ -113,7 +143,7 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 
 ---
 
-## ✅ V1.0 Release (Completed)
+## ✅ Foundation (shipped by v0.1.0, formerly labeled "V1.0 Release")
 
 **Core Foundation & Deployment**
 - [x] **Project Foundation:** Config, logger, router, Postgres DB, Migrations.
@@ -131,18 +161,18 @@ Based on comprehensive user flow analysis, the following must be addressed befor
 
 ---
 
-## 🚀 V1.1: Resilience & Scale (Next Steps)
+## 🚀 Resilience & Scale (formerly labeled "V1.1")
 
-The focus for the next release is hardening the platform and improving the developer experience for power users.
+Hardening the platform and improving the developer experience for power users. Items shipped through v0.3.0 are checked with their PR; open items are scheduled through the [Release plan](#release-plan).
 
 ### 1. Advanced Observability
 - [x] **Log Persistence:** Clone and build logs are stored in `deployment_logs` and replayed when the deployment log stream connects.
-- [ ] **Alerting System:** Email/Slack notifications for failed deployments or high resource usage.
+- [x] **Alerting System:** Outbound alerts for failed deploys, failed services, failed backups, and unhealthy or exited containers, set up in Settings → Profile → Notifications: ntfy and webhook with the container health watch (#106), and Email (SMTP) (#109). *(Not yet: alerts on resource usage thresholds, and a Slack-specific channel.)*
 - [ ] **Status Page:** Public-facing status page for services.
 - [x] **Health Checks:** Add real comprehensive health checks for DB, Docker, and other dependencies. *(Moved to Critical Phase)*
-- [ ] **Notifications Center:** In-app notification system for deployment events
+- [ ] **Notifications Center:** In-app notification system for deployment events *(outbound alerts shipped in #106 and #109; there is no in-app center)*
 
-### 1.5 Recent V1.0.x Improvements (Completed)
+### 1.5 Earlier Improvements (before v0.1.0)
 - [x] **Environment Variable Sync:** Added `.env.example` sync from repository
 - [x] **Service Linking:** Automatic env var injection when linking services to projects
 - [x] **Variable Management:** Delete and sync buttons for environment variables
@@ -153,16 +183,17 @@ The focus for the next release is hardening the platform and improving the devel
 - [x] **Deployment cancel status:** The `canceled` status matches the database check constraint
 
 ### 2. Enhanced Services
-- [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. `goforge backup list` / `goforge backup restore` restore the GoForge database (side database, then rename; previous one kept), with a read-only Restore points list on Settings → Profile. Service data restore is manual. Not yet: other templates, service restore tooling, web/API restore, run-now from the API
+- [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. `goforge backup list` / `goforge backup restore` restore the GoForge database (side database, then rename; previous one kept), with a read-only Restore points list on Settings → Profile. `goforge backup restore-service <run key> <instance id>` restores one Postgres, Gitea, or Vaultwarden service's data from a run (dry run by default, size and SHA-256 checks before anything stops, previous data kept aside; #104, #105), and those service pages list their restore points for admins. Not yet: other templates, web/API/MCP restore, run-now from the API
 - [x] **More Templates:** MySQL, MongoDB, MinIO *(shipped in `templates/`, alongside MariaDB, NocoDB, Uptime Kuma, Gitea, Vaultwarden, and SolidCraft)*
-- [ ] **More Templates (next):** Plausible, PocketBase.
+- [x] **More Templates (next):** PocketBase, with ntfy, Umami, SearXNG, Listmonk, Stirling-PDF, authentik, and Meilisearch (#101); Gitea Actions runner (#112); GeoLibre and RustGIS (#118).
+- [ ] **Plausible template:** not in `templates/` yet.
 - [ ] **Service Networking:** Private internal networking between projects and services.
 - [x] **Lifecycle Management:** Service instances stop, start, and restart their Docker container (`InstanceService.StopInstance` / `StartInstance` / `RestartInstance`; `POST /services/{id}/restart`), and delete removes the container.
 
 ### 3. Team & Security
 - [ ] **Team Management:** Invite users, Role-based Access Control (RBAC). *(Moved to Critical Phase. The `admin`/`user` role and `GOFORGE_ADMIN_EMAIL` grant shipped in #28; teams, invites, and per-project roles have not.)*
-- [ ] **Audit Logs:** Track who did what and when (13.4). *(Moved to Critical Phase - partially implemented. Every real `/api/v1` mutation writes an `api_v1.<action>` row first (#61); UI coverage is still partial)*
-- [ ] **2FA:** Two-factor authentication for local accounts.
+- [x] **Audit Logs:** Track who did what and when (13.4). *(Every real `/api/v1` and `/mcp` mutation writes an `api_v1.<action>` row first (#61). Since #103, web UI changes to projects, deployments, environments, variables (key only), services, and containers are recorded with `details.via` = `ui`, queued work writes linked outcome rows, and Settings → Activity shows the log. The remaining gaps (Git source changes, profile and password changes, webhook-triggered deploys, retention, tamper protection) are on the [Path to v1.0](#path-to-v10).)*
+- [ ] **2FA:** Two-factor authentication for local accounts. *(On the [Path to v1.0](#path-to-v10).)*
 - [x] **Data Encryption:** Encrypt project variables marked as secret and OAuth access tokens at rest. *(AES-GCM with `ENCRYPTION_KEY`. Git source tokens and SSH keys and one-click service credentials are encrypted too. Legacy plaintext rows are encrypted on their next update.)*
 - [ ] **API Key Management:** Secure storage and rotation of service API keys
 - [x] **Security hardening (security queue Goals 1-3, #69-#71):** govulncheck at 0 reachable (#69); client IP from `TRUSTED_PROXIES` (rightmost untrusted hop, `CF-Connecting-IP` behind `CLOUDFLARE_PROXY_MODE`), login lockout, security headers, HMAC CSRF keyed by `CSRF_SECRET`, hourly expired-session purge (#70); repo Compose Traefik dashboard off and loopback-only, pinned `cloudflared` and `alpine`, Docker socket trust model in `SECURITY.md` (#71)
@@ -170,6 +201,7 @@ The focus for the next release is hardening the platform and improving the devel
 ### 4. Developer Experience
 - [ ] **CLI Tool:** `goforge` CLI for deploying from terminal.
 - [x] **API Tokens:** Personal Access Tokens for external integrations, with `read` / `write` / `protected` scopes for `/api/v1` (#61).
+- [x] **Token resource scoping and protected services:** a token can be restricted to listed projects and services (#108), and the service page **Protected** switch makes `/api/v1` and MCP refuse stop, config edit, and image update without the `protected` scope (#107).
 - [x] **JSON API and MCP:** `/api/v1` (bearer only, dry-run by default, audited mutations) and the `goforge-mcp` stdio server (#61).
 - [x] **MCP over HTTP:** `/mcp` on `goforge serve` with scoped Profile tokens (`gf_` prefix, hint, rotate, audited), a Profile MCP card with `mcp.json`, and the stdio binary kept as a fallback pointed at HTTPS. *(Not yet: OAuth, per-token rate limits, MCP ownership of Postgres tenants, Redis ACL users, and backups.)*
 - [ ] **Build Caching:** S3/Local cache for faster Docker builds.
@@ -184,7 +216,7 @@ The focus for the next release is hardening the platform and improving the devel
 
 ## 🛠 Code Review Findings (Priority Fixes)
 
-### Recent Fixes (V1.0.x)
+### Earlier Fixes (before v0.1.0)
 - [x] **Environment Variable System:**
     - [x] Extracted `ServiceEnvVarName` to shared `internal/services/envvars.go` package
     - [x] Fixed collision issue: Now uses instance name prefix (e.g., `MYDB_DATABASE_URL`)
@@ -224,10 +256,10 @@ The focus for the next release is hardening the platform and improving the devel
 - [x] **Configuration:**
     - [x] Replace hardcoded `/tmp` paths in build pipeline with configured directories.
 
-## 📊 V1.0 Release Readiness Checklist
+## v1.0 Readiness Checklist
 
-### Definition of Done for V1.0 GA
-Before tagging V1.0, the following **must** be completed:
+### Definition of Done for v1.0
+Before tagging v1.0.0, the following **must** be completed:
 
 **Critical User Flows (All Working End-to-End):**
 - [x] User can register/login via email or GitHub *(registration closes after the first account unless `GOFORGE_ENABLE_REGISTRATION=true`)*
@@ -251,13 +283,13 @@ Before tagging V1.0, the following **must** be completed:
 **Quality Assurance:**
 - [ ] All critical user paths tested manually
 - [ ] Mobile responsiveness verified on actual devices
-- [ ] Accessibility audit (WCAG 2.1 AA) *(the `drive-ui-a11y` axe scan, WCAG 2.2 AA tags, reports 0 serious or critical issues on its 32 light and dark scans since `fix/axe-leftovers-and-docs`; a manual audit, including screen readers, is still open)*
+- [ ] Accessibility audit (WCAG 2.1 AA) *(the `drive-ui-a11y` axe scan, WCAG 2.2 AA tags, reports 0 serious or critical issues on its 32 light and dark scans since #92; a manual audit, including screen readers, is still open)*
 - [ ] Security review of auth flows *(2026-10-29 audit findings on client IP, lockout, CSRF, and session purge fixed in #70; a dedicated auth-flow review is still open)*
-- [ ] Load testing for concurrent deployments
+- [ ] Load testing for concurrent deployments *(plan only, not run yet: [production validation](docs/deployment/production-validation.md))*
 
 ---
 
-## 📦 Shipped since V1.0.x (#58-#91)
+## 📦 Shipped before v0.1.0 (#58-#92)
 
 - [x] **#58** Redis template enforces `requirepass`; services without a Domain get `traefik.enable=false`; Postgres health check and MinIO `command` fixed
 - [x] **#59** A1 shared data services: Postgres 17 (`pgadmin`), Redis 7.4 (AOF, `noeviction`), `scripts/shared-data/pg-tenant.sh`
@@ -288,16 +320,54 @@ Before tagging V1.0, the following **must** be completed:
 - [x] **#89** Final sweep: last inline handlers and legacy classes removed, `docs/reference/ui-kit.md` added
 - [x] **#90** Body scroll locks while the mobile Sheet is open
 - [x] **#91** Primary buttons rest on `primary-700` and primary text uses `text-primary-700`, for color contrast
-- [x] **`fix/axe-leftovers-and-docs`** `.btn-warning`, muted gray text, and the Overview `dlitem` fixed, so `drive-ui-a11y` reports 0 serious or critical issues; security docs and README brought up to date
+- [x] **#92** `.btn-warning`, muted gray text, and the Overview `dlitem` fixed, so `drive-ui-a11y` reports 0 serious or critical issues; security docs and README brought up to date
 
-Later PRs (#92-#122, through v0.2.1 and the Sentry, GIS, htmx 4, and Tailwind 4 work after it) are listed in [CHANGELOG.md](CHANGELOG.md) rather than here.
+## 📦 Shipped in v0.1.0 to v0.3.0 (#93-#124)
+
+One line per PR; [CHANGELOG.md](CHANGELOG.md) has the detail.
+
+**v0.1.0** (2026-10-31)
+- [x] **#93** `Dockerfile.docs` for the self-hosted docs site; docs dependencies pinned in `requirements-docs.txt`
+- [x] **#94** `SECURITY.md` contact and audit claim for the public repo
+- [x] **#95, #96** The previous deployment container is retired after the redeploy grace period, including after a restart
+- [x] **#97, #98** TLA+ model of redeploy grace and retire (`formal/deploy-retire/`); its two findings fixed in #98
+- [x] **#99** Deploy-retire polish and docs
+- [x] **#100** Version from the git tag (`goforge --version`) and tag-triggered GitHub Releases
+
+**v0.2.0** (2026-11-01)
+- [x] **#101** One-click templates: ntfy, Umami, SearXNG, Listmonk, Stirling-PDF, PocketBase, authentik, Meilisearch
+- [x] **#102** MCP reliability: timeout-safe sync mutations, `last_error`, structured results, `wait_for`, idempotent `approval_ref`
+- [x] **#103** Settings → Activity and web UI audit coverage with linked outcome rows
+- [x] **#104, #105** `goforge backup restore-service` for Gitea, Vaultwarden, and Postgres services, and per-service Restore points
+- [x] **#106** Notifier v1 (ntfy and webhook) and the container health watch
+- [x] **#107** Protected switch on the service page and typed-name delete
+- [x] **#108** API tokens restricted to listed projects and services
+- [x] **#109** Email (SMTP) notifier
+- [x] **#110** UI kit gaps: page scripts retired, 44 px touch targets, `drive-ui-a11y` extended
+- [x] **#111** Geist Sans and Geist Mono, self-hosted
+- [x] **#112** Gitea Actions runner template
+- [x] **#113** Recent agent actions card matches the dashboard cards
+
+**v0.2.1** (2026-11-01)
+- [x] **#114** Service detail actions wrap on narrow screens
+- [x] **#115** Theme token migration (emerald accent)
+- [x] **#116** Button content centered (spinner out of flow at rest)
+- [x] **#117** README dashboard screenshot, dark and light
+
+**v0.3.0** (2026-11-02)
+- [x] **#118** GeoLibre and RustGIS templates
+- [x] **#119** Optional Sentry error reporting, DSN in Settings → Profile
+- [x] **#120, #121** htmx 2.0.11 interim pin, then htmx 4.0.1 with the bundled `hx-sse` extension
+- [x] **#122** Tailwind CSS 4.3.3
+- [x] **#123, #124** CHANGELOG sections cut for 0.2.0, 0.2.1, and 0.3.0
 
 ## 🅿️ Parked and follow-up
 
 Parked items need Raymond's OK before anyone starts them.
 
 - [x] **Backup restore (GoForge database)**: `goforge backup list` and `goforge backup restore <run key>` (CLI only), read-only Restore points on Settings → Profile; PostgreSQL 15 runbook fixed (`docs/deployment/backup.md`)
-- [ ] **Backup restore, follow-up** (parked): service data restore (Postgres services, Gitea, Vaultwarden), web/API/MCP restore, run-now from the API
+- [x] **Backup restore, services**: `goforge backup restore-service <run key> <instance id>` for Postgres, Gitea, and Vaultwarden (CLI, dry run by default; #104, #105), with per-service Restore points for admins; see `docs/deployment/backup.md`
+- [ ] **Backup restore, follow-up** (parked): web/API/MCP restore, restore for other templates, run-now from the API
 - [x] **Aesthetics Goal 3 nits** (#68 leftovers): `class_check.py` also checks `class={ ... }`, `*Class()` helpers, and `app.js` classes; `make css` fails unless it runs Tailwind v3.4.17 (standalone or `npx`); unused `.sidebar-link*` removed; dark `select` chevron; auth-aware error page (B17)
 - [ ] **Deadcode sweep** (parked): `deadcode ./...` reported 96 unreachable functions on 2026-10-29. Not removed in the cleanup goal; needs a reviewed pass
 - [ ] **Stale remote branches** (needs Raymond's OK): about 30 squash-merged branches remain on `origin` (for example `ui/shell-fixes`, `security/auth-edge-hardening`, `fix/4x-*`). Delete only with approval
@@ -306,7 +376,7 @@ Parked items need Raymond's OK before anyone starts them.
 
 ---
 
-## 🔮 V2.0: Multi-Server (Future)
+## 🔮 Multi-Server (after v1.0, formerly labeled "V2.0")
 
 - [ ] **Remote Agents:** Deploy to multiple servers via SSH/Agent.
 - [ ] **Cluster Management:** Simple orchestration across nodes.
