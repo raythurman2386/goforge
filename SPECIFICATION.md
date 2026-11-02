@@ -80,7 +80,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **1.8** Download TailwindCSS standalone CLI, create build script `scripts/tailwind.sh` (since replaced by `make css`)
 - [x] **1.9** Create the Tailwind config with content paths for templ files (now `@source` and `@theme` in `static/css/input.css`, Tailwind 4)
 - [x] **1.10** Create base layout template `internal/web/templates/layouts/base.templ`
-- [x] **1.11** Add HTMX 2.x to `static/js/htmx.min.js`
+- [x] **1.11** Add HTMX 2.x to `static/js/htmx.min.js` (now htmx 4.0.1)
 - [x] **1.12** Create HTTP router in `internal/web/router.go` using chi
 - [x] **1.13** Add common middleware stack (logging, recovery, request ID)
 - [x] **1.14** Create health check endpoint `GET /health`
@@ -242,7 +242,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **10.5** Create container log streaming endpoint
 - [x] **10.6** Add build output streaming
 - [x] **10.7** Implement real-time deployment status updates
-- [x] **10.8** Create HTMX SSE extension integration
+- [x] **10.8** Create HTMX SSE extension integration (now the bundled hx-sse extension)
 - [x] **10.9** Add reconnection handling with event replay
 - [x] **10.10** Implement client-side connection status indicator
 
