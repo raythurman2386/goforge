@@ -148,26 +148,27 @@ make css-watch
 make css-check
 ```
 
-`make css` uses Tailwind v3.4.19, the version the Dockerfile and CI pin: the standalone `tailwindcss` on `PATH` if it reports v3.4.19, otherwise `npx --yes tailwindcss@3.4.19`. It fails (no placeholder CSS) when neither works or when `TAILWIND=...` names another version. `make css-check` deletes `output.css` first, so it never checks a stale file.
+`make css` uses Tailwind v4.3.3, the version the Dockerfile and CI pin: the standalone `tailwindcss` on `PATH` if it reports v4.3.3, otherwise `sh scripts/tailwindcss-npx.sh 4.3.3`, which runs `npx --yes @tailwindcss/cli@4.3.3` with npx's `node_modules` on `NODE_PATH` so `@import "tailwindcss"` resolves without a `package.json`. It fails (no placeholder CSS) when neither works or when `TAILWIND=...` names another version. `make css-check` deletes `output.css` first, so it never checks a stale file.
 
 `scripts/class_check.py` checks these class sources against `output.css`: literal `class="..."` attributes in `.templ` files and handlers; string literals inside templ `class={ ... }` expressions (including `templ.KV` keys); `return "..."` strings in Go helpers named `*Class` under `internal/web/templates` (`badgeToneClass`, `alertToneClass`, `logLevelBadgeClass`, `backupLineClass`, ...); string arguments to `Skeleton`; literal arguments to `Class(...)`/`ui.Class(...)`, `"class": "..."` entries in `templ.Attributes` maps, and `Class: "..."` fields in props literals such as `ui.ButtonProps{Class: "w-full"}`; and in `static/js/app.js` and `static/js/ui.js`, `LEVEL_CLASSES` values, `.className` literals, and `classList.add/remove/toggle` arguments. A class assembled from a runtime value (for example `"w-" + n`) cannot be checked, and Tailwind would not compile it either: keep every class a complete literal in one of those places.
 
 ### Configuration
 
-The Tailwind configuration is in `tailwind.config.js`:
+Tailwind 4 is configured in CSS, at the top of `static/css/input.css`; there is no JS config file:
 
-- Scans `.templ` and generated `_templ.go` files, Go files under `internal/web/templates` and `internal/web/handlers`, and `static/js/app.js` and `static/js/ui.js` for class names (the same sources `class_check.py` reads)
-- Uses a green/emerald color palette
-- Sets `font-sans` to Geist Sans and `font-mono` to Geist Mono (code, logs, IDs), each with a system fallback
+- `@import "tailwindcss" source(none);` turns off automatic source detection, and `@source` lines scan `.templ` files and Go files under `internal/web/templates` and `internal/web/handlers`, and `static/js/app.js` and `static/js/ui.js`, for class names (the same sources `class_check.py` reads)
+- `@custom-variant dark (@media (prefers-color-scheme: dark));` keeps dark mode OS-only
+- `@theme` maps the `--gf-*` tokens to colors (`--color-card: rgb(var(--gf-card))`, the emerald `primary-*` palette), `rounded-ui`/`rounded-ui-lg`, `animate-fade-in`, and sets `font-sans` to Geist Sans and `font-mono` to Geist Mono (code, logs, IDs), each with a system fallback
+- Kit classes (`.btn*`, `.input`, `.select`, `.card*`, ...) are plain selectors in `@layer components`, so a utility on the same element always wins. Tailwind 4 cannot `@apply` a non-utility class, so the shared button and field bases are grouped selectors
 
 ### Input and Output
 
-- Input: `static/css/input.css` (Tailwind directives)
+- Input: `static/css/input.css` (Tailwind import, `@source`, `@theme`, kit components)
 - Output: `static/css/output.css` (generated, not committed)
 
 ### UI kit (Path A)
 
-Colors, radius, and the focus ring are CSS variables in `static/css/input.css` (`--gf-*`, RGB triplets with light and dark values). `tailwind.config.js` maps them to utilities such as `bg-card`, `text-muted-foreground`, `border-field-border`, `ring-ring`, and `rounded-ui`. The `primary` palette keeps its emerald values through the same tokens. Prefer the semantic utilities in new markup.
+Colors, radius, and the focus ring are CSS variables in `static/css/input.css` (`--gf-*`, RGB triplets with light and dark values). `@theme` maps them to utilities such as `bg-card`, `text-muted-foreground`, `border-field-border`, `ring-ring`, and `rounded-ui`. The `primary` palette keeps its emerald values through the same tokens. Prefer the semantic utilities in new markup.
 
 Pages and shared components use the kit in `internal/web/templates/components/ui`. [UI kit reference](../reference/ui-kit.md) covers all 20 components, their variants, the `ui.js` contract, and the accessibility expectations. `TestPagesUseKit` (`components/sweep_gate_test.go`) fails on hand-written `class="btn`, `class="card`, `class="input`, `class="select`, or `class="label`, on inline `onclick=` or `confirm(`, and on the old `id="modal"` and `id="menu-button"` outside `components/ui`.
 

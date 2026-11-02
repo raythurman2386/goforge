@@ -19,8 +19,8 @@
 //  3. Overlays never live inside a polled or SSE-swapped region. Before htmx
 //     updates the history entry, every open dialog and popover closes.
 //  4. Toasts stay in app.js. Do not duplicate LEVEL_CLASSES here.
-//  5. Every class string is a complete literal, so tailwind.config.js content
-//     and scripts/class_check.py (both list this file) can see it.
+//  5. Every class string is a complete literal, so Tailwind (@source in
+//     input.css) and scripts/class_check.py (both list this file) can see it.
 //  6. Motion respects prefers-reduced-motion (CSS in input.css).
 (function () {
 	"use strict";

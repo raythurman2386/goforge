@@ -1,5 +1,5 @@
 // Package ui is the GoForge templ component kit (Path A): accessible
-// primitives on Tailwind 3.4 tokens, native <dialog> and popover, and the
+// primitives on Tailwind 4 tokens, native <dialog> and popover, and the
 // delegated runtime in static/js/ui.js. See docs/development/frontend.md (UI kit).
 //
 // Rules every component in this package follows:
