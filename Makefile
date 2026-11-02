@@ -13,25 +13,28 @@ BINARY_PATH=bin/$(BINARY_NAME)
 # Tools
 TEMPL=go tool templ
 # Tailwind CLI. Must be v$(TAILWIND_VERSION), the version the Dockerfile and the
-# CI css job use; v4 cannot read tailwind.config.js. Empty TAILWIND picks a
-# standalone `tailwindcss` on PATH if it is v$(TAILWIND_VERSION), else
-# `npx --yes tailwindcss@$(TAILWIND_VERSION)`. css, css-watch, and css-check fail
-# (no placeholder, no stale output.css) when no v$(TAILWIND_VERSION) CLI runs.
+# CI css job use. Tailwind 4 is configured in CSS (static/css/input.css @theme
+# and @source), with no JavaScript config file. Empty TAILWIND picks a
+# standalone `tailwindcss` on PATH if it is v$(TAILWIND_VERSION), else the npm
+# CLI @tailwindcss/cli@$(TAILWIND_VERSION) through scripts/tailwindcss-npx.sh
+# (npx plus NODE_PATH, so `@import "tailwindcss"` resolves without a
+# node_modules). css, css-watch, and css-check fail (no placeholder, no stale
+# output.css) when no v$(TAILWIND_VERSION) CLI runs.
 TAILWIND?=
-TAILWIND_VERSION=3.4.19
+TAILWIND_VERSION=4.3.3
 # Shell snippet: sets $$tw to a v$(TAILWIND_VERSION) Tailwind command or exits 1.
 TAILWIND_RESOLVE=set -e; tw="$(TAILWIND)"; \
 	if [ -z "$$tw" ]; then \
 		if command -v tailwindcss >/dev/null 2>&1 && tailwindcss --help 2>&1 | grep -q "v$(TAILWIND_VERSION)"; then \
 			tw=tailwindcss; \
 		elif command -v npx >/dev/null 2>&1; then \
-			tw="npx --yes tailwindcss@$(TAILWIND_VERSION)"; \
+			tw="sh scripts/tailwindcss-npx.sh $(TAILWIND_VERSION)"; \
 		else \
 			echo "error: Tailwind v$(TAILWIND_VERSION) not found: install the standalone CLI (make install-tools) or Node (for npx)" >&2; exit 1; \
 		fi; \
 	fi; \
 	if ! $$tw --help 2>&1 | grep -q "v$(TAILWIND_VERSION)"; then \
-		echo "error: '$$tw' is not Tailwind v$(TAILWIND_VERSION) (Dockerfile and CI use v$(TAILWIND_VERSION)); set TAILWIND=\"npx --yes tailwindcss@$(TAILWIND_VERSION)\"" >&2; exit 1; \
+		echo "error: '$$tw' is not Tailwind v$(TAILWIND_VERSION) (Dockerfile and CI use v$(TAILWIND_VERSION)); set TAILWIND=\"sh scripts/tailwindcss-npx.sh $(TAILWIND_VERSION)\"" >&2; exit 1; \
 	fi
 AIR=air
 GOLINT=go tool golangci-lint
@@ -173,7 +176,7 @@ install-tools:
 	@echo "Tools (templ, golangci-lint) are managed via go.mod and 'go tool'."
 	@echo "Run 'go mod download' to ensure they are available."
 	@echo ""
-	@echo "TailwindCSS v$(TAILWIND_VERSION) must be installed manually (not v4):"
+	@echo "TailwindCSS v$(TAILWIND_VERSION) standalone CLI (optional; make css falls back to npx @tailwindcss/cli@$(TAILWIND_VERSION) via scripts/tailwindcss-npx.sh):"
 	@echo "  curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v$(TAILWIND_VERSION)/tailwindcss-linux-x64"
 	@echo "  chmod +x tailwindcss-linux-x64 && sudo mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss"
 
@@ -193,6 +196,6 @@ docker-run:
 check: fmt-check vet lint test
 	@echo "All checks passed!"
 
-## ci: Run CI pipeline locally (needs Tailwind v3.4.19 for css-check)
+## ci: Run CI pipeline locally (needs Tailwind v4.3.3 for css-check, standalone CLI or npx)
 ci: deps templ css-check fmt-check vet lint test
 	@echo "CI pipeline passed!"

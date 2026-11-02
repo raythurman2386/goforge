@@ -48,8 +48,8 @@ jobs:
       - name: Generate templates
         run: make templ
 
-      - name: Build CSS (Tailwind 3.4.19)
-        run: make css TAILWIND="npx --yes tailwindcss@3.4.19"
+      - name: Build CSS (Tailwind 4.3.3)
+        run: make css TAILWIND="sh scripts/tailwindcss-npx.sh 4.3.3"
 
       - name: Build binaries
         env:
