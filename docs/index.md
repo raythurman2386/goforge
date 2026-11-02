@@ -47,7 +47,7 @@ GoForge provides git-to-deploy workflows, one-click services, automatic SSL via 
 
 ## Project Status
 
-GoForge is currently at **v0.1.0** and is under active development. See the [Roadmap](https://github.com/raythurman2386/goforge/blob/main/ROADMAP.md) for planned features.
+GoForge is currently at **v0.3.0** and is under active development. See the [Roadmap](https://github.com/raythurman2386/goforge/blob/main/ROADMAP.md) for planned features.
 
 ## License
 

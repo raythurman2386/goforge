@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
 ### Added
 - Optional **Error reporting (Sentry)** for the GoForge control plane: Settings → Profile gains an admin-only **Error reporting (Sentry)** card with a DSN field, an environment (default `production`, `development` in dev mode), **Send test event**, and **Save error reporting**. With a DSN, a panic in a web or `/api/v1` handler, a panic in an in-process `/mcp` tool call, and every handled `5xx` page (`RenderError`) is sent to Sentry with its chi route pattern, method, and status as tags (the request still gets its `500`). Blank means off; a save or **Remove the stored DSN** takes effect at once without a restart. The DSN is sealed with `ENCRYPTION_KEY` in `error_reporting_settings` (migration `029_error_reporting_settings`), never shown again (the card shows only scheme, host, and project), and must be `https://` (`http://` only on a loopback host) without a secret key. `SENTRY_DSN` is read only while no settings are saved. Events carry no cookies, `Authorization`, CSRF or API-key headers, query strings, request bodies, client IPs, or user details, and messages go through the notification redactor. Tracing is off. Saves are audited as `error_reporting.settings.update` with changed field names only. Routes `PUT /settings/error-reporting` and `POST /settings/error-reporting/test`. See `docs/configuration/index.md#error-reporting-sentry` (t1770u)
 - One-click GIS templates: **GeoLibre** (`templates/geolibre.yaml`, `ghcr.io/opengeos/geolibre:v3.6.0`, port 80, `data` volume at `/data`) with Share and the Project Gallery off (`GEOLIBRE_SHARE_URL=off`), the Python sidecar off by default (`GEOLIBRE_DISABLE_SIDECAR=1`, **Python Processing Sidecar** select to turn it on), a GeoLens URL field (default `off`), and optional shared Basic Auth (set only when both user and password are filled); and **RustGIS** (`templates/rustgis.yaml`, `ghcr.io/opengeos/rustgis:0.5.0`, port 8080, no config or volume). Both are category `gis`, `web: true`, also offer `latest`, and need HTTPS (or `.localhost`) for full browser features. See `docs/guides/services.md#geolibre` (t1761u)
@@ -207,7 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - One-click service catalog
 - HTMX-powered responsive dashboard
 
-[Unreleased]: https://github.com/raythurman2386/goforge/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/raythurman2386/goforge/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/raythurman2386/goforge/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/raythurman2386/goforge/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/raythurman2386/goforge/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/raythurman2386/goforge/releases/tag/v0.1.0
