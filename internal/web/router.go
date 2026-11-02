@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/go-chi/chi/v5"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
 
@@ -47,6 +48,12 @@ func Router(
 
 	// Middleware stack
 	r.Use(chi_middleware.Recoverer)
+	// Optional Sentry (Settings → Profile → Error reporting). It must sit
+	// inside Recoverer: it reports a handler panic and re-panics, and
+	// Recoverer still writes the 500. Each request gets a clone of the
+	// process hub, so a saved DSN applies to new requests without a
+	// restart. With no DSN the hub has no client and nothing is sent.
+	r.Use(sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle)
 	// Browser hardening headers (CSP frame-ancestors, XFO, nosniff,
 	// Referrer-Policy, HSTS on HTTPS) on every response.
 	r.Use(middleware.SecurityHeaders)
@@ -235,6 +242,8 @@ func Router(
 						r.Get("/backups/restore-points", settingsHandler.RestorePoints)
 						r.Put("/notifications", settingsHandler.UpdateNotifySettings)
 						r.Post("/notifications/test", settingsHandler.TestNotifySettings)
+						r.Put("/error-reporting", settingsHandler.UpdateErrorReportingSettings)
+						r.Post("/error-reporting/test", settingsHandler.TestErrorReportingSettings)
 						r.Route("/tokens", func(r chi.Router) {
 							r.Get("/", settingsHandler.ListAPITokens)
 							r.Get("/new", settingsHandler.NewAPITokenModal)

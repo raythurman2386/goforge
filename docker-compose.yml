@@ -27,6 +27,7 @@ services:
       - ENABLE_METRICS=${ENABLE_METRICS:-true}
       - METRICS_RETENTION=${METRICS_RETENTION:-168h}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - SENTRY_DSN=${SENTRY_DSN:-}
       - LOG_FORMAT=${LOG_FORMAT:-json}
     volumes:
       # Read-write Docker socket: GoForge builds, runs, and removes containers.

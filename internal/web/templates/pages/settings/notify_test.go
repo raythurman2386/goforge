@@ -62,14 +62,14 @@ func TestNotifyCard_UnsetAndUnreadable(t *testing.T) {
 func TestProfile_NotifyCardOnlyWhenGiven(t *testing.T) {
 	user := &models.User{Email: "a@x", Role: models.RoleAdmin}
 	var b strings.Builder
-	if err := Profile(user, "tok", nil, nil, &notify.SettingsView{Kind: "ntfy"}, nil).Render(context.Background(), &b); err != nil {
+	if err := Profile(user, "tok", nil, nil, &notify.SettingsView{Kind: "ntfy"}, nil, nil).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(b.String(), `id="notify-settings"`) {
 		t.Error("admin profile has no Notifications card")
 	}
 	b.Reset()
-	if err := Profile(user, "tok", nil, nil, nil, nil).Render(context.Background(), &b); err != nil {
+	if err := Profile(user, "tok", nil, nil, nil, nil, nil).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(b.String(), `id="notify-settings"`) {

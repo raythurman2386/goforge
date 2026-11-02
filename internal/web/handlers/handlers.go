@@ -11,6 +11,7 @@ import (
 	"github.com/a-h/templ"
 
 	"github.com/raythurman2386/goforge/internal/auth"
+	"github.com/raythurman2386/goforge/internal/errreport"
 	"github.com/raythurman2386/goforge/internal/web/httputil"
 	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/errors"
@@ -40,7 +41,9 @@ func getClientIP(r *http.Request) string {
 }
 
 // RenderError renders an error page or an HTMX-compatible error fragment.
+// A 5xx is also reported to Sentry when error reporting is on.
 func RenderError(w http.ResponseWriter, r *http.Request, status int, message string) {
+	errreport.CaptureServerError(r, status, message)
 	// For HTMX requests, return a small HTML fragment instead of a full page
 	// to avoid injecting <!DOCTYPE html> into swap targets.
 	if r.Header.Get("HX-Request") == htmxTrue {

@@ -46,7 +46,7 @@ func TestNewMCPCard_Snippet(t *testing.T) {
 
 func TestProfile_MCPCard(t *testing.T) {
 	user := &models.User{Email: "u@x", Role: models.RoleUser}
-	got := html.UnescapeString(renderMCP(t, Profile(user, "tok", nil, nil, nil, NewMCPCard("https://gf.example.test"))))
+	got := html.UnescapeString(renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, NewMCPCard("https://gf.example.test"))))
 	for _, want := range []string{
 		`id="mcp-card"`, "https://gf.example.test/mcp", `"Authorization": "Bearer ${env:GOFORGE_MCP_TOKEN}"`,
 		`hx-get="/settings/tokens/new?preset=mcp"`, "Generate MCP token", "23 read-only tools", "all 37", "Full tokens are refused",
@@ -55,7 +55,7 @@ func TestProfile_MCPCard(t *testing.T) {
 			t.Errorf("profile missing %q", want)
 		}
 	}
-	if off := renderMCP(t, Profile(user, "tok", nil, nil, nil, nil)); strings.Contains(off, "mcp-card") {
+	if off := renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, nil)); strings.Contains(off, "mcp-card") {
 		t.Error("MCP card shown with /mcp off")
 	}
 }
@@ -135,14 +135,14 @@ func TestTokenDialogs_KitContract(t *testing.T) {
 func TestCopyButtonsUseKit(t *testing.T) {
 	user := &models.User{Email: "u@x", Role: models.RoleUser}
 	for name, got := range map[string]string{
-		"profile": renderMCP(t, Profile(user, "tok", nil, nil, nil, NewMCPCard("https://gf.example.test"))),
+		"profile": renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, NewMCPCard("https://gf.example.test"))),
 		"created": renderMCP(t, TokenCreatedModal("API Token Created", "gf_secret", false)),
 	} {
 		if strings.Contains(got, "onclick") || strings.Contains(got, "copyText") {
 			t.Errorf("%s: inline copy handler left", name)
 		}
 	}
-	prof := renderMCP(t, Profile(user, "tok", nil, nil, nil, NewMCPCard("https://gf.example.test")))
+	prof := renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, NewMCPCard("https://gf.example.test")))
 	if !strings.Contains(prof, `data-ui-copy="mcp-snippet"`) || !strings.Contains(prof, `id="mcp-snippet"`) {
 		t.Error("mcp.json copy button not wired to #mcp-snippet")
 	}

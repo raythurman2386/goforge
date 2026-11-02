@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/raythurman2386/goforge/internal/backup"
+	"github.com/raythurman2386/goforge/internal/errreport"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/notify"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
@@ -16,8 +17,9 @@ import (
 // hides the Backups card. backupForm is the admin settings form; nil shows
 // the card read-only. mcp is nil when /mcp is off (GOFORGE_MCP_HTTP=false),
 // which hides the MCP card. notifyForm is the admin Notifications form; nil
-// hides that card.
-templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, mcp *MCPCard) {
+// hides that card. errReportForm is the admin Error reporting (Sentry) form;
+// nil hides that card.
+templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, errReportForm *errreport.SettingsView, mcp *MCPCard) {
 	@layouts.AppLayout("Profile Settings", csrfToken) {
 		<div class="max-w-2xl mx-auto">
 			@components.PageHeader("Profile Settings", "Manage your account information and security.")
@@ -98,6 +100,10 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 
 			if notifyForm != nil {
 				@NotifyCard(notifyForm, csrfToken)
+			}
+
+			if errReportForm != nil {
+				@ErrorReportingCard(errReportForm, csrfToken)
 			}
 
 			if mcp != nil {

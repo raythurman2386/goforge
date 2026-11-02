@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/raythurman2386/goforge/internal/errreport"
 )
 
 const apiPrefix = "/api/v1"
@@ -83,14 +85,15 @@ func (t *inProcess) RoundTrip(req *http.Request) (resp *http.Response, err error
 	}
 
 	rec := &recorder{header: http.Header{}}
-	defer func() {
+	defer func(ctx context.Context) {
 		// A panic here would run on an SDK goroutine, outside the router's
 		// Recoverer, and take the process down.
 		if p := recover(); p != nil {
 			t.logger.Error("mcp http: api handler panicked", "path", in.URL.Path, "panic", p)
+			errreport.CapturePanic(ctx, "mcp_http", p)
 			resp, err = nil, fmt.Errorf("mcphttp: internal error serving %s", in.URL.Path)
 		}
-	}()
+	}(req.Context())
 	t.api.ServeHTTP(rec, in)
 	return rec.result(req), nil
 }
