@@ -18,7 +18,7 @@ TEMPL=go tool templ
 # `npx --yes tailwindcss@$(TAILWIND_VERSION)`. css, css-watch, and css-check fail
 # (no placeholder, no stale output.css) when no v$(TAILWIND_VERSION) CLI runs.
 TAILWIND?=
-TAILWIND_VERSION=3.4.17
+TAILWIND_VERSION=3.4.19
 # Shell snippet: sets $$tw to a v$(TAILWIND_VERSION) Tailwind command or exits 1.
 TAILWIND_RESOLVE=set -e; tw="$(TAILWIND)"; \
 	if [ -z "$$tw" ]; then \
@@ -193,6 +193,6 @@ docker-run:
 check: fmt-check vet lint test
 	@echo "All checks passed!"
 
-## ci: Run CI pipeline locally (needs Tailwind v3.4.17 for css-check)
+## ci: Run CI pipeline locally (needs Tailwind v3.4.19 for css-check)
 ci: deps templ css-check fmt-check vet lint test
 	@echo "CI pipeline passed!"

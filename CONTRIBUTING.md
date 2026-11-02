@@ -30,7 +30,7 @@ make dev                 # http://localhost:8080 with GOFORGE_DEV_MODE=true
 ```
 
 You need Go 1.26 or newer, Docker Engine, a PostgreSQL you can reach (CI uses
-16, the Compose stack uses 15), and the Tailwind CSS v3.4.17 standalone CLI
+16, the Compose stack uses 15), and the Tailwind CSS v3.4.19 standalone CLI
 or Node (`npx`) for `make css`. Full setup: [docs/development/setup.md](docs/development/setup.md).
 
 `make dev` turns on dev mode for that one process. Never copy a dev-mode
@@ -80,7 +80,7 @@ reviewer is the check.
    the race detector. CI (`.github/workflows/ci.yml`) runs the same checks on
    every PR; its lint step (`golangci/golangci-lint-action@v6`) pins the same
    golangci-lint version as `go.mod` (v1.64.8). CI also has a `css` job that
-   builds Tailwind v3.4.17 and runs `scripts/class_check.py`; run it locally
+   builds Tailwind v3.4.19 and runs `scripts/class_check.py`; run it locally
    with `make css-check` when you touch templates, `static/js`, or CSS.
    `make ci` runs `deps`, `templ`, `css-check`, and the `make check` steps
    in one go.

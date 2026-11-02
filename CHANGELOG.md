@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Network and block I/O are now filled in container metrics (they were always 0, also in `/api/v1` stats)
 
 ### Changed
+- Frontend pins: Tailwind 3.4.17 to 3.4.19 (v3 LTS, bugfix only; `output.css` is unchanged apart from the version banner) in `make css`, the Dockerfile, CI, and the release workflow; vendored `static/js/htmx.min.js` 2.0.4 to htmx 2.0.11 and `static/js/htmx-sse.js` 2.2.2 to htmx-ext-sse 2.2.4, byte for byte from npm (sha256 `d6fdc75f…f717` and `3b5992a5…61d2`). htmx 2.0.5+ keeps its history cache in `sessionStorage`, its injected `.htmx-indicator` style adds `visibility:hidden`, and `hx-disabled-elt` keeps elements that were already disabled. Tailwind v4 and htmx 4 are not adopted (t1778u)
 - UI typefaces are now **Geist Sans** (UI and body, `font-sans`) and **Geist Mono** (code, logs, IDs, `font-mono`), self-hosted as variable WOFF2 files in `static/fonts` (OFL-1.1), vendored from the npm `geist` package v1.9.0. Inter is removed; `font-mono` previously named JetBrains Mono, which was never shipped, so it fell back to the browser monospace (t1682u)
 - The version in `/api/v1/health`, startup logs, and backup manifests is now the build's tag (or `dev`) instead of the hard-coded `0.1.0`; the MCP server reports the same value instead of `1.0.0`
 - `docs/security.md` and `docs/guides/projects.md` say AES-GCM like the Secrets docs

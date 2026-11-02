@@ -21,7 +21,7 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 - **Cloudflare Tunnel:** Secure public access without opening inbound ports.
 - **Monitoring:** Live container CPU, memory, network I/O, and block I/O over SSE, plus a Container card (image, state, health, limits, ports, Traefik host) on service detail and project Overview. Metrics are not stored.
 - **Real-time Updates:** SSE-powered deployment logs and status updates.
-- **Web UI:** server-rendered templ pages with HTMX 2 and Tailwind CSS 3.4, built from one component kit (`internal/web/templates/components/ui`: native `<dialog>` and `popover`, one delegated `static/js/ui.js`, no inline event handlers). Dark mode follows the OS. Dialogs, menus, tabs, and the mobile navigation are keyboard accessible, and the axe scan of the main pages reports no serious or critical WCAG 2.2 AA issues in light or dark. See [UI kit](docs/reference/ui-kit.md).
+- **Web UI:** server-rendered templ pages with HTMX 2.0.11 and Tailwind CSS 3.4.19, built from one component kit (`internal/web/templates/components/ui`: native `<dialog>` and `popover`, one delegated `static/js/ui.js`, no inline event handlers). Dark mode follows the OS. Dialogs, menus, tabs, and the mobile navigation are keyboard accessible, and the axe scan of the main pages reports no serious or critical WCAG 2.2 AA issues in light or dark. See [UI kit](docs/reference/ui-kit.md).
 - **One-click Services:** PostgreSQL, Redis, Gitea, Vaultwarden, MinIO, and more from YAML templates in `templates/`, including shared Postgres and Redis for several apps. See [Services](docs/guides/services.md).
 - **API v1 and MCP:** a bearer-token JSON API at `/api/v1` with scoped tokens and gated, audited writes, and the same MCP tools at `/mcp` (streamable HTTP, scoped Profile tokens, set up from Settings → Profile → MCP), with `goforge-mcp` as a stdio fallback. See [API v1](docs/reference/api-v1.md) and [MCP server](docs/guides/mcp.md).
 - **Nightly Backups:** the GoForge database and Postgres, Gitea, and Vaultwarden services uploaded to S3-compatible storage (R2, B2, MinIO) every night, plus `goforge backup run` on demand. `goforge backup restore` puts the GoForge database back from a run; service data restore is a manual runbook. See [Backup & Restore](docs/deployment/backup.md).
@@ -87,7 +87,7 @@ make dev       # sets GOFORGE_DEV_MODE=true for this local process only
 - `make check`: Run fmt-check, vet, lint, and test.
 - `make ci`: Run the full local CI pipeline (deps, templ, css-check, then the `make check` steps). Run it before you push.
 - `make templ`: Generate templ templates.
-- `make css`: Build `static/css/output.css` with Tailwind v3.4.17 (`make css-check` also fails on class names missing from it).
+- `make css`: Build `static/css/output.css` with Tailwind v3.4.19 (`make css-check` also fails on class names missing from it).
 
 ## Production Deployment
 
