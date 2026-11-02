@@ -290,6 +290,8 @@ Before tagging V1.0, the following **must** be completed:
 - [x] **#91** Primary buttons rest on `primary-700` and primary text uses `text-primary-700`, for color contrast
 - [x] **`fix/axe-leftovers-and-docs`** `.btn-warning`, muted gray text, and the Overview `dlitem` fixed, so `drive-ui-a11y` reports 0 serious or critical issues; security docs and README brought up to date
 
+Later PRs (#92-#122, through v0.2.1 and the Sentry, GIS, htmx 4, and Tailwind 4 work after it) are listed in [CHANGELOG.md](CHANGELOG.md) rather than here.
+
 ## 🅿️ Parked and follow-up
 
 Parked items need Raymond's OK before anyone starts them.
