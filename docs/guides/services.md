@@ -188,6 +188,30 @@ Backend in one binary with SQLite (`ghcr.io/muchobien/pocketbase:0.40.6`, commun
 
 Search engine (`getmeili/meilisearch:v1.56.0`, port 7700, `data` volume at `/meili_data`). Runs with `MEILI_ENV=production` and a generated 32-char master key, set once at deploy. Clients use the master key or API keys created with it. A newer version may need a dump and import of `data.ms`, so pin the version and read the Meilisearch upgrade notes before **Update image**.
 
+### GeoLibre
+
+Browser GIS (MapLibre, DuckDB-WASM) from `ghcr.io/opengeos/geolibre:v3.6.0`, served by nginx on port 80. Data you open stays in the browser.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Version | v3.6.0 | `ghcr.io/opengeos/geolibre` tag (`latest` tracks upstream main) |
+| Python Processing Sidecar | disabled | `enabled` starts the bundled Python sidecar at `/sidecar` for file conversion and processing under `/data` |
+| GeoLens Server URL | `off` | `off` hides GeoLens; otherwise an `https://` URL (or localhost), or the container refuses to start |
+| Basic Auth User / Password | blank | Optional shared HTTP Basic Auth over the whole site; set both or neither |
+| Storage | `data` → `/data` | Sidecar conversion root; unused while the sidecar is off |
+
+- **HTTPS**: the app's Content Security Policy only lets it fetch remote data over HTTPS, so give it a public HTTPS domain (see below) or a `.localhost` domain. The shipped CSP also allows `http://localhost:*` in `connect-src`; that is fine for private use behind Traefik, but keep it in mind before exposing it publicly.
+- **Share is off**: the template sets `GEOLIBRE_SHARE_URL=off`, which removes Share and the Project Gallery, so nothing is published to the hosted `share.geolibre.app`.
+- **Sidecar**: off by default (smaller attack surface, less memory); `/sidecar/` answers 403 while it is off. If you turn it on, raise the memory limit for heavy conversions.
+- **Basic Auth**: GoForge sets `GEOLIBRE_AUTH_USER` and `GEOLIBRE_AUTH_PASSWORD` only when both fields are filled. It is one shared login, not per-user accounts, and `/healthz` stays open. Like every template value, the password is in the container environment (visible to anyone who can run `docker inspect` on the host).
+- Hosting under a subpath needs an image rebuild upstream; GoForge routes by host, so the app runs at the domain root.
+
+### RustGIS
+
+RustGIS web app (Rust compiled to WebAssembly, WebGPU or WebGL2) from `ghcr.io/opengeos/rustgis:0.5.0`, served by unprivileged nginx on port 8080. No configuration fields and no volume: files stay in the browser.
+
+Offline start and install-as-app use a service worker, which needs HTTPS or `localhost`. Use a `.localhost` domain locally, or a public HTTPS domain (see below). ArcGIS sign-in from a self-hosted copy needs its own ArcGIS OAuth app.
+
 ### Public HTTPS behind Cloudflare Tunnel
 
 With `CLOUDFLARE_PROXY_MODE=true`, Cloudflare ends TLS and forwards HTTP to Traefik. GoForge routes the service on the `web` entrypoint, and templates still get `Protocol` = `https` for any domain that is not `localhost` or `*.localhost`, because that is the URL a browser uses.

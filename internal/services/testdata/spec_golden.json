@@ -1208,5 +1208,109 @@
       "CMD-SHELL",
       "wget -q -O /dev/null http://127.0.0.1:9101/healthz"
     ]
+  },
+  "geolibre": {
+    "image": "ghcr.io/opengeos/geolibre:v3.6.0",
+    "env": [
+      "GEOLIBRE_DISABLE_SIDECAR=1",
+      "GEOLIBRE_GEOLENS_URL=off",
+      "GEOLIBRE_SHARE_URL=off"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "python",
+      "-c",
+      "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1/healthz', timeout=4).status==200 else 1)"
+    ]
+  },
+  "geolibre+domain": {
+    "image": "ghcr.io/opengeos/geolibre:v3.6.0",
+    "env": [
+      "GEOLIBRE_DISABLE_SIDECAR=1",
+      "GEOLIBRE_GEOLENS_URL=off",
+      "GEOLIBRE_SHARE_URL=off"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`geolibre-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "python",
+      "-c",
+      "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1/healthz', timeout=4).status==200 else 1)"
+    ]
+  },
+  "rustgis": {
+    "image": "ghcr.io/opengeos/rustgis:0.5.0",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "-q",
+      "--spider",
+      "http://127.0.0.1:8080/healthz"
+    ]
+  },
+  "rustgis+domain": {
+    "image": "ghcr.io/opengeos/rustgis:0.5.0",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`rustgis-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "-q",
+      "--spider",
+      "http://127.0.0.1:8080/healthz"
+    ]
   }
 }

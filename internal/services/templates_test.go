@@ -45,6 +45,8 @@ func TestRepoTemplates_WebServices(t *testing.T) {
 		{name: "pocketbase", image: "ghcr.io/muchobien/pocketbase:{{ .Version }}", port: 8090, category: "devtools"},
 		{name: "authentik", image: "ghcr.io/goauthentik/server:{{ .Version }}", port: 9000, category: "security"},
 		{name: "meilisearch", image: "getmeili/meilisearch:{{ .Version }}", port: 7700, category: "database"},
+		{name: "geolibre", image: "ghcr.io/opengeos/geolibre:{{ .Version }}", port: 80, category: "gis"},
+		{name: "rustgis", image: "ghcr.io/opengeos/rustgis:{{ .Version }}", port: 8080, category: "gis"},
 	}
 	for _, tt := range tests {
 		tt := tt

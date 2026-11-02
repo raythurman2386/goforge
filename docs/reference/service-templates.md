@@ -416,6 +416,22 @@ Every template except SearXNG also offers `latest`. Umami, Listmonk, and authent
 
 ---
 
+### GIS templates: GeoLibre, RustGIS
+
+Both are `web: true` single-container templates in category `gis` that serve a browser app; user data stays in the browser. The first port is the one Traefik routes to, and no port is published on the host. See [One-Click Services](../guides/services.md#geolibre) for usage.
+
+| File | Category | Image (default version) | Port | Volumes | Config fields | Default resources |
+|------|----------|-------------------------|------|---------|---------------|-------------------|
+| `templates/geolibre.yaml` | `gis` | `ghcr.io/opengeos/geolibre:v3.6.0` | 80 | `data` → `/data` | `sidecar` (select `disabled`/`enabled`, `disabled`), `geolens_url` (text, `off`), `auth_user` (optional), `auth_password` (password, optional) | 0.5 CPU, 512MB |
+| `templates/rustgis.yaml` | `gis` | `ghcr.io/opengeos/rustgis:0.5.0` | 8080 | none | none | 0.25 CPU, 128MB |
+
+Both also offer `latest`, which tracks upstream main and moves fast; the pinned release is the default.
+
+- **GeoLibre** `environment`: `GEOLIBRE_SHARE_URL=off` (fixed) and `GEOLIBRE_GEOLENS_URL` from `geolens_url`. `optional_environment`: `GEOLIBRE_DISABLE_SIDECAR=1` while `sidecar` is `disabled`; `GEOLIBRE_AUTH_USER` and `GEOLIBRE_AUTH_PASSWORD` render only when both fields are set, because the image refuses to start with only one. Health check is the image's own `python -c "urllib.request.urlopen('http://127.0.0.1/healthz')"` (the image has no `wget` or `curl`).
+- **RustGIS**: no environment, no volume. Health check `wget -q --spider http://127.0.0.1:8080/healthz`. The image runs unprivileged nginx.
+
+---
+
 ## Creating Custom Templates
 
 To add a new service template:

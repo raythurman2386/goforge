@@ -1,0 +1,69 @@
+name: geolibre
+display_name: GeoLibre
+description: Browser GIS (MapLibre, DuckDB-WASM) served by nginx. Your data stays in the browser. Share and the Project Gallery are off (GEOLIBRE_SHARE_URL=off), so nothing is published to the hosted share server. The CSP only lets the app fetch remote data over HTTPS, so give it an HTTPS domain. The Python processing sidecar is off by default; turn it on to convert and process files under /data.
+icon: geolibre
+category: gis
+web: true
+
+versions:
+  - "v3.6.0"
+  - "latest"
+default_version: "v3.6.0"
+
+config:
+  # The bundled Python sidecar (/sidecar) runs conversions and processing.
+  # Off by default: smaller attack surface and less memory.
+  - name: sidecar
+    label: Python Processing Sidecar
+    type: select
+    options: [disabled, enabled]
+    default: disabled
+    required: true
+  # "off" hides GeoLens. Any other value must be an https:// URL (or
+  # localhost), or the container refuses to start.
+  - name: geolens_url
+    label: GeoLens Server URL (https, or off)
+    type: text
+    default: "off"
+    required: true
+  # Optional shared HTTP Basic Auth over the whole site (/healthz stays open).
+  # GeoLibre needs both or neither, so the template sets them only together.
+  - name: auth_user
+    label: Basic Auth User (optional)
+    type: text
+    required: false
+  - name: auth_password
+    label: Basic Auth Password (optional)
+    type: password
+    required: false
+
+resources:
+  cpu: "0.5"
+  memory: "512m"
+
+docker:
+  image: "ghcr.io/opengeos/geolibre:{{ .Version }}"
+  ports:
+    - container: 80
+      protocol: tcp
+  environment:
+    GEOLIBRE_SHARE_URL: "off"
+    GEOLIBRE_GEOLENS_URL: "{{ .Config.geolens_url }}"
+  optional_environment:
+    GEOLIBRE_DISABLE_SIDECAR: "{{ if eq .Config.sidecar \"disabled\" }}1{{ end }}"
+    GEOLIBRE_AUTH_USER: "{{ if and .Config.auth_user .Config.auth_password }}{{ .Config.auth_user }}{{ end }}"
+    GEOLIBRE_AUTH_PASSWORD: "{{ if and .Config.auth_user .Config.auth_password }}{{ .Config.auth_password }}{{ end }}"
+  volumes:
+    # Sidecar conversion root (GEOLIBRE_CONVERSION_ROOTS=/data in the image).
+    - name: data
+      path: /data
+  # The image ships Python but no wget or curl; this is upstream's own check.
+  health_check:
+    test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1/healthz', timeout=4).status==200 else 1)"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+
+connection:
+  internal: "http://{{ .ContainerName }}:80"
+  external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:80{{ end }}"
