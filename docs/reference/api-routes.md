@@ -52,7 +52,7 @@ These routes are **not** protected by CSRF (machine-to-machine communication).
 |--------|------|---------|------|-------------|
 | `GET` | `/static/*` | File server | No | Serves static assets (CSS, JS) |
 | `GET` | `/health` | `healthHandler.Health` | No | Basic health check (liveness) |
-| `GET` | `/health/ready` | `healthHandler.HealthReady` | No | Readiness check (DB connectivity) |
+| `GET` | `/health/ready` | `healthHandler.HealthReady` | No | Readiness check (database and Docker); each check is `ok`, `unavailable`, or `not_configured`, errors are logged, not returned |
 
 ---
 

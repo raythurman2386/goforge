@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- `/health/ready` no longer returns database or Docker error text (HEALTH-READY-PUBLIC). The route stays public and keeps its status codes (`200` ready, `503` not ready) and its `checks` keys, but each value is now only `ok`, `unavailable`, or `not_configured` for every caller. The error behind `unavailable` is logged server side as a `readiness check failed` warning with `check` and `error` fields. `verify.sh` still reads `"database":"ok"`. New verification file `.cursor/skills/verify-goforge/features/health-ready.md` (t1858u)
+
 ## [0.3.0] - 2026-11-02
 
 ### Added

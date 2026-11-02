@@ -42,7 +42,7 @@ We take security vulnerabilities seriously. If you find a security issue:
 
 ## Known Security Gaps (As of Current Version)
 
-Checked against `main` on 2026-10-30.
+Checked against `main` on 2026-11-02.
 
 ### Partly done
 
@@ -56,7 +56,6 @@ Checked against `main` on 2026-10-30.
 - [ ] Two-factor authentication (2FA)
 - [ ] Container escape prevention measures
 - [ ] Resource quota enforcement per project (per-container CPU and memory limits exist)
-- [ ] `/health/ready` is unauthenticated and its JSON includes database and Docker error text (HEALTH-READY-PUBLIC)
 - [ ] The main `goforge` image runs as root (the `mcp` image runs as uid 10001)
 - [ ] Webhook routes are not limited to a provider's IP ranges; the signature or token is the only check
 
@@ -66,6 +65,7 @@ Checked against `main` on 2026-10-30.
 - **API token rotation.** Settings → Profile can rotate a token in place; the old secret stops working on its next request (#78).
 - **Empty `WEBHOOK_SECRET` outside dev mode.** With it empty, anyone could sign a GitHub or Gitea webhook (HMAC with an empty key) or send an empty `X-Gitlab-Token`, and a matching push could trigger a deployment. GoForge now refuses to start outside dev mode while `WEBHOOK_SECRET` is empty or only whitespace (#92). Dev mode still generates it.
 - **Client IP spoofing, login lockout, CSRF, and session purge** (#70). See [docs/security.md](docs/security.md).
+- **`/health/ready` error text (HEALTH-READY-PUBLIC).** The route stays public so load balancers and `verify.sh` can poll it, but each entry in `checks` is now only `ok`, `unavailable`, or `not_configured` for every caller, signed in or not. The database or Docker error behind `unavailable` (host names, socket paths, driver messages) goes to the server log as a `readiness check failed` warning with the check name, and never into the response (t1858u).
 
 ### Defaults that reduce exposure
 

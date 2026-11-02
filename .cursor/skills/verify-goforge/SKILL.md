@@ -48,7 +48,7 @@ Use host mode when `launch` refuses because `127.0.0.1:8080` is taken. On minis 
 - Serve: `GOFORGE_PORT=18080`, `GOFORGE_HOST=127.0.0.1`, `GOFORGE_BASE_URL=http://127.0.0.1:18080`, random `ENCRYPTION_KEY`, `SESSION_SECRET`, `CSRF_SECRET`, and `WEBHOOK_SECRET` in a mode `600` env file, `GOFORGE_ENABLE_REGISTRATION=true`, `GOFORGE_ADMIN_EMAIL=verify-admin@example.test`, `LOG_FORMAT=json`, and stdout to `/tmp/goforge-verify/host-app.log`.
 - Point the drives at it with `GOFORGE_VERIFY_BASE`, `GOFORGE_VERIFY_PSQL` (a psql command for that database; `-c <sql>` is appended), and `GOFORGE_VERIFY_APP_LOGS` (a command that prints the app log).
 - Create `/tmp/goforge-verify/state` with mode `700` first. `launch` normally makes it.
-- Skip `doctor`. It reads the Compose project. Docker is not reachable from a host serve run as a non-root user, so `/health/ready` reports `not_ready` with `"database":"ok"`. Auth, token, and MCP drives only need the database.
+- Skip `doctor`. It reads the Compose project. Docker is not reachable from a host serve run as a non-root user, so `/health/ready` reports `not_ready` with `"database":"ok"` and `"docker":"unavailable"` (no error text; see [features/health-ready.md](features/health-ready.md)). Auth, token, and MCP drives only need the database.
 - Stop the host serve by its PID, not by process name. Then remove the Postgres container with `-v`.
 
 [features/backups.md](features/backups.md) and [features/mcp-http.md](features/mcp-http.md) give the exact commands. With registration open, the `register-closed*` and `register-admin-role` lines in `register-verdict.txt` read `fail`. That is expected in host mode.
