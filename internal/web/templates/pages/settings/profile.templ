@@ -259,7 +259,7 @@ templ EmptyTokenList() {
 templ TokenCreatedModal(title, rawToken string, mcp bool) {
 	@ui.Dialog(ui.DialogProps{Title: title, NonDismissible: true}) {
 		<div class="flex items-start gap-3 mb-6">
-			<div class="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center dark:bg-primary-900/50">
+			<div class="h-10 w-10 shrink-0 rounded-full bg-primary-100 flex items-center justify-center dark:bg-primary-900/50">
 				<svg class="h-6 w-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 				</svg>
@@ -404,7 +404,7 @@ templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string)
 				{ backupLastLine(st) }
 			</p>
 			if st.LastRun != nil && st.LastRun.Status == statusFailed && st.LastRun.ErrorSummary != "" {
-				<p class="mt-1 text-xs text-danger break-words">{ st.LastRun.ErrorSummary }</p>
+				<p class="mt-1 text-xs text-danger wrap-break-word">{ st.LastRun.ErrorSummary }</p>
 			}
 			<p class="mt-2 text-xs text-foreground-secondary">
 				{ backupScheduleLine(st) }
@@ -432,7 +432,7 @@ templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string)
 templ BackupRestorePoints(v *backup.RestorePointsView) {
 	<h4 class="text-sm font-medium text-foreground">Restore points</h4>
 	if v.Error != "" {
-		<p class="mt-1 text-xs text-danger break-words" data-testid="restore-points-error">{ v.Error }</p>
+		<p class="mt-1 text-xs text-danger wrap-break-word" data-testid="restore-points-error">{ v.Error }</p>
 	} else if len(v.Points) == 0 {
 		<p class="mt-1 text-xs text-foreground-secondary" data-testid="restore-points-empty">
 			{ fmt.Sprintf("No complete backups in %s/%s yet.", v.Bucket, v.Prefix) }
@@ -470,7 +470,7 @@ templ BackupRestorePoints(v *backup.RestorePointsView) {
 		<p class="mt-2 text-xs text-foreground-secondary" data-testid="restore-points-howto">
 			Restoring replaces the GoForge database (not service data) and is done from the command line. Stop GoForge, preview with a dry run, then add <code class="font-mono">--yes</code>:
 		</p>
-		<pre class="mt-1 overflow-x-auto rounded bg-code p-2 text-xs"><code>{ restoreCommand(v) }</code></pre>
+		<pre class="mt-1 overflow-x-auto rounded-sm bg-code p-2 text-xs"><code>{ restoreCommand(v) }</code></pre>
 	}
 }
 

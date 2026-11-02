@@ -68,7 +68,7 @@ templ ContainerRow(dc container.Summary, tracked []*models.Container) {
 			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "name"), Text: containerName(dc), Align: ui.AlignStart})
 		}
 		@ui.TD(ui.CellProps{}) {
-			<span tabindex="0" class="block truncate rounded font-mono text-xs text-foreground-secondary" { ui.TooltipAttrs(tipID(dc, "image"))... }>{ dc.Image }</span>
+			<span tabindex="0" class="block truncate rounded-sm font-mono text-xs text-foreground-secondary" { ui.TooltipAttrs(tipID(dc, "image"))... }>{ dc.Image }</span>
 			@ui.Tooltip(ui.TooltipProps{ID: tipID(dc, "image"), Text: dc.Image, Align: ui.AlignStart, Class: "break-all font-mono"})
 		}
 		@ui.TD(ui.CellProps{}) {

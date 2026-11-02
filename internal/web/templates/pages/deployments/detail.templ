@@ -103,7 +103,7 @@ templ Detail(props DetailProps) {
 					}
 					if props.Deployment.CommitSHA.Valid {
 						@infoRow("Commit") {
-							<code class="px-2 py-1 bg-code rounded text-foreground font-mono text-xs">{ props.Deployment.CommitSHA.String }</code>
+							<code class="px-2 py-1 bg-code rounded-sm text-foreground font-mono text-xs">{ props.Deployment.CommitSHA.String }</code>
 						}
 					}
 					if props.Deployment.CommitMessage.Valid {
@@ -118,7 +118,7 @@ templ Detail(props DetailProps) {
 					}
 					if props.Deployment.ImageTag.Valid {
 						@infoRow("Image Tag") {
-							<code class="px-2 py-1 bg-code rounded text-foreground font-mono text-xs break-all">{ props.Deployment.ImageTag.String }</code>
+							<code class="px-2 py-1 bg-code rounded-sm text-foreground font-mono text-xs break-all">{ props.Deployment.ImageTag.String }</code>
 						}
 					}
 				</dl>
@@ -126,7 +126,7 @@ templ Detail(props DetailProps) {
 					@ui.CardContent(templ.Attributes{"class": "border-t border-divider"}) {
 						@ui.Alert(ui.AlertProps{Tone: ui.AlertError}) {
 							<p class="font-semibold">Error</p>
-							<p class="mt-1 break-words">{ props.Deployment.ErrorMessage.String }</p>
+							<p class="mt-1 wrap-break-word">{ props.Deployment.ErrorMessage.String }</p>
 						}
 					}
 				}
@@ -277,12 +277,12 @@ func logLevelClass(level models.DeploymentLogLevel) string {
 func logLevelBadgeClass(level models.DeploymentLogLevel) string {
 	switch level {
 	case models.LogLevelError:
-		return "px-1 rounded bg-danger/15 text-danger text-xs"
+		return "px-1 rounded-sm bg-danger/15 text-danger text-xs"
 	case models.LogLevelWarn:
-		return "px-1 rounded bg-warning/15 text-warning-foreground text-xs"
+		return "px-1 rounded-sm bg-warning/15 text-warning-foreground text-xs"
 	case models.LogLevelDebug:
-		return "px-1 rounded bg-highlight text-foreground-secondary text-xs"
+		return "px-1 rounded-sm bg-highlight text-foreground-secondary text-xs"
 	default:
-		return "px-1 rounded bg-info/15 text-info text-xs"
+		return "px-1 rounded-sm bg-info/15 text-info text-xs"
 	}
 }

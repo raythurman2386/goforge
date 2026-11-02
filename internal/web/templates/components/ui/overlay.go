@@ -105,7 +105,7 @@ func dropdownTriggerProps(p DropdownProps) ButtonProps {
 // dropdownMenuClass is the menu panel. Position, the open transition, and
 // reduced motion live in input.css ([data-ui-overlay]).
 func dropdownMenuClass() string {
-	return "min-w-[14rem] max-w-[calc(100vw-1rem)] rounded-xl border border-divider bg-card p-1.5 text-left shadow-xl ring-1 ring-border"
+	return "min-w-56 max-w-[calc(100vw-1rem)] rounded-xl border border-divider bg-card p-1.5 text-left shadow-xl ring-1 ring-border"
 }
 
 func dropdownMenuAttrs(p DropdownProps) templ.Attributes {
@@ -146,13 +146,13 @@ type DropdownItemProps struct {
 func dropdownItemClass(t DropdownItemTone) string {
 	switch t {
 	case ItemPrimary:
-		return "block w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-primary-700 outline-none transition-colors hover:bg-primary-50 focus:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30 dark:focus:bg-primary-900/30"
+		return "block w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-primary-700 outline-hidden transition-colors hover:bg-primary-50 focus:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30 dark:focus:bg-primary-900/30"
 	case ItemDanger:
-		return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-danger outline-none transition-colors hover:bg-danger/10 focus:bg-danger/10"
+		return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-danger outline-hidden transition-colors hover:bg-danger/10 focus:bg-danger/10"
 	case ItemDefault:
 	}
 	// ItemDefault, the zero value, and unknown values.
-	return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground-secondary outline-none transition-colors hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:text-primary-700 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:focus:bg-primary-900/30 dark:focus:text-primary-300"
+	return "block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground-secondary outline-hidden transition-colors hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:text-primary-700 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:focus:bg-primary-900/30 dark:focus:text-primary-300"
 }
 
 func dropdownItemAttrs(p DropdownItemProps) templ.Attributes {

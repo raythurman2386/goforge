@@ -63,7 +63,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 						}
 					</div>
 					if instance.LastError.Valid && instance.LastError.String != "" {
-						<p id="service-last-error" class="mt-2 text-sm text-danger break-words">
+						<p id="service-last-error" class="mt-2 text-sm text-danger wrap-break-word">
 							<span class="font-semibold">Last error:</span> { instance.LastError.String }
 						</p>
 					}
@@ -186,7 +186,7 @@ templ detailRow(instanceID string, row services.DetailRow) {
 		<dt class="text-sm font-bold text-foreground-secondary uppercase tracking-widest">{ row.Key }</dt>
 		if row.Secret {
 			<dd
-				class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono bg-card p-2 border border-divider rounded-md shadow-sm flex items-center justify-between gap-3"
+				class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono bg-card p-2 border border-divider rounded-md shadow-xs flex items-center justify-between gap-3"
 				data-secret
 				data-secret-url={ secretURL(instanceID, row) }
 				data-secret-mask={ row.Display }
@@ -202,7 +202,7 @@ templ detailRow(instanceID string, row services.DetailRow) {
 				</span>
 			</dd>
 		} else {
-			<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono bg-card p-2 border border-divider rounded-md shadow-sm select-all">
+			<dd class="mt-1 text-sm text-foreground sm:mt-0 sm:col-span-2 font-mono bg-card p-2 border border-divider rounded-md shadow-xs select-all">
 				{ row.Display }
 			</dd>
 		}

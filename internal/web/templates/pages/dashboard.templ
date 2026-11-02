@@ -313,7 +313,7 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 				<!-- Standard Welcome & Quick Actions -->
 				<div class="mt-8">
 					@ui.Card(ui.CardProps{
-						Class: "bg-gradient-to-br from-card to-muted/50",
+						Class: "bg-linear-to-br from-card to-muted/50",
 					}) {
 						<div class="sm:flex sm:items-start sm:justify-between">
 							<div>
@@ -322,7 +322,7 @@ templ Dashboard(csrfToken string, hasProjects bool, hasGitSources bool) {
 									<p>Start by creating a project or deploying a service from the catalog.</p>
 								</div>
 							</div>
-							<div class="mt-5 sm:mt-0 sm:ml-6 sm:flex-shrink-0 flex space-x-3">
+							<div class="mt-5 sm:mt-0 sm:ml-6 sm:shrink-0 flex space-x-3">
 								@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/projects/new"}) {
 									Create Project
 								}
