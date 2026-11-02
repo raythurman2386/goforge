@@ -71,7 +71,7 @@ templ GitSources(sources []*models.GitSource, csrfToken string) {
 
 templ AddGitSourceModal(csrfToken string) {
 	@ui.Dialog(ui.DialogProps{Title: "Add Git Source"}) {
-		<form hx-post="/settings/git" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
+		<form hx-post="/settings/git" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			
 			@ui.Input(ui.InputProps{ID: "git-source-name", Name: "name", Label: "Source Name", Autocomplete: "off", Required: true, Class: "mb-4"})

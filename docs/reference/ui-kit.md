@@ -1,6 +1,6 @@
 # UI kit reference
 
-GoForge pages are built from one templ component kit in `internal/web/templates/components/ui` (package `ui`). It runs on Tailwind 3.4.19, htmx 2.0.11, native `<dialog>`, and the native `popover` attribute. One delegated script, `static/js/ui.js`, adds keyboard and focus behavior. There is no React, no JS build step, and no client framework.
+GoForge pages are built from one templ component kit in `internal/web/templates/components/ui` (package `ui`). It runs on Tailwind 3.4.19, htmx 4.0.1, native `<dialog>`, and the native `popover` attribute. One delegated script, `static/js/ui.js`, adds keyboard and focus behavior. There is no React, no JS build step, and no client framework.
 
 **Rule:** pages and shared components use `components/ui`. Do not write `class="btn…"`, `class="card…"`, `class="input"`, `class="select"`, or `class="label"` by hand. Do not add `confirm(...)` or the old `id="modal"` and `id="menu-button"` contracts. `TestPagesUseKit` in `internal/web/templates/components/sweep_gate_test.go` fails on any of those outside `components/ui`. Do not add inline event handlers (any `on…=` attribute, an `"on…":` key in `templ.Attributes`, or `hx-on`) or an inline `<script>` anywhere, `components/ui` included. `TestNoInlineHandlersOrScripts` in the same file fails on them; page behavior goes in a delegated `data-*` listener in `static/js/app.js`.
 
@@ -107,7 +107,7 @@ The 20 components of Path A, with their variants.
 `ui.Dialog(ui.DialogProps{ID, Title, Description, NonDismissible, Static})` is a native `<dialog>` that `ui.js` opens with `showModal()`.
 
 - An empty `ID` gets a generated unique id, so two dialogs can stack. The title is the accessible name (`aria-labelledby`), and `Description` becomes `aria-describedby`.
-- Server fragments are ephemeral. They are appended to `<body>` by a trigger using `ui.OpenDialogAttrs`, opened on `htmx:load`, and removed on close. `Static` dialogs stay in the page and open from a `[data-ui-dialog-open="id"]` button.
+- Server fragments are ephemeral. They are appended to `<body>` by a trigger using `ui.OpenDialogAttrs`, opened on `htmx:after:process`, and removed on close. `Static` dialogs stay in the page and open from a `[data-ui-dialog-open="id"]` button.
 - Focus moves into the dialog, Tab stays inside, and Escape closes it. Focus returns to the opener. A backdrop click closes it unless `NonDismissible` is set. A successful request from inside closes it. A failed one writes its text into the dialog's own `role="alert"` error node (`ui.DialogErrorID`).
 - `ui.ConfirmDialog` is rendered once by `layouts.Base`. `ui.js` opens it as a `role="alertdialog"` for every `hx-confirm` trigger, and for a plain form submit with `hx-confirm`. Cancel, Escape, and the backdrop send nothing. Confirm sends one request. `data-ui-confirm-tone="danger"` and `data-ui-confirm-label` set the accept button.
 
@@ -145,11 +145,11 @@ The 20 components of Path A, with their variants.
 
 ## `static/js/ui.js` contract
 
-`layouts.Base` loads `htmx.min.js`, `htmx-sse.js`, `app.js`, then `ui.js`. `app.js` keeps the shell: toasts (including the delegated `[data-toast-dismiss]` button), htmx error toasts, and the active sidebar link. `ui.js` is the kit runtime.
+`layouts.Base` sets `<meta name="htmx-config" content='{"noSwap":[204,304,"4xx","5xx"]}'>` (4xx and 5xx never swap; `app.js` toasts them), then loads `htmx.min.js`, `hx-sse.min.js`, `app.js`, and `ui.js`. `app.js` keeps the shell: toasts (including the delegated `[data-toast-dismiss]` button), htmx error toasts, and the active sidebar link. `ui.js` is the kit runtime.
 
 1. **Delegated listeners only.** `click`, `keydown`, `focusin`, `pointerover`, and `toggle` are attached to `document` once. Targets are found by `data-ui*` attributes, so nothing binds to an element htmx may replace.
-2. **Init once.** Markup that needs setup is `data-ui="<name>"`. It is initialized on the first load and on every `htmx:load`, then marked `data-ui-ready`, so a second pass is a no-op. Components register with `GoForgeUI.register(name, {init, events})`.
-3. **Overlays outside polled regions.** Dialogs go to `<body>` and popovers to the top layer. Before htmx snapshots the page for history, every open dialog and popover closes. A swap that replaces an open overlay's anchor closes it first, so focus returns while the trigger exists.
+2. **Init once.** Markup that needs setup is `data-ui="<name>"`. It is initialized on the first load and on every `htmx:after:process` (htmx 4's `htmx:load`), then marked `data-ui-ready`, so a second pass is a no-op. Components register with `GoForgeUI.register(name, {init, events})`.
+3. **Overlays outside polled regions.** Dialogs go to `<body>` and popovers to the top layer. Before htmx updates the history entry (`htmx:before:history:update`), every open dialog and popover closes. A swap that replaces an open overlay's anchor closes it first, so focus returns while the trigger exists.
 4. **Toasts stay in `app.js`.** Do not duplicate `LEVEL_CLASSES` in `ui.js`.
 5. **Literal classes.** Every class string in `ui.js` and `app.js` is a complete literal. Both files are in `tailwind.config.js` `content` and in `scripts/class_check.py`.
 6. **Motion** respects `prefers-reduced-motion` (CSS in `static/css/input.css`).

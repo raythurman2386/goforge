@@ -605,7 +605,7 @@ func (h *SettingsHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request)
 	h.recordToken(r, user.ID, models.AuditActionAPITokenCreate, token.ID, details)
 
 	// Trigger a token list refresh on the client
-	w.Header().Set("HX-Trigger", "tokenCreated")
+	triggerOnBody(w, "tokenCreated")
 	w.Header().Set("Cache-Control", "no-store")
 
 	// Return the raw token to the user (only shown once)
@@ -686,7 +686,7 @@ func (h *SettingsHandler) RotateAPIToken(w http.ResponseWriter, r *http.Request)
 	}
 	h.recordToken(r, user.ID, models.AuditActionAPITokenRotate, token.ID, tokenAuditDetails(token))
 
-	w.Header().Set("HX-Trigger", "tokenCreated")
+	triggerOnBody(w, "tokenCreated")
 	w.Header().Set("Cache-Control", "no-store")
 	if err := settings.TokenCreatedModal("API Token Rotated", rawToken, token.IsMCPCapable()).Render(r.Context(), w); err != nil {
 		h.logger.Error("failed to render token rotated modal", "error", err)

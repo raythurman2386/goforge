@@ -78,6 +78,15 @@ func RenderError(w http.ResponseWriter, r *http.Request, status int, message str
 	}
 }
 
+// triggerOnBody sets an HX-Trigger response header that fires event on
+// <body>. htmx 4 fires a plain HX-Trigger on the request element after the
+// swap; when the swap replaced that element (a dialog form with
+// hx-target="closest dialog"), the event never bubbles to body, so
+// listeners such as hx-trigger="tokenCreated from:body" would miss it.
+func triggerOnBody(w http.ResponseWriter, event string) {
+	w.Header().Set("HX-Trigger", fmt.Sprintf(`{%q:{"target":"body"}}`, event))
+}
+
 // NotFoundHandler handles 404 errors.
 func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	RenderError(w, r, http.StatusNotFound, "Page not found")

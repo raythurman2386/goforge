@@ -248,7 +248,7 @@ SSE connections are long-lived HTTP connections. Clients should handle reconnect
 
 All state-changing methods (`POST`, `PUT`, `DELETE`, `PATCH`) under the UI routes group require a valid CSRF token. The token can be provided via:
 
-- **Header**: `X-CSRF-Token` (used by HTMX via `hx-headers`)
+- **Header**: `X-CSRF-Token` (used by HTMX via `hx-headers:inherited` on `<body>`)
 - **Form field**: `csrf_token` (used by standard HTML forms)
 
 Signed in, the token is `HMAC(CSRF_SECRET, SHA-256(session token))`; signed out, it is a nonce plus its HMAC, kept in the `goforge_csrf` cookie (not HttpOnly). A cookie value without a valid MAC is rejected. See [Security](../security.md#csrf-protection).

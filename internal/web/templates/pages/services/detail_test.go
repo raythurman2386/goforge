@@ -80,13 +80,13 @@ func TestDetailMetricsStreamPreservedByDockerID(t *testing.T) {
 	html := renderDetail(t, models.ServiceStatusPending, &models.Container{DockerID: "abc123"}, nil)
 	start, end := innerRange(t, html, `id="`+components.MetricsStreamID("abc123")+`"`)
 	tag := html[start : strings.Index(html[start:], ">")+start]
-	for _, want := range []string{`hx-preserve="true"`, `sse-connect="/containers/abc123/stats"`, `hx-ext="sse"`} {
+	for _, want := range []string{`hx-preserve="true"`, `hx-sse:connect="/containers/abc123/stats"`, `hx-target="find [data-metrics-frame]"`} {
 		if !strings.Contains(tag, want) {
 			t.Errorf("stream element lacks %s: %s", want, tag)
 		}
 	}
-	if !strings.Contains(html[start:end], `sse-swap="stats,unavailable"`) {
-		t.Error("stream does not swap the unavailable event")
+	if !strings.Contains(html[start:end], `data-metrics-frame`) {
+		t.Error("stream has no frame for its stats and unavailable messages")
 	}
 	other := renderDetail(t, models.ServiceStatusPending, &models.Container{DockerID: "def456"}, nil)
 	if !strings.Contains(other, `id="metrics-stream-def456"`) || strings.Contains(other, "metrics-stream-abc123") {
@@ -126,7 +126,7 @@ func TestDetailContainerCard(t *testing.T) {
 	if !strings.Contains(none, "Container details are not available") || !strings.Contains(none, `href="/containers/abc123"`) {
 		t.Error("card without inspect should say so and keep the logs link")
 	}
-	if noCtr := renderDetail(t, models.ServiceStatusPending, nil, nil); strings.Contains(noCtr, "data-container-card") || strings.Contains(noCtr, "sse-connect") {
+	if noCtr := renderDetail(t, models.ServiceStatusPending, nil, nil); strings.Contains(noCtr, "data-container-card") || strings.Contains(noCtr, "hx-sse:connect") {
 		t.Error("no container should render no card and no stream")
 	}
 }

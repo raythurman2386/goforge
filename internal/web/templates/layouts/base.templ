@@ -21,16 +21,22 @@ templ Base(title, csrfToken string) {
 			<meta name="theme-color" content="#f9fafb" media="(prefers-color-scheme: light)"/>
 			<meta name="theme-color" content="#030712" media="(prefers-color-scheme: dark)"/>
 			<link rel="stylesheet" href={ cssHref() }/>
+			<!-- htmx 4 swaps 4xx/5xx by default. Keep the htmx 2 behavior: errors
+			     never swap, app.js shows them as a toast (or in the dialog's own
+			     error node). Read once when htmx loads, so it precedes the script. -->
+			<meta name="htmx-config" content={ htmxConfig }/>
 			<script src={ jsHref("htmx.min.js") }></script>
-			<script src={ jsHref("htmx-sse.js") }></script>
+			<script src={ jsHref("hx-sse.min.js") }></script>
 			<script src={ jsHref("app.js") }></script>
 			<script src={ jsHref("ui.js") }></script>
 		</head>
 		<body class="min-h-screen bg-background"
 			if csrfToken != "" {
-				hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrfToken) }
+				hx-headers:inherited={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrfToken) }
 			}
 		>
+			<!-- htmx 4 inheritance is explicit: hx-headers:inherited on body sends the
+			     CSRF header from every request element, including fragments appended to body. -->
 			{ children... }
 			<!-- Toast live region: server toasts swap in via hx-swap-oob, client toasts via app.js -->
 			<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-50 flex flex-col items-end space-y-2"></div>

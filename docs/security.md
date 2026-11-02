@@ -52,7 +52,7 @@ The OAuth flow validates the `state` parameter using a cookie-based approach: a 
 
 ## CSRF Protection
 
-State-changing requests (`POST`, `PUT`, `DELETE`, `PATCH`) in the UI group must send a CSRF token in the `X-CSRF-Token` header (HTMX, via `hx-headers`) or the `csrf_token` form field. Tokens are HMAC-SHA256 values keyed by `CSRF_SECRET` (`internal/auth/csrf.go`):
+State-changing requests (`POST`, `PUT`, `DELETE`, `PATCH`) in the UI group must send a CSRF token in the `X-CSRF-Token` header (HTMX, via `hx-headers:inherited` on `<body>`) or the `csrf_token` form field. Tokens are HMAC-SHA256 values keyed by `CSRF_SECRET` (`internal/auth/csrf.go`):
 
 1. **Signed in**: the token is `HMAC(CSRF_SECRET, SHA-256(session token))`. It is stable for the session, fails in any other session, and cannot be computed without both the session cookie and the secret.
 2. **Signed out** (login and register forms): the token is a random nonce plus `HMAC(CSRF_SECRET, nonce)`, stored in the `goforge_csrf` cookie and echoed in the form.

@@ -248,9 +248,9 @@ func (h *SSEHandler) ContainerStats(w http.ResponseWriter, r *http.Request) {
 	h.streamStats(w, flusher, r, containerID)
 }
 
-// streamStats sends a "stats" frame from each pair of one-shot samples, the
+// streamStats sends a stats frame from each pair of one-shot samples, the
 // first about statsPrime after connect. When the container is gone or not
-// running it sends one "unavailable" frame per distinct reason and keeps
+// running it sends one unavailable frame per distinct reason and keeps
 // sampling, so the card recovers if the container comes back.
 func (h *SSEHandler) streamStats(w http.ResponseWriter, flusher http.Flusher, r *http.Request, containerID string) {
 	ctx := r.Context()
@@ -274,7 +274,7 @@ func (h *SSEHandler) streamStats(w http.ResponseWriter, flusher http.Flusher, r 
 		case reason != "":
 			prev = nil
 			if reason != lastReason {
-				writeStatsFragment(w, flusher, r, "unavailable", components.StatsUnavailable(reason))
+				writeStatsFragment(w, flusher, r, components.StatsUnavailable(reason))
 				lastReason = reason
 			}
 			timer.Reset(h.statsInterval)
@@ -284,7 +284,7 @@ func (h *SSEHandler) streamStats(w http.ResponseWriter, flusher http.Flusher, r 
 			prev = cur
 			timer.Reset(h.statsPrime)
 		default:
-			writeStatsFragment(w, flusher, r, "stats", components.Stats(monitor.MetricsFromSamples(containerID, prev, cur)))
+			writeStatsFragment(w, flusher, r, components.Stats(monitor.MetricsFromSamples(containerID, prev, cur)))
 			prev = cur
 			lastReason = ""
 			timer.Reset(h.statsInterval)
@@ -308,12 +308,14 @@ func (h *SSEHandler) sampleStats(ctx context.Context, containerID string) (sampl
 	return cur, ""
 }
 
-func writeStatsFragment(w http.ResponseWriter, flusher http.Flusher, r *http.Request, event string, c templ.Component) {
+// writeStatsFragment sends one stats or unavailable frame as an unnamed
+// message; the card's hx-target swaps it into the [data-metrics-frame] child.
+func writeStatsFragment(w http.ResponseWriter, flusher http.Flusher, r *http.Request, c templ.Component) {
 	var buf bytes.Buffer
 	if err := c.Render(r.Context(), &buf); err != nil {
 		return
 	}
-	writeRawEvent(w, flusher, event, buf.Bytes())
+	writeMessage(w, flusher, buf.Bytes())
 }
 
 // BuildOutput streams build output via SSE.
@@ -366,11 +368,11 @@ func writeEvent(w http.ResponseWriter, flusher http.Flusher, eventType string, d
 	flusher.Flush()
 }
 
-// writeRawEvent writes raw data to the response.
-func writeRawEvent(w http.ResponseWriter, flusher http.Flusher, eventType string, data []byte) {
-	fmt.Fprintf(w, "event: %s\n", eventType)
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+// writeMessage writes an unnamed SSE message (no event: line). htmx 4
+// hx-sse swaps it into the connect element's target (hx-target, hx-swap);
+// a named event would only be dispatched as a DOM event on the element.
+func writeMessage(w http.ResponseWriter, flusher http.Flusher, data []byte) {
+	for _, line := range strings.Split(string(data), "\n") {
 		fmt.Fprintf(w, "data: %s\n", line)
 	}
 	fmt.Fprintf(w, "\n")
@@ -398,16 +400,25 @@ func (h *SSEHandler) verifyContainerOwnership(w http.ResponseWriter, r *http.Req
 	return true
 }
 
+// The deployment log stream's connect element swaps nothing itself
+// (hx-swap="none"); each unnamed message carries one out-of-band swap.
+
+// writeDeploymentLog appends one line to the log list.
 func writeDeploymentLog(w http.ResponseWriter, flusher http.Flusher, r *http.Request, entry *models.DeploymentLog) {
 	var buf bytes.Buffer
+	fmt.Fprintf(&buf, `<div hx-swap-oob="beforeend:#%s">`, deployments.LogLinesID)
 	if err := deployments.LogLine(entry).Render(r.Context(), &buf); err != nil {
 		return
 	}
-	writeRawEvent(w, flusher, "log", buf.Bytes())
+	buf.WriteString(`</div>`)
+	writeMessage(w, flusher, buf.Bytes())
 }
 
+// writeDeploymentSnapshot replaces the log list with the stored lines, so a
+// reconnect does not duplicate the lines the page already shows.
 func writeDeploymentSnapshot(w http.ResponseWriter, flusher http.Flusher, r *http.Request, logs []*models.DeploymentLog) {
 	var buf bytes.Buffer
+	fmt.Fprintf(&buf, `<div id="%s" hx-swap-oob="innerHTML">`, deployments.LogLinesID)
 	if len(logs) == 0 {
 		buf.WriteString(`<p class="text-foreground-secondary italic">No logs available yet...</p>`)
 	}
@@ -416,15 +427,19 @@ func writeDeploymentSnapshot(w http.ResponseWriter, flusher http.Flusher, r *htt
 			return
 		}
 	}
-	writeRawEvent(w, flusher, "snapshot", buf.Bytes())
+	buf.WriteString(`</div>`)
+	writeMessage(w, flusher, buf.Bytes())
 }
 
+// writeDeploymentStatus replaces the live status badge.
 func writeDeploymentStatus(w http.ResponseWriter, flusher http.Flusher, r *http.Request, status models.DeploymentStatus) {
 	var buf bytes.Buffer
+	fmt.Fprintf(&buf, `<span id="%s" hx-swap-oob="innerHTML">`, deployments.LiveStatusID)
 	if err := components.DeploymentStatusBadge(status).Render(r.Context(), &buf); err != nil {
 		return
 	}
-	writeRawEvent(w, flusher, "status", buf.Bytes())
+	buf.WriteString(`</span>`)
+	writeMessage(w, flusher, buf.Bytes())
 }
 
 func deploymentStatusFromEvent(data interface{}) (models.DeploymentStatus, bool) {
@@ -490,7 +505,7 @@ func writeContainerLogLine(w http.ResponseWriter, flusher http.Flusher, line str
 	buf.WriteString(`<div class="py-0.5">`)
 	buf.WriteString(html.EscapeString(line))
 	buf.WriteString(`</div>`)
-	writeRawEvent(w, flusher, "log", buf.Bytes())
+	writeMessage(w, flusher, buf.Bytes())
 }
 
 // verifyDeploymentOwnership checks that a deployment belongs to the authenticated

@@ -23,7 +23,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 							"hx-post": "/projects/" + projectID + "/envs/" + envID + "/variables/sync",
 							"hx-swap": "none",
 							"hx-headers": `{"X-CSRF-Token": "` + csrfToken + `"}`,
-							"hx-disabled-elt": "this",
+							"hx-disable": "this",
 							"hx-indicator": "find .htmx-indicator",
 						},
 					}) {
@@ -88,7 +88,7 @@ templ VariableEditor(envID string, variables []*models.EnvVariable, csrfToken st
 
 templ AddVariableModal(envID string, csrfToken string) {
 	@ui.Dialog(ui.DialogProps{Title: "Add Environment Variable"}) {
-		<form hx-post={ "/envs/" + envID + "/variables" } hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
+		<form hx-post={ "/envs/" + envID + "/variables" } hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			@ui.Input(ui.InputProps{ID: "variable-key", Name: "key", Label: "Key", Autocomplete: "off", Required: true, Class: "mb-4", Attrs: templ.Attributes{"spellcheck": "false"}})
 			@ui.Input(ui.InputProps{ID: "variable-value", Name: "value", Label: "Value", Autocomplete: "off", Required: true, Class: "mb-4", Attrs: templ.Attributes{"spellcheck": "false"}})

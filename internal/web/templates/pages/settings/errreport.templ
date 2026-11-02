@@ -15,7 +15,7 @@ templ ErrorReportingCard(v *errreport.SettingsView, csrfToken string) {
 			Error reporting (Sentry)
 		}
 		<p class="text-sm text-foreground-secondary" data-testid="errreport-status">{ errReportStatusLine(v) }</p>
-		<form class="mt-6 border-t border-divider pt-4" data-testid="errreport-settings-form" hx-put="/settings/error-reporting" hx-target="#error-reporting-settings" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+		<form class="mt-6 border-t border-divider pt-4" data-testid="errreport-settings-form" hx-put="/settings/error-reporting" hx-target="#error-reporting-settings" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
 			<input type="hidden" name="csrf_token" value={ csrfToken }/>
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div class="sm:col-span-2">

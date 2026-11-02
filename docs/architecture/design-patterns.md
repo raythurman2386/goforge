@@ -121,7 +121,7 @@ Clients subscribe to topics (e.g., `deployment:abc123`, `container:stats`), and 
 CSRF protection uses HMAC tokens keyed by `CSRF_SECRET`, adapted for HTMX:
 
 1. Signed in, the token is derived from the session (`HMAC(secret, SHA-256(session token))`); signed out, it is a random nonce plus its HMAC, stored in the `goforge_csrf` cookie
-2. Templates render the token into `hx-headers` (`X-CSRF-Token`) and forms (`csrf_token`)
+2. Templates render the token into `hx-headers:inherited` on `<body>` (`X-CSRF-Token`) and forms (`csrf_token`)
 3. Server middleware recomputes the expected token and compares in constant time; an unsigned cookie value never verifies
 
 ## Middleware Chain

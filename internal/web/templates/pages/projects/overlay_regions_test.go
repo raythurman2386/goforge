@@ -21,7 +21,7 @@ var (
 // on a timer (hx-trigger "every Ns") or over SSE.
 func liveRegion(attrs string) bool {
 	return everyRE.MatchString(attrs) ||
-		strings.Contains(attrs, "sse-swap=") || strings.Contains(attrs, "sse-connect=")
+		strings.Contains(attrs, "hx-sse:connect=")
 }
 
 // overlaysInLiveRegions walks the rendered markup and returns the opening
@@ -75,7 +75,7 @@ func TestProjectDetailOverlaysOutsideLiveRegions(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `hx-trigger="every 3s"`) || !strings.Contains(html, "sse-connect=") {
+	if !strings.Contains(html, `hx-trigger="every 3s"`) || !strings.Contains(html, "hx-sse:connect=") {
 		t.Fatal("fixture should render both the polled banner and the SSE region")
 	}
 	found, bad := overlaysInLiveRegions(html)

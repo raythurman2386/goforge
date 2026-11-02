@@ -30,6 +30,6 @@ A service owner turns on **Protected** on a service page. From then on a `write`
 ## Gotchas
 
 - The switch posts `protected=true` and a hidden `protected=false`; the handler treats any `true` as on.
-- htmx sends a `DELETE`'s form fields in the query string, so `confirm_name` is read from the query first, then from a form body.
+- htmx (2 and 4) sends a `DELETE`'s form fields in the query string, so `confirm_name` is read from the query first, then from a form body.
 - The env list is read at start; the switch applies at once. For an env-listed service the switch is locked on, so only the env list can unprotect it.
 - Tests: `TestUIProtectedFlagRefusesStop`, `TestUIProtectedFlagInReads`, `TestProtectedCheckFailsClosed` (apiv1), `TestServiceHandler_SetProtected_*`, `TestServiceHandler_Delete_RequiresTypedName`, `TestProjectHandler_Delete_RequiresTypedName` (handlers, the last needs `DATABASE_URL`), `TestServiceInstanceRepository_Protected`, `TestProtectedCardStates`, `TestDetailDeleteUsesTypedNameDialog`.

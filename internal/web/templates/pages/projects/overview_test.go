@@ -25,7 +25,7 @@ func TestOverviewStreamsActiveContainerWithCard(t *testing.T) {
 	s := &docker.InspectSummary{DockerID: "abc123", Image: "goforge/app:d1", State: "running", Running: true, Health: "healthy"}
 	html := renderOverview(t, latest, &models.Container{DockerID: "abc123", Status: models.ContainerStatusRunning}, s)
 	for _, want := range []string{
-		`sse-connect="/containers/abc123/stats"`, `id="metrics-stream-abc123"`, `sse-swap="stats,unavailable"`,
+		`hx-sse:connect="/containers/abc123/stats"`, `id="metrics-stream-abc123"`, `hx-target="find [data-metrics-frame]"`, `data-metrics-frame`,
 		"data-container-card", "goforge/app:d1", "healthy", `href="/containers/abc123"`,
 	} {
 		if !strings.Contains(html, want) {
@@ -37,7 +37,7 @@ func TestOverviewStreamsActiveContainerWithCard(t *testing.T) {
 func TestOverviewEmptyStateWithoutRunningContainer(t *testing.T) {
 	latest := &models.Deployment{ID: "d2", Status: models.DeploymentStatusBuilding}
 	html := renderOverview(t, latest, nil, nil)
-	if strings.Contains(html, "sse-connect") {
+	if strings.Contains(html, "hx-sse:connect") {
 		t.Fatal("overview streams with no running container")
 	}
 	if !strings.Contains(html, "No running container for this environment.") {

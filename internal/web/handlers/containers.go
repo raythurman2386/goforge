@@ -147,7 +147,7 @@ func (h *ContainerHandler) Stop(w http.ResponseWriter, r *http.Request) {
 
 	h.audit.record(r, models.AuditActionContainerStop, models.ResourceTypeContainer, containerID, nil)
 
-	w.Header().Set("HX-Trigger", "containerStopped")
+	triggerOnBody(w, "containerStopped")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -182,7 +182,7 @@ func (h *ContainerHandler) Restart(w http.ResponseWriter, r *http.Request) {
 
 	h.audit.record(r, models.AuditActionContainerRestart, models.ResourceTypeContainer, containerID, nil)
 
-	w.Header().Set("HX-Trigger", "containerRestarted")
+	triggerOnBody(w, "containerRestarted")
 	w.WriteHeader(http.StatusOK)
 }
 

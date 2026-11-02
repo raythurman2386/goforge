@@ -839,7 +839,7 @@ goforge/
 │   │   └── output.css                 # Compiled TailwindCSS
 │   ├── js/
 │   │   ├── htmx.min.js                # HTMX library
-│   │   └── htmx-sse.js                # SSE extension
+│   │   └── hx-sse.min.js              # SSE extension (htmx 4)
 │   └── img/
 │       └── logo.svg
 ├── templates/                         # Service templates directory (configurable)

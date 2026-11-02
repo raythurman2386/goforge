@@ -30,7 +30,7 @@ templ TypedDeleteDialog(p TypedDeleteProps) {
 		<form
 			hx-delete={ p.URL }
 			hx-swap="none"
-			hx-disabled-elt="find button[type=submit]"
+			hx-disable="find button[type=submit]"
 			autocomplete="off"
 			data-testid={ p.ID + "-form" }
 		>

@@ -59,7 +59,7 @@ templ emptyStateBody(p EmptyStateProps) {
 					Variant: ui.ButtonPrimary,
 					Attrs: templ.Attributes{
 						"hx-post": p.HxPost,
-						"hx-disabled-elt": "this",
+						"hx-disable": "this",
 						"hx-indicator": "find .htmx-indicator",
 					},
 				}) {

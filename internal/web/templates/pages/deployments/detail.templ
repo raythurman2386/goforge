@@ -22,7 +22,10 @@ type DetailProps struct {
 
 templ Detail(props DetailProps) {
 	@layouts.AppLayout(fmt.Sprintf("Deployment %s", truncateID(props.Deployment.ID)), props.CSRFToken) {
-		<div hx-ext="sse" sse-connect={ fmt.Sprintf("/projects/%s/deployments/%s/logs", props.Project.ID, props.Deployment.ID) }>
+		// The log stream (htmx 4 hx-sse). Its messages are unnamed and carry only
+		// out-of-band swaps (snapshot, log line, status), so the connect element
+		// itself never swaps (hx-swap="none").
+		<div hx-sse:connect={ fmt.Sprintf("/projects/%s/deployments/%s/logs", props.Project.ID, props.Deployment.ID) } hx-swap="none">
 		@ui.Breadcrumb([]ui.Crumb{
 			{Label: "Projects", Href: "/projects"},
 			{Label: props.Project.Name, Href: "/projects/" + props.Project.ID},
@@ -39,7 +42,7 @@ templ Detail(props DetailProps) {
 						"hx-confirm": "Are you sure you want to rollback this deployment?",
 						"data-ui-confirm-label": "Roll back",
 						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
-						"hx-disabled-elt": "this",
+						"hx-disable": "this",
 						"hx-indicator": "find .htmx-indicator",
 					},
 				}) {
@@ -59,7 +62,7 @@ templ Detail(props DetailProps) {
 						"data-ui-confirm-tone": "danger",
 						"data-ui-confirm-label": "Cancel deployment",
 						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
-						"hx-disabled-elt": "this",
+						"hx-disable": "this",
 						"hx-indicator": "find .htmx-indicator",
 					},
 				}) {
@@ -177,7 +180,7 @@ templ Detail(props DetailProps) {
 				}
 			}
 			<div id="deployment-logs" class="bg-terminal text-foreground font-mono text-sm p-4 max-h-96 overflow-y-auto">
-				<div id="deployment-log-lines" sse-swap="snapshot" hx-swap="innerHTML">
+				<div id="deployment-log-lines">
 					if len(props.Logs) == 0 {
 						<p class="text-foreground-secondary italic">No logs available yet...</p>
 					} else {
@@ -186,16 +189,24 @@ templ Detail(props DetailProps) {
 						}
 					}
 				</div>
-				<div sse-swap="log" hx-swap="beforeend" hx-target="#deployment-log-lines"></div>
 			</div>
 		}
 		</div>
 	}
 }
 
-// liveStatus is the status badge wrapped in the SSE "status" swap target.
+// LiveStatusID is the id of the status badge wrapper that the log stream's
+// status message swaps out of band (handlers.writeDeploymentStatus).
+const LiveStatusID = "deployment-live-status"
+
+// LogLinesID is the id of the log list the stream's snapshot replaces and its
+// log lines append to.
+const LogLinesID = "deployment-log-lines"
+
+// liveStatus is the status badge wrapped in the stream's out-of-band status
+// target.
 templ liveStatus(status models.DeploymentStatus) {
-	<span sse-swap="status" hx-swap="innerHTML">
+	<span id={ LiveStatusID }>
 		@components.DeploymentStatusBadge(status)
 	</span>
 }

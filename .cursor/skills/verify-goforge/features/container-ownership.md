@@ -24,8 +24,8 @@ Preconditions:
 - A second account exists. Registration is closed after the first account by default, so launch with `GOFORGE_VERIFY_ENABLE_REGISTRATION=true` and say so in the verdict. `POST /auth/register` as `verify-other@example.test` into `/tmp/goforge-verify/state/jar-b.txt` using the same CSRF flow as register. Do not seed a password hash by hand.
 - The Docker id comes from `verify.sh psql "select docker_id from containers c join service_instances s on s.id = c.service_instance_id where s.name = 'verify-pg'"`.
 
-- **Owner stop.** With `jar-a.txt` and header `X-CSRF-Token`, `POST /containers/$DOCKER_ID/stop`. The status is `200` and the response header `HX-Trigger` is `containerStopped`.
-- **Owner restart.** `POST /containers/$DOCKER_ID/restart` with the same jar and header. The status is `200` and `HX-Trigger` is `containerRestarted`.
+- **Owner stop.** With `jar-a.txt` and header `X-CSRF-Token`, `POST /containers/$DOCKER_ID/stop`. The status is `200` and the response header `HX-Trigger` is `{"containerStopped":{"target":"body"}}`.
+- **Owner restart.** `POST /containers/$DOCKER_ID/restart` with the same jar and header. The status is `200` and `HX-Trigger` is `{"containerRestarted":{"target":"body"}}`.
 - **Other account.** With `jar-b.txt`, `GET /containers/$DOCKER_ID`, `GET /containers/$DOCKER_ID/logs`, and `GET /containers/$DOCKER_ID/stats` each return `403`. `POST` stop and `POST` restart each return `403` and the body contains `access denied`.
 - **Proof.** Write the five statuses for account B and the two statuses for account A to `/tmp/goforge-verify/proof/container-verdict.txt`. Do not save response HTML.
 

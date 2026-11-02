@@ -31,7 +31,7 @@ templ DeploymentList(props DeploymentListProps) {
 					Size: ui.ButtonSM,
 					Attrs: templ.Attributes{
 						"hx-post": fmt.Sprintf("/projects/%s/deployments?env_id=%s", props.ProjectID, props.EnvID),
-						"hx-disabled-elt": "this",
+						"hx-disable": "this",
 						"hx-indicator": "find .htmx-indicator",
 					},
 				}) {
