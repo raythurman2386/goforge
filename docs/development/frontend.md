@@ -160,6 +160,7 @@ Tailwind 4 is configured in CSS, at the top of `static/css/input.css`; there is 
 - `@custom-variant dark (@media (prefers-color-scheme: dark));` keeps dark mode OS-only
 - `@theme` maps the `--gf-*` tokens to colors (`--color-card: rgb(var(--gf-card))`, the emerald `primary-*` palette), `rounded-ui`/`rounded-ui-lg`, `animate-fade-in`, and sets `font-sans` to Geist Sans and `font-mono` to Geist Mono (code, logs, IDs), each with a system fallback
 - Kit classes (`.btn*`, `.input`, `.select`, `.card*`, ...) are plain selectors in `@layer components`, so a utility on the same element always wins. Tailwind 4 cannot `@apply` a non-utility class, so the shared button and field bases are grouped selectors
+- A few Tailwind 4 defaults are set back to their Tailwind 3 behavior, so pages look as before: a bare `border` uses the `border` token, enabled buttons get `cursor: pointer`, `<dialog>` and `[popover]` keep `margin: auto`, `space-x-*`/`space-y-*` use the v3 sibling rule (new layouts can use flex or grid `gap`), and the red, amber, green, emerald, and blue palettes keep their v3 hex values
 
 ### Input and Output
 

@@ -64,6 +64,68 @@
   --color-primary-900: rgb(var(--gf-primary-900));
   --color-primary-950: rgb(var(--gf-primary-950));
 
+  /*
+   * Default-palette families the templates use, pinned to their Tailwind 3
+   * sRGB hex values. Tailwind 4 redefined the palette in OKLCH (red-600 is a
+   * brighter, more saturated red), which shifted btn-danger, btn-warning, and
+   * the status text colors and their checked contrast ratios.
+   */
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+  --color-red-950: #450a0a;
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+  --color-amber-950: #451a03;
+  --color-green-50: #f0fdf4;
+  --color-green-100: #dcfce7;
+  --color-green-200: #bbf7d0;
+  --color-green-300: #86efac;
+  --color-green-400: #4ade80;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+  --color-green-700: #15803d;
+  --color-green-800: #166534;
+  --color-green-900: #14532d;
+  --color-green-950: #052e16;
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+  --color-blue-950: #172554;
+
   /* Semantic tokens. */
   --color-background: rgb(var(--gf-background));
   --color-foreground: rgb(var(--gf-foreground));
@@ -148,6 +210,16 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+
+  /*
+   * Tailwind 4 preflight sets margin: 0 on every element; Tailwind 3 left
+   * <dialog> and [popover] alone, so the UA's margin: auto centered a modal
+   * dialog. Restore it (sheets and placed overlays set their own margin).
+   */
+  dialog,
+  [popover] {
+    margin: auto;
   }
 }
 
@@ -496,6 +568,43 @@
 }
 
 /*
+ * space-x-* and space-y-* keep their Tailwind 3 behavior (t1792u). Tailwind
+ * 4 moved the gap to margin-bottom/margin-end on every child but the last,
+ * under :where(). Two GoForge patterns depend on the 3.x rule: forms whose
+ * first child is the hidden csrf_token input (3.x gave the first visible
+ * field the top gap), and children that also carry an mb-* class (3.x
+ * replaced it with the space value). The @utility below emits the 3.x rule
+ * next to Tailwind's own; the :where() rules after it zero Tailwind 4's
+ * end margins at specificity 0, so a child's own mb-* or me-* still wins.
+ * Reverse and variants are unused here; flex or grid gap is the 4.x way.
+ */
+@utility space-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-top: --spacing(--value(number));
+    margin-top: --value([length]);
+    margin-bottom: 0;
+  }
+}
+
+@utility space-x-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-left: --spacing(--value(number));
+    margin-left: --value([length]);
+    margin-right: 0;
+  }
+}
+
+@layer utilities {
+  :where([class*="space-y-"] > *) {
+    margin-block-end: 0;
+  }
+
+  :where([class*="space-x-"] > *) {
+    margin-inline-end: 0;
+  }
+}
+
+/*
  * Unlayered rules below. Tailwind 4 emits native cascade layers, so these
  * beat every Tailwind utility on the same element regardless of
  * specificity. Keep them to states utilities do not set.
@@ -518,15 +627,17 @@
  * runs, then shows with the label centered as a group. hx-indicator="find
  * .htmx-indicator" puts htmx-request on the svg itself; a button or form
  * that is its own indicator puts it on an ancestor. Indicators outside a
- * button keep the opacity rule above.
+ * button keep the opacity rule above. Tailwind 3 copied these rules to
+ * every variant through @apply btn; Tailwind 4 has no such copy, so the
+ * :is() list names the base and each variant (same specificity as .btn).
  */
-.btn .htmx-indicator {
+:is(.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-ghost, .btn-ghost-primary, .btn-ghost-warning, .btn-ghost-danger, .btn-link) .htmx-indicator {
   display: none;
 }
 
-.btn .htmx-indicator.htmx-request,
-.btn.htmx-request .htmx-indicator,
-.htmx-request .btn .htmx-indicator {
+:is(.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-ghost, .btn-ghost-primary, .btn-ghost-warning, .btn-ghost-danger, .btn-link) .htmx-indicator.htmx-request,
+:is(.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-ghost, .btn-ghost-primary, .btn-ghost-warning, .btn-ghost-danger, .btn-link).htmx-request .htmx-indicator,
+.htmx-request :is(.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-ghost, .btn-ghost-primary, .btn-ghost-warning, .btn-ghost-danger, .btn-link) .htmx-indicator {
   display: inline-block;
 }
 
