@@ -24,7 +24,7 @@ GoForge is a lightweight, self-hosted Platform as a Service (PaaS) built in Go.
 - **Web UI:** server-rendered templ pages with htmx 4.0.1 (bundled `hx-sse` extension) and Tailwind CSS 4.3.3 (CSS-first config in `static/css/input.css`), built from one component kit (`internal/web/templates/components/ui`: native `<dialog>` and `popover`, one delegated `static/js/ui.js`, no inline event handlers). Dark mode follows the OS. Dialogs, menus, tabs, and the mobile navigation are keyboard accessible, and the axe scan of the main pages reports no serious or critical WCAG 2.2 AA issues in light or dark. See [UI kit](docs/reference/ui-kit.md).
 - **One-click Services:** PostgreSQL, Redis, Gitea, Vaultwarden, MinIO, the GeoLibre and RustGIS GIS apps, and more from YAML templates in `templates/`, including shared Postgres and Redis for several apps. See [Services](docs/guides/services.md).
 - **API v1 and MCP:** a bearer-token JSON API at `/api/v1` with scoped tokens and gated, audited writes, and the same MCP tools at `/mcp` (streamable HTTP, scoped Profile tokens, set up from Settings → Profile → MCP), with `goforge-mcp` as a stdio fallback. See [API v1](docs/reference/api-v1.md) and [MCP server](docs/guides/mcp.md).
-- **Nightly Backups:** the GoForge database and Postgres, Gitea, and Vaultwarden services uploaded to S3-compatible storage (R2, B2, MinIO) every night, plus `goforge backup run` on demand. `goforge backup restore` puts the GoForge database back from a run; service data restore is a manual runbook. See [Backup & Restore](docs/deployment/backup.md).
+- **Nightly Backups:** the GoForge database and Postgres, Gitea, and Vaultwarden services uploaded to S3-compatible storage (R2, B2, MinIO) every night, plus `goforge backup run` on demand. `goforge backup restore` puts the GoForge database back from a run, and `goforge backup restore-service` puts one Postgres, Gitea, or Vaultwarden service's data back (both CLI, dry run by default). See [Backup & Restore](docs/deployment/backup.md).
 - **Error Reporting (optional):** set a Sentry DSN in Settings → Profile and GoForge sends handler panics, `/mcp` tool panics, and 5xx pages to Sentry, with no cookies, auth headers, request bodies, or client IPs. Blank means off. See [Error reporting](docs/configuration/index.md#error-reporting-sentry).
 
 ## Getting Started
@@ -131,6 +131,7 @@ GoForge follows a clean architecture with:
    - GoForge is designed for teams/individuals hosting their own applications
    - Do not expose to untrusted users without proper review
    - Review and test thoroughly before any production deployment
+   - No load test, resource limit check, or restore drill against a full GoForge stack has been recorded yet. The plan is in [Production validation](docs/deployment/production-validation.md), and the remaining v1.0 blockers are in the [Roadmap](ROADMAP.md#path-to-v10)
 
 2. **Secret Management**
    - Never commit `.env` files or secrets to version control
@@ -160,10 +161,10 @@ GoForge follows a clean architecture with:
    - Review OAuth permissions requested by GitHub integration
    - There is no 2FA
    - API and MCP tokens are hashed, carry a scope (`full`, `read`, `write`, or `protected`), expire, and can be rotated or revoked in Settings → Profile
-   - Audit logs cover sign-in, registration, logout, API token changes, backup settings, restore, and every `/api/v1` and `/mcp` write. Changes made in the web UI are not recorded yet
+   - Audit logs cover sign-in, registration, logout, API token changes, backup settings, restore, every `/api/v1` and `/mcp` write, and web UI changes to projects, deployments, environments, variables (key only), services, and containers. Settings → Activity shows the log. Not recorded yet: Git source changes, profile and password changes, and webhook-triggered deploys
 
 6. **Data Protection**
-   - Turn on the built-in nightly backups (Settings → Profile → Backups) or run your own. See [Backup & Restore](docs/deployment/backup.md). `goforge backup restore` restores the GoForge database; service data restore is manual
+   - Turn on the built-in nightly backups (Settings → Profile → Backups) or run your own. See [Backup & Restore](docs/deployment/backup.md). `goforge backup restore` restores the GoForge database and `goforge backup restore-service` restores a Postgres, Gitea, or Vaultwarden service (CLI only; there is no restore button)
    - `ENCRYPTION_KEY` encrypts these values at rest with AES-GCM: project variables marked secret, GitHub OAuth access tokens, Git source access tokens and SSH private keys, one-click service `config` and `connection_info`, and the backup S3 keys saved in Settings
    - Rows written in plaintext by an older version stay readable and are encrypted the next time they are updated
    - Non-secret project variables are stored in plaintext

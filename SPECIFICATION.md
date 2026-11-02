@@ -201,7 +201,7 @@ This checklist is ordered for incremental, testable implementation. Each task is
   - Any state → failed
   - running → rolled_back
 - [x] **8.3** Create deployment queue in `internal/deploy/queue.go`
-- [x] **8.4** Implement concurrent deployment limiting (configurable)
+- [ ] **8.4** Implement concurrent deployment limiting (configurable) (not built as written: the worker runs one deployment at a time, and `MAX_CONCURRENT_BUILDS` is accepted but unused)
 - [x] **8.5** Create build pipeline in `internal/deploy/pipeline.go`:
   - Clone repository
   - Prepare build context
@@ -222,9 +222,9 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **9.1** Create `internal/proxy/traefik.go` for Traefik management
 - [x] **9.2** Implement Docker labels generation for Traefik routing
 - [x] **9.3** Create Let's Encrypt certificate resolver configuration
-- [x] **9.4** Implement domain validation
+- [ ] **9.4** Implement domain validation (code present, not wired: `DomainValidator` in `internal/proxy/acme.go` does DNS checks but has no caller outside its tests; the forms check only the name format. Planned for v0.6.0)
 - [x] **9.5** Add custom domain management UI
-- [x] **9.6** Create SSL certificate status checking
+- [ ] **9.6** Create SSL certificate status checking (not built: there is no certificate status code or dashboard; it applies to direct installs that use Let's Encrypt)
 - [x] **9.7** Implement Traefik dashboard proxy (optional, secured)
 - [x] **9.8** Add HTTP to HTTPS redirect configuration
 - [x] **9.9** Create middleware configuration (rate limiting, headers)
@@ -250,13 +250,13 @@ This checklist is ordered for incremental, testable implementation. Each task is
 
 - [x] **11.1** Create `internal/monitor/stats.go` for Docker stats collection
 - [x] **11.2** Implement periodic stats polling per container
-- [x] **11.3** Create metrics storage schema (time-series in PostgreSQL)
-- [x] **11.4** Implement metrics retention policy (7-day rolling)
+- [ ] **11.3** Create metrics storage schema (time-series in PostgreSQL) (not built: stats are streamed live over SSE and not stored)
+- [ ] **11.4** Implement metrics retention policy (7-day rolling) (not built: nothing is stored to retain)
 - [x] **11.5** Build CPU usage chart component (server-rendered SVG)
 - [x] **11.6** Build memory usage chart component
 - [x] **11.7** Create disk usage display
 - [x] **11.8** Implement container health status indicators
-- [x] **11.9** Add resource usage alerts (configurable thresholds)
+- [ ] **11.9** Add resource usage alerts (configurable thresholds) (not built: the notifier sends `deploy.failed`, `service.failed`, `backup.failed`, and container health alerts (#106, #109), but no CPU or memory thresholds)
 - [x] **11.10** Create dashboard overview with aggregate stats
 - [x] **11.11** Implement per-container detail view
 
@@ -269,29 +269,29 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **12.5** Create Redis service template
 - [x] **12.6** Create MySQL/MariaDB service template
 - [x] **12.7** Create MongoDB service template
-- [x] **12.8** Create Plausible Analytics service template
-- [x] **12.9** Create PocketBase service template
+- [ ] **12.8** Create Plausible Analytics service template (not built: there is no `templates/plausible.yaml`)
+- [x] **12.9** Create PocketBase service template (#101)
 - [x] **12.10** Build service catalog browser page
 - [x] **12.11** Create service configuration wizard
 - [x] **12.12** Implement service instance management in `internal/services/instance.go`
 - [x] **12.13** Add connection string exposure to linked projects
-- [x] **12.14** Service backups: nightly S3 backup of Postgres, Gitea, and Vaultwarden service instances in `internal/backup` (backup only; restore is the manual runbook in `docs/deployment/backup.md`)
+- [x] **12.14** Service backups: nightly S3 backup of Postgres, Gitea, and Vaultwarden service instances in `internal/backup` (restore with `goforge backup restore-service`, #104 and #105; see `docs/deployment/backup.md`)
 
 ### Phase 13: Polish & Production Readiness
 
 - [x] **13.1** Implement rate limiting middleware
 - [x] **13.2** Add request validation and sanitization
 - [x] **13.3** Create comprehensive error handling
-- [x] **13.4** Implement audit logging
+- [x] **13.4** Implement audit logging (`/api/v1` and `/mcp` writes, #61; web UI writes and Settings → Activity, #103. Not recorded yet: Git source changes, profile and password changes, webhook-triggered deploys)
 - [x] **13.5** Add graceful shutdown handling
 - [x] **13.6** Create systemd service file `deploy/goforge.service`
 - [x] **13.7** Write Docker Compose deployment file `deploy/docker-compose.yml`
 - [x] **13.8** Database backup: nightly `pg_dump -Fc` of the GoForge database to S3-compatible storage inside `goforge serve`, plus `goforge backup run`
-- [x] **13.9** Implement restore functionality (GoForge database only: `goforge backup restore`, #79; service data is still the manual runbook in `docs/deployment/backup.md`)
+- [x] **13.9** Implement restore functionality (GoForge database: `goforge backup restore`, #79; Postgres, Gitea, and Vaultwarden service data: `goforge backup restore-service`, #104 and #105. CLI only, no web/API/MCP restore)
 - [ ] **13.10** Add Prometheus metrics endpoint (optional) (not built: there is no `/metrics` route, and `ENABLE_METRICS` is unused)
 - [x] **13.11** Create readiness endpoint `GET /health/ready`
 - [x] **13.12** Write integration tests for critical paths
-- [x] **13.13** Add E2E tests with Playwright
+- [ ] **13.13** Add E2E tests with Playwright (not built: there is no Playwright suite; browser checks run through the `drive-ui-a11y` axe and keyboard drive in `.cursor/skills/verify-goforge`)
 - [x] **13.14** Create user documentation
 
 ---
@@ -1095,7 +1095,7 @@ labels := map[string]string{
 2. **Backup Strategy**
    - Nightly backups to S3-compatible storage when `BACKUP_S3_BUCKET` is set: GoForge database, Postgres service instances (per database plus roles), Gitea and Vaultwarden data
    - Encryption is the storage provider's at-rest encryption. `ENCRYPTION_KEY` is never in a backup and must be kept separately
-   - `goforge backup restore` restores the GoForge database (CLI only); service restore is manual (documented). Other service volumes are the operator's responsibility
+   - `goforge backup restore` restores the GoForge database and `goforge backup restore-service` restores a Postgres, Gitea, or Vaultwarden service (CLI only). Other service volumes are the operator's responsibility
 
 ### Monitoring
 

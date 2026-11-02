@@ -21,7 +21,7 @@ GoForge provides git-to-deploy workflows, one-click services, automatic SSL via 
 - **Blue-Green Deployments** -- Zero-downtime deployments with health check verification and automatic rollback.
 - **Authentication** -- Local email/password authentication (Argon2id) and GitHub OAuth.
 - **Secrets Management** -- `ENCRYPTION_KEY` encrypts at rest with AES-GCM: project variables marked secret, GitHub OAuth and Git source access tokens, SSH private keys, one-click service credentials (`config` and `connection_info`), and the backup S3 keys saved in Settings. Non-secret variables are stored in plaintext, and rows written by an older version stay plaintext until updated; see the [Security Guide](security.md).
-- **Audit Logging** -- Records logins, logouts, registration, API token changes, backup settings and restores, and every `/api/v1` and `/mcp` write. Changes made in the web UI to projects, deployments, variables, and services are not recorded yet; see the [Security Guide](security.md).
+- **Audit Logging** -- Records logins, logouts, registration, API token changes, backup settings and restores, every `/api/v1` and `/mcp` write, and web UI changes to projects, deployments, environments, variables, services, and containers. Settings → Activity shows the log; see [Activity](guides/activity.md). Git source changes, profile and password changes, and webhook-triggered deploys are not in it yet; see the [Security Guide](security.md).
 - **Error Reporting (optional)** -- Set a Sentry DSN in Settings → Profile to send handler panics and 5xx pages to Sentry, with no cookies, auth headers, request bodies, or client IPs. Blank means off; see [Error reporting](configuration/index.md#error-reporting-sentry).
 - **HTMX Frontend** -- Fast, server-rendered UI with real-time updates using htmx 4 and templ templates.
 
@@ -47,7 +47,7 @@ GoForge provides git-to-deploy workflows, one-click services, automatic SSL via 
 
 ## Project Status
 
-GoForge is currently at **v0.3.0** and is under active development. See the [Roadmap](https://github.com/raythurman2386/goforge/blob/main/ROADMAP.md) for planned features.
+GoForge is currently at **v0.3.0** and is under active development. The next cycle, v0.4.0, brings the docs in line with what shipped. See the [Roadmap](https://github.com/raythurman2386/goforge/blob/main/ROADMAP.md) for the release plan and the Path to v1.0. No production validation (load, resource limits, restore drill on a full stack) has been run yet; the plan is in [Production validation](deployment/production-validation.md).
 
 ## License
 
