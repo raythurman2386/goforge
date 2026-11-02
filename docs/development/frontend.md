@@ -1,6 +1,6 @@
 # Templates & Frontend
 
-GoForge uses [templ](https://templ.guide/) for type-safe server-side templates and [HTMX 2](https://htmx.org/) for dynamic UI interactions.
+GoForge uses [templ](https://templ.guide/) for type-safe server-side templates and [htmx 4](https://four.htmx.org/) for dynamic UI interactions.
 
 ## Template Structure
 
@@ -109,20 +109,26 @@ HTMX enables dynamic UI without writing JavaScript. Common patterns used in GoFo
 
 ### Server-Sent Events
 
+htmx 4's bundled `hx-sse` extension (`static/js/hx-sse.min.js`) opens the stream. Unnamed messages (no `event:` line) swap into the element's `hx-target` with its `hx-swap`; a named event is only dispatched as a DOM event on the element.
+
 ```html
-<div hx-ext="sse"
-     sse-connect="/sse/deployments/{id}/logs"
-     sse-swap="message">
-    <!-- Logs appear here in real-time -->
+<div hx-sse:connect="/containers/{id}/logs" hx-swap="beforeend">
+    <!-- Log lines are appended here in real time -->
 </div>
 ```
 
+The deployment log stream uses `hx-swap="none"` and sends out-of-band swaps (`hx-swap-oob`) for the snapshot, each line, and the status badge.
+
+### Errors
+
+htmx 4 swaps every response except 204 and 304. `layouts.Base` keeps 4xx and 5xx from swapping with `<meta name="htmx-config" content='{"noSwap":[204,304,"4xx","5xx"]}'>`; `app.js` shows their text as a toast (`htmx:response:error`) and a network failure as another (`htmx:error`).
+
 ### CSRF Token
 
-The base template configures HTMX to send the CSRF token automatically:
+The base template configures HTMX to send the CSRF token automatically. htmx 4 inheritance is explicit, so the body attribute carries `:inherited`:
 
 ```html
-<body hx-headers='{"X-CSRF-Token": "..."}'>
+<body hx-headers:inherited='{"X-CSRF-Token": "..."}'>
 ```
 
 ## TailwindCSS

@@ -81,6 +81,29 @@ func runStatsStream(t *testing.T, sampler statsSampler, d time.Duration) string 
 	return w.Body.String()
 }
 
+// Stats frames are unnamed SSE messages (htmx 4 hx-sse swaps only unnamed
+// messages), told apart by their markup.
+const (
+	statsFrame       = "data: <dl"
+	unavailableFrame = "data: <div class=\"flex items-center justify-center py-12\" data-stats-unavailable"
+)
+
+// A named event would reach the card only as a DOM event and never swap.
+func TestContainerStats_FramesAreUnnamedMessages(t *testing.T) {
+	t.Parallel()
+	for _, f := range []*fakeSampler{{}, {stop: true}} {
+		body := runStatsStream(t, f, time.Second)
+		if !strings.Contains(body, statsFrame) && !strings.Contains(body, unavailableFrame) {
+			t.Fatalf("no frame sent:\n%s", body)
+		}
+		for _, named := range []string{"event: stats", "event: unavailable"} {
+			if strings.Contains(body, named) {
+				t.Errorf("frame sent as a named event %q:\n%s", named, body)
+			}
+		}
+	}
+}
+
 func TestContainerStats_FirstFrameWithinOneSecond(t *testing.T) {
 	t.Parallel()
 	f := &fakeSampler{}
@@ -88,7 +111,7 @@ func TestContainerStats_FirstFrameWithinOneSecond(t *testing.T) {
 	// sent nothing in this window.
 	body := runStatsStream(t, f, time.Second)
 
-	if got := strings.Count(body, "event: stats\n"); got != 1 {
+	if got := strings.Count(body, statsFrame); got != 1 {
 		t.Fatalf("stats events in 1s = %d, want 1:\n%s", got, body)
 	}
 	// Two one-shot samples give a real CPU delta: 250/1000 on one CPU.
@@ -98,7 +121,7 @@ func TestContainerStats_FirstFrameWithinOneSecond(t *testing.T) {
 	if !strings.Contains(body, "Network I/O") || !strings.Contains(body, "2.0 KiB in / 1.0 KiB out") {
 		t.Errorf("first frame lacks network I/O:\n%s", body)
 	}
-	if strings.Contains(body, "event: unavailable") {
+	if strings.Contains(body, unavailableFrame) {
 		t.Errorf("unexpected unavailable event:\n%s", body)
 	}
 	f.mu.Lock()
@@ -114,13 +137,13 @@ func TestContainerStats_FirstFrameWithinOneSecond(t *testing.T) {
 func TestContainerStats_MissingContainerSendsUnavailable(t *testing.T) {
 	t.Parallel()
 	body := runStatsStream(t, &fakeSampler{err: errors.New("No such container: abc123")}, 300*time.Millisecond)
-	if !strings.Contains(body, "event: unavailable\n") {
+	if !strings.Contains(body, unavailableFrame) {
 		t.Fatalf("no unavailable event for a missing container:\n%s", body)
 	}
 	if !strings.Contains(body, "the container was not found") || !strings.Contains(body, "data-stats-unavailable") {
 		t.Errorf("unavailable frame lacks its visible reason:\n%s", body)
 	}
-	if strings.Contains(body, "event: stats") {
+	if strings.Contains(body, statsFrame) {
 		t.Errorf("stats event for a missing container:\n%s", body)
 	}
 	if strings.Contains(body, "No such container") {
@@ -131,7 +154,7 @@ func TestContainerStats_MissingContainerSendsUnavailable(t *testing.T) {
 func TestContainerStats_StoppedContainerSendsUnavailable(t *testing.T) {
 	t.Parallel()
 	body := runStatsStream(t, &fakeSampler{stop: true}, 300*time.Millisecond)
-	if !strings.Contains(body, "event: unavailable\n") || !strings.Contains(body, "the container is not running") {
+	if !strings.Contains(body, unavailableFrame) || !strings.Contains(body, "the container is not running") {
 		t.Fatalf("no not-running unavailable event:\n%s", body)
 	}
 }
@@ -154,7 +177,7 @@ func TestContainerStats_UnavailableSentOncePerReason(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ContainerStats(w, req.WithContext(ctx))
 
-	if got := strings.Count(w.Body.String(), "event: unavailable\n"); got != 1 {
+	if got := strings.Count(w.Body.String(), unavailableFrame); got != 1 {
 		t.Fatalf("unavailable events = %d, want 1 (sampled %d times)", got, f.calls)
 	}
 	if f.calls < 3 {
@@ -165,7 +188,7 @@ func TestContainerStats_UnavailableSentOncePerReason(t *testing.T) {
 func TestContainerStats_NoCollectorSendsUnavailable(t *testing.T) {
 	t.Parallel()
 	body := runStatsStream(t, nil, 200*time.Millisecond)
-	if !strings.Contains(body, "event: unavailable\n") {
+	if !strings.Contains(body, unavailableFrame) {
 		t.Fatalf("no unavailable event without a collector:\n%s", body)
 	}
 }

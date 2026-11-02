@@ -83,11 +83,13 @@
 	// --- HTMX error routing -------------------------------------------------
 
 	// Turn an error response into one line of text. RenderError sends a small
-	// HTML fragment for HTMX requests; plain-text errors pass through.
-	function errorMessage(xhr) {
-		var status = xhr ? xhr.status : 0;
+	// HTML fragment for HTMX requests; plain-text errors pass through. ctx is
+	// the htmx 4 request context (evt.detail.ctx): ctx.response.status and
+	// ctx.text, the response body.
+	function errorMessage(ctx) {
+		var status = ctx && ctx.response ? ctx.response.status : 0;
 		var fallback = "Request failed" + (status ? " (" + status + ")" : "") + ".";
-		var body = (xhr && xhr.responseText) || "";
+		var body = (ctx && ctx.text) || "";
 		if (!body || /<html[\s>]/i.test(body)) return fallback;
 		var doc = new DOMParser().parseFromString(body, "text/html");
 		doc.querySelectorAll("script, style").forEach(function (n) {
@@ -101,24 +103,33 @@
 
 	// Requests from inside a dialog show errors in that dialog's own error
 	// node (ui.Dialog, handled by ui.js). Polling requests would toast every
-	// few seconds, so they stay quiet.
-	function shouldToast(elt) {
+	// few seconds, and an SSE stream (hx-sse:connect) reconnects on its own,
+	// so they stay quiet. A response that redirects (HX-Redirect, such as the
+	// 401 for an expired session) is leaving the page anyway.
+	function shouldToast(ctx) {
+		var elt = ctx && ctx.sourceElement;
+		if (ctx && ctx.hx && (ctx.hx.redirect || ctx.hx.refresh === "true")) return false;
 		if (!elt || !elt.closest) return true;
 		if (elt.closest("dialog[data-ui-dialog]")) return false;
+		if (elt.hasAttribute("hx-sse:connect")) return false;
 		var trigger = elt.getAttribute("hx-trigger") || "";
 		return !/\bevery\b/.test(trigger);
 	}
 
-	// htmx 2 does not swap 4xx/5xx responses by default. Rather than change
-	// htmx.config.responseHandling (which would let an error fragment replace
-	// a polling target such as #instance-list), surface the text as a toast.
-	document.addEventListener("htmx:responseError", function (evt) {
-		if (!shouldToast(evt.detail.elt)) return;
-		showToast(errorMessage(evt.detail.xhr), "error");
+	// 4xx/5xx responses do not swap (htmx.config.noSwap in the htmx-config
+	// meta of layouts.Base), so an error fragment never replaces a polling
+	// target such as #instance-list. Surface the text as a toast instead.
+	document.addEventListener("htmx:response:error", function (evt) {
+		var ctx = evt.detail && evt.detail.ctx;
+		if (!shouldToast(ctx)) return;
+		showToast(errorMessage(ctx), "error");
 	});
 
-	document.addEventListener("htmx:sendError", function (evt) {
-		if (!shouldToast(evt.detail.elt)) return;
+	// htmx:error is a network failure or an exception in the request
+	// pipeline; an abort (hx-sync, navigation) does not fire it.
+	document.addEventListener("htmx:error", function (evt) {
+		var ctx = evt.detail && evt.detail.ctx;
+		if (!shouldToast(ctx)) return;
 		showToast("Could not reach GoForge. Check your connection and try again.", "error");
 	});
 
@@ -161,12 +172,16 @@
 		if (el && el.matches && el.matches("[data-git-source-toggle]")) syncGitSource(el);
 	});
 
-	document.addEventListener("htmx:load", function (evt) {
+	// htmx:after:process fires on body at startup and on every swapped-in
+	// element (htmx 4; it replaces htmx 2's load event).
+	document.addEventListener("htmx:after:process", function (evt) {
 		initGitSources(evt.target);
 	});
 
 	// Container detail: the stop and restart responses send HX-Trigger
-	// containerStopped / containerRestarted; swap in the matching badge from
+	// containerStopped / containerRestarted with target body (htmx 4 fires a
+	// plain HX-Trigger on the request element, which the swap may have
+	// detached); swap in the matching badge from
 	// the page's <template id="container-status-{state}">.
 	function setContainerStatus(state) {
 		var el = document.getElementById("container-status");

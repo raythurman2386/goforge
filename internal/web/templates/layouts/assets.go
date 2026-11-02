@@ -21,7 +21,14 @@ const jsDir = "static/js/"
 // browser or the CDN keeps a script for hours, and a page from a new deploy
 // would run with an older script (for example a ui.js without the Sheet
 // runtime, so the mobile menu button does nothing).
-var baseScripts = []string{"htmx.min.js", "htmx-sse.js", "app.js", "ui.js"}
+var baseScripts = []string{"htmx.min.js", "hx-sse.min.js", "app.js", "ui.js"}
+
+// htmxConfig is the <meta name="htmx-config"> Base renders before htmx loads.
+// htmx 4 swaps every response except 204 and 304; GoForge keeps the htmx 2
+// rule that 4xx and 5xx responses do not swap, so an error fragment never
+// replaces a polled target. app.js turns the error text into a toast and
+// ui.js shows it in the dialog's error node.
+const htmxConfig = `{"noSwap":[204,304,"4xx","5xx"]}`
 
 // devVersion is the cache-bust value when output.css cannot be read.
 const devVersion = "dev"

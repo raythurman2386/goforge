@@ -197,13 +197,14 @@ async function galleryChecks(browser, scheme, page) {
     host.innerHTML = '<button type="button" data-ui="probe" id="ui-probe">probe</button>';
     document.body.appendChild(host);
     window.htmx.process(host);
-    window.htmx.trigger(host, "htmx:load", { elt: host });
+    window.htmx.trigger(host, "htmx:after:process");
     ui.init(document);
     const first = inits;
     document.getElementById("ui-probe").click();
-    // Simulate an htmx swap: replace the element, fire htmx:load again.
+    // Simulate an htmx swap: replace the element, fire htmx:after:process
+    // again (htmx 4's htmx:load).
     host.innerHTML = '<button type="button" data-ui="probe" id="ui-probe">probe</button>';
-    window.htmx.trigger(host, "htmx:load", { elt: host });
+    window.htmx.trigger(host, "htmx:after:process");
     document.getElementById("ui-probe").click();
     host.remove();
     return { ok: first === 1 && inits === 2 && clicks === 2, detail: `inits=${inits} clicks=${clicks} first-pass=${first}` };
@@ -787,11 +788,11 @@ async function overlayChecks(scheme, page) {
     await page.click("#" + M + "-trigger");
     await settle();
     const before = await isOpen(M);
-    await page.evaluate(() => document.body.dispatchEvent(new CustomEvent("htmx:beforeHistorySave", { bubbles: true })));
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent("htmx:before:history:update", { bubbles: true })));
     await settle();
     const after = await isOpen(M);
     const open = await page.$$eval("[data-ui-overlay]", (els) => els.filter((e) => e.matches(":popover-open")).length);
-    check(scheme, "overlays-history", before && !after && open === 0, `menu open=${before} after htmx:beforeHistorySave open=${after} overlays open=${open}`);
+    check(scheme, "overlays-history", before && !after && open === 0, `menu open=${before} after htmx:before:history:update open=${after} overlays open=${open}`);
   });
 
   await t("overlays-axe", async () => {

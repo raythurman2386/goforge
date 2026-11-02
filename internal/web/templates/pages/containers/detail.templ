@@ -22,7 +22,7 @@ templ Detail(containerID string, csrfToken string) {
 					"hx-post": fmt.Sprintf("/containers/%s/restart", containerID),
 					"hx-confirm": "Are you sure you want to restart this container?",
 					"data-ui-confirm-label": "Restart",
-					"hx-disabled-elt": "this",
+					"hx-disable": "this",
 					"hx-indicator": "find .htmx-indicator",
 				},
 			}) {
@@ -40,7 +40,7 @@ templ Detail(containerID string, csrfToken string) {
 					"hx-confirm": "Are you sure you want to stop this container?",
 					"data-ui-confirm-tone": "danger",
 					"data-ui-confirm-label": "Stop",
-					"hx-disabled-elt": "this",
+					"hx-disable": "this",
 					"hx-indicator": "find .htmx-indicator",
 				},
 			}) {
@@ -59,7 +59,7 @@ templ Detail(containerID string, csrfToken string) {
 					Resource Usage
 				}
 			}
-			@ui.CardContent(templ.Attributes{"id": "container-stats", "hx-ext": "sse", "sse-connect": fmt.Sprintf("/containers/%s/stats", containerID), "sse-swap": "stats,unavailable"}) {
+			@ui.CardContent(templ.Attributes{"id": "container-stats", "hx-sse:connect": fmt.Sprintf("/containers/%s/stats", containerID)}) {
 				@components.LoadingState("Waiting for stats...")
 			}
 		}
@@ -78,9 +78,7 @@ templ Detail(containerID string, csrfToken string) {
 			<div
 				id="container-logs"
 				class="bg-terminal text-foreground font-mono text-sm p-4 max-h-96 overflow-y-auto"
-				hx-ext="sse"
-				sse-connect={ fmt.Sprintf("/containers/%s/logs", containerID) }
-				sse-swap="log"
+				hx-sse:connect={ fmt.Sprintf("/containers/%s/logs", containerID) }
 				hx-swap="beforeend"
 			>
 				<p class="text-foreground-secondary italic">Waiting for logs...</p>

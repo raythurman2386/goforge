@@ -1,7 +1,8 @@
 // GoForge UI kit runtime (components/ui). Loaded from layouts.Base after
 // app.js. No build step; plain ES2017 like app.js.
 //
-// PR 1 shipped the delegated listener pattern and the htmx:load init pass.
+// PR 1 shipped the delegated listener pattern and the htmx init pass
+// (on htmx:after:process since htmx 4).
 // PR 2 added the dismissible Alert. PR 4 added Dialog and the hx-confirm
 // dialog. PR 5 added Dropdown, Popover, and Tooltip on the popover
 // attribute. PR 6 added in-page Tabs and the Sheet (an edge-pinned static
@@ -12,11 +13,11 @@
 //  1. Delegated listeners only. click, keydown, focusin, pointerover, and
 //     toggle are attached to document once. Targets are found by data-ui-*
 //     attributes, so nothing binds to an element htmx may replace.
-//  2. Markup that needs setup is initialized from htmx:load (fires for the
-//     first page and every swapped fragment) and marked data-ui-ready, so a
-//     second pass over the same element is a no-op.
+//  2. Markup that needs setup is initialized from htmx:after:process (fires
+//     for the first page and every swapped fragment) and marked
+//     data-ui-ready, so a second pass over the same element is a no-op.
 //  3. Overlays never live inside a polled or SSE-swapped region. Before htmx
-//     snapshots the page for history, every open dialog and popover closes.
+//     updates the history entry, every open dialog and popover closes.
 //  4. Toasts stay in app.js. Do not duplicate LEVEL_CLASSES here.
 //  5. Every class string is a complete literal, so tailwind.config.js content
 //     and scripts/class_check.py (both list this file) can see it.
@@ -69,15 +70,17 @@
 	});
 	document.addEventListener("toggle", dispatch, true);
 
-	document.addEventListener("htmx:load", function (evt) {
-		var root = evt.detail && evt.detail.elt ? evt.detail.elt : evt.target;
+	// htmx 4 fires htmx:after:process on body at startup and on each
+	// swapped-in element after it settles (htmx 2's load event).
+	document.addEventListener("htmx:after:process", function (evt) {
+		var root = evt.target;
 		initTree(root);
 		initDialogs(root);
 		initSheets(root);
 	});
 
-	// Close open overlays before htmx stores the page in its history cache,
-	// so Back never restores a half-open dialog or menu.
+	// Close open overlays before htmx pushes or replaces the history entry,
+	// so Back never returns to a half-open dialog or menu.
 	function closeOverlays() {
 		hideTip(false);
 		document.querySelectorAll("dialog[open]").forEach(function (d) {
@@ -95,7 +98,7 @@
 			}
 		});
 	}
-	document.addEventListener("htmx:beforeHistorySave", closeOverlays);
+	document.addEventListener("htmx:before:history:update", closeOverlays);
 
 	// Alert (components/ui Alert with Dismissible): the close button
 	// ([data-ui-dismiss]) removes the alert from the page.
@@ -113,9 +116,9 @@
 	// --- Dialog and confirm (components/ui Dialog, ConfirmDialog) ----------
 	//
 	// A server fragment renders <dialog data-ui-dialog="ephemeral">, appended
-	// to <body> (ui.OpenDialogAttrs). On htmx:load it opens with showModal(),
+	// to <body> (ui.OpenDialogAttrs). On htmx:after:process it opens with showModal(),
 	// which gives the focus trap, the inert page, and Escape natively. The
-	// element that issued the request (htmx:beforeRequest) is its opener, and
+	// element that issued the request (htmx:before:request) is its opener, and
 	// focus returns there on close. An ephemeral dialog is removed on close.
 	// data-ui-dialog="static" dialogs stay in the page and open from a
 	// [data-ui-dialog-open="id"] button.
@@ -129,12 +132,12 @@
 
 	// Only a request the user started can open a dialog, so only those record
 	// the opener. Polls (every Ns), load triggers, and event triggers such as
-	// "tokenCreated from:body" (which fires before the swap of the dialog
+	// "tokenCreated from:body" (sent to body after the swap of the dialog
 	// that caused it) must not overwrite it.
 	var USER_EVENTS = { click: 1, submit: 1, keydown: 1, keyup: 1, change: 1, input: 1 };
 
-	function isUserRequest(detail) {
-		var ev = detail && detail.requestConfig && detail.requestConfig.triggeringEvent;
+	function isUserRequest(ctx) {
+		var ev = ctx && ctx.sourceEvent;
 		return !!ev && USER_EVENTS[ev.type] === 1;
 	}
 
@@ -274,7 +277,7 @@
 
 	// A swap can drop an open dialog without a close event, and a page
 	// restored from the back/forward cache comes back as it was left.
-	document.addEventListener("htmx:afterSettle", syncScrollLock);
+	document.addEventListener("htmx:after:settle", syncScrollLock);
 	window.addEventListener("pageshow", syncScrollLock);
 
 	function closeDialog(d, value) {
@@ -312,14 +315,19 @@
 			setOpenerExpanded(liveTwin(d._uiOpener), "false");
 			var back = visibleOpener(liveTwin(d._uiOpener));
 			d._uiOpener = null;
-			var confirmed = null;
+			var pending = null;
+			var confirmed = false;
 			if (d.hasAttribute("data-ui-confirm")) {
-				confirmed = d.returnValue === "confirm" ? pendingConfirm : null;
+				pending = pendingConfirm;
+				confirmed = d.returnValue === "confirm";
 				pendingConfirm = null;
 			}
 			if (d.getAttribute("data-ui-dialog") === "ephemeral") d.remove();
 			if (back && back !== document.body && back.focus) back.focus();
-			if (confirmed) confirmed.run();
+			if (pending) {
+				if (confirmed) pending.run();
+				else pending.drop();
+			}
 		},
 		true,
 	);
@@ -375,15 +383,23 @@
 	});
 
 	// Confirm. askConfirm opens the one ConfirmDialog (layouts.Base) and calls
-	// run only when Confirm is pressed. Cancel, Escape, and the backdrop send
-	// nothing.
-	function askConfirm(source, question, run) {
+	// run only when Confirm is pressed. Cancel, Escape, and the backdrop call
+	// drop instead and send nothing. Exactly one of the two runs: htmx 4
+	// holds the element's request queue until the confirm settles.
+	function askConfirm(source, question, run, drop) {
+		drop = drop || function () {};
 		var d = document.getElementById("ui-confirm");
 		if (!d) {
 			// A page without layouts.Base: keep the request gated.
 			if (window.confirm(question)) run();
+			else drop();
 			return;
 		}
+		// A new prompt replaces an open one. Its close event runs after the
+		// reopen and sees an open dialog, so settle the old prompt here.
+		var prev = pendingConfirm;
+		pendingConfirm = null;
+		if (prev) prev.drop();
 		closeDialog(d, "cancel");
 		var message = d.querySelector("[data-ui-confirm-message]");
 		if (message) message.textContent = question;
@@ -397,37 +413,47 @@
 			}
 		}
 		d.returnValue = "";
-		pendingConfirm = { run: run };
+		pendingConfirm = { run: run, drop: drop };
 		openDialog(d, source);
 	}
 
-	// htmx 2.0.4 fires htmx:confirm before every request; detail.question is
-	// the hx-confirm text and detail.issueRequest(true) sends the request
-	// without htmx's own window.confirm().
+	// htmx 4 fires htmx:confirm only for a request with hx-confirm:
+	// detail.ctx.confirm is the text and detail.ctx.sourceElement the element.
+	// After preventDefault htmx waits, holding that element's request queue,
+	// until detail.issueRequest() or detail.dropRequest() is called, so every
+	// path below calls exactly one of them.
 	document.addEventListener("htmx:confirm", function (evt) {
 		var detail = evt.detail || {};
-		if (!detail.question) return;
-		var elt = detail.elt;
+		var ctx = detail.ctx;
+		if (!ctx || !ctx.confirm) return;
+		var elt = ctx.sourceElement;
 		evt.preventDefault();
 		if (elt._uiConfirmed) {
 			elt._uiConfirmed = false;
-			detail.issueRequest(true);
+			detail.issueRequest();
 			return;
 		}
 		var source = (elt.closest && elt.closest("[hx-confirm]")) || elt;
-		askConfirm(source, detail.question, function () {
-			if (elt.isConnected) {
-				detail.issueRequest(true);
-				return;
-			}
-			// A poll re-rendered the trigger while the prompt was open; htmx
-			// drops requests from detached elements, so ask its twin.
-			var twin = liveTwin(elt);
-			if (!twin) return;
-			twin._uiConfirmed = true;
-			if (twin.tagName === "FORM") twin.requestSubmit();
-			else twin.click();
-		});
+		askConfirm(
+			source,
+			ctx.confirm,
+			function () {
+				if (elt.isConnected) {
+					detail.issueRequest();
+					return;
+				}
+				// A poll re-rendered the trigger while the prompt was open. Its
+				// hx-target ("this", "closest ...") is gone with it, so drop
+				// this request and ask the live twin, which confirms at once.
+				detail.dropRequest();
+				var twin = liveTwin(elt);
+				if (!twin) return;
+				twin._uiConfirmed = true;
+				if (twin.tagName === "FORM") twin.requestSubmit();
+				else twin.click();
+			},
+			detail.dropRequest,
+		);
 	});
 
 	// hx-confirm on a plain (non-htmx) form or submit button: the same
@@ -450,10 +476,11 @@
 		});
 	});
 
-	document.addEventListener("htmx:beforeRequest", function (evt) {
-		var elt = evt.detail && evt.detail.elt;
+	document.addEventListener("htmx:before:request", function (evt) {
+		var ctx = evt.detail && evt.detail.ctx;
+		var elt = ctx && ctx.sourceElement;
 		if (!elt) return;
-		if (isUserRequest(evt.detail)) lastTrigger = elt;
+		if (isUserRequest(ctx)) lastTrigger = elt;
 		var d = elt.closest && elt.closest(DIALOG);
 		var err = d && errorNode(d);
 		if (err) {
@@ -465,20 +492,31 @@
 	// A request from inside a dialog closes it on success and shows its error
 	// text in the dialog's own error node on failure. Triggers that open
 	// another dialog (aria-haspopup="dialog") keep their dialog open, so
-	// dialogs can stack.
-	document.addEventListener("htmx:afterRequest", function (evt) {
-		var elt = evt.detail && evt.detail.elt;
-		var d = elt && elt.closest && elt.closest(DIALOG);
+	// dialogs can stack. htmx 4 fires htmx:finally:request after the swap
+	// (htmx:after:request now fires before it), for every request: one with
+	// no response that did not fail was dropped (a cancelled confirm) or
+	// aborted, and leaves the dialog alone. Read the element from
+	// evt.target, not ctx.sourceElement: after an outerHTML swap htmx
+	// repoints ctx.sourceElement at the new content (the shown-once token
+	// dialog), and fires this event on document when the original element
+	// is gone.
+	document.addEventListener("htmx:finally:request", function (evt) {
+		var ctx = evt.detail && evt.detail.ctx;
+		var elt = evt.target;
+		var d = ctx && elt && elt.closest && elt.closest(DIALOG);
 		// Disconnected: the response replaced this dialog (closest dialog).
 		if (!d || !d.isConnected || d.hasAttribute("data-ui-confirm")) return;
-		if (evt.detail.successful) {
+		var status = ctx.response ? ctx.response.status : 0;
+		if (status && status < 400) {
 			if (elt.getAttribute("aria-haspopup") !== "dialog") closeDialog(d, "done");
 			return;
 		}
+		var failed = status >= 400 || (/^error/.test(String(ctx.status)) && !/AbortError/.test(String(ctx.status)));
+		if (!failed) return;
 		var err = errorNode(d);
 		var GF = window.GoForge;
 		if (err) {
-			err.textContent = GF && GF.errorMessage ? GF.errorMessage(evt.detail.xhr) : "Request failed.";
+			err.textContent = GF && GF.errorMessage ? GF.errorMessage(ctx) : "Request failed.";
 			err.classList.remove("hidden");
 		}
 	});
@@ -971,16 +1009,21 @@
 
 	// An htmx swap that replaces an open overlay's anchor or the overlay
 	// itself closes it first, so focus returns while the trigger exists.
-	document.addEventListener("htmx:beforeSwap", function (evt) {
-		var target = evt.detail && evt.detail.target;
-		if (!target || !target.contains) return;
-		document.querySelectorAll(OVERLAY).forEach(function (p) {
-			if (!isOpen(p)) return;
-			var a = anchorOf(p);
-			if (target.contains(p) || (a && target.contains(a))) {
-				if (p === openTip) hideTip(false);
-				else hideOverlay(p, false);
-			}
+	// htmx 4 lists every target of the swap (main, out-of-band, partials) in
+	// detail.tasks.
+	document.addEventListener("htmx:before:swap", function (evt) {
+		var tasks = (evt.detail && evt.detail.tasks) || [];
+		tasks.forEach(function (task) {
+			var target = task && task.target;
+			if (!target || !target.contains) return;
+			document.querySelectorAll(OVERLAY).forEach(function (p) {
+				if (!isOpen(p)) return;
+				var a = anchorOf(p);
+				if (target.contains(p) || (a && target.contains(a))) {
+					if (p === openTip) hideTip(false);
+					else hideOverlay(p, false);
+				}
+			});
 		});
 	});
 

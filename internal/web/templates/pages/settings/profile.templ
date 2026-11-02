@@ -35,7 +35,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 						<p class="truncate text-sm text-foreground-secondary">{ components.UserDisplayName(user) }</p>
 					</div>
 				</div>
-				<form hx-put="/settings/profile" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
+				<form hx-put="/settings/profile" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
 					<input type="hidden" name="csrf_token" value={ csrfToken } />
 					
 					@ui.Input(ui.InputProps{ID: "profile-email", Name: "email", Type: "email", Label: "Email Address", Value: user.Email, Autocomplete: "email", Required: true, Class: "mb-4"})
@@ -77,7 +77,7 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 					@ui.CardTitle(3, templ.Attributes{"class": "mb-4"}) {
 						Change Password
 					}
-					<form hx-put="/settings/password" hx-swap="none" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
+					<form hx-put="/settings/password" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
 						<input type="hidden" name="csrf_token" value={ csrfToken } />
 						
 						@ui.Input(ui.InputProps{ID: "password-current", Name: "current_password", Type: "password", Label: "Current Password", Autocomplete: "current-password", Required: true, Class: "mb-4"})
@@ -290,7 +290,7 @@ templ TokenCreatedModal(title, rawToken string, mcp bool) {
 // services for the optional restriction; nil or empty hides that section.
 templ AddAPITokenModal(csrfToken string, mcp bool, res *TokenResources) {
 	@ui.Dialog(ui.DialogProps{Title: addTokenTitle(mcp)}) {
-		<form hx-post="/settings/tokens" hx-target="closest dialog" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']" hx-indicator="find .htmx-indicator">
+		<form hx-post="/settings/tokens" hx-target="closest dialog" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
 			<input type="hidden" name="csrf_token" value={ csrfToken } />
 			if mcp {
 				<input type="hidden" name="preset" value="mcp" />
@@ -475,7 +475,7 @@ templ BackupRestorePoints(v *backup.RestorePointsView) {
 }
 
 templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
-	<form class="mt-6 border-t border-divider pt-4" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+	<form class="mt-6 border-t border-divider pt-4" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
 		<input type="hidden" name="csrf_token" value={ csrfToken }/>
 		<p class="mb-4 text-xs text-foreground-secondary" data-testid="backup-source">{ backupSourceLine(f) }</p>
 		@ui.Switch(ui.CheckboxProps{ID: "backup-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops the schedule and keeps the settings.", Checked: f.Enabled, Class: "mb-4"})

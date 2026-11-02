@@ -9,7 +9,7 @@ import (
 
 // DialogProps configures Dialog. The zero value is an ephemeral modal: the
 // server fragment is appended to <body>, static/js/ui.js opens it with
-// showModal() on htmx:load and removes it from the page when it closes.
+// showModal() on htmx:after:process and removes it from the page when it closes.
 type DialogProps struct {
 	// ID is the <dialog> id. Leave it empty to get a generated, unique id,
 	// so two dialogs can stack without colliding. The title and error node

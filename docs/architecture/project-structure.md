@@ -34,7 +34,7 @@ goforge/
 │   └── webhook/           # Git webhook handling
 ├── static/                # Static assets
 │   ├── css/               # TailwindCSS input/output
-│   └── js/                # HTMX and SSE extension
+│   └── js/                # htmx, hx-sse extension, app.js, ui.js
 ├── templates/             # Service YAML templates
 ├── deploy/                # Deployment artifacts
 │   └── goforge.service    # Systemd service file

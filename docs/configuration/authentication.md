@@ -97,10 +97,10 @@ Details: [Security → CSRF Protection](../security.md#csrf-protection).
 
 ### Configuring HTMX
 
-HTMX is pre-configured in the base template to send the CSRF token automatically:
+HTMX is pre-configured in the base template to send the CSRF token automatically. htmx 4 inherits an attribute only when it says so, hence `:inherited`:
 
 ```html
-<body hx-headers='{"X-CSRF-Token": "{{csrfToken}}"}'>
+<body hx-headers:inherited='{"X-CSRF-Token": "{{csrfToken}}"}'>
 ```
 
 ## Rate Limiting

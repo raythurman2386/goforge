@@ -86,7 +86,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 								"hx-confirm": "Pull the latest image for this service and recreate its container? Data volumes and configuration are kept. The service is briefly unavailable while it restarts.",
 								"data-ui-confirm-label": "Pull and recreate",
 								"hx-swap": "none",
-								"hx-disabled-elt": "this",
+								"hx-disable": "this",
 								"hx-indicator": "find .htmx-indicator",
 								"title": "Pull the image again and recreate the container",
 							},
@@ -103,7 +103,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 						Attrs: templ.Attributes{
 							"hx-post": "/services/" + instance.ID + "/restart",
 							"hx-swap": "none",
-							"hx-disabled-elt": "this",
+							"hx-disable": "this",
 							"hx-indicator": "find .htmx-indicator",
 						},
 					}) {

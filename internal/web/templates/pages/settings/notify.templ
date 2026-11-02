@@ -15,7 +15,7 @@ templ NotifyCard(v *notify.SettingsView, csrfToken string) {
 			Notifications
 		}
 		<p class="text-sm text-foreground-secondary" data-testid="notify-status">{ notifyStatusLine(v) }</p>
-		<form class="mt-6 border-t border-divider pt-4" data-testid="notify-settings-form" hx-put="/settings/notifications" hx-target="#notify-settings" hx-swap="outerHTML" hx-disabled-elt="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+		<form class="mt-6 border-t border-divider pt-4" data-testid="notify-settings-form" hx-put="/settings/notifications" hx-target="#notify-settings" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
 			<input type="hidden" name="csrf_token" value={ csrfToken }/>
 			@ui.Switch(ui.CheckboxProps{ID: "notify-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops every alert and keeps the settings.", Checked: v.Enabled, Class: "mb-4"})
 			<div class="grid gap-4 sm:grid-cols-2">

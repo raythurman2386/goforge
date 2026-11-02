@@ -69,7 +69,7 @@ curl -sS -N --max-time 10 \
 ## Gotchas
 
 - Not re-driven live since #28. The expectations below come from the merged source.
-- Pipeline log lines are stored in `deployment_logs`. A reconnect to the log stream sends one `snapshot` event with the stored lines before live `log` events. Do not treat `event: connected` alone as replay.
+- Pipeline log lines are stored in `deployment_logs`. A reconnect to the log stream sends one snapshot message with the stored lines before live log messages. Since htmx 4 these are unnamed messages (no `event:` line) carrying out-of-band swaps: the snapshot is `<div id="deployment-log-lines" hx-swap-oob="innerHTML">`, each line `<div hx-swap-oob="beforeend:#deployment-log-lines">`, and the status `<span id="deployment-live-status" hx-swap-oob="innerHTML">`. Do not treat `event: connected` alone as replay.
 - The manual repository field is named `repository_url_manual` until page script renames it. HTTP posts must send `repository_url`.
 - The log stream is behind `RequireAuth`. A missing session is `401` or a redirect to `/login`, not an empty log.
 - A deployment id under a project it does not belong to, or another account's project, returns `404` on the detail page and the log stream.

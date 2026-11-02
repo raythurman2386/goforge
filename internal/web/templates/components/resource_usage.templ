@@ -10,16 +10,17 @@ func MetricsStreamID(dockerID string) string {
 	return "metrics-stream-" + dockerID
 }
 
-// ResourceUsageCard streams live stats for one container. The stream swaps
-// in a "stats" frame or an "unavailable" frame that says why there is none.
+// ResourceUsageCard streams live stats for one container over htmx 4
+// hx-sse. Each unnamed message is a stats frame or an unavailable frame that
+// says why there is none; it replaces the [data-metrics-frame] child.
 templ ResourceUsageCard(dockerID string, class string) {
 	@ui.Card(ui.CardProps{Flush: true, Class: ui.Class("overflow-hidden", class), Attrs: templ.Attributes{"data-resource-usage": true}}) {
 		<div class="px-6 py-5 border-b border-divider bg-muted/30">
 			<h3 class="text-lg font-bold text-foreground tracking-tight">Resource Usage</h3>
 			<p class="mt-1 text-sm text-foreground-secondary">Real-time container performance metrics.</p>
 		</div>
-		<div class="p-6" id={ MetricsStreamID(dockerID) } hx-preserve="true" hx-ext="sse" sse-connect={ "/containers/" + dockerID + "/stats" }>
-			<div sse-swap="stats,unavailable" class="flex items-center justify-center py-12">
+		<div class="p-6" id={ MetricsStreamID(dockerID) } hx-preserve="true" hx-sse:connect={ "/containers/" + dockerID + "/stats" } hx-target="find [data-metrics-frame]">
+			<div data-metrics-frame class="flex items-center justify-center py-12">
 				<div class="flex flex-col items-center">
 					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
 					<p class="text-sm text-foreground-secondary font-medium">Connecting to metrics stream...</p>

@@ -220,7 +220,7 @@ func TestRotateAPIToken(t *testing.T) {
 	if after.TokenHint != auth.APITokenHint(newRaw) {
 		t.Fatal("hint not updated")
 	}
-	if w.Header().Get("HX-Trigger") != "tokenCreated" {
+	if w.Header().Get("HX-Trigger") != `{"tokenCreated":{"target":"body"}}` {
 		t.Error("list not refreshed")
 	}
 	if !slices.Equal(a.actions, []string{models.AuditActionAPITokenCreate, models.AuditActionAPITokenRotate}) {

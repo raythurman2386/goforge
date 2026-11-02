@@ -6,11 +6,11 @@ After a user saves `Edit configuration` (or runs `Update image`) on a running se
 
 - `metrics-edit-save` saves the edit form: `POST /services/{instanceID}/edit` answers `303` to `/services/{instanceID}` and the instance goes `pending`.
 - `metrics-poll-stops` the pending render of `GET /services/{instanceID}` carries `id="service-detail-poll"` inside `id="service-detail-content"`; the first `running` render has no `service-detail-poll`, so htmx stops polling after that swap.
-- `metrics-stream-first-frame` `GET /containers/{dockerID}/stats` sends `event: connected` and then `event: stats` within about 1 second, with `Network I/O` and `Block I/O` in the frame.
-- `metrics-stream-unavailable` the same route for a stopped or removed container sends `event: unavailable` with `Metrics are not available: ...` and no `event: stats`.
+- `metrics-stream-first-frame` `GET /containers/{dockerID}/stats` sends `event: connected` and then an unnamed stats message (`data: <dl`, no `event:` line; htmx 4 hx-sse swaps only unnamed messages) within about 1 second, with `Network I/O` and `Block I/O` in the frame.
+- `metrics-stream-unavailable` the same route for a stopped or removed container sends an unnamed unavailable message (`data-stats-unavailable`) with `Metrics are not available: ...` and no stats frame.
 - `metrics-stream-preserved` the stream element is `id="metrics-stream-{dockerID}"` with `hx-preserve="true"`, so a pending poll swap keeps it open while the Docker ID is unchanged; a recreate renders a new id.
 - `metrics-container-card` service detail and project Overview render `data-container-card` with the fields above and `href="/containers/{dockerID}"`.
-- `metrics-project-empty` a project whose environment has no running container renders `No running container for this environment.` and no `sse-connect`.
+- `metrics-project-empty` a project whose environment has no running container renders `No running container for this environment.` and no `hx-sse:connect`.
 
 ## How to get to it (user POV)
 
@@ -33,8 +33,8 @@ Preconditions:
 - **Edit save.** `GET $BASE/services/$INSTANCE_ID/edit` with `jar-a.txt` returns `200`. Post the form back with `csrf_token`, `name=verify-pg`, and the unchanged non-secret fields (`database=app`, `username=postgres`; leave `password` empty to keep it). Expect `303` with `Location: /services/$INSTANCE_ID`.
 - **Pending render.** Right after the save, `GET $BASE/services/$INSTANCE_ID`. Record `pending_has_poll` (body contains `id="service-detail-poll"`). Save nothing else from the body; it contains masked connection rows only, but keep the habit.
 - **Running render.** Poll `verify.sh psql "select status from service_instances where name = 'verify-pg'"` until `running`, then `GET` the page again with header `HX-Request: true`. Record `running_has_poll` (must be `no`), `has_stream_id` (`id="metrics-stream-$DOCKER_ID"`), and `has_container_card` (`data-container-card`).
-- **First frame.** `DOCKER_ID` from `verify.sh psql "select docker_id from containers c join service_instances s on s.id = c.service_instance_id where s.name = 'verify-pg'"`. Run `curl -sS -N --max-time 2 -b jar-a.txt "$BASE/containers/$DOCKER_ID/stats" -o /tmp/goforge-verify/state/stats.txt -w '%{http_code}\n'`. Expect exit `28` (timeout) with code `200`; `grep -c '^event: stats' stats.txt` is at least `1` and the file contains `Network I/O`.
-- **Unavailable.** `sudo -n docker stop $DOCKER_ID` (the throwaway service only), then the same curl. The file contains `event: unavailable` and `the container is not running`, and no `event: stats`. Start it again with `POST $BASE/containers/$DOCKER_ID/restart`.
+- **First frame.** `DOCKER_ID` from `verify.sh psql "select docker_id from containers c join service_instances s on s.id = c.service_instance_id where s.name = 'verify-pg'"`. Run `curl -sS -N --max-time 2 -b jar-a.txt "$BASE/containers/$DOCKER_ID/stats" -o /tmp/goforge-verify/state/stats.txt -w '%{http_code}\n'`. Expect exit `28` (timeout) with code `200`; `grep -c '^data: <dl' stats.txt` is at least `1`, the file contains `Network I/O`, and `grep -c '^event: stats' stats.txt` is `0`.
+- **Unavailable.** `sudo -n docker stop $DOCKER_ID` (the throwaway service only), then the same curl. The file contains `data-stats-unavailable` and `the container is not running`, and no `data: <dl` stats frame. Start it again with `POST $BASE/containers/$DOCKER_ID/restart`.
 - **Project empty state.** Optional: a project with a deployment and no running container renders `No running container for this environment.` on `/projects/{id}`.
 - **Proof.** Write the statuses and booleans above to `/tmp/goforge-verify/proof/metrics-verdict.txt`. Do not copy jars or full page HTML.
 

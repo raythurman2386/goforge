@@ -9,7 +9,7 @@ types, migration and template rules, and the PR format. Agents follow it too.
 
 GoForge is a lightweight, self-hosted PaaS built in Go with HTMX + templ. It provides
 git-to-deploy workflows, one-click services, automatic SSL via Traefik, and real-time
-monitoring. Tech stack: Go 1.26+, PostgreSQL, Docker, HTMX 2, templ, TailwindCSS.
+monitoring. Tech stack: Go 1.26+, PostgreSQL, Docker, htmx 4, templ, TailwindCSS.
 
 ## Build, Lint, and Test Commands
 
