@@ -271,6 +271,7 @@ require (
 	honnef.co/go/tools v0.6.1 // indirect
 	mvdan.cc/gofumpt v0.7.0 // indirect
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
+	rsc.io/qr v0.2.0 // indirect
 )
 
 replace github.com/docker/docker => github.com/docker/docker v27.3.1+incompatible

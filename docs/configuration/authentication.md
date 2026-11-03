@@ -8,6 +8,18 @@ Local authentication works out of the box with no additional configuration. User
 
 `GOFORGE_ENABLE_REGISTRATION` defaults to false. When no users exist, the register form and a new GitHub login can still create the first account. That account is a normal user. After that account exists, both paths stay closed unless the variable is true. Set `GOFORGE_ADMIN_EMAIL` to an account's address and restart GoForge to grant the admin role. The same address is also admin if it registers while the variable is already set. Matching ignores case: `Admin@Example.com` and `admin@example.com` are one account. Addresses are stored in lowercase, and a second registration that differs only by case is rejected. Linking GitHub to an existing email does not change the role.
 
+### Two-factor authentication (TOTP)
+
+A local password account can turn on two-factor authentication in **Settings → Profile → Two-factor authentication**. Nothing to configure; it needs `ENCRYPTION_KEY`, which seals the TOTP key.
+
+1. Enter the current password and choose **Set up 2FA**.
+2. Scan the QR code with an authenticator app (or type the setup key), then enter the 6-digit code it shows.
+3. Save the 10 recovery codes. They are shown once, and each works once.
+
+From then on, sign-in asks for the password and then a code from the app or a recovery code at `/auth/2fa` (5 minutes, 5 tries). Wrong codes count toward the login lockout. To turn it off, enter the password and a code. If a user loses the app and the recovery codes, run `goforge user reset-2fa <email>` on the host (`docker compose exec goforge ./goforge user reset-2fa <email>` with Docker Compose).
+
+Sign in with GitHub does not ask for this code; it relies on the GitHub account's 2FA. GitHub sign-in links a local account with the same email, so turn on 2FA at GitHub as well. API tokens and `/mcp` never ask for a code. Details: [Security → Two-factor authentication](../security.md#two-factor-authentication).
+
 ### Password Hashing
 
 GoForge uses Argon2id with these parameters:
@@ -26,6 +38,8 @@ These meet OWASP's minimum recommendations for Argon2id.
 ## GitHub OAuth
 
 GitHub OAuth enables users to log in with their GitHub account and connect repositories for deployment.
+
+GitHub sign-in relies on GitHub's own two-factor authentication. GoForge does not ask for its TOTP code after a GitHub login, even when the linked account has 2FA on.
 
 ### Step 1: Create a GitHub OAuth App
 

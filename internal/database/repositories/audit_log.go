@@ -195,7 +195,7 @@ type AuditFilter struct {
 	// ActionContains matches actions that contain it, ignoring case.
 	ActionContains string
 	// Source is models.AuditSourceMCP, AuditSourceAPI, AuditSourceUI,
-	// AuditSourceWebhook, or AuditSourceAgent (MCP or API); see
+	// AuditSourceWebhook, AuditSourceCLI, or AuditSourceAgent (MCP or API); see
 	// models.AuditLog.Source.
 	Source string
 	// TokenName matches details.token_name, the API token that made the
@@ -219,8 +219,10 @@ const auditSourceSQL = `(
 		AND (left(action, 7) = 'api_v1.' OR details->>'via' = 'api_v1'))
 	OR ($8 = 'webhook' AND COALESCE(user_agent, '') NOT LIKE 'goforge-mcp%'
 		AND left(action, 7) <> 'api_v1.' AND details->>'via' = 'webhook')
+	OR ($8 = 'cli' AND COALESCE(user_agent, '') NOT LIKE 'goforge-mcp%'
+		AND left(action, 7) <> 'api_v1.' AND details->>'via' = 'cli')
 	OR ($8 = 'ui' AND COALESCE(user_agent, '') NOT LIKE 'goforge-mcp%'
-		AND left(action, 7) <> 'api_v1.' AND COALESCE(details->>'via', '') NOT IN ('api_v1', 'webhook'))
+		AND left(action, 7) <> 'api_v1.' AND COALESCE(details->>'via', '') NOT IN ('api_v1', 'webhook', 'cli'))
 )`
 
 // ListFiltered retrieves audit log entries matching every non-empty filter

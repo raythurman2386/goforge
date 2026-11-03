@@ -1,0 +1,40 @@
+package pages
+
+import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
+)
+
+// TwoFactor is the second sign-in step for a password account with 2FA on.
+// The password was already checked; the goforge_2fa cookie carries the
+// short-lived challenge. One field takes a 6-digit authenticator code or a
+// recovery code.
+templ TwoFactor(csrfToken, errorMessage string) {
+	@layouts.AuthLayout("Two-factor authentication", csrfToken) {
+		@authHeader("Two-factor authentication", "Enter the 6-digit code from your authenticator app")
+		@ui.Card(ui.CardProps{Class: "space-y-6"}) {
+			<form class="space-y-5" action="/auth/2fa" method="POST" data-testid="two-factor-form">
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				@ui.Input(ui.InputProps{
+					ID:           "two-factor-code",
+					Name:         "code",
+					Label:        "Authentication code",
+					Autocomplete: "one-time-code",
+					Placeholder:  "123456",
+					Required:     true,
+					Help:         "Lost your device? Enter one of your recovery codes instead. Each works once.",
+					Attrs:        templ.Attributes{"autofocus": true, "spellcheck": "false", "autocapitalize": "off"},
+				})
+				if errorMessage != "" {
+					@ui.AlertMessage(ui.AlertError, errorMessage)
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit", Class: "w-full"}) {
+					Verify
+				}
+			</form>
+		}
+		<p class="text-center text-sm text-foreground-secondary">
+			<a href="/login" class="font-medium text-primary-700 hover:text-primary-800 dark:text-primary-400">Back to sign in</a>
+		</p>
+	}
+}

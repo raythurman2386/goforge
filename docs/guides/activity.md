@@ -8,7 +8,7 @@ first: every change made in the web UI, through `/api/v1`, or by an MCP agent.
 | Column | Meaning |
 |--------|---------|
 | Time | When the row was written |
-| Source | `MCP` (user agent starts with `goforge-mcp`), `API` (an `api_v1.` action or `details.via` = `api_v1`), `Webhook` (`details.via` = `webhook`), or `UI` |
+| Source | `MCP` (user agent starts with `goforge-mcp`), `API` (an `api_v1.` action or `details.via` = `api_v1`), `Webhook` (`details.via` = `webhook`), `CLI` (`details.via` = `cli`, a host command such as `goforge user reset-2fa`), or `UI` |
 | Action | The action, for example `service.delete` or `api_v1.restart_service`. It links to the change and its outcome rows |
 | Token | The API token name that made the change (API and MCP rows) |
 | Resource | A link to the project, service, deployment, environment's project, container, API token, or Git source |
@@ -19,7 +19,7 @@ Rows whose action ends in `.failed` are tinted red.
 
 ## Filters
 
-- **Source**: Agents (MCP or API), MCP, API, UI, or Webhook.
+- **Source**: Agents (MCP or API), MCP, API, UI, Webhook, or CLI.
 - **Token name**: exact token name, for example `ci-bot`.
 - **Action**: part of the action, ignoring case (`restart`, `delete`).
 - `?audit_id=<id>` shows one change and every row whose `details.audit_id`
@@ -50,6 +50,13 @@ API rows and links to the page filtered to agents.
   `new_email_domain`, never the full address; Git source add and remove
   (`git_source.create`, `git_source.delete`) with the name, type,
   `has_access_token`, and `has_api_url`, never the token, SSH key, or URL.
+- Two-factor authentication: `user.2fa.enable` (with `recovery_codes`),
+  `user.2fa.disable` (with `second_factor`, the kind of code used),
+  `login.2fa_failed` for each wrong code at `/auth/2fa` (with `attempt` and
+  `challenge_ended`), and `user.2fa.reset` from `goforge user reset-2fa`
+  (`details.via` = `cli`, source **CLI**). A `login` row after the second
+  step has `second_factor` = `totp` or `recovery_code`. The key and the codes
+  are never recorded.
 - Webhook deploys: each deployment a signed GitHub, Gitea, or GitLab push
   starts writes `deployment.trigger` with `details.via` = `webhook`,
   `provider`, `branch`, `commit`, `repository`, `project_id`, and

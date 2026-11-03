@@ -18,8 +18,8 @@ import (
 // the card read-only. mcp is nil when /mcp is off (GOFORGE_MCP_HTTP=false),
 // which hides the MCP card. notifyForm is the admin Notifications form; nil
 // hides that card. errReportForm is the admin Error reporting (Sentry) form;
-// nil hides that card.
-templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, errReportForm *errreport.SettingsView, mcp *MCPCard) {
+// nil hides that card. twoFactor is the opt-in TOTP card; nil hides it.
+templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, errReportForm *errreport.SettingsView, mcp *MCPCard, twoFactor *TwoFactorCard) {
 	@layouts.AppLayout("Profile Settings", csrfToken) {
 		<div class="max-w-2xl mx-auto">
 			@components.PageHeader("Profile Settings", "Manage your account information and security.")
@@ -92,6 +92,10 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 						</div>
 					</form>
 				}
+			}
+
+			if twoFactor != nil {
+				@TwoFactorCardView(twoFactor, csrfToken)
 			}
 
 			<!-- Sessions -->

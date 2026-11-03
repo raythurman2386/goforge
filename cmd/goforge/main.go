@@ -490,8 +490,10 @@ func runServer() error {
 	// account (stopped during graceful shutdown).
 	loginThrottle := middleware.NewDefaultLoginThrottle()
 	defer loginThrottle.Stop()
+	// Opt-in TOTP for password accounts; secrets sealed with ENCRYPTION_KEY.
+	twoFactor := auth.NewTwoFactor(repositories.NewTwoFactorRepository(db.DB, secretService))
 	authHandler := handlers.NewAuthHandler(sessionManager, userRepo, githubProvider, authenticator, auditService, cfg.EnableRegistration, logger.WithComponent(log, "auth")).
-		WithLoginThrottle(loginThrottle)
+		WithLoginThrottle(loginThrottle).WithTwoFactor(twoFactor)
 	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService, projectRepo, gitSourceRepo, logger.WithComponent(log, "dashboard"))
 	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService, logger.WithComponent(log, "projects")).
 		WithAudit(auditService)
@@ -509,7 +511,7 @@ func runServer() error {
 	serviceHandler.WithEnvProtected(cfg.ProtectedServices)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithTokenResources(projectService, instanceService).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithNotifySettings(notifySettings).WithErrorReporting(errReportSettings).
-		WithRestorePoints(restorePoints).WithAudit(auditService).WithSessions(sessionRepo).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
+		WithRestorePoints(restorePoints).WithAudit(auditService).WithSessions(sessionRepo).WithMCP(cfg.BaseURL, cfg.MCPHTTP).WithTwoFactor(twoFactor)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))

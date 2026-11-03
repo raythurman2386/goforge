@@ -1,0 +1,113 @@
+package settings
+
+import (
+	"fmt"
+
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// TwoFactorCardView is the Profile card for opt-in TOTP. Password accounts
+// turn it on with their password and a first code, and off with their
+// password and a current code. GitHub sign-in never asks for this code.
+templ TwoFactorCardView(c *TwoFactorCard, csrfToken string) {
+	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"data-testid": "two-factor-card"}}) {
+		<div class="mb-2 flex items-center justify-between gap-4">
+			@ui.CardTitle(3, nil) {
+				Two-factor authentication
+			}
+			if c.Enabled {
+				@ui.Badge(ui.BadgeProps{Tone: ui.BadgeSuccess, Size: ui.BadgeMD}) {
+					{ twoFactorEnabledLabel(c) }
+				}
+			} else if c.PasswordAccount {
+				@ui.Badge(ui.BadgeProps{Size: ui.BadgeMD}) {
+					Off
+				}
+			}
+		</div>
+		if !c.PasswordAccount {
+			<p class="text-sm text-foreground-secondary">This account signs in with GitHub, so GoForge uses your GitHub account's two-factor authentication. Turn it on in GitHub's settings.</p>
+		} else if c.Enabled {
+			<p class="mb-4 text-sm text-foreground-secondary">
+				Password sign-in asks for a code from your authenticator app.
+				{ fmt.Sprintf("%d of 10 recovery codes left.", c.RecoveryCodesLeft) }
+				API tokens and <code>/mcp</code> are not affected.
+			</p>
+			if c.GitHubLinked {
+				<p class="mb-4 text-sm text-foreground-secondary">Sign in with GitHub skips this code and relies on your GitHub account's 2FA.</p>
+			}
+			<form hx-post="/settings/2fa/disable" hx-swap="none" hx-confirm="Turn off two-factor authentication for this account?" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="two-factor-disable">
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				@ui.Input(ui.InputProps{ID: "two-factor-disable-password", Name: "password", Type: "password", Label: "Current Password", Autocomplete: "current-password", Required: true, Class: "mb-4"})
+				@ui.Input(ui.InputProps{ID: "two-factor-disable-code", Name: "code", Label: "Authentication or recovery code", Autocomplete: "one-time-code", Required: true, Class: "mb-4", Attrs: templ.Attributes{"spellcheck": "false", "autocapitalize": "off"}})
+				<div class="flex justify-end">
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonDanger, Type: "submit"}) {
+						Turn off 2FA
+						@components.Spinner()
+					}
+				</div>
+			</form>
+		} else {
+			<p class="mb-4 text-sm text-foreground-secondary">
+				Ask for a code from an authenticator app after your password. Optional. API tokens and <code>/mcp</code> are not affected.
+			</p>
+			if c.GitHubLinked {
+				<p class="mb-4 text-sm text-foreground-secondary">Sign in with GitHub will keep relying on your GitHub account's 2FA.</p>
+			}
+			<form hx-post="/settings/2fa/setup" hx-target="body" hx-swap="beforeend" aria-haspopup="dialog" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="two-factor-setup">
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				@ui.Input(ui.InputProps{ID: "two-factor-setup-password", Name: "password", Type: "password", Label: "Current Password", Autocomplete: "current-password", Required: true, Class: "mb-4"})
+				<div class="flex justify-end">
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit", Attrs: templ.Attributes{"aria-haspopup": "dialog"}}) {
+						Set up 2FA
+						@components.Spinner()
+					}
+				</div>
+			</form>
+		}
+	}
+}
+
+// TwoFactorSetupModal shows the QR code and the manual secret once, and
+// takes the first code to confirm enrollment.
+templ TwoFactorSetupModal(s *TwoFactorSetup, csrfToken string) {
+	@ui.Dialog(ui.DialogProps{Title: "Set up two-factor authentication"}) {
+		<p class="mb-4 text-sm text-foreground-secondary">Scan this QR code with an authenticator app, or enter the key by hand. Then type the 6-digit code it shows.</p>
+		<div class="mb-4 flex justify-center">
+			<img src={ templ.SafeURL(s.QRDataURI) } alt="QR code for your authenticator app" width="200" height="200" class="rounded-lg border border-border bg-white p-2" data-testid="two-factor-qr"/>
+		</div>
+		<p class={ ui.LabelClass("") }>Setup key</p>
+		<code id="two-factor-secret" class="mt-1 mb-4 block w-full rounded-lg bg-code p-3 text-sm font-mono break-all border border-border">{ s.ManualSecret }</code>
+		<form hx-post="/settings/2fa/enable" hx-target="closest dialog" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
+			<input type="hidden" name="csrf_token" value={ csrfToken }/>
+			@ui.Input(ui.InputProps{ID: "two-factor-enable-code", Name: "code", Label: "Code from your app", Autocomplete: "one-time-code", Placeholder: "123456", Required: true, Class: "mb-4", Attrs: templ.Attributes{"inputmode": "numeric", "spellcheck": "false"}})
+			<div class="flex justify-end gap-3">
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: templ.Attributes{"data-ui-dialog-close": true}}) {
+					Cancel
+				}
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+					Turn on 2FA
+					@components.Spinner()
+				}
+			</div>
+		</form>
+	}
+}
+
+// RecoveryCodesModal shows the new recovery codes once. They are stored
+// hashed and cannot be shown again.
+templ RecoveryCodesModal(codes []string) {
+	@ui.Dialog(ui.DialogProps{Title: "Two-factor authentication is on", NonDismissible: true}) {
+		<p class="mb-4 text-sm text-foreground-secondary">Save these recovery codes somewhere safe. Each one signs you in once if you lose your authenticator. You won't be able to see them again.</p>
+		<pre id="recovery-codes" class="mb-6 grid grid-cols-2 gap-2 rounded-lg bg-code p-3 text-sm font-mono border border-border" data-testid="recovery-codes">{ recoveryCodesText(codes) }</pre>
+		<div class="flex justify-end gap-3">
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: ui.CopyAttrs("recovery-codes")}) {
+				Copy codes
+			}
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/settings/profile"}) {
+				Done
+			}
+		</div>
+	}
+}

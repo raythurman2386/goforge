@@ -431,6 +431,49 @@ The outbound notifier an admin saves in Settings → Profile → Notifications. 
 
 ---
 
+### user_totp
+
+One row per local account that started TOTP setup. See [Security → Two-factor authentication](../security.md#two-factor-authentication).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `user_id` | `UUID` | PK, FK -> users(id) ON DELETE CASCADE | Account |
+| `secret_sealed` | `TEXT` | NOT NULL | TOTP key encrypted with `ENCRYPTION_KEY` (AES-GCM, base64) |
+| `enabled_at` | `TIMESTAMPTZ` | Nullable | NULL while setup waits for the first code; set when 2FA turns on |
+| `last_used_step` | `BIGINT` | NOT NULL, default `0` | Highest accepted TOTP time step; a code at or below it is refused (no replay) |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Creation time |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Last change |
+
+### user_recovery_codes
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `UUID` | PK | Row ID |
+| `user_id` | `UUID` | FK -> users(id) ON DELETE CASCADE | Account |
+| `code_hash` | `VARCHAR(64)` | NOT NULL, UNIQUE with `user_id` | SHA-256 of the normalized recovery code |
+| `used_at` | `TIMESTAMPTZ` | Nullable | Set when the code is used; a used code is refused |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Creation time |
+
+### login_challenges
+
+The pending second login step after a correct password on an account with 2FA on.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `UUID` | PK | Row ID |
+| `token_hash` | `VARCHAR(64)` | UNIQUE, NOT NULL | SHA-256 of the `goforge_2fa` cookie value |
+| `user_id` | `UUID` | FK -> users(id) ON DELETE CASCADE | Account |
+| `remember_me` | `BOOLEAN` | NOT NULL, default `FALSE` | "Remember me" from the password step |
+| `attempts` | `INT` | NOT NULL, default `0` | Wrong codes so far (the challenge ends at 5) |
+| `expires_at` | `TIMESTAMPTZ` | NOT NULL | 5 minutes after the password step |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Creation time |
+
+**Indexes**: `idx_login_challenges_user_id`, `idx_login_challenges_expires_at`. Expired rows are deleted when the next challenge is created.
+
+**Migration**: `030_two_factor`
+
+---
+
 ## Database Functions
 
 ### cleanup_old_data()
@@ -478,5 +521,6 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 024 | `deployment_queue_audit_id` | `deployment_queue.audit_id` (UUID, nullable, no FK): the audit row that queued the deploy, so its outcome row links back |
 | 025 | `notify_settings` | Admin-edited outbound notifier (ntfy or webhook), URL and token sealed with `ENCRYPTION_KEY` |
 | 028 | `notify_smtp` | `notify_settings.kind` may be `email`; sealed SMTP host, username, password, From, To, plus `smtp_port` and `smtp_tls`. Down turns an email notifier off (kind `ntfy`) |
+| 030 | `two_factor` | Opt-in TOTP 2FA: `user_totp` (key sealed with `ENCRYPTION_KEY`), `user_recovery_codes` (SHA-256 hashes), `login_challenges` (token hashes) |
 
 All migrations have corresponding `.down.sql` files for rollback support.
