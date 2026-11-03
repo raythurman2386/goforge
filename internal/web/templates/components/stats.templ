@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 )
 
 // Stats is the container resource panel streamed over SSE ("stats" event)
@@ -50,14 +51,62 @@ templ Stats(metrics *models.ContainerMetrics) {
 }
 
 // StatsUnavailable is streamed as the "unavailable" SSE event when no sample
-// can be taken, so the card says why instead of spinning forever.
+// can be taken, so the card says why instead of spinning forever. It
+// reserves the Stats grid (an invisible statsSkeletonGrid) and centers the
+// reason over it, so unavailable to running and back keeps the card height
+// at every breakpoint.
 templ StatsUnavailable(reason string) {
-	<div class="flex items-center justify-center py-12" data-stats-unavailable>
-		<div class="flex flex-col items-center text-center">
-			<svg class="h-8 w-8 text-muted-foreground mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z"></path>
-			</svg>
-			<p class="text-sm font-medium text-foreground-secondary">{ reason }</p>
+	<div class="relative" data-stats-unavailable>
+		<div class="invisible" aria-hidden="true">
+			@statsSkeletonGrid()
+		</div>
+		<div class="absolute inset-0 flex items-center justify-center p-4">
+			<div class="flex flex-col items-center text-center">
+				<svg class="h-8 w-8 text-muted-foreground mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z"></path>
+				</svg>
+				<p class="text-sm font-medium text-foreground-secondary">{ reason }</p>
+			</div>
+		</div>
+	</div>
+}
+
+// StatsSkeleton fills a stats frame until the first Stats or
+// StatsUnavailable message lands. It is a busy status region around
+// statsSkeletonGrid.
+templ StatsSkeleton() {
+	<div role="status" aria-label="Loading resource usage" aria-busy="true" data-stats-skeleton>
+		@statsSkeletonGrid()
+	</div>
+}
+
+// statsSkeletonGrid copies Stats: the same grid and tile classes, and one
+// skeleton line per dt and dd sized to its line height (h-5 for text-sm,
+// h-9 for text-3xl, h-7 for text-lg, h-4 for text-xs, h-2 for the bars),
+// with the same top margins, so the first frame does not move the page.
+// It is a div, not a dl, because it has no dt or dd (axe dlitem).
+templ statsSkeletonGrid() {
+	<div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			@ui.Skeleton(ui.SkeletonLine, "h-5 w-24")
+			@ui.Skeleton(ui.SkeletonLine, "mt-1 h-9 w-28")
+			@ui.Skeleton(ui.SkeletonLine, "mt-3 h-2 w-full rounded-full")
+		</div>
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			@ui.Skeleton(ui.SkeletonLine, "h-5 w-28")
+			@ui.Skeleton(ui.SkeletonLine, "mt-1 h-9 w-32")
+			@ui.Skeleton(ui.SkeletonLine, "mt-3 h-2 w-full rounded-full")
+			@ui.Skeleton(ui.SkeletonLine, "mt-2 h-5 w-36")
+		</div>
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			@ui.Skeleton(ui.SkeletonLine, "h-5 w-24")
+			@ui.Skeleton(ui.SkeletonLine, "mt-1 h-7 w-48")
+			@ui.Skeleton(ui.SkeletonLine, "mt-1 h-4 w-28")
+		</div>
+		<div class="rounded-lg border border-divider bg-muted/50 p-4">
+			@ui.Skeleton(ui.SkeletonLine, "h-5 w-20")
+			@ui.Skeleton(ui.SkeletonLine, "mt-1 h-7 w-48")
+			@ui.Skeleton(ui.SkeletonLine, "mt-1 h-4 w-28")
 		</div>
 	</div>
 }

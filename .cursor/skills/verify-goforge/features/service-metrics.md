@@ -1,6 +1,6 @@
 # Service and project metrics after a config save
 
-After a user saves `Edit configuration` (or runs `Update image`) on a running service, the service page polls while the instance is pending, stops polling once it is `running`, and the `Resource Usage` card shows live CPU, memory, network I/O, and block I/O without a reload. A stream for a container that is gone or stopped says so instead of spinning on `Connecting to metrics stream...`. Service detail and the project Overview also show a `Container` card (image, state, health, uptime, restarts, OOM flag, limits, ports, Traefik host rule) with a `View logs` link to `/containers/{dockerID}`. The project Overview only ever streams a running container: the latest deployment's, else the newest earlier `running` deployment's, else an empty state.
+After a user saves `Edit configuration` (or runs `Update image`) on a running service, the service page polls while the instance is pending, stops polling once it is `running`, and the `Resource Usage` card shows live CPU, memory, network I/O, and block I/O without a reload. Until the first frame, the card shows `components.StatsSkeleton`, a busy (`role="status"`, `aria-label="Loading resource usage"`, `aria-busy="true"`) copy of the four-tile stats grid, so the first frame does not move the cards below it (t1953u). A stream for a container that is gone or stopped says so with an unavailable frame that reserves the same grid height. Service detail and the project Overview also show a `Container` card (image, state, health, uptime, restarts, OOM flag, limits, ports, Traefik host rule) with a `View logs` link to `/containers/{dockerID}`. The project Overview only ever streams a running container: the latest deployment's, else the newest earlier `running` deployment's, else an empty state.
 
 ## Sub-features
 
@@ -10,6 +10,7 @@ After a user saves `Edit configuration` (or runs `Update image`) on a running se
 - `metrics-stream-unavailable` the same route for a stopped or removed container sends an unnamed unavailable message (`data-stats-unavailable`) with `Metrics are not available: ...` and no stats frame.
 - `metrics-stream-preserved` the stream element is `id="metrics-stream-{dockerID}"` with `hx-preserve="true"`, so a pending poll swap keeps it open while the Docker ID is unchanged; a recreate renders a new id.
 - `metrics-container-card` service detail and project Overview render `data-container-card` with the fields above and `href="/containers/{dockerID}"`.
+- `metrics-skeleton` (t1953u) `[data-metrics-frame]` (service detail, project Overview) and `#container-stats` (container detail) open on `StatsSkeleton`, and the stats and unavailable frames keep its height. Measured in the browser by the `layout-shift-*` checks in [ui-a11y.md](./ui-a11y.md).
 - `metrics-project-empty` a project whose environment has no running container renders `No running container for this environment.` and no `hx-sse:connect`.
 
 ## How to get to it (user POV)
@@ -40,7 +41,7 @@ Preconditions:
 
 ## Gotchas
 
-- Unit coverage for every sub-feature: `go test -run 'TestDetail' ./internal/web/templates/pages/services/`, `go test -run 'TestOverview' ./internal/web/templates/pages/projects/`, `go test -run 'TestContainerStats|TestActiveContainer' ./internal/web/handlers/`, `go test -run 'TestMetricsFromSamples' ./internal/monitor/`, `go test -run TestSummarizeInspect ./internal/docker/`.
+- Unit coverage for every sub-feature: `go test -run 'TestDetail' ./internal/web/templates/pages/services/`, `go test -run 'TestOverview' ./internal/web/templates/pages/projects/`, `go test -run 'TestStats|TestResourceUsageCard' ./internal/web/templates/components/`, `go test -run 'TestContainerStats|TestActiveContainer' ./internal/web/handlers/`, `go test -run 'TestMetricsFromSamples' ./internal/monitor/`, `go test -run TestSummarizeInspect ./internal/docker/`.
 - `hx-preserve` and the poll stopping are browser behavior. curl proves the markup (poll inside the swapped region, absent once running; stream id keyed by Docker ID), not the htmx swap itself.
 - The first frame waits for two one-shot samples about 500 ms apart so CPU is a real delta. Later frames come every 2 seconds. Network and block I/O are totals since the container started, not rates.
 - `unavailable` is sent once per reason; the stream keeps sampling and goes back to `stats` when the container runs again.

@@ -19,10 +19,32 @@ templ restorePointsCard(instanceID string) {
 			hx-trigger="load"
 			hx-swap="innerHTML"
 		>
-			<h3 class="text-lg font-bold text-foreground tracking-tight">Restore points</h3>
-			<p class="mt-1 text-sm text-foreground-secondary">Loading restore points…</p>
+			@restorePointsSkeleton()
 		</div>
 	}
+}
+
+// restorePointsSkeleton copies RestorePoints with points: the heading, the
+// text-sm intro line (h-5), the compact table (a text-xs header and two
+// rows, py-1 cells, h-6, rows split by a 1px border), the text-xs how-to
+// (two h-4 lines), and the two-line command block (p-2, h-12). The empty and
+// error states are shorter (data-dependent, like the dashboard's).
+templ restorePointsSkeleton() {
+	<h3 class="text-lg font-bold text-foreground tracking-tight">Restore points</h3>
+	<div role="status" aria-label="Loading restore points" aria-busy="true" data-testid="service-restore-points-loading">
+		@ui.Skeleton(ui.SkeletonLine, "mt-1 h-5 w-72 max-w-full")
+		<div class="mt-2">
+			@ui.Skeleton(ui.SkeletonLine, "h-6 w-full")
+			for range 2 {
+				<div class="border-t border-divider">
+					@ui.Skeleton(ui.SkeletonLine, "h-6 w-full")
+				</div>
+			}
+		</div>
+		@ui.Skeleton(ui.SkeletonLine, "mt-3 h-4 w-full")
+		@ui.Skeleton(ui.SkeletonLine, "h-4 w-2/3")
+		@ui.Skeleton(ui.SkeletonLine, "mt-1 h-12 w-full rounded-sm")
+	</div>
 }
 
 // RestorePoints lists the backup runs that hold this instance's data, with

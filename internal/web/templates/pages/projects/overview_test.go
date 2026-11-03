@@ -32,6 +32,13 @@ func TestOverviewStreamsActiveContainerWithCard(t *testing.T) {
 			t.Errorf("overview lacks %q", want)
 		}
 	}
+	// t1953u: the frame opens on the mirrored StatsSkeleton, not the spinner.
+	if !strings.Contains(html, `<div data-metrics-frame><div role="status" aria-label="Loading resource usage" aria-busy="true" data-stats-skeleton>`) {
+		t.Error("overview metrics frame does not hold the StatsSkeleton")
+	}
+	if strings.Contains(html, "Connecting to metrics stream") {
+		t.Error("overview metrics frame still holds the spinner")
+	}
 }
 
 func TestOverviewEmptyStateWithoutRunningContainer(t *testing.T) {
