@@ -85,7 +85,7 @@ func runStatsStream(t *testing.T, sampler statsSampler, d time.Duration) string 
 // messages), told apart by their markup.
 const (
 	statsFrame       = "data: <dl"
-	unavailableFrame = "data: <div class=\"flex items-center justify-center py-12\" data-stats-unavailable"
+	unavailableFrame = "data: <div class=\"relative\" data-stats-unavailable"
 )
 
 // A named event would reach the card only as a DOM event and never swap.
