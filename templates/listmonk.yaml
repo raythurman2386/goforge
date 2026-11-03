@@ -94,7 +94,7 @@ docker:
     - name: uploads
       path: /listmonk/uploads
   health_check:
-    test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/api/health"]
+    test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/health"]
     interval: 10s
     timeout: 5s
     retries: 10
