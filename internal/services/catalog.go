@@ -117,6 +117,12 @@ type PortConfig struct {
 	// HostIP is the host address to bind. It defaults to 127.0.0.1 and must
 	// be a loopback address; 0.0.0.0 and :: are refused.
 	HostIP string `yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
+	// Domain routes a second public host to this port through Traefik. It is
+	// a Go template rendered like docker.environment, usually a config field
+	// such as {{ .Config.console_domain }}. Empty, the default, adds no
+	// route. It is ignored on the first port, which the instance Domain
+	// routes, and when the instance has no Domain.
+	Domain string `yaml:"domain,omitempty" json:"domain,omitempty"`
 }
 
 // VolumeConfig defines a volume mount.

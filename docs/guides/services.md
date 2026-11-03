@@ -118,6 +118,18 @@ Pick an **SSH Port** that nothing else on the host uses: not `22` (the host's ss
 !!! warning "Do not redeploy to change settings or upgrade"
     As with Vaultwarden, a new deploy is a new instance with a new, empty `/data` volume, so repositories and users are lost. Use **Edit configuration** or **Update image** on the service page instead: both recreate the container on the same volume and keep the secret key. Settings that come from the environment (domain, URLs, registration, install lock, secret key) are rewritten into `app.ini` on every container start, so change those in GoForge. Change everything else in **Site Administration**.
 
+### MinIO
+
+S3-compatible object storage (`pgsty/silo` image). The instance **Domain** routes to the S3 API on port 9000; `/minio/health/live` is the health check.
+
+| Field | Default | Notes |
+|-------|---------|-------|
+| Root User | `minioadmin` | Console and S3 root user |
+| Root Password | generated | Shown on the service page |
+| Console Domain | blank | Optional second host routed to the console on port 9001 |
+
+The console listens on port 9001. Without a **Console Domain** it is not routed, and a browser that opens the API host is redirected to `http://<domain>:9001/`, which a Cloudflare Tunnel cannot reach. Set **Console Domain** (for example `minio-console-app.example.com`, with its own proxied CNAME) and GoForge adds a second Traefik router from that host to port 9001 and sets `MINIO_BROWSER_REDIRECT_URL=<protocol>://<console domain>`, so the API host sends browsers to the console host. The Console Domain needs the instance Domain to be set, must be a hostname, and must differ from the Domain. Setting it on an existing instance with **Edit configuration** recreates the container; the data volume is kept.
+
 ### Gitea Actions Runner
 
 A [Gitea Actions](https://docs.gitea.com/usage/actions/overview) runner from the official `gitea/act_runner` image. Jobs run in act_runner host mode inside this one container, which has Python, Node.js, TypeScript, Go, and Rust installed.

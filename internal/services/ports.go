@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/proxy"
 )
 
 // protoTCP is the protocol a port gets when the template leaves it empty.
@@ -36,6 +38,13 @@ func (t *ServiceTemplate) validatePorts() error {
 		case "", protoTCP, "udp":
 		default:
 			errs = append(errs, fmt.Errorf("%s: protocol %q must be tcp or udp", where, p.Protocol))
+		}
+		if p.Domain != "" {
+			if i == 0 {
+				errs = append(errs, fmt.Errorf("%s: domain is for extra ports; the instance Domain routes the first port", where))
+			} else if _, err := template.New("domain").Funcs(templateFuncs).Parse(p.Domain); err != nil {
+				errs = append(errs, fmt.Errorf("%s: domain: %w", where, err))
+			}
 		}
 		if !p.Publish {
 			if p.HostPort != "" || p.HostIP != "" {
@@ -128,6 +137,46 @@ func (s *InstanceService) renderPortBindings(tmpl *ServiceTemplate, data map[str
 			HostIP:        hostIP,
 			HostPort:      strconv.Itoa(n),
 		})
+	}
+	return out, nil
+}
+
+// hostnamePattern matches an RFC 1123 hostname, so a rendered port domain can
+// go into a Traefik Host() rule unquoted.
+var hostnamePattern = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
+
+// renderPortRoutes renders the domain of every port after the first and
+// returns one Traefik route per port whose domain is not empty. It returns
+// nil when the instance has no Domain, since Traefik is then off for the
+// container. A domain that is not a hostname, or that repeats the instance
+// Domain or another port's domain, is a config error (ErrInvalidConfig).
+func (s *InstanceService) renderPortRoutes(tmpl *ServiceTemplate, data map[string]interface{}) ([]proxy.ExtraRoute, error) {
+	primary := dataString(data, "Domain")
+	if primary == "" {
+		return nil, nil
+	}
+	var out []proxy.ExtraRoute //nolint:prealloc // nil when no port has a domain
+	seen := map[string]bool{strings.ToLower(primary): true}
+	for i, p := range tmpl.Docker.Ports {
+		if i == 0 || p.Domain == "" {
+			continue
+		}
+		raw, err := s.interpolate(p.Domain, data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to interpolate domain for container port %d: %w", p.Container, err)
+		}
+		host := strings.TrimSpace(raw)
+		if host == "" {
+			continue
+		}
+		if len(host) > 253 || !hostnamePattern.MatchString(host) {
+			return nil, fmt.Errorf("%w: domain %q for container port %d is not a valid hostname", ErrInvalidConfig, host, p.Container)
+		}
+		if seen[strings.ToLower(host)] {
+			return nil, fmt.Errorf("%w: domain %q for container port %d is already used by this service", ErrInvalidConfig, host, p.Container)
+		}
+		seen[strings.ToLower(host)] = true
+		out = append(out, proxy.ExtraRoute{Domain: host, Port: p.Container})
 	}
 	return out, nil
 }

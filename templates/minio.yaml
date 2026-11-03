@@ -20,6 +20,10 @@ config:
     type: password
     generate: true
     required: true
+  - name: console_domain
+    label: Console Domain
+    type: text
+    required: false
 
 resources:
   cpu: "0.5"
@@ -33,11 +37,17 @@ docker:
   ports:
     - container: 9000
       protocol: tcp
+    # Console. Set Console Domain to route a second host here; the API host
+    # then redirects browsers to it instead of to <api host>:9001.
     - container: 9001
       protocol: tcp
+      domain: "{{ .Config.console_domain }}"
   environment:
     MINIO_ROOT_USER: "{{ .Config.username }}"
     MINIO_ROOT_PASSWORD: "{{ .Config.password }}"
+  optional_environment:
+    # Only with a Domain too: without one GoForge adds no console route.
+    MINIO_BROWSER_REDIRECT_URL: "{{ if and .Domain .Config.console_domain }}{{ .Protocol }}://{{ .Config.console_domain }}{{ end }}"
   volumes:
     - name: data
       path: /data

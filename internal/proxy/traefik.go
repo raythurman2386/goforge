@@ -389,7 +389,13 @@ func DefaultSecurityHeaders() *HeadersConfig {
 // would otherwise build a default Host(<container name>) router to the first
 // exposed port, which puts a data service such as Redis or Postgres behind
 // the web entrypoint.
-func GenerateServiceLabels(instanceID, domain, network string, port int, cloudflareMode bool) Labels {
+//
+// extra adds one more router per ExtraRoute, each with its own Traefik
+// service on its own container port. They need the primary domain: without
+// one Traefik is off for the container and extra is ignored. When extra is
+// non-empty every router names its service, because Traefik drops a router
+// with no service once a container defines more than one.
+func GenerateServiceLabels(instanceID, domain, network string, port int, cloudflareMode bool, extra ...ExtraRoute) Labels {
 	name := fmt.Sprintf("goforge-svc-%s", instanceID)
 
 	labels := Labels{
@@ -404,19 +410,7 @@ func GenerateServiceLabels(instanceID, domain, network string, port int, cloudfl
 		return labels
 	}
 
-	rule := fmt.Sprintf("Host(`%s`)", domain)
-
-	if cloudflareMode || IsLocalhostDomain(domain) {
-		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
-		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTP
-	} else {
-		labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = rule
-		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTPS
-		labels[fmt.Sprintf("traefik.http.routers.%s.tls.certresolver", name)] = "letsencrypt"
-
-		// Add HTTP to HTTPS redirect
-		addHTTPRedirectLabels(labels, name, domain, "")
-	}
+	addServiceRouterLabels(labels, name, domain, cloudflareMode)
 
 	// Service port configuration
 	if port <= 0 {
@@ -424,7 +418,48 @@ func GenerateServiceLabels(instanceID, domain, network string, port int, cloudfl
 	}
 	labels[fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", name)] = fmt.Sprintf("%d", port)
 
+	if len(extra) == 0 {
+		return labels
+	}
+	bindRouterServices(labels, name)
+	for _, r := range extra {
+		routeName := fmt.Sprintf("%s-p%d", name, r.Port)
+		addServiceRouterLabels(labels, routeName, r.Domain, cloudflareMode)
+		labels[fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", routeName)] = fmt.Sprintf("%d", r.Port)
+		bindRouterServices(labels, routeName)
+	}
+
 	return labels
+}
+
+// ExtraRoute is a second public host for a service container, routed to a
+// container port other than the primary one (MinIO's console on 9001).
+type ExtraRoute struct {
+	Domain string
+	Port   int
+}
+
+// addServiceRouterLabels adds router name for domain on the entrypoint the
+// mode uses, plus the HTTP-to-HTTPS redirect outside Cloudflare mode.
+func addServiceRouterLabels(labels Labels, name, domain string, cloudflareMode bool) {
+	labels[fmt.Sprintf("traefik.http.routers.%s.rule", name)] = fmt.Sprintf("Host(`%s`)", domain)
+	if cloudflareMode || IsLocalhostDomain(domain) {
+		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTP
+		return
+	}
+	labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", name)] = entrypointHTTPS
+	labels[fmt.Sprintf("traefik.http.routers.%s.tls.certresolver", name)] = "letsencrypt"
+	addHTTPRedirectLabels(labels, name, domain, "")
+}
+
+// bindRouterServices points router name and its -http redirect router, when
+// present, at the Traefik service of the same name.
+func bindRouterServices(labels Labels, name string) {
+	for _, router := range []string{name, name + "-http"} {
+		if _, ok := labels[fmt.Sprintf("traefik.http.routers.%s.rule", router)]; ok {
+			labels[fmt.Sprintf("traefik.http.routers.%s.service", router)] = name
+		}
+	}
 }
 
 // DefaultRateLimit returns a RateLimitConfig with reasonable defaults.
