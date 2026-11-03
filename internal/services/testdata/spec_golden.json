@@ -1,619 +1,4 @@
 {
-  "gitea": {
-    "image": "gitea/gitea:1.25.5",
-    "env": [
-      "GITEA__SERVER__DOMAIN=goforge-service-00000000-0000-0000-0000-000000000042",
-      "GITEA__SERVER__HTTP_PORT=3000",
-      "GITEA__SERVER__PROTOCOL=http",
-      "GITEA__SERVER__ROOT_URL=http://goforge-service-00000000-0000-0000-0000-000000000042:3000/",
-      "GITEA__SERVER__SSH_PORT=22",
-      "GITEA__SERVICE__DISABLE_REGISTRATION=true",
-      "GITEA__SERVICE__REQUIRE_SIGNIN_VIEW=true",
-      "GITEA____APP_NAME=Gitea: Git with a cup of tea",
-      "GITEA__security__INSTALL_LOCK=true",
-      "GITEA__security__SECRET_KEY=fixed-secret_key",
-      "USER_GID=1000",
-      "USER_UID=1000"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "wget",
-      "--spider",
-      "-q",
-      "http://localhost:3000/api/healthz"
-    ]
-  },
-  "gitea+domain": {
-    "image": "gitea/gitea:1.25.5",
-    "env": [
-      "GITEA__SERVER__DOMAIN=gitea-app.example.com",
-      "GITEA__SERVER__HTTP_PORT=3000",
-      "GITEA__SERVER__PROTOCOL=http",
-      "GITEA__SERVER__ROOT_URL=https://gitea-app.example.com/",
-      "GITEA__SERVER__SSH_PORT=22",
-      "GITEA__SERVICE__DISABLE_REGISTRATION=true",
-      "GITEA__SERVICE__REQUIRE_SIGNIN_VIEW=true",
-      "GITEA____APP_NAME=Gitea: Git with a cup of tea",
-      "GITEA__security__INSTALL_LOCK=true",
-      "GITEA__security__SECRET_KEY=fixed-secret_key",
-      "USER_GID=1000",
-      "USER_UID=1000"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`gitea-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3000"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "wget",
-      "--spider",
-      "-q",
-      "http://localhost:3000/api/healthz"
-    ]
-  },
-  "mariadb": {
-    "image": "mariadb:11",
-    "env": [
-      "MYSQL_DATABASE=app",
-      "MYSQL_PASSWORD=fixed-password",
-      "MYSQL_ROOT_PASSWORD=fixed-root_password",
-      "MYSQL_USER=mariadb"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "healthcheck.sh",
-      "--connect",
-      "--innodb_initialized"
-    ]
-  },
-  "mariadb+domain": {
-    "image": "mariadb:11",
-    "env": [
-      "MYSQL_DATABASE=app",
-      "MYSQL_PASSWORD=fixed-password",
-      "MYSQL_ROOT_PASSWORD=fixed-root_password",
-      "MYSQL_USER=mariadb"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mariadb-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3306"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "healthcheck.sh",
-      "--connect",
-      "--innodb_initialized"
-    ]
-  },
-  "minio": {
-    "image": "minio/minio:latest",
-    "env": [
-      "MINIO_ROOT_PASSWORD=fixed-password",
-      "MINIO_ROOT_USER=minioadmin"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "curl",
-      "-f",
-      "http://localhost:9000/minio/health/live"
-    ]
-  },
-  "minio+domain": {
-    "image": "minio/minio:latest",
-    "env": [
-      "MINIO_ROOT_PASSWORD=fixed-password",
-      "MINIO_ROOT_USER=minioadmin"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`minio-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "9000"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "curl",
-      "-f",
-      "http://localhost:9000/minio/health/live"
-    ]
-  },
-  "mongodb": {
-    "image": "mongo:7",
-    "env": [
-      "MONGO_INITDB_DATABASE=app",
-      "MONGO_INITDB_ROOT_PASSWORD=fixed-password",
-      "MONGO_INITDB_ROOT_USERNAME=mongo"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data/db"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "mongosh",
-      "--eval",
-      "db.adminCommand('ping')"
-    ]
-  },
-  "mongodb+domain": {
-    "image": "mongo:7",
-    "env": [
-      "MONGO_INITDB_DATABASE=app",
-      "MONGO_INITDB_ROOT_PASSWORD=fixed-password",
-      "MONGO_INITDB_ROOT_USERNAME=mongo"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mongodb-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "27017"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data/db"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "mongosh",
-      "--eval",
-      "db.adminCommand('ping')"
-    ]
-  },
-  "mysql": {
-    "image": "mysql:9",
-    "env": [
-      "MYSQL_DATABASE=app",
-      "MYSQL_PASSWORD=fixed-password",
-      "MYSQL_ROOT_PASSWORD=fixed-root_password",
-      "MYSQL_USER=mysql"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "mysqladmin",
-      "ping",
-      "-h",
-      "localhost"
-    ]
-  },
-  "mysql+domain": {
-    "image": "mysql:9",
-    "env": [
-      "MYSQL_DATABASE=app",
-      "MYSQL_PASSWORD=fixed-password",
-      "MYSQL_ROOT_PASSWORD=fixed-root_password",
-      "MYSQL_USER=mysql"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mysql-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3306"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "mysqladmin",
-      "ping",
-      "-h",
-      "localhost"
-    ]
-  },
-  "nocodb": {
-    "image": "nocodb/nocodb:latest",
-    "env": [
-      "NC_JWT_SECRET=fixed-jwt_secret"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/usr/app/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "wget",
-      "--spider",
-      "-q",
-      "http://localhost:8080/api/v1/health"
-    ]
-  },
-  "nocodb+domain": {
-    "image": "nocodb/nocodb:latest",
-    "env": [
-      "NC_JWT_SECRET=fixed-jwt_secret"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`nocodb-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/usr/app/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "wget",
-      "--spider",
-      "-q",
-      "http://localhost:8080/api/v1/health"
-    ]
-  },
-  "postgres": {
-    "image": "postgres:16",
-    "env": [
-      "POSTGRES_DB=app",
-      "POSTGRES_PASSWORD=fixed-password",
-      "POSTGRES_USER=postgres"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/postgresql/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD-SHELL",
-      "pg_isready -U {{ .Config.username }}"
-    ]
-  },
-  "postgres+domain": {
-    "image": "postgres:16",
-    "env": [
-      "POSTGRES_DB=app",
-      "POSTGRES_PASSWORD=fixed-password",
-      "POSTGRES_USER=postgres"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`postgres-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "5432"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/postgresql/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD-SHELL",
-      "pg_isready -U {{ .Config.username }}"
-    ]
-  },
-  "redis": {
-    "image": "redis:7",
-    "env": [
-      "REDIS_PASSWORD=fixed-password"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 268435456,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD-SHELL",
-      "redis-cli ping | grep PONG"
-    ]
-  },
-  "redis+domain": {
-    "image": "redis:7",
-    "env": [
-      "REDIS_PASSWORD=fixed-password"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`redis-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "6379"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 268435456,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD-SHELL",
-      "redis-cli ping | grep PONG"
-    ]
-  },
-  "solidcraft": {
-    "image": "ghcr.io/tangency-labs/solidcraft-web:latest",
-    "env": [],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": null,
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 134217728,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD",
-      "wget",
-      "--spider",
-      "-q",
-      "http://127.0.0.1:8080/"
-    ]
-  },
-  "solidcraft+domain": {
-    "image": "ghcr.io/tangency-labs/solidcraft-web:latest",
-    "env": [],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`solidcraft-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
-    },
-    "binds": null,
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 134217728,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD",
-      "wget",
-      "--spider",
-      "-q",
-      "http://127.0.0.1:8080/"
-    ]
-  },
-  "uptimekuma": {
-    "image": "louislam/uptime-kuma:1",
-    "env": [],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/app/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 268435456,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD",
-      "extra/healthcheck"
-    ]
-  },
-  "uptimekuma+domain": {
-    "image": "louislam/uptime-kuma:1",
-    "env": [],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`uptimekuma-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3001"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/app/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 268435456,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD",
-      "extra/healthcheck"
-    ]
-  },
-  "vaultwarden": {
-    "image": "vaultwarden/server:latest",
-    "env": [
-      "ADMIN_TOKEN=\u003cargon2id\u003e",
-      "DOMAIN=",
-      "SIGNUPS_ALLOWED=true"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 268435456,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD",
-      "curl",
-      "-fsS",
-      "http://localhost:80/alive"
-    ]
-  },
-  "vaultwarden+domain": {
-    "image": "vaultwarden/server:latest",
-    "env": [
-      "ADMIN_TOKEN=\u003cargon2id\u003e",
-      "DOMAIN=https://vaultwarden-app.example.com",
-      "SIGNUPS_ALLOWED=true"
-    ],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`vaultwarden-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
-    },
-    "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
-    ],
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 268435456,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD",
-      "curl",
-      "-fsS",
-      "http://localhost:80/alive"
-    ]
-  },
   "authentik": {
     "image": "ghcr.io/goauthentik/server:2026.8.5",
     "command": [
@@ -683,6 +68,229 @@
       "healthcheck"
     ]
   },
+  "geolibre": {
+    "image": "ghcr.io/opengeos/geolibre:v3.6.0",
+    "env": [
+      "GEOLIBRE_DISABLE_SIDECAR=1",
+      "GEOLIBRE_GEOLENS_URL=off",
+      "GEOLIBRE_SHARE_URL=off"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "python",
+      "-c",
+      "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1/healthz', timeout=4).status==200 else 1)"
+    ]
+  },
+  "geolibre+domain": {
+    "image": "ghcr.io/opengeos/geolibre:v3.6.0",
+    "env": [
+      "GEOLIBRE_DISABLE_SIDECAR=1",
+      "GEOLIBRE_GEOLENS_URL=off",
+      "GEOLIBRE_SHARE_URL=off"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`geolibre-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "python",
+      "-c",
+      "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1/healthz', timeout=4).status==200 else 1)"
+    ]
+  },
+  "gitea": {
+    "image": "gitea/gitea:1.25.5",
+    "env": [
+      "GITEA__SERVER__DOMAIN=goforge-service-00000000-0000-0000-0000-000000000042",
+      "GITEA__SERVER__HTTP_PORT=3000",
+      "GITEA__SERVER__PROTOCOL=http",
+      "GITEA__SERVER__ROOT_URL=http://goforge-service-00000000-0000-0000-0000-000000000042:3000/",
+      "GITEA__SERVER__SSH_DOMAIN=minis",
+      "GITEA__SERVER__SSH_PORT=2223",
+      "GITEA__SERVICE__DISABLE_REGISTRATION=true",
+      "GITEA__SERVICE__REQUIRE_SIGNIN_VIEW=true",
+      "GITEA____APP_NAME=Gitea: Git with a cup of tea",
+      "GITEA__security__INSTALL_LOCK=true",
+      "GITEA__security__SECRET_KEY=fixed-secret_key",
+      "USER_GID=1000",
+      "USER_UID=1000"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:3000/api/healthz"
+    ]
+  },
+  "gitea+domain": {
+    "image": "gitea/gitea:1.25.5",
+    "env": [
+      "GITEA__SERVER__DOMAIN=gitea-app.example.com",
+      "GITEA__SERVER__HTTP_PORT=3000",
+      "GITEA__SERVER__PROTOCOL=http",
+      "GITEA__SERVER__ROOT_URL=https://gitea-app.example.com/",
+      "GITEA__SERVER__SSH_DOMAIN=minis",
+      "GITEA__SERVER__SSH_PORT=2223",
+      "GITEA__SERVICE__DISABLE_REGISTRATION=true",
+      "GITEA__SERVICE__REQUIRE_SIGNIN_VIEW=true",
+      "GITEA____APP_NAME=Gitea: Git with a cup of tea",
+      "GITEA__security__INSTALL_LOCK=true",
+      "GITEA__security__SECRET_KEY=fixed-secret_key",
+      "USER_GID=1000",
+      "USER_UID=1000"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`gitea-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3000"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:3000/api/healthz"
+    ]
+  },
+  "gitea-runner": {
+    "image": "gitea/act_runner:0.6.1",
+    "entrypoint": [
+      "/sbin/tini",
+      "--",
+      "sh",
+      "-c",
+      "set -eu\nsay() { echo \"goforge-runner: $*\"; }\ndie() { echo \"goforge-runner: $*\" \u003e\u00262; exit 1; }\n\n# Labels: bare names become \u003cname\u003e:host. Anything else is refused,\n# because docker:// labels need a Docker daemon this container lacks.\nlabels=\"\"\nfor l in $(printf '%s' \"$RUNNER_LABELS\" | tr ',' ' '); do\n  case \"$l\" in\n    *:host) name=\"${l%:host}\" ;;\n    *:*) die \"label $l: only host labels work here (no Docker socket); use a bare name such as python\" ;;\n    *) name=\"$l\" ;;\n  esac\n  case \"$name\" in\n    ''|*[!A-Za-z0-9._-]*) die \"label $l: use letters, digits, dot, dash, or underscore\" ;;\n  esac\n  labels=\"${labels:+$labels,}$name:host\"\ndone\n[ -n \"$labels\" ] || die \"no labels configured\"\ncase \"$RUNNER_CAPACITY\" in\n  ''|*[!0-9]*|0) die \"Concurrent Jobs must be a positive number\" ;;\nesac\n\nmkdir -p /data /cache/apk /cache/act /cache/actcache\ncd /data\n# Registered against another Gitea URL: with a token, keep the old\n# registration aside and register again; without one, change nothing.\nif [ -s .runner ] \u0026\u0026 ! grep -qF \"\\\"address\\\": \\\"$GITEA_INSTANCE_URL\\\"\" .runner; then\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"Gitea URL differs from the registered one; add a registration token from that Gitea to register there\"\n  say \"Gitea URL changed; moving the old registration to .runner.previous\"\n  mv -f .runner .runner.previous\nfi\nif [ ! -s .runner ]; then\n  [ -n \"$GITEA_INSTANCE_URL\" ] || die \"Gitea URL is required to register\"\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"registration token is required to register (Gitea: Actions \u003e Runners \u003e Create new Runner)\"\nfi\n\n# Toolchains. The apk cache on /cache keeps a recreate from downloading\n# every package again.\nln -sfn /cache/apk /etc/apk/cache\nsay \"installing toolchains\"\napk add --update-cache --quiet \\\n  bash git git-lfs openssh-client ca-certificates curl wget jq \\\n  tar xz zstd gzip unzip make build-base pkgconf openssl-dev \\\n  python3 py3-pip nodejs npm go rust cargo rust-clippy rustfmt \\\n  $RUNNER_EXTRA_PACKAGES\nif [ -n \"$RUNNER_NPM_GLOBALS\" ]; then\n  npm install --global --no-audit --no-fund --loglevel=error $RUNNER_NPM_GLOBALS\nfi\nexport PATH=\"/cache/cargo/bin:/cache/go/bin:$PATH\"\nsay \"python $(python3 --version 2\u003e\u00261 | cut -d' ' -f2), node $(node --version), go $(go env GOVERSION), $(rustc --version | cut -d' ' -f1-2)\"\n\n# act_runner config, rewritten on every create. Labels here override the\n# ones stored at registration, so a label edit needs no new token.\n{\n  echo \"log:\"\n  echo \"  level: info\"\n  echo \"runner:\"\n  echo \"  file: .runner\"\n  echo \"  capacity: $RUNNER_CAPACITY\"\n  echo \"  timeout: 3h\"\n  echo \"  labels:\"\n  for l in $(printf '%s' \"$labels\" | tr ',' ' '); do echo \"    - \\\"$l\\\"\"; done\n  echo \"cache:\"\n  echo \"  enabled: true\"\n  echo \"  dir: /cache/actcache\"\n  echo \"container:\"\n  echo \"  docker_host: \\\"-\\\"\"\n  echo \"  require_docker: false\"\n  echo \"host:\"\n  echo \"  workdir_parent: /cache/act\"\n  echo \"metrics:\"\n  echo \"  enabled: true\"\n  echo \"  addr: 127.0.0.1:9101\"\n} \u003e /data/config.yaml\n\nexport CONFIG_FILE=/data/config.yaml GITEA_RUNNER_LABELS=\"$labels\"\nsay \"starting act_runner with labels $labels\"\nexec run.sh\n"
+    ],
+    "env": [
+      "CARGO_HOME=/cache/cargo",
+      "GITEA_INSTANCE_URL=",
+      "GITEA_RUNNER_NAME=goforge-runner",
+      "GOCACHE=/cache/go-build",
+      "GOPATH=/cache/go",
+      "PIP_CACHE_DIR=/cache/pip",
+      "RUNNER_CAPACITY=1",
+      "RUNNER_EXTRA_PACKAGES=",
+      "RUNNER_LABELS=linux,alpine,python,node,typescript,go,rust",
+      "RUNNER_NPM_GLOBALS=typescript",
+      "RUNNER_TOOL_CACHE=/cache/toolcache",
+      "npm_config_cache=/cache/npm"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data",
+      "goforge-vol-00000000-0000-0000-0000-000000000042-cache:/cache"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 4294967296,
+    "nano_cpus": 2000000000,
+    "health_check": [
+      "CMD-SHELL",
+      "wget -q -O /dev/null http://127.0.0.1:9101/healthz"
+    ]
+  },
+  "gitea-runner+domain": {
+    "image": "gitea/act_runner:0.6.1",
+    "entrypoint": [
+      "/sbin/tini",
+      "--",
+      "sh",
+      "-c",
+      "set -eu\nsay() { echo \"goforge-runner: $*\"; }\ndie() { echo \"goforge-runner: $*\" \u003e\u00262; exit 1; }\n\n# Labels: bare names become \u003cname\u003e:host. Anything else is refused,\n# because docker:// labels need a Docker daemon this container lacks.\nlabels=\"\"\nfor l in $(printf '%s' \"$RUNNER_LABELS\" | tr ',' ' '); do\n  case \"$l\" in\n    *:host) name=\"${l%:host}\" ;;\n    *:*) die \"label $l: only host labels work here (no Docker socket); use a bare name such as python\" ;;\n    *) name=\"$l\" ;;\n  esac\n  case \"$name\" in\n    ''|*[!A-Za-z0-9._-]*) die \"label $l: use letters, digits, dot, dash, or underscore\" ;;\n  esac\n  labels=\"${labels:+$labels,}$name:host\"\ndone\n[ -n \"$labels\" ] || die \"no labels configured\"\ncase \"$RUNNER_CAPACITY\" in\n  ''|*[!0-9]*|0) die \"Concurrent Jobs must be a positive number\" ;;\nesac\n\nmkdir -p /data /cache/apk /cache/act /cache/actcache\ncd /data\n# Registered against another Gitea URL: with a token, keep the old\n# registration aside and register again; without one, change nothing.\nif [ -s .runner ] \u0026\u0026 ! grep -qF \"\\\"address\\\": \\\"$GITEA_INSTANCE_URL\\\"\" .runner; then\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"Gitea URL differs from the registered one; add a registration token from that Gitea to register there\"\n  say \"Gitea URL changed; moving the old registration to .runner.previous\"\n  mv -f .runner .runner.previous\nfi\nif [ ! -s .runner ]; then\n  [ -n \"$GITEA_INSTANCE_URL\" ] || die \"Gitea URL is required to register\"\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"registration token is required to register (Gitea: Actions \u003e Runners \u003e Create new Runner)\"\nfi\n\n# Toolchains. The apk cache on /cache keeps a recreate from downloading\n# every package again.\nln -sfn /cache/apk /etc/apk/cache\nsay \"installing toolchains\"\napk add --update-cache --quiet \\\n  bash git git-lfs openssh-client ca-certificates curl wget jq \\\n  tar xz zstd gzip unzip make build-base pkgconf openssl-dev \\\n  python3 py3-pip nodejs npm go rust cargo rust-clippy rustfmt \\\n  $RUNNER_EXTRA_PACKAGES\nif [ -n \"$RUNNER_NPM_GLOBALS\" ]; then\n  npm install --global --no-audit --no-fund --loglevel=error $RUNNER_NPM_GLOBALS\nfi\nexport PATH=\"/cache/cargo/bin:/cache/go/bin:$PATH\"\nsay \"python $(python3 --version 2\u003e\u00261 | cut -d' ' -f2), node $(node --version), go $(go env GOVERSION), $(rustc --version | cut -d' ' -f1-2)\"\n\n# act_runner config, rewritten on every create. Labels here override the\n# ones stored at registration, so a label edit needs no new token.\n{\n  echo \"log:\"\n  echo \"  level: info\"\n  echo \"runner:\"\n  echo \"  file: .runner\"\n  echo \"  capacity: $RUNNER_CAPACITY\"\n  echo \"  timeout: 3h\"\n  echo \"  labels:\"\n  for l in $(printf '%s' \"$labels\" | tr ',' ' '); do echo \"    - \\\"$l\\\"\"; done\n  echo \"cache:\"\n  echo \"  enabled: true\"\n  echo \"  dir: /cache/actcache\"\n  echo \"container:\"\n  echo \"  docker_host: \\\"-\\\"\"\n  echo \"  require_docker: false\"\n  echo \"host:\"\n  echo \"  workdir_parent: /cache/act\"\n  echo \"metrics:\"\n  echo \"  enabled: true\"\n  echo \"  addr: 127.0.0.1:9101\"\n} \u003e /data/config.yaml\n\nexport CONFIG_FILE=/data/config.yaml GITEA_RUNNER_LABELS=\"$labels\"\nsay \"starting act_runner with labels $labels\"\nexec run.sh\n"
+    ],
+    "env": [
+      "CARGO_HOME=/cache/cargo",
+      "GITEA_INSTANCE_URL=",
+      "GITEA_RUNNER_NAME=goforge-runner",
+      "GOCACHE=/cache/go-build",
+      "GOPATH=/cache/go",
+      "PIP_CACHE_DIR=/cache/pip",
+      "RUNNER_CAPACITY=1",
+      "RUNNER_EXTRA_PACKAGES=",
+      "RUNNER_LABELS=linux,alpine,python,node,typescript,go,rust",
+      "RUNNER_NPM_GLOBALS=typescript",
+      "RUNNER_TOOL_CACHE=/cache/toolcache",
+      "npm_config_cache=/cache/npm"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`gitea-runner-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data",
+      "goforge-vol-00000000-0000-0000-0000-000000000042-cache:/cache"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 4294967296,
+    "nano_cpus": 2000000000,
+    "health_check": [
+      "CMD-SHELL",
+      "wget -q -O /dev/null http://127.0.0.1:9101/healthz"
+    ]
+  },
   "listmonk": {
     "image": "listmonk/listmonk:v6.2.0",
     "command": [
@@ -723,7 +331,7 @@
       "wget",
       "-q",
       "--spider",
-      "http://localhost:9000/api/health"
+      "http://localhost:9000/health"
     ]
   },
   "listmonk+domain": {
@@ -769,7 +377,66 @@
       "wget",
       "-q",
       "--spider",
-      "http://localhost:9000/api/health"
+      "http://localhost:9000/health"
+    ]
+  },
+  "mariadb": {
+    "image": "mariadb:11",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mariadb"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "healthcheck.sh",
+      "--connect",
+      "--innodb_initialized"
+    ]
+  },
+  "mariadb+domain": {
+    "image": "mariadb:11",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mariadb"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mariadb-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3306"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "healthcheck.sh",
+      "--connect",
+      "--innodb_initialized"
     ]
   },
   "meilisearch": {
@@ -829,6 +496,246 @@
       "curl",
       "-fsS",
       "http://localhost:7700/health"
+    ]
+  },
+  "minio": {
+    "image": "pgsty/silo:latest",
+    "command": [
+      "server",
+      "/data",
+      "--console-address",
+      ":9001"
+    ],
+    "env": [
+      "MINIO_ROOT_PASSWORD=fixed-password",
+      "MINIO_ROOT_USER=minioadmin"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "curl",
+      "-f",
+      "http://localhost:9000/minio/health/live"
+    ]
+  },
+  "minio+domain": {
+    "image": "pgsty/silo:latest",
+    "command": [
+      "server",
+      "/data",
+      "--console-address",
+      ":9001"
+    ],
+    "env": [
+      "MINIO_ROOT_PASSWORD=fixed-password",
+      "MINIO_ROOT_USER=minioadmin"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`minio-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "9000"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "curl",
+      "-f",
+      "http://localhost:9000/minio/health/live"
+    ]
+  },
+  "mongodb": {
+    "image": "mongo:7",
+    "env": [
+      "MONGO_INITDB_DATABASE=app",
+      "MONGO_INITDB_ROOT_PASSWORD=fixed-password",
+      "MONGO_INITDB_ROOT_USERNAME=mongo"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data/db"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mongosh",
+      "--eval",
+      "db.adminCommand('ping')"
+    ]
+  },
+  "mongodb+domain": {
+    "image": "mongo:7",
+    "env": [
+      "MONGO_INITDB_DATABASE=app",
+      "MONGO_INITDB_ROOT_PASSWORD=fixed-password",
+      "MONGO_INITDB_ROOT_USERNAME=mongo"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mongodb-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "27017"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data/db"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mongosh",
+      "--eval",
+      "db.adminCommand('ping')"
+    ]
+  },
+  "mysql": {
+    "image": "mysql:9",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mysql"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mysqladmin",
+      "ping",
+      "-h",
+      "localhost"
+    ]
+  },
+  "mysql+domain": {
+    "image": "mysql:9",
+    "env": [
+      "MYSQL_DATABASE=app",
+      "MYSQL_PASSWORD=fixed-password",
+      "MYSQL_ROOT_PASSWORD=fixed-root_password",
+      "MYSQL_USER=mysql"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`mysql-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3306"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/mysql"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "mysqladmin",
+      "ping",
+      "-h",
+      "localhost"
+    ]
+  },
+  "nocodb": {
+    "image": "nocodb/nocodb:latest",
+    "env": [
+      "NC_JWT_SECRET=fixed-jwt_secret"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/usr/app/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:8080/api/v1/health"
+    ]
+  },
+  "nocodb+domain": {
+    "image": "nocodb/nocodb:latest",
+    "env": [
+      "NC_JWT_SECRET=fixed-jwt_secret"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`nocodb-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/usr/app/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 500000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://localhost:8080/api/v1/health"
     ]
   },
   "ntfy": {
@@ -953,6 +860,165 @@
       "http://localhost:8090/api/health"
     ]
   },
+  "postgres": {
+    "image": "postgres:17",
+    "env": [
+      "POSTGRES_DB=app",
+      "POSTGRES_PASSWORD=fixed-password",
+      "POSTGRES_USER=pgadmin"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/postgresql/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 1073741824,
+    "nano_cpus": 1000000000,
+    "health_check": [
+      "CMD-SHELL",
+      "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
+    ]
+  },
+  "postgres+domain": {
+    "image": "postgres:17",
+    "env": [
+      "POSTGRES_DB=app",
+      "POSTGRES_PASSWORD=fixed-password",
+      "POSTGRES_USER=pgadmin"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`postgres-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "5432"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/var/lib/postgresql/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 1073741824,
+    "nano_cpus": 1000000000,
+    "health_check": [
+      "CMD-SHELL",
+      "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
+    ]
+  },
+  "redis": {
+    "image": "redis:7.4",
+    "command": [
+      "sh",
+      "-c",
+      "set -eu\nif [ -z \"${REDIS_PASSWORD:-}\" ]; then\n  echo \"goforge: REDIS_PASSWORD is empty, refusing to start without auth\" \u003e\u00262\n  exit 1\nfi\numask 077\nhash=$(printf '%s' \"$REDIS_PASSWORD\" | sha256sum | cut -d' ' -f1)\ncase \"$hash\" in\n  *[!0-9a-f]* | '') hash= ;;\nesac\nif [ \"${#hash}\" -ne 64 ]; then\n  echo \"goforge: could not hash REDIS_PASSWORD, refusing to start\" \u003e\u00262\n  exit 1\nfi\nacl=/data/users.acl\nnext=/data/.users.acl.next\nrm -f \"$next\"\n{\n  printf 'user default on #%s ~* \u0026* +@all\\n' \"$hash\"\n  if [ -f \"$acl\" ]; then grep -v '^user default ' \"$acl\" || [ $? -eq 1 ]; fi\n} \u003e \"$next\"\nconf=/tmp/goforge-redis.conf\nrm -f \"$conf\"\nprintf '%s\\n' \"aclfile $acl\" 'dir /data' 'appendonly yes' 'appendfsync everysec' \\\n  'maxmemory 256mb' 'maxmemory-policy noeviction' \u003e \"$conf\"\nif [ \"$(id -u)\" = 0 ]; then chown redis \"$next\" \"$conf\"; fi\nmv -f \"$next\" \"$acl\"\nexec docker-entrypoint.sh redis-server \"$conf\"\n"
+    ],
+    "env": [
+      "REDIS_PASSWORD=fixed-password"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD-SHELL",
+      "REDISCLI_AUTH=\"$REDIS_PASSWORD\" redis-cli ping | grep PONG"
+    ]
+  },
+  "redis+domain": {
+    "image": "redis:7.4",
+    "command": [
+      "sh",
+      "-c",
+      "set -eu\nif [ -z \"${REDIS_PASSWORD:-}\" ]; then\n  echo \"goforge: REDIS_PASSWORD is empty, refusing to start without auth\" \u003e\u00262\n  exit 1\nfi\numask 077\nhash=$(printf '%s' \"$REDIS_PASSWORD\" | sha256sum | cut -d' ' -f1)\ncase \"$hash\" in\n  *[!0-9a-f]* | '') hash= ;;\nesac\nif [ \"${#hash}\" -ne 64 ]; then\n  echo \"goforge: could not hash REDIS_PASSWORD, refusing to start\" \u003e\u00262\n  exit 1\nfi\nacl=/data/users.acl\nnext=/data/.users.acl.next\nrm -f \"$next\"\n{\n  printf 'user default on #%s ~* \u0026* +@all\\n' \"$hash\"\n  if [ -f \"$acl\" ]; then grep -v '^user default ' \"$acl\" || [ $? -eq 1 ]; fi\n} \u003e \"$next\"\nconf=/tmp/goforge-redis.conf\nrm -f \"$conf\"\nprintf '%s\\n' \"aclfile $acl\" 'dir /data' 'appendonly yes' 'appendfsync everysec' \\\n  'maxmemory 256mb' 'maxmemory-policy noeviction' \u003e \"$conf\"\nif [ \"$(id -u)\" = 0 ]; then chown redis \"$next\" \"$conf\"; fi\nmv -f \"$next\" \"$acl\"\nexec docker-entrypoint.sh redis-server \"$conf\"\n"
+    ],
+    "env": [
+      "REDIS_PASSWORD=fixed-password"
+    ],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`redis-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "6379"
+    },
+    "binds": [
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data"
+    ],
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 536870912,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD-SHELL",
+      "REDISCLI_AUTH=\"$REDIS_PASSWORD\" redis-cli ping | grep PONG"
+    ]
+  },
+  "rustgis": {
+    "image": "ghcr.io/opengeos/rustgis:0.5.0",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "-q",
+      "--spider",
+      "http://127.0.0.1:8080/healthz"
+    ]
+  },
+  "rustgis+domain": {
+    "image": "ghcr.io/opengeos/rustgis:0.5.0",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`rustgis-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "-q",
+      "--spider",
+      "http://127.0.0.1:8080/healthz"
+    ]
+  },
   "searxng": {
     "image": "searxng/searxng:latest",
     "env": [
@@ -1010,6 +1076,53 @@
       "-q",
       "--spider",
       "http://localhost:8080/healthz"
+    ]
+  },
+  "solidcraft": {
+    "image": "ghcr.io/tangency-labs/solidcraft-web:latest",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "false"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://127.0.0.1:8080/"
+    ]
+  },
+  "solidcraft+domain": {
+    "image": "ghcr.io/tangency-labs/solidcraft-web:latest",
+    "env": [],
+    "labels": {
+      "goforge.managed": "true",
+      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
+      "traefik.docker.network": "goforge_net",
+      "traefik.enable": "true",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`solidcraft-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
+    },
+    "binds": null,
+    "network": "goforge_net",
+    "restart": "unless-stopped",
+    "memory": 134217728,
+    "nano_cpus": 250000000,
+    "health_check": [
+      "CMD",
+      "wget",
+      "--spider",
+      "-q",
+      "http://127.0.0.1:8080/"
     ]
   },
   "stirlingpdf": {
@@ -1122,29 +1235,9 @@
       "http://localhost:3000/api/heartbeat"
     ]
   },
-  "gitea-runner": {
-    "image": "gitea/act_runner:0.6.1",
-    "entrypoint": [
-      "/sbin/tini",
-      "--",
-      "sh",
-      "-c",
-      "set -eu\nsay() { echo \"goforge-runner: $*\"; }\ndie() { echo \"goforge-runner: $*\" \u003e\u00262; exit 1; }\n\n# Labels: bare names become \u003cname\u003e:host. Anything else is refused,\n# because docker:// labels need a Docker daemon this container lacks.\nlabels=\"\"\nfor l in $(printf '%s' \"$RUNNER_LABELS\" | tr ',' ' '); do\n  case \"$l\" in\n    *:host) name=\"${l%:host}\" ;;\n    *:*) die \"label $l: only host labels work here (no Docker socket); use a bare name such as python\" ;;\n    *) name=\"$l\" ;;\n  esac\n  case \"$name\" in\n    ''|*[!A-Za-z0-9._-]*) die \"label $l: use letters, digits, dot, dash, or underscore\" ;;\n  esac\n  labels=\"${labels:+$labels,}$name:host\"\ndone\n[ -n \"$labels\" ] || die \"no labels configured\"\ncase \"$RUNNER_CAPACITY\" in\n  ''|*[!0-9]*|0) die \"Concurrent Jobs must be a positive number\" ;;\nesac\n\nmkdir -p /data /cache/apk /cache/act /cache/actcache\ncd /data\n# Registered against another Gitea URL: with a token, keep the old\n# registration aside and register again; without one, change nothing.\nif [ -s .runner ] \u0026\u0026 ! grep -qF \"\\\"address\\\": \\\"$GITEA_INSTANCE_URL\\\"\" .runner; then\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"Gitea URL differs from the registered one; add a registration token from that Gitea to register there\"\n  say \"Gitea URL changed; moving the old registration to .runner.previous\"\n  mv -f .runner .runner.previous\nfi\nif [ ! -s .runner ]; then\n  [ -n \"$GITEA_INSTANCE_URL\" ] || die \"Gitea URL is required to register\"\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"registration token is required to register (Gitea: Actions \u003e Runners \u003e Create new Runner)\"\nfi\n\n# Toolchains. The apk cache on /cache keeps a recreate from downloading\n# every package again.\nln -sfn /cache/apk /etc/apk/cache\nsay \"installing toolchains\"\napk add --update-cache --quiet \\\n  bash git git-lfs openssh-client ca-certificates curl wget jq \\\n  tar xz zstd gzip unzip make build-base pkgconf openssl-dev \\\n  python3 py3-pip nodejs npm go rust cargo rust-clippy rustfmt \\\n  $RUNNER_EXTRA_PACKAGES\nif [ -n \"$RUNNER_NPM_GLOBALS\" ]; then\n  npm install --global --no-audit --no-fund --loglevel=error $RUNNER_NPM_GLOBALS\nfi\nexport PATH=\"/cache/cargo/bin:/cache/go/bin:$PATH\"\nsay \"python $(python3 --version 2\u003e\u00261 | cut -d' ' -f2), node $(node --version), go $(go env GOVERSION), $(rustc --version | cut -d' ' -f1-2)\"\n\n# act_runner config, rewritten on every create. Labels here override the\n# ones stored at registration, so a label edit needs no new token.\n{\n  echo \"log:\"\n  echo \"  level: info\"\n  echo \"runner:\"\n  echo \"  file: .runner\"\n  echo \"  capacity: $RUNNER_CAPACITY\"\n  echo \"  timeout: 3h\"\n  echo \"  labels:\"\n  for l in $(printf '%s' \"$labels\" | tr ',' ' '); do echo \"    - \\\"$l\\\"\"; done\n  echo \"cache:\"\n  echo \"  enabled: true\"\n  echo \"  dir: /cache/actcache\"\n  echo \"container:\"\n  echo \"  docker_host: \\\"-\\\"\"\n  echo \"  require_docker: false\"\n  echo \"host:\"\n  echo \"  workdir_parent: /cache/act\"\n  echo \"metrics:\"\n  echo \"  enabled: true\"\n  echo \"  addr: 127.0.0.1:9101\"\n} \u003e /data/config.yaml\n\nexport CONFIG_FILE=/data/config.yaml GITEA_RUNNER_LABELS=\"$labels\"\nsay \"starting act_runner with labels $labels\"\nexec run.sh\n"
-    ],
-    "env": [
-      "CARGO_HOME=/cache/cargo",
-      "GITEA_INSTANCE_URL=",
-      "GITEA_RUNNER_NAME=goforge-runner",
-      "GOCACHE=/cache/go-build",
-      "GOPATH=/cache/go",
-      "PIP_CACHE_DIR=/cache/pip",
-      "RUNNER_CAPACITY=1",
-      "RUNNER_EXTRA_PACKAGES=",
-      "RUNNER_LABELS=linux,alpine,python,node,typescript,go,rust",
-      "RUNNER_NPM_GLOBALS=typescript",
-      "RUNNER_TOOL_CACHE=/cache/toolcache",
-      "npm_config_cache=/cache/npm"
-    ],
+  "uptimekuma": {
+    "image": "louislam/uptime-kuma:1",
+    "env": [],
     "labels": {
       "goforge.managed": "true",
       "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
@@ -1152,69 +1245,47 @@
       "traefik.enable": "false"
     },
     "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data",
-      "goforge-vol-00000000-0000-0000-0000-000000000042-cache:/cache"
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/app/data"
     ],
     "network": "goforge_net",
     "restart": "unless-stopped",
-    "memory": 4294967296,
-    "nano_cpus": 2000000000,
+    "memory": 268435456,
+    "nano_cpus": 250000000,
     "health_check": [
-      "CMD-SHELL",
-      "wget -q -O /dev/null http://127.0.0.1:9101/healthz"
+      "CMD",
+      "extra/healthcheck"
     ]
   },
-  "gitea-runner+domain": {
-    "image": "gitea/act_runner:0.6.1",
-    "entrypoint": [
-      "/sbin/tini",
-      "--",
-      "sh",
-      "-c",
-      "set -eu\nsay() { echo \"goforge-runner: $*\"; }\ndie() { echo \"goforge-runner: $*\" \u003e\u00262; exit 1; }\n\n# Labels: bare names become \u003cname\u003e:host. Anything else is refused,\n# because docker:// labels need a Docker daemon this container lacks.\nlabels=\"\"\nfor l in $(printf '%s' \"$RUNNER_LABELS\" | tr ',' ' '); do\n  case \"$l\" in\n    *:host) name=\"${l%:host}\" ;;\n    *:*) die \"label $l: only host labels work here (no Docker socket); use a bare name such as python\" ;;\n    *) name=\"$l\" ;;\n  esac\n  case \"$name\" in\n    ''|*[!A-Za-z0-9._-]*) die \"label $l: use letters, digits, dot, dash, or underscore\" ;;\n  esac\n  labels=\"${labels:+$labels,}$name:host\"\ndone\n[ -n \"$labels\" ] || die \"no labels configured\"\ncase \"$RUNNER_CAPACITY\" in\n  ''|*[!0-9]*|0) die \"Concurrent Jobs must be a positive number\" ;;\nesac\n\nmkdir -p /data /cache/apk /cache/act /cache/actcache\ncd /data\n# Registered against another Gitea URL: with a token, keep the old\n# registration aside and register again; without one, change nothing.\nif [ -s .runner ] \u0026\u0026 ! grep -qF \"\\\"address\\\": \\\"$GITEA_INSTANCE_URL\\\"\" .runner; then\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"Gitea URL differs from the registered one; add a registration token from that Gitea to register there\"\n  say \"Gitea URL changed; moving the old registration to .runner.previous\"\n  mv -f .runner .runner.previous\nfi\nif [ ! -s .runner ]; then\n  [ -n \"$GITEA_INSTANCE_URL\" ] || die \"Gitea URL is required to register\"\n  [ -n \"${GITEA_RUNNER_REGISTRATION_TOKEN:-}\" ] || die \"registration token is required to register (Gitea: Actions \u003e Runners \u003e Create new Runner)\"\nfi\n\n# Toolchains. The apk cache on /cache keeps a recreate from downloading\n# every package again.\nln -sfn /cache/apk /etc/apk/cache\nsay \"installing toolchains\"\napk add --update-cache --quiet \\\n  bash git git-lfs openssh-client ca-certificates curl wget jq \\\n  tar xz zstd gzip unzip make build-base pkgconf openssl-dev \\\n  python3 py3-pip nodejs npm go rust cargo rust-clippy rustfmt \\\n  $RUNNER_EXTRA_PACKAGES\nif [ -n \"$RUNNER_NPM_GLOBALS\" ]; then\n  npm install --global --no-audit --no-fund --loglevel=error $RUNNER_NPM_GLOBALS\nfi\nexport PATH=\"/cache/cargo/bin:/cache/go/bin:$PATH\"\nsay \"python $(python3 --version 2\u003e\u00261 | cut -d' ' -f2), node $(node --version), go $(go env GOVERSION), $(rustc --version | cut -d' ' -f1-2)\"\n\n# act_runner config, rewritten on every create. Labels here override the\n# ones stored at registration, so a label edit needs no new token.\n{\n  echo \"log:\"\n  echo \"  level: info\"\n  echo \"runner:\"\n  echo \"  file: .runner\"\n  echo \"  capacity: $RUNNER_CAPACITY\"\n  echo \"  timeout: 3h\"\n  echo \"  labels:\"\n  for l in $(printf '%s' \"$labels\" | tr ',' ' '); do echo \"    - \\\"$l\\\"\"; done\n  echo \"cache:\"\n  echo \"  enabled: true\"\n  echo \"  dir: /cache/actcache\"\n  echo \"container:\"\n  echo \"  docker_host: \\\"-\\\"\"\n  echo \"  require_docker: false\"\n  echo \"host:\"\n  echo \"  workdir_parent: /cache/act\"\n  echo \"metrics:\"\n  echo \"  enabled: true\"\n  echo \"  addr: 127.0.0.1:9101\"\n} \u003e /data/config.yaml\n\nexport CONFIG_FILE=/data/config.yaml GITEA_RUNNER_LABELS=\"$labels\"\nsay \"starting act_runner with labels $labels\"\nexec run.sh\n"
-    ],
-    "env": [
-      "CARGO_HOME=/cache/cargo",
-      "GITEA_INSTANCE_URL=",
-      "GITEA_RUNNER_NAME=goforge-runner",
-      "GOCACHE=/cache/go-build",
-      "GOPATH=/cache/go",
-      "PIP_CACHE_DIR=/cache/pip",
-      "RUNNER_CAPACITY=1",
-      "RUNNER_EXTRA_PACKAGES=",
-      "RUNNER_LABELS=linux,alpine,python,node,typescript,go,rust",
-      "RUNNER_NPM_GLOBALS=typescript",
-      "RUNNER_TOOL_CACHE=/cache/toolcache",
-      "npm_config_cache=/cache/npm"
-    ],
+  "uptimekuma+domain": {
+    "image": "louislam/uptime-kuma:1",
+    "env": [],
     "labels": {
       "goforge.managed": "true",
       "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
       "traefik.docker.network": "goforge_net",
       "traefik.enable": "true",
       "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`gitea-runner-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`uptimekuma-app.example.com`)",
+      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "3001"
     },
     "binds": [
-      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/data",
-      "goforge-vol-00000000-0000-0000-0000-000000000042-cache:/cache"
+      "goforge-vol-00000000-0000-0000-0000-000000000042-data:/app/data"
     ],
     "network": "goforge_net",
     "restart": "unless-stopped",
-    "memory": 4294967296,
-    "nano_cpus": 2000000000,
+    "memory": 268435456,
+    "nano_cpus": 250000000,
     "health_check": [
-      "CMD-SHELL",
-      "wget -q -O /dev/null http://127.0.0.1:9101/healthz"
+      "CMD",
+      "extra/healthcheck"
     ]
   },
-  "geolibre": {
-    "image": "ghcr.io/opengeos/geolibre:v3.6.0",
+  "vaultwarden": {
+    "image": "vaultwarden/server:latest",
     "env": [
-      "GEOLIBRE_DISABLE_SIDECAR=1",
-      "GEOLIBRE_GEOLENS_URL=off",
-      "GEOLIBRE_SHARE_URL=off"
+      "ADMIN_TOKEN=\u003cargon2id\u003e",
+      "DOMAIN=",
+      "SIGNUPS_ALLOWED=true"
     ],
     "labels": {
       "goforge.managed": "true",
@@ -1227,21 +1298,21 @@
     ],
     "network": "goforge_net",
     "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
+    "memory": 268435456,
+    "nano_cpus": 250000000,
     "health_check": [
       "CMD",
-      "python",
-      "-c",
-      "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1/healthz', timeout=4).status==200 else 1)"
+      "curl",
+      "-fsS",
+      "http://localhost:80/alive"
     ]
   },
-  "geolibre+domain": {
-    "image": "ghcr.io/opengeos/geolibre:v3.6.0",
+  "vaultwarden+domain": {
+    "image": "vaultwarden/server:latest",
     "env": [
-      "GEOLIBRE_DISABLE_SIDECAR=1",
-      "GEOLIBRE_GEOLENS_URL=off",
-      "GEOLIBRE_SHARE_URL=off"
+      "ADMIN_TOKEN=\u003cargon2id\u003e",
+      "DOMAIN=https://vaultwarden-app.example.com",
+      "SIGNUPS_ALLOWED=true"
     ],
     "labels": {
       "goforge.managed": "true",
@@ -1249,7 +1320,7 @@
       "traefik.docker.network": "goforge_net",
       "traefik.enable": "true",
       "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`geolibre-app.example.com`)",
+      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`vaultwarden-app.example.com`)",
       "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "80"
     },
     "binds": [
@@ -1257,60 +1328,13 @@
     ],
     "network": "goforge_net",
     "restart": "unless-stopped",
-    "memory": 536870912,
-    "nano_cpus": 500000000,
-    "health_check": [
-      "CMD",
-      "python",
-      "-c",
-      "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1/healthz', timeout=4).status==200 else 1)"
-    ]
-  },
-  "rustgis": {
-    "image": "ghcr.io/opengeos/rustgis:0.5.0",
-    "env": [],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "false"
-    },
-    "binds": null,
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 134217728,
+    "memory": 268435456,
     "nano_cpus": 250000000,
     "health_check": [
       "CMD",
-      "wget",
-      "-q",
-      "--spider",
-      "http://127.0.0.1:8080/healthz"
-    ]
-  },
-  "rustgis+domain": {
-    "image": "ghcr.io/opengeos/rustgis:0.5.0",
-    "env": [],
-    "labels": {
-      "goforge.managed": "true",
-      "goforge.service.instance.id": "00000000-0000-0000-0000-000000000042",
-      "traefik.docker.network": "goforge_net",
-      "traefik.enable": "true",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.entrypoints": "web",
-      "traefik.http.routers.goforge-svc-00000000-0000-0000-0000-000000000042.rule": "Host(`rustgis-app.example.com`)",
-      "traefik.http.services.goforge-svc-00000000-0000-0000-0000-000000000042.loadbalancer.server.port": "8080"
-    },
-    "binds": null,
-    "network": "goforge_net",
-    "restart": "unless-stopped",
-    "memory": 134217728,
-    "nano_cpus": 250000000,
-    "health_check": [
-      "CMD",
-      "wget",
-      "-q",
-      "--spider",
-      "http://127.0.0.1:8080/healthz"
+      "curl",
+      "-fsS",
+      "http://localhost:80/alive"
     ]
   }
 }
