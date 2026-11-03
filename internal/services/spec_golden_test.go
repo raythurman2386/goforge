@@ -161,7 +161,8 @@ func TestBuildContainerSpec_MatchesMain(t *testing.T) {
 // w, the golden snapshot for key: a variant without a domain gets
 // traefik.enable=false (no Traefik router for data services), and the redis
 // and postgres templates got a new command and health check, and minio's
-// command, a string GoForge used to ignore, is now applied. For A1 shared
+// command, a string GoForge used to ignore, is now applied, and minio's
+// image is pgsty/silo because minio/minio no longer pulls. For A1 shared
 // data services, postgres defaults to 17 with a pgadmin admin on 1 CPU / 1GiB,
 // and redis defaults to 7.4 on 512MiB (AOF and maxmemory live in the command).
 // Everything else must still match main.
@@ -191,6 +192,7 @@ func wantSinceMain(key string, w, g specSnapshot) specSnapshot {
 		w.Env = env
 	case "minio":
 		w.Command = g.Command
+		w.Image = "pgsty/silo:latest"
 	}
 	return w
 }

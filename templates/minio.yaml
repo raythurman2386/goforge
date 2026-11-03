@@ -1,6 +1,6 @@
 name: minio
 display_name: MinIO
-description: High-performance object storage compatible with Amazon S3 API.
+description: High-performance object storage compatible with Amazon S3 API. Uses pgsty/silo, a community build of MinIO (MinIO no longer publishes public images on Docker Hub or Quay).
 icon: minio
 category: storage
 web: true
@@ -26,7 +26,10 @@ resources:
   memory: "512m"
 
 docker:
-  image: "minio/minio:{{ .Version }}"
+  # MinIO deleted minio/minio from Docker Hub (Sep 2026) and quay.io/minio/minio
+  # refuses anonymous pulls. pgsty/silo is a drop-in fork: same /data layout,
+  # MINIO_ROOT_* env, health path, and console; its entrypoint maps "server".
+  image: "pgsty/silo:{{ .Version }}"
   ports:
     - container: 9000
       protocol: tcp
