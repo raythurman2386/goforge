@@ -45,7 +45,7 @@ The OAuth flow validates the `state` parameter using a cookie-based approach: a 
 ### Known Limitations
 
 - Each login, registration, and GitHub callback creates a new session with a new random token. There is no anonymous session that becomes authenticated, so a session cookie planted before login is not promoted
-- **Password change keeps other sessions**: changing the password does not end the account's other sessions
+- **Password change ends other sessions**: a successful password change deletes every other session of the account and keeps the browser that made it. Settings → Profile → **Sign out other sessions** does the same on demand. Both are audited (`user.password.change`, `user.sessions.revoke`) with the number of sessions ended. API tokens are not revoked by either
 - **No concurrent session limits**: Users can have unlimited active sessions
 
 ---

@@ -94,6 +94,23 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 				}
 			}
 
+			<!-- Sessions -->
+			@ui.Card(ui.CardProps{Class: "mb-8"}) {
+				@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
+					Sessions
+				}
+				<p class="mb-4 text-sm text-foreground-secondary">Changing your password signs out every other browser. You can also sign them out now; this browser stays signed in. API tokens are not affected.</p>
+				<form hx-post="/settings/sessions/revoke-others" hx-swap="none" hx-confirm="Sign out every other session of this account?" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="revoke-other-sessions">
+					<input type="hidden" name="csrf_token" value={ csrfToken } />
+					<div class="flex justify-end">
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Type: "submit"}) {
+							Sign out other sessions
+							@components.Spinner()
+						}
+					</div>
+				</form>
+			}
+
 			if backups != nil {
 				@BackupCard(backups, backupForm, csrfToken)
 			}

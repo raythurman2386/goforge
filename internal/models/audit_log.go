@@ -61,6 +61,14 @@ const (
 	// Error reporting (Sentry) form. Details hold {"changed": [field
 	// names]}, never the DSN.
 	AuditActionErrorReportingSettingsUpdate = "error_reporting.settings.update"
+	// AuditActionUserPasswordChange records a successful password change in
+	// Settings → Profile. Details hold {"sessions_revoked": n, "via": "ui"}:
+	// the number of the account's other sessions that were ended. Never the
+	// password or its hash.
+	AuditActionUserPasswordChange = "user.password.change"
+	// AuditActionUserSessionsRevoke records Settings → Profile "Sign out
+	// other sessions". Details hold {"sessions_revoked": n, "via": "ui"}.
+	AuditActionUserSessionsRevoke = "user.sessions.revoke"
 )
 
 // Common resource types

@@ -236,6 +236,7 @@ func Router(
 						r.Get("/activity", activityHandler.Page)
 						r.Put("/profile", settingsHandler.UpdateProfile)
 						r.Put("/password", settingsHandler.UpdatePassword)
+						r.Post("/sessions/revoke-others", settingsHandler.RevokeOtherSessions)
 						r.Post("/prune", settingsHandler.PruneSystem)
 						r.Put("/backups", settingsHandler.UpdateBackupSettings)
 						r.Post("/backups/test", settingsHandler.TestBackupConnection)

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- Changing the password ends the account's other sessions. A successful `PUT /settings/password` deletes every session of the account except the one that made the change (`SessionRepository.DeleteByUserIDExcept`), so a stolen session cookie stops working once the password is changed. Settings → Profile has a new **Sessions** card with **Sign out other sessions** (`POST /settings/sessions/revoke-others`), which does the same without a password change. Both write an audit row, `user.password.change` or `user.sessions.revoke`, with `sessions_revoked` (the number of sessions ended) and `via` = `ui`, never the password or a hash. API tokens are not revoked. See `.cursor/skills/verify-goforge/features/session-revoke.md` (v0.5.0 S2, t1861u)
 - `/health/ready` no longer returns database or Docker error text (HEALTH-READY-PUBLIC). The route stays public and keeps its status codes (`200` ready, `503` not ready) and its `checks` keys, but each value is now only `ok`, `unavailable`, or `not_configured` for every caller. The error behind `unavailable` is logged server side as a `readiness check failed` warning with `check` and `error` fields. `verify.sh` still reads `"database":"ok"`. New verification file `.cursor/skills/verify-goforge/features/health-ready.md` (t1858u)
 
 ## [0.3.0] - 2026-11-02

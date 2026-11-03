@@ -37,6 +37,7 @@ type SettingsHandler struct {
 	notifySettings  NotifySettings
 	errReport       ErrorReportingSettings
 	audit           AuditRecorder
+	sessions        SessionRevoker
 	tokenProjects   TokenProjectLister
 	tokenServices   TokenServiceLister
 	logger          *slog.Logger
@@ -134,6 +135,42 @@ type APITokenStore interface {
 func (h *SettingsHandler) WithAPITokens(s APITokenStore) *SettingsHandler {
 	h.apiTokenRepo = s
 	return h
+}
+
+// SessionRevoker ends an account's sessions except the one making the
+// request (repositories.SessionRepository).
+type SessionRevoker interface {
+	DeleteByUserIDExcept(ctx context.Context, userID, keepSessionID string) (int64, error)
+}
+
+// WithSessions lets a password change and "Sign out other sessions" end the
+// account's other sessions. Without it (most tests) the password still
+// changes and no session is touched.
+func (h *SettingsHandler) WithSessions(s SessionRevoker) *SettingsHandler {
+	h.sessions = s
+	return h
+}
+
+// revokeOtherSessions deletes every session of user except the one on the
+// request (none when the request carries no session, such as an API token)
+// and returns how many it removed.
+func (h *SettingsHandler) revokeOtherSessions(r *http.Request, userID string) (int64, error) {
+	if h.sessions == nil {
+		return 0, nil
+	}
+	keep := ""
+	if s := auth.GetSessionFromContext(r.Context()); s != nil {
+		keep = s.ID
+	}
+	return h.sessions.DeleteByUserIDExcept(r.Context(), userID, keep)
+}
+
+// recordUser writes a via=ui audit row about the signed-in account.
+func (h *SettingsHandler) recordUser(r *http.Request, userID, action string, details map[string]interface{}) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.Record(r.Context(), userID, action, models.ResourceTypeUser, userID, uiDetails(details), getClientIP(r), r.UserAgent())
 }
 
 // WithAudit records API token create, rotate, and revoke in the audit log.
@@ -435,8 +472,65 @@ func (h *SettingsHandler) UpdatePassword(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// A new password ends every other session of the account; the browser
+	// that changed it stays signed in.
+	revoked, revokeErr := h.revokeOtherSessions(r, user.ID)
+	if revokeErr != nil {
+		h.logger.Error("password changed but other sessions were not revoked", "error", revokeErr, "user_id", user.ID)
+		h.recordUser(r, user.ID, models.AuditActionUserPasswordChange, map[string]interface{}{"sessions_revoked": int64(0), "revoke_error": true})
+		RenderError(w, r, http.StatusInternalServerError, "Password updated, but other sessions could not be signed out. Use Sign out other sessions.")
+		return
+	}
+	h.recordUser(r, user.ID, models.AuditActionUserPasswordChange, map[string]interface{}{"sessions_revoked": revoked})
+
 	w.WriteHeader(http.StatusOK)
-	if err := components.Toast("Password updated successfully", "success").Render(r.Context(), w); err != nil {
+	if err := components.Toast(passwordChangedMessage(revoked), "success").Render(r.Context(), w); err != nil {
+		h.logger.Error("failed to render toast", "error", err)
+	}
+}
+
+// passwordChangedMessage is the toast after a password change.
+func passwordChangedMessage(revoked int64) string {
+	if revoked == 0 {
+		return "Password updated successfully"
+	}
+	return "Password updated. " + signedOutMessage(revoked)
+}
+
+// signedOutMessage says how many other sessions were ended.
+func signedOutMessage(revoked int64) string {
+	switch revoked {
+	case 0:
+		return "No other sessions were signed in."
+	case 1:
+		return "Signed out 1 other session."
+	default:
+		return "Signed out " + strconv.FormatInt(revoked, 10) + " other sessions."
+	}
+}
+
+// RevokeOtherSessions handles Settings → Profile "Sign out other sessions":
+// every session of the account except this one is deleted.
+func (h *SettingsHandler) RevokeOtherSessions(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+	if h.sessions == nil {
+		RenderError(w, r, http.StatusServiceUnavailable, "Session management is not available")
+		return
+	}
+	revoked, err := h.revokeOtherSessions(r, user.ID)
+	if err != nil {
+		h.logger.Error("failed to revoke other sessions", "error", err, "user_id", user.ID)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to sign out other sessions")
+		return
+	}
+	h.recordUser(r, user.ID, models.AuditActionUserSessionsRevoke, map[string]interface{}{"sessions_revoked": revoked})
+
+	w.WriteHeader(http.StatusOK)
+	if err := components.Toast(signedOutMessage(revoked), "success").Render(r.Context(), w); err != nil {
 		h.logger.Error("failed to render toast", "error", err)
 	}
 }

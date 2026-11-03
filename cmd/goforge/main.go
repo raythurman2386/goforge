@@ -509,7 +509,7 @@ func runServer() error {
 	serviceHandler.WithEnvProtected(cfg.ProtectedServices)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithTokenResources(projectService, instanceService).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithNotifySettings(notifySettings).WithErrorReporting(errReportSettings).
-		WithRestorePoints(restorePoints).WithAudit(auditService).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
+		WithRestorePoints(restorePoints).WithAudit(auditService).WithSessions(sessionRepo).WithMCP(cfg.BaseURL, cfg.MCPHTTP)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))

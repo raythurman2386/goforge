@@ -161,7 +161,7 @@ GoForge follows a clean architecture with:
    - Review OAuth permissions requested by GitHub integration
    - There is no 2FA
    - API and MCP tokens are hashed, carry a scope (`full`, `read`, `write`, or `protected`), expire, and can be rotated or revoked in Settings → Profile
-   - Audit logs cover sign-in, registration, logout, API token changes, backup settings, restore, every `/api/v1` and `/mcp` write, and web UI changes to projects, deployments, environments, variables (key only), services, and containers. Settings → Activity shows the log. Not recorded yet: Git source changes, profile and password changes, and webhook-triggered deploys
+   - Audit logs cover sign-in, registration, logout, API token changes, password changes and "Sign out other sessions", backup settings, restore, every `/api/v1` and `/mcp` write, and web UI changes to projects, deployments, environments, variables (key only), services, and containers. Settings → Activity shows the log. Not recorded yet: Git source changes, profile (email) changes, and webhook-triggered deploys
 
 6. **Data Protection**
    - Turn on the built-in nightly backups (Settings → Profile → Backups) or run your own. See [Backup & Restore](docs/deployment/backup.md). `goforge backup restore` restores the GoForge database and `goforge backup restore-service` restores a Postgres, Gitea, or Vaultwarden service (CLI only; there is no restore button)
