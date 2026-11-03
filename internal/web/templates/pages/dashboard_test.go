@@ -101,3 +101,55 @@ func TestDashboardStatsPruneBuildCacheOnly(t *testing.T) {
 		t.Fatal("build cache note shown with nothing reclaimable")
 	}
 }
+
+// t1905u: the enabled Prune button is the htmx requester. It posts to
+// /dashboard/prune, swaps #dashboard-stats, disables itself and shows a
+// spinner and "Pruning…" while it runs, and keeps the kit confirm (text and
+// danger tone). The form keeps its plain POST for no-JS. The disabled
+// "Nothing to prune" state is unchanged and makes no request.
+func TestDashboardStatsPruneButtonFeedback(t *testing.T) {
+	du := &models.DiskUsageInfo{ImagesSize: 1 << 30, ReclaimableSize: 1 << 30}
+	out := render(t, DashboardStats("tok", &models.SystemStats{DiskUsage: du}, true))
+	start := strings.Index(out, `data-testid="dashboard-prune"`)
+	if start < 0 {
+		t.Fatal("enabled prune button missing")
+	}
+	btnStart := strings.LastIndex(out[:start], "<button")
+	btnEnd := strings.Index(out[start:], "</button>") + start
+	btn := out[btnStart:btnEnd]
+	for _, want := range []string{
+		`type="submit"`,
+		`hx-post="/dashboard/prune"`,
+		`hx-target="#dashboard-stats"`,
+		`hx-swap="outerHTML"`,
+		`hx-disable="this"`,
+		`hx-indicator="this"`,
+		`hx-confirm="This removes stopped GoForge containers, unused GoForge images, and all unused Docker build cache on this host (build cache is engine-wide, not only GoForge builds). Continue?"`,
+		`data-ui-confirm-tone="danger"`,
+		`data-ui-confirm-label="Prune"`,
+		`class="htmx-indicator animate-spin`,
+		`group-[.htmx-request]:hidden">Prune System</span>`,
+		`hidden group-[.htmx-request]:inline">Pruning…</span>`,
+	} {
+		if !strings.Contains(btn, want) {
+			t.Errorf("enabled prune button missing %s\n%s", want, btn)
+		}
+	}
+	for _, want := range []string{`method="POST" action="/dashboard/prune"`, `name="csrf_token" value="tok"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("prune form missing %s", want)
+		}
+	}
+
+	none := render(t, DashboardStats("tok", &models.SystemStats{DiskUsage: &models.DiskUsageInfo{}}, true))
+	for _, want := range []string{`disabled`, `title="Nothing to prune"`, `opacity-50 cursor-not-allowed`} {
+		if !strings.Contains(none, want) {
+			t.Errorf("disabled prune button missing %s", want)
+		}
+	}
+	for _, bad := range []string{`hx-post="/dashboard/prune"`, "Pruning…", "htmx-indicator", "hx-confirm"} {
+		if strings.Contains(none, bad) {
+			t.Errorf("disabled prune button should not carry %s", bad)
+		}
+	}
+}

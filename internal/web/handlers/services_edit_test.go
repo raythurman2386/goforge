@@ -87,10 +87,12 @@ func (fakeDocker) StopContainer(context.Context, string) error           { retur
 func (fakeDocker) RemoveContainer(context.Context, string) error         { return nil }
 func (fakeDocker) RenameContainer(context.Context, string, string) error { return nil }
 func (fakeDocker) RestartContainer(context.Context, string) error        { return nil }
-func (fakeDocker) CleanupSystem(context.Context) error                   { return nil }
-func (fakeDocker) EnsureImage(context.Context, string) error             { return nil }
-func (fakeDocker) PullImage(context.Context, string) error               { return nil }
-func (fakeDocker) ImageExists(context.Context, string) (bool, error)     { return true, nil }
+func (fakeDocker) CleanupSystem(context.Context) (docker.PruneSummary, error) {
+	return docker.PruneSummary{}, nil
+}
+func (fakeDocker) EnsureImage(context.Context, string) error         { return nil }
+func (fakeDocker) PullImage(context.Context, string) error           { return nil }
+func (fakeDocker) ImageExists(context.Context, string) (bool, error) { return true, nil }
 func (fakeDocker) WaitHealthy(context.Context, string, time.Duration) error {
 	return nil
 }

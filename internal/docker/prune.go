@@ -52,19 +52,55 @@ func (c *Client) PruneBuildCache(ctx context.Context) (build.CachePruneReport, e
 	return res.Report, nil
 }
 
+// PruneSummary totals what CleanupSystem removed, from the reports Docker
+// returns for each prune step.
+type PruneSummary struct {
+	// SpaceReclaimed is the bytes freed across all three steps.
+	SpaceReclaimed uint64
+	// Containers is the number of stopped managed containers removed.
+	Containers int
+	// Images counts deleted images only. ImagesDeleted also lists untag
+	// entries, so an image with two tags would otherwise count three times.
+	Images int
+	// BuildCacheRecords is the number of build cache records removed.
+	BuildCacheRecords int
+}
+
+// Empty reports whether nothing was removed and no space was freed.
+func (s PruneSummary) Empty() bool {
+	return s.SpaceReclaimed == 0 && s.Containers == 0 && s.Images == 0 && s.BuildCacheRecords == 0
+}
+
 // CleanupSystem prunes stopped managed containers, unused managed images, and
-// unused (engine-wide) build cache, in that order.
-func (c *Client) CleanupSystem(ctx context.Context) error {
-	if _, err := c.PruneContainers(ctx); err != nil {
-		return fmt.Errorf("failed to prune containers: %w", err)
+// unused (engine-wide) build cache, in that order, and stops at the first
+// error. The summary covers the steps that finished, also when one fails.
+func (c *Client) CleanupSystem(ctx context.Context) (PruneSummary, error) {
+	var sum PruneSummary
+	cr, err := c.PruneContainers(ctx)
+	if err != nil {
+		return sum, fmt.Errorf("failed to prune containers: %w", err)
 	}
-	if _, err := c.PruneImages(ctx); err != nil {
-		return fmt.Errorf("failed to prune images: %w", err)
+	sum.SpaceReclaimed += cr.SpaceReclaimed
+	sum.Containers = len(cr.ContainersDeleted)
+
+	ir, err := c.PruneImages(ctx)
+	if err != nil {
+		return sum, fmt.Errorf("failed to prune images: %w", err)
 	}
-	if _, err := c.PruneBuildCache(ctx); err != nil {
-		return fmt.Errorf("failed to prune build cache: %w", err)
+	sum.SpaceReclaimed += ir.SpaceReclaimed
+	for _, d := range ir.ImagesDeleted {
+		if d.Deleted != "" {
+			sum.Images++
+		}
 	}
-	return nil
+
+	br, err := c.PruneBuildCache(ctx)
+	if err != nil {
+		return sum, fmt.Errorf("failed to prune build cache: %w", err)
+	}
+	sum.SpaceReclaimed += br.SpaceReclaimed
+	sum.BuildCacheRecords = len(br.CachesDeleted)
+	return sum, nil
 }
 
 // RemoveImage removes an image by ID.

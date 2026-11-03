@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/moby/moby/api/types/build"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 )
 
@@ -34,7 +37,7 @@ func TestCleanupSystem_ScopesToManagedLabel(t *testing.T) {
 	}
 
 	c := &Client{docker: api}
-	if err := c.CleanupSystem(context.Background()); err != nil {
+	if _, err := c.CleanupSystem(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -71,7 +74,7 @@ func TestCleanupSystem_BuildCacheError(t *testing.T) {
 			return client.BuildCachePruneResult{}, errors.New("boom")
 		},
 	}
-	err := (&Client{docker: api}).CleanupSystem(context.Background())
+	_, err := (&Client{docker: api}).CleanupSystem(context.Background())
 	if err == nil || err.Error() != "failed to prune build cache: boom" {
 		t.Fatalf("err = %v, want wrapped build cache error", err)
 	}
@@ -90,11 +93,90 @@ func TestCleanupSystem_ImageErrorSkipsBuildCache(t *testing.T) {
 			return client.BuildCachePruneResult{}, nil
 		},
 	}
-	if err := (&Client{docker: api}).CleanupSystem(context.Background()); err == nil {
-		t.Fatal("want image prune error")
+	sum, err := (&Client{docker: api}).CleanupSystem(context.Background())
+	if err == nil || err.Error() != "failed to prune images: nope" {
+		t.Fatalf("err = %v, want wrapped image prune error", err)
 	}
 	if called {
 		t.Fatal("build cache prune ran after image prune failed")
+	}
+	if !sum.Empty() {
+		t.Fatalf("summary = %+v, want empty (containers pruned nothing)", sum)
+	}
+}
+
+// t1905u: CleanupSystem sums SpaceReclaimed across the three prunes and
+// counts containers, deleted images (not untag entries), and build cache
+// records, so the dashboard toast can say what was freed.
+func TestCleanupSystem_Summary(t *testing.T) {
+	t.Parallel()
+
+	api := &mockDockerAPI{
+		containersPrune: func(context.Context, client.ContainerPruneOptions) (client.ContainerPruneResult, error) {
+			return client.ContainerPruneResult{Report: container.PruneReport{
+				ContainersDeleted: []string{"c1", "c2"},
+				SpaceReclaimed:    1000,
+			}}, nil
+		},
+		imagesPruneFunc: func(context.Context, client.ImagePruneOptions) (client.ImagePruneResult, error) {
+			return client.ImagePruneResult{Report: image.PruneReport{
+				ImagesDeleted: []image.DeleteResponse{
+					{Untagged: "goforge/app:old"},
+					{Deleted: "sha256:aaa"},
+					{Deleted: "sha256:bbb"},
+					{Untagged: "goforge/app:older"},
+					{Deleted: "sha256:ccc"},
+				},
+				SpaceReclaimed: 20000,
+			}}, nil
+		},
+		buildCachePruneFunc: func(context.Context, client.BuildCachePruneOptions) (client.BuildCachePruneResult, error) {
+			return client.BuildCachePruneResult{Report: build.CachePruneReport{
+				CachesDeleted:  []string{"r1", "r2", "r3", "r4"},
+				SpaceReclaimed: 300000,
+			}}, nil
+		},
+	}
+	sum, err := (&Client{docker: api}).CleanupSystem(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := PruneSummary{SpaceReclaimed: 321000, Containers: 2, Images: 3, BuildCacheRecords: 4}
+	if sum != want {
+		t.Fatalf("summary = %+v, want %+v", sum, want)
+	}
+	if sum.Empty() {
+		t.Fatal("non-zero summary reports Empty")
+	}
+}
+
+// t1905u: an image prune error stops the run, and the summary keeps what the
+// container step already freed.
+func TestCleanupSystem_ImageErrorKeepsContainerSummary(t *testing.T) {
+	t.Parallel()
+
+	buildCalled := false
+	api := &mockDockerAPI{
+		containersPrune: func(context.Context, client.ContainerPruneOptions) (client.ContainerPruneResult, error) {
+			return client.ContainerPruneResult{Report: container.PruneReport{ContainersDeleted: []string{"c1"}, SpaceReclaimed: 512}}, nil
+		},
+		imagesPruneFunc: func(context.Context, client.ImagePruneOptions) (client.ImagePruneResult, error) {
+			return client.ImagePruneResult{}, errors.New("nope")
+		},
+		buildCachePruneFunc: func(context.Context, client.BuildCachePruneOptions) (client.BuildCachePruneResult, error) {
+			buildCalled = true
+			return client.BuildCachePruneResult{}, nil
+		},
+	}
+	sum, err := (&Client{docker: api}).CleanupSystem(context.Background())
+	if err == nil {
+		t.Fatal("want image prune error")
+	}
+	if buildCalled {
+		t.Fatal("build cache prune ran after image prune failed")
+	}
+	if want := (PruneSummary{SpaceReclaimed: 512, Containers: 1}); sum != want {
+		t.Fatalf("summary = %+v, want %+v", sum, want)
 	}
 }
 

@@ -108,7 +108,7 @@ type mockDockerClient struct {
 	removeContainerFunc  func(ctx context.Context, id string) error
 	renameContainerFunc  func(ctx context.Context, id, newName string) error
 	restartContainerFunc func(ctx context.Context, id string) error
-	cleanupSystemFunc    func(ctx context.Context) error
+	cleanupSystemFunc    func(ctx context.Context) (docker.PruneSummary, error)
 	imageExistsFunc      func(ctx context.Context, image string) (bool, error)
 	ensureImageFunc      func(ctx context.Context, image string) error
 	pullImageFunc        func(ctx context.Context, image string) error
@@ -193,11 +193,11 @@ func (m *mockDockerClient) RestartContainer(ctx context.Context, id string) erro
 	return nil
 }
 
-func (m *mockDockerClient) CleanupSystem(ctx context.Context) error {
+func (m *mockDockerClient) CleanupSystem(ctx context.Context) (docker.PruneSummary, error) {
 	if m.cleanupSystemFunc != nil {
 		return m.cleanupSystemFunc(ctx)
 	}
-	return nil
+	return docker.PruneSummary{}, nil
 }
 
 func TestInstanceService_DeployInstance(t *testing.T) {
@@ -837,8 +837,8 @@ func TestInstanceService_PruneSystem(t *testing.T) {
 		{
 			name: "Success",
 			setupMock: func(md *mockDockerClient) {
-				md.cleanupSystemFunc = func(ctx context.Context) error {
-					return nil
+				md.cleanupSystemFunc = func(ctx context.Context) (docker.PruneSummary, error) {
+					return docker.PruneSummary{SpaceReclaimed: 42, Images: 1}, nil
 				}
 			},
 			wantErr: false,
@@ -846,8 +846,8 @@ func TestInstanceService_PruneSystem(t *testing.T) {
 		{
 			name: "Error",
 			setupMock: func(md *mockDockerClient) {
-				md.cleanupSystemFunc = func(ctx context.Context) error {
-					return errors.New("docker error")
+				md.cleanupSystemFunc = func(ctx context.Context) (docker.PruneSummary, error) {
+					return docker.PruneSummary{}, errors.New("docker error")
 				}
 			},
 			wantErr: true,
@@ -865,9 +865,12 @@ func TestInstanceService_PruneSystem(t *testing.T) {
 
 			svc := NewInstanceService(nil, nil, mockDocker, nil, "goforge_net", false, logger)
 
-			err := svc.PruneSystem(context.Background())
+			sum, err := svc.PruneSystem(context.Background())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PruneSystem() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && sum != (docker.PruneSummary{SpaceReclaimed: 42, Images: 1}) {
+				t.Errorf("PruneSystem() summary = %+v, want the CleanupSystem summary", sum)
 			}
 		})
 	}
