@@ -150,6 +150,8 @@ func activitySourceLabel(source string) string {
 		return "API"
 	case models.AuditSourceWebhook:
 		return "Webhook"
+	case models.AuditSourceCLI:
+		return "CLI"
 	default:
 		return "UI"
 	}
@@ -163,6 +165,8 @@ func activitySourceTone(source string) ui.BadgeTone {
 		return ui.BadgeInfo
 	case models.AuditSourceWebhook:
 		return ui.BadgeWarning
+	case models.AuditSourceCLI:
+		return ui.BadgeSuccess
 	default:
 		return ui.BadgeNeutral
 	}

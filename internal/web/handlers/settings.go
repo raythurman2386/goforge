@@ -40,6 +40,7 @@ type SettingsHandler struct {
 	sessions        SessionRevoker
 	tokenProjects   TokenProjectLister
 	tokenServices   TokenServiceLister
+	twoFactor       *auth.TwoFactor
 	logger          *slog.Logger
 }
 
@@ -405,7 +406,7 @@ func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
 	}
 	// The page carries backup settings for admins; never cache it.
 	w.Header().Set("Cache-Control", "no-store")
-	component := settings.Profile(currentUser, csrfToken, st, form, h.notifyForm(r, currentUser), h.errReportForm(r, currentUser), h.mcp)
+	component := settings.Profile(currentUser, csrfToken, st, form, h.notifyForm(r, currentUser), h.errReportForm(r, currentUser), h.mcp, h.twoFactorCard(r, currentUser))
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render profile page")
 	}

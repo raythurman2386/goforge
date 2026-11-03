@@ -16,7 +16,21 @@ This page documents GoForge's security model, current protections, and known are
 - Passwords are hashed using **Argon2id** before storage
 - Login is handled via `POST /auth/login` with form-encoded credentials
 - Sessions are created upon successful authentication
+- With two-factor authentication on (see [Two-factor authentication](#two-factor-authentication)), a correct password starts a login challenge instead of a session
 - Failed password logins are throttled in memory: 10 failures from one client IP, or 10 failures for one account (email, case-insensitive) from any IP, within 15 minutes lock that key for 15 minutes. A locked login gets `429` with `Retry-After` before the password is checked, so a correct password is refused until the lockout ends. A successful login clears the account counter, not the IP counter. The account limit means someone who knows an email can keep it locked; the lockout is short for that reason. Counters reset when the process restarts
+
+### Two-factor authentication
+
+Local password accounts can turn on TOTP in Settings → Profile → **Two-factor authentication**. It is optional.
+
+- **Setup** asks for the current password, then shows a QR code (`otpauth://totp/GoForge:<email>`) and the key once. 2FA turns on only when the first code from the app checks out. Then 10 recovery codes (`xxxxx-xxxxx`) are shown once.
+- **Codes**: RFC 6238 with SHA-1, 6 digits, and a 30-second step. The previous and next step are accepted for clock skew. A time step that was accepted once is refused after that (`user_totp.last_used_step`), so a code seen over someone's shoulder cannot be replayed.
+- **Storage**: the TOTP key is sealed with `ENCRYPTION_KEY` (`user_totp.secret_sealed`). Recovery codes are stored as SHA-256 hashes and each works once.
+- **Login**: with 2FA on, `POST /auth/login` checks the password, creates a row in `login_challenges` (only the SHA-256 of a random 32-byte token), sets it in the `goforge_2fa` cookie (HttpOnly, SameSite Lax, 5 minutes), and redirects to `/auth/2fa`. No session exists until `POST /auth/2fa` gets a valid code or recovery code. The challenge expires after 5 minutes or 5 wrong codes and is single use; the user then starts again with the password.
+- **Lockout**: a wrong code counts as a failed login for the client IP and the account, so 10 in 15 minutes give `429` with `Retry-After` on both `/auth/login` and `/auth/2fa`. A correct password alone does not clear the account counter while 2FA is on; a correct code does.
+- **Turning it off** needs the password and a current code or a recovery code. An operator can clear it for a locked-out user with `goforge user reset-2fa <email>` on the host (`docker compose exec goforge ./goforge user reset-2fa <email>`), which also deletes the recovery codes and any pending challenge.
+- **Audit**: `user.2fa.enable`, `user.2fa.disable`, `login.2fa_failed` (with `attempt` and `challenge_ended`), `user.2fa.reset` (`via` = `cli`), and `login` with `second_factor` = `totp` or `recovery_code`. The key and codes are never logged.
+- **Not covered**: API tokens and `/mcp` bearer tokens are separate credentials and never ask for a code. Sign in with GitHub does not ask for a GoForge code either; see below. There is no WebAuthn.
 
 ### GitHub OAuth
 
@@ -24,6 +38,7 @@ This page documents GoForge's security model, current protections, and known are
 - Callback at `/auth/github/callback` exchanges the code for an access token
 - GitHub user ID is linked to the local user account
 - Access tokens are stored in the `users` table for API access
+- GitHub sign-in never asks for a GoForge TOTP code; it relies on the GitHub account's own 2FA. The callback links a local account with the same email to the GitHub account, so with GoForge 2FA on, anyone who controls a GitHub account with that email can sign in without the code. Turn on 2FA at GitHub, or leave GitHub OAuth unconfigured, if you rely on GoForge 2FA
 
 The OAuth flow validates the `state` parameter using a cookie-based approach: a UUID is generated, stored in a `github_oauth_state` cookie (HttpOnly, 5-minute expiry), and verified on callback (`GitHubLogin` and `GitHubCallback` in `internal/web/handlers/auth.go`).
 

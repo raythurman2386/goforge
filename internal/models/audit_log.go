@@ -80,6 +80,28 @@ const (
 	// URL.
 	AuditActionGitSourceCreate = "git_source.create"
 	AuditActionGitSourceDelete = "git_source.delete"
+	// AuditActionUser2FAEnable records a confirmed TOTP enrollment in
+	// Settings → Profile. Details hold {"recovery_codes": n, "via": "ui"},
+	// never the secret or a code.
+	AuditActionUser2FAEnable = "user.2fa.enable"
+	// AuditActionUser2FADisable records Settings → Profile turning TOTP off
+	// with the password and a code. Details hold {"second_factor":
+	// "totp"|"recovery_code", "via": "ui"}.
+	AuditActionUser2FADisable = "user.2fa.disable"
+	// AuditActionUser2FAReset is written by `goforge user reset-2fa` (lockout
+	// recovery from the host). Details hold {"via": "cli"}.
+	AuditActionUser2FAReset = "user.2fa.reset"
+	// AuditActionLogin2FAFailed records a wrong TOTP or recovery code on the
+	// sign-in step after a correct password. Details hold {"attempt": n,
+	// "challenge_ended": bool}, never the code. A successful second step
+	// writes the usual login row with details.second_factor.
+	AuditActionLogin2FAFailed = "login.2fa_failed"
+)
+
+// Values of details.second_factor on login and user.2fa.disable rows.
+const (
+	SecondFactorTOTP         = "totp"
+	SecondFactorRecoveryCode = "recovery_code"
 )
 
 // Common resource types
@@ -108,6 +130,9 @@ const (
 	// AuditSourceWebhook is a row written for a signed push webhook
 	// (details.via "webhook") and the run outcomes linked to it.
 	AuditSourceWebhook = "webhook"
+	// AuditSourceCLI is a row written by a goforge host command
+	// (details.via "cli"), such as user reset-2fa.
+	AuditSourceCLI = "cli"
 	// AuditSourceAgent matches MCP and API rows together (filter only).
 	AuditSourceAgent = "agent"
 )
@@ -123,7 +148,8 @@ const AuditAPIActionPrefix = "api_v1."
 // Source reports who made the change: MCP when the User-Agent is an MCP
 // client, API for other api_v1 rows (or rows whose details.via is api_v1,
 // such as a background run started by the API), webhook for rows whose
-// details.via is webhook, and UI for everything else.
+// details.via is webhook, CLI for rows whose details.via is cli, and UI for
+// everything else.
 func (a *AuditLog) Source() string {
 	if a.UserAgent.Valid && strings.HasPrefix(a.UserAgent.String, AuditMCPUserAgentPrefix) {
 		return AuditSourceMCP
@@ -137,6 +163,8 @@ func (a *AuditLog) Source() string {
 			return AuditSourceAPI
 		case AuditViaWebhook:
 			return AuditSourceWebhook
+		case AuditViaCLI:
+			return AuditSourceCLI
 		}
 	}
 	return AuditSourceUI
@@ -150,6 +178,9 @@ const (
 	// push webhook. user_id is the project owner; details carry the
 	// provider, branch, and commit.
 	AuditViaWebhook = "webhook"
+	// AuditViaCLI marks a row written by a goforge host command, such as
+	// user reset-2fa.
+	AuditViaCLI = "cli"
 )
 
 // Failed reports whether the row records a failed change (<action>.failed).

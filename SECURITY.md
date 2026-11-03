@@ -42,7 +42,7 @@ We take security vulnerabilities seriously. If you find a security issue:
 
 ## Known Security Gaps (As of Current Version)
 
-Checked against `main` on 2026-11-02 (v0.5.0 S3, t1870u).
+Checked against `main` on 2026-11-02 (v0.5.0 S4, t1873u).
 
 ### Partly done
 
@@ -53,7 +53,6 @@ Checked against `main` on 2026-11-02 (v0.5.0 S3, t1870u).
 
 ### Not started
 
-- [ ] Two-factor authentication (2FA)
 - [ ] Container escape prevention measures
 - [ ] Resource quota enforcement per project (per-container CPU and memory limits exist)
 - [ ] The main `goforge` image runs as root (the `mcp` image runs as uid 10001)
@@ -61,6 +60,7 @@ Checked against `main` on 2026-11-02 (v0.5.0 S3, t1870u).
 
 ### Closed since the 2026-10-29 audit
 
+- **Two-factor authentication (v0.5.0 S4).** Local password accounts can turn on TOTP two-factor authentication in Settings → Profile → **Two-factor authentication** (RFC 6238: SHA-1, 6 digits, 30 seconds, one step of clock skew either way; a code is accepted once). Setup asks for the current password, shows a QR code and the key once, and turns 2FA on only after the first code checks out; it then shows 10 single-use recovery codes once (stored as SHA-256 hashes). The TOTP key is sealed with `ENCRYPTION_KEY`. With 2FA on, a correct password does not create a session: it starts a 5-minute login challenge (a random token in the HttpOnly `goforge_2fa` cookie, only its hash stored; 5 wrong codes end it) and `/auth/2fa` asks for a code or a recovery code. Wrong codes count toward the login lockout for the client IP and the account (10 in 15 minutes gives `429`). Turning 2FA off needs the password and a code. An operator can clear it with `goforge user reset-2fa <email>`. 2FA is optional; nothing forces it. Audited as `user.2fa.enable`, `user.2fa.disable`, `login.2fa_failed`, `user.2fa.reset` (`via` = `cli`), and `login` with `second_factor`. API tokens and `/mcp` are unaffected: a bearer token is its own credential and never asks for a code. **Sign in with GitHub does not ask for a GoForge code; it relies on the GitHub account's own 2FA.** Because GitHub sign-in links a local account with the same email, anyone who controls a GitHub account with that email signs in without the TOTP code, so turn on 2FA at GitHub too (or do not configure GitHub OAuth) if you rely on GoForge 2FA. No WebAuthn (t1873u).
 - **`BACKUP_S3_*` in the container environment (ENV-CREDS).** The repo `docker-compose.yml` passes no `BACKUP_*` variable (#80). Backup keys saved in Settings → Profile are stored encrypted with `ENCRYPTION_KEY` and never sent back to the browser (#77). On 2026-10-30 `docker inspect` of the deployed `goforge` container listed no `BACKUP_*` names. If you import settings through a `docker-compose.override.yml`, remove every `BACKUP_*` variable from it afterwards (not only the two keys) and recreate the `goforge` container. Host runs and `goforge backup run` still read `BACKUP_*` from the process environment.
 - **API token rotation.** Settings → Profile can rotate a token in place; the old secret stops working on its next request (#78).
 - **Empty `WEBHOOK_SECRET` outside dev mode.** With it empty, anyone could sign a GitHub or Gitea webhook (HMAC with an empty key) or send an empty `X-Gitlab-Token`, and a matching push could trigger a deployment. GoForge now refuses to start outside dev mode while `WEBHOOK_SECRET` is empty or only whitespace (#92). Dev mode still generates it.

@@ -229,3 +229,37 @@ func TestActivityPage_RendersS3AuditRows(t *testing.T) {
 		t.Errorf("filter = %+v, want source webhook", store.got)
 	}
 }
+
+// The v0.5 S4 rows show on Settings → Activity: 2FA enable and disable from
+// the UI, a failed second step, a login with second_factor, and a CLI reset
+// with the CLI badge. ?source=cli reaches the store.
+func TestActivityPage_RendersTwoFactorRows(t *testing.T) {
+	store := &fakeAuditLister{logs: []*models.AuditLog{
+		auditRow(t, "a1111111-1111-4111-8111-111111111111", models.AuditActionUser2FAEnable, models.ResourceTypeUser, "user-1",
+			"Mozilla/5.0", map[string]any{"via": "ui", "recovery_codes": 10}),
+		auditRow(t, "a2222222-2222-4222-8222-222222222222", models.AuditActionLogin2FAFailed, models.ResourceTypeUser, "user-1",
+			"Mozilla/5.0", map[string]any{"via": "ui", "attempt": 1, "challenge_ended": false}),
+		auditRow(t, "a3333333-3333-4333-8333-333333333333", models.AuditActionLogin, models.ResourceTypeUser, "user-1",
+			"Mozilla/5.0", map[string]any{"via": "ui", "second_factor": models.SecondFactorTOTP}),
+		auditRow(t, "a4444444-4444-4444-8444-444444444444", models.AuditActionUser2FADisable, models.ResourceTypeUser, "user-1",
+			"Mozilla/5.0", map[string]any{"via": "ui", "second_factor": models.SecondFactorRecoveryCode}),
+		auditRow(t, "a5555555-5555-4555-8555-555555555555", models.AuditActionUser2FAReset, models.ResourceTypeUser, "user-1",
+			"goforge-cli", map[string]any{"via": models.AuditViaCLI}),
+	}}
+	h := NewActivityHandler(store, slog.Default())
+	w := activityGet(t, h.Page, "/settings/activity?source=cli", &models.User{ID: "user-1", Role: models.RoleUser})
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	html := w.Body.String()
+	for _, want := range []string{
+		"user.2fa.enable", "login.2fa_failed", "user.2fa.disable", "user.2fa.reset", ">CLI<", `value="cli"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("activity page missing %q", want)
+		}
+	}
+	if len(store.got) != 1 || store.got[0].Source != models.AuditSourceCLI {
+		t.Errorf("filter = %+v, want source cli", store.got)
+	}
+}

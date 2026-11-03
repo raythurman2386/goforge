@@ -159,9 +159,9 @@ GoForge follows a clean architecture with:
    - A project or deployment owned by another account returns `404`
    - Use strong passwords for local accounts. Failed logins lock the client IP or the account for 15 minutes after 10 tries in 15 minutes; set `TRUSTED_PROXIES` (and `CLOUDFLARE_PROXY_MODE=true` behind Cloudflare Tunnel) so the lockout and rate limiter see the real client IP
    - Review OAuth permissions requested by GitHub integration
-   - There is no 2FA
+   - Local password accounts can turn on TOTP 2FA (authenticator app plus 10 recovery codes) in Settings → Profile; `goforge user reset-2fa <email>` clears it. Sign in with GitHub relies on GitHub's own 2FA, and API and MCP tokens never ask for a code
    - API and MCP tokens are hashed, carry a scope (`full`, `read`, `write`, or `protected`), expire, and can be rotated or revoked in Settings → Profile
-   - Audit logs cover sign-in, registration, logout, API token changes, password changes and "Sign out other sessions", profile (email) saves, Git source changes, backup settings, restore, every `/api/v1` and `/mcp` write, web UI changes to projects, deployments, environments, variables (key only), services, and containers, and webhook-triggered deploys. Settings → Activity shows the log. The log has no retention setting and no tamper protection
+   - Audit logs cover sign-in (with the second factor used), 2FA enable, disable, failed codes, and CLI reset, registration, logout, API token changes, password changes and "Sign out other sessions", profile (email) saves, Git source changes, backup settings, restore, every `/api/v1` and `/mcp` write, web UI changes to projects, deployments, environments, variables (key only), services, and containers, and webhook-triggered deploys. Settings → Activity shows the log. The log has no retention setting and no tamper protection
 
 6. **Data Protection**
    - Turn on the built-in nightly backups (Settings → Profile → Backups) or run your own. See [Backup & Restore](docs/deployment/backup.md). `goforge backup restore` restores the GoForge database and `goforge backup restore-service` restores a Postgres, Gitea, or Vaultwarden service (CLI only; there is no restore button)

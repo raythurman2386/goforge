@@ -62,9 +62,11 @@ These routes are **not** protected by CSRF (machine-to-machine communication).
 |--------|------|---------|------|-------------|
 | `GET` | `/` | `handlers.Index` | No | Landing/home page |
 | `GET` | `/login` | `authHandler.LoginPage` | No | Login form |
-| `POST` | `/auth/login` | `authHandler.Login` | No | Process login (email/password) |
+| `POST` | `/auth/login` | `authHandler.Login` | No | Process login (email/password). With 2FA on, a right password sets the `goforge_2fa` cookie and redirects `303 /auth/2fa` instead of creating a session |
 | `GET` | `/auth/register` | `authHandler.RegisterPage` | No | Registration form |
 | `POST` | `/auth/register` | `authHandler.Register` | No | Process registration |
+| `GET` | `/auth/2fa` | `authHandler.TwoFactorPage` | No (needs the `goforge_2fa` challenge cookie) | Second login step for an account with 2FA on. Without a live challenge it clears the cookie and redirects to `/login` |
+| `POST` | `/auth/2fa` | `authHandler.TwoFactorVerify` | No (challenge cookie) | Check `code` (6-digit TOTP or a recovery code). Right: session, `303 /dashboard`. Wrong: `401` and `login.2fa_failed`; after 5 wrong codes the challenge ends. Shares the login lockout (`429` with `Retry-After`) |
 | `GET` | `/auth/github` | `authHandler.GitHubLogin` | No | Initiate GitHub OAuth flow |
 | `GET` | `/auth/github/callback` | `authHandler.GitHubCallback` | No | GitHub OAuth callback |
 | `POST` | `/auth/logout` | `authHandler.Logout` | No | Destroy session and logout |
@@ -182,6 +184,9 @@ Used by HTMX components for dynamic repository/branch selection.
 | `PUT` | `/settings/profile` | `settingsHandler.UpdateProfile` | Update email. Audited as `user.profile.update` with `changed` and the old and new email domain only |
 | `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password. On success every other session of the account is deleted (the current one is kept). Audited as `user.password.change` with `sessions_revoked` |
 | `POST` | `/settings/sessions/revoke-others` | `settingsHandler.RevokeOtherSessions` | Sign out other sessions: deletes every session of the account except the current one. Audited as `user.sessions.revoke` with `sessions_revoked` |
+| `POST` | `/settings/2fa/setup` | `settingsHandler.SetupTwoFactor` | Start TOTP setup: checks `password`, stores a pending key, returns the dialog with the QR code and setup key |
+| `POST` | `/settings/2fa/enable` | `settingsHandler.EnableTwoFactor` | Confirm setup with the first `code`; turns 2FA on and returns the recovery codes dialog (shown once). Audited as `user.2fa.enable` |
+| `POST` | `/settings/2fa/disable` | `settingsHandler.DisableTwoFactor` | Turn 2FA off with `password` and `code` (TOTP or recovery code). Audited as `user.2fa.disable` |
 | `GET` | `/settings/tokens` | `settingsHandler.ListAPITokens` | List API tokens (HTMX partial) |
 | `GET` | `/settings/tokens/new` | `settingsHandler.NewAPITokenModal` | New token modal (HTMX) |
 | `GET` | `/settings/tokens/new?preset=mcp` | `settingsHandler.NewAPITokenModal` | MCP token modal: `read` + `write` checked, 90 days, no never-expiring option |
@@ -254,7 +259,7 @@ All state-changing methods (`POST`, `PUT`, `DELETE`, `PATCH`) under the UI route
 
 Signed in, the token is `HMAC(CSRF_SECRET, SHA-256(session token))`; signed out, it is a nonce plus its HMAC, kept in the `goforge_csrf` cookie (not HttpOnly). A cookie value without a valid MAC is rejected. See [Security](../security.md#csrf-protection).
 
-`POST /auth/login` also answers `429` with `Retry-After` while the client IP or the account is locked out after repeated failures.
+`POST /auth/login` and `POST /auth/2fa` also answer `429` with `Retry-After` while the client IP or the account is locked out after repeated failures.
 
 Webhook routes (`/webhooks/*`), the JSON API (`/api/v1/*`), and `/mcp` are
 excluded from CSRF protection. `/api/v1` and `/mcp` accept only

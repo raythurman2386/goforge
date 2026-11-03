@@ -47,6 +47,7 @@ func TestAuditLogRepository_ListFiltered_Activity(t *testing.T) {
 	ui := mk(uid, "service.delete", "Mozilla/5.0", map[string]any{"via": "ui"})
 	run := mk(uid, "deployment.run.failed", "goforge-mcp/1.0", map[string]any{"via": "api_v1", "audit_id": api.ID, "token_name": token})
 	foreign := mk(sql.NullString{String: other.ID, Valid: true}, "service.delete", "", map[string]any{"via": "ui"})
+	cli := mk(uid, models.AuditActionUser2FAReset, "goforge-cli", map[string]any{"via": models.AuditViaCLI})
 	hook := mk(uid, "deployment.trigger", "GitHub-Hookshot/abc", map[string]any{"via": "webhook", "provider": "github"})
 	hookRun := mk(uid, "deployment.run.completed", "GitHub-Hookshot/abc", map[string]any{"via": "webhook", "audit_id": hook.ID})
 
@@ -85,7 +86,11 @@ func TestAuditLogRepository_ListFiltered_Activity(t *testing.T) {
 	check("mcp", AuditFilter{UserID: u.ID, Source: models.AuditSourceMCP}, []*models.AuditLog{mcp, outcome, run}, []*models.AuditLog{api, ui})
 	check("api", AuditFilter{UserID: u.ID, Source: models.AuditSourceAPI}, []*models.AuditLog{api}, []*models.AuditLog{mcp, ui, run})
 	check("agent", AuditFilter{UserID: u.ID, Source: models.AuditSourceAgent}, []*models.AuditLog{mcp, outcome, api, run}, []*models.AuditLog{ui})
-	check("ui", AuditFilter{UserID: u.ID, Source: models.AuditSourceUI}, []*models.AuditLog{ui}, []*models.AuditLog{mcp, api, run, hook, hookRun})
+	check("ui", AuditFilter{UserID: u.ID, Source: models.AuditSourceUI}, []*models.AuditLog{ui}, []*models.AuditLog{mcp, api, run, hook, hookRun, cli})
+	check("cli", AuditFilter{UserID: u.ID, Source: models.AuditSourceCLI}, []*models.AuditLog{cli}, []*models.AuditLog{mcp, outcome, api, ui, run, hook, hookRun})
+	if cli.Source() != models.AuditSourceCLI {
+		t.Errorf("reset-2fa Source() = %s, want cli", cli.Source())
+	}
 	check("webhook", AuditFilter{UserID: u.ID, Source: models.AuditSourceWebhook}, []*models.AuditLog{hook, hookRun}, []*models.AuditLog{mcp, outcome, api, ui, run})
 	check("agent-no-webhook", AuditFilter{UserID: u.ID, Source: models.AuditSourceAgent}, nil, []*models.AuditLog{hook, hookRun})
 	for _, l := range []*models.AuditLog{hook, hookRun} {
