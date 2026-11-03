@@ -661,3 +661,35 @@ func splitMiddlewares(s string) []string {
 	}
 	return result
 }
+
+func TestGenerateServiceLabels_ExtraRoute(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "s3.example.com", "traefik", 9000, true, ExtraRoute{Domain: "console.example.com", Port: 9001})
+	name := "goforge-svc-inst-abc"
+	extra := name + "-p9001"
+	assertLabel(t, labels, "traefik.http.routers."+name+".rule", "Host(`s3.example.com`)")
+	assertLabel(t, labels, "traefik.http.routers."+name+".service", name)
+	assertLabel(t, labels, "traefik.http.services."+name+".loadbalancer.server.port", "9000")
+	assertLabel(t, labels, "traefik.http.routers."+extra+".rule", "Host(`console.example.com`)")
+	assertLabel(t, labels, "traefik.http.routers."+extra+".entrypoints", "web")
+	assertLabel(t, labels, "traefik.http.routers."+extra+".service", extra)
+	assertLabel(t, labels, "traefik.http.services."+extra+".loadbalancer.server.port", "9001")
+}
+
+func TestGenerateServiceLabels_ExtraRouteNeedsDomain(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "", "traefik", 9000, true, ExtraRoute{Domain: "console.example.com", Port: 9001})
+	assertLabel(t, labels, "traefik.enable", "false")
+	for k := range labels {
+		if strings.HasPrefix(k, "traefik.http.") {
+			t.Errorf("unexpected routing label %s without domain", k)
+		}
+	}
+}
+
+func TestGenerateServiceLabels_NoExtraRouteNoServiceLabel(t *testing.T) {
+	labels := GenerateServiceLabels("inst-abc", "app.example.com", "traefik", 3000, false)
+	for k := range labels {
+		if strings.HasSuffix(k, ".service") {
+			t.Errorf("unexpected %s on a single-service container", k)
+		}
+	}
+}

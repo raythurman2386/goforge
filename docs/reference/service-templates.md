@@ -48,6 +48,7 @@ docker:
       publish: bool       # Publish on the host (optional, default false)
       host_port: string   # Host port, Go template (required with publish), e.g. "{{ .Config.ssh_port }}"
       host_ip: string     # Host address (optional, default 127.0.0.1). Loopback only; 0.0.0.0 and :: are refused
+      domain: string      # Second public host Traefik routes to this port (optional, Go template, not on the first port)
   environment:            # Environment variables (Go templates)
     KEY: "{{ .Config.fieldname }}"
   optional_environment:   # Like environment, but left out when the value renders empty
@@ -103,6 +104,27 @@ docker:
 - `host_port` or `host_ip` without `publish: true` is an error.
 - The binding is stored on the container record and shown on the service page under **Connection Details** (`published 22/tcp` → `127.0.0.1:2223`).
 - Two instances with the same host port collide. When **Edit configuration** or **Update image** recreates a container that publishes a port, GoForge renames the old container aside instead of removing it, and removes it only once the new one runs. If the new container cannot start (for example, its host port is taken), the old container gets its name back and starts again, and the instance is marked `failed`.
+
+### Port domains
+
+The instance Domain routes to the first port. A later port can get its own public host with `domain`, a Go template with the same variables as `environment`, usually a config field:
+
+```yaml
+config:
+  - name: console_domain
+    label: Console Domain
+    type: text
+docker:
+  ports:
+    - container: 9000          # API, routed by the instance Domain
+    - container: 9001          # Console, routed by Console Domain when set
+      domain: "{{ .Config.console_domain }}"
+```
+
+- When it renders to a hostname, GoForge adds a router ``Host(`<host>`)`` named `goforge-svc-<id>-p<port>` with its own Traefik service on that port, on the same entrypoint and TLS settings as the instance Domain. Every router of the container then names its service.
+- An empty render adds nothing. So does an instance without a Domain: Traefik is off for the container.
+- A render that is not an RFC 1123 hostname, or that repeats the instance Domain or another port's domain, rejects the deploy or edit before a container is touched. `domain` on the first port is refused when the catalog loads.
+- Create the proxied DNS record for the extra host yourself, as for the Domain.
 
 ### Post-start hooks
 

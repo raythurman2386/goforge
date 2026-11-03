@@ -238,12 +238,17 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		domain = d
 	}
 
-	// Reject a bad published host port before any record or container exists.
-	if _, portErr := s.renderPortBindings(tmpl, s.templateData(tmpl, &models.ServiceInstance{
+	// Reject a bad published host port or port domain before any record or
+	// container exists.
+	preData := s.templateData(tmpl, &models.ServiceInstance{
 		Version: sql.NullString{String: tmpl.DefaultVersion, Valid: true},
 		Domain:  sql.NullString{String: domain, Valid: domain != ""},
-	}, config)); portErr != nil {
+	}, config)
+	if _, portErr := s.renderPortBindings(tmpl, preData); portErr != nil {
 		return nil, portErr
+	}
+	if _, routeErr := s.renderPortRoutes(tmpl, preData); routeErr != nil {
+		return nil, routeErr
 	}
 
 	instance := &models.ServiceInstance{
@@ -396,7 +401,11 @@ func (s *InstanceService) buildContainerSpec(tmpl *ServiceTemplate, instance *mo
 
 	// Always mark the container as managed. Traefik is enabled, with a
 	// router, only when a domain is set.
-	labels := proxy.GenerateServiceLabels(instance.ID, domain, s.traefikNetwork, servicePort, s.cloudflareProxyMode)
+	extraRoutes, err := s.renderPortRoutes(tmpl, data)
+	if err != nil {
+		return nil, err
+	}
+	labels := proxy.GenerateServiceLabels(instance.ID, domain, s.traefikNetwork, servicePort, s.cloudflareProxyMode, extraRoutes...)
 	opts.Labels = labels.ToMap()
 
 	if hc := buildHealthCheck(tmpl.Docker.HealthCheck); hc != nil {
