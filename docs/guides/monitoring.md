@@ -108,6 +108,8 @@ The button is enabled when **Reclaimable Space** is above zero. That figure is u
 
 Volumes, networks, and containers or images GoForge did not create are left alone.
 
+After you confirm, the button is disabled and shows a spinner and **Pruning…** while the prune runs. The page does not reload. When it finishes, a toast says what was freed, for example `Pruned 3.42 GB: 2 containers, 5 images, 41 build cache records` (the bytes are Docker's `SpaceReclaimed` summed over the three steps; the image count is deleted images, not untag entries). If nothing was freed it says **Nothing to free**. The **Docker Disk Usage** card then re-renders in place with fresh numbers, so **Prune System** usually turns into the disabled **Nothing to prune** state. If a step fails, an error toast says **Prune System failed** and the page stays as it was; the Docker error is in the GoForge log (`system prune failed`), not in the browser. The steps still run in order and stop at the first error, so earlier steps may already have freed space. Without JavaScript the form still posts and redirects back to the Dashboard. `POST /settings/prune` answers with the same summary toast.
+
 ## Metrics Storage
 
 Container metrics are not stored. They are read from Docker and streamed live. The `container_metrics` table exists but nothing writes to it, and `ENABLE_METRICS` and `METRICS_RETENTION` are accepted but unused. There is no `/metrics` endpoint.

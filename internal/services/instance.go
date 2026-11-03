@@ -56,7 +56,8 @@ type DockerClient interface {
 	// ports parks the old container under another name until the new one starts.
 	RenameContainer(ctx context.Context, id, newName string) error
 	RestartContainer(ctx context.Context, id string) error
-	CleanupSystem(ctx context.Context) error
+	// CleanupSystem prunes and reports what it removed (see docker.PruneSummary).
+	CleanupSystem(ctx context.Context) (docker.PruneSummary, error)
 	// WaitHealthy blocks until the container's health check passes (or, with
 	// no health check, until it runs), polling every poll.
 	WaitHealthy(ctx context.Context, id string, poll time.Duration) error
@@ -1158,12 +1159,13 @@ func (s *InstanceService) RestartInstance(ctx context.Context, id string) error 
 }
 
 // PruneSystem removes stopped managed containers, unused managed images, and
-// unused build cache (engine-wide).
-func (s *InstanceService) PruneSystem(ctx context.Context) error {
-	if err := s.dockerClient.CleanupSystem(ctx); err != nil {
-		return fmt.Errorf("failed to prune system: %w", err)
+// unused build cache (engine-wide), and returns what was freed.
+func (s *InstanceService) PruneSystem(ctx context.Context) (docker.PruneSummary, error) {
+	sum, err := s.dockerClient.CleanupSystem(ctx)
+	if err != nil {
+		return sum, fmt.Errorf("failed to prune system: %w", err)
 	}
-	return nil
+	return sum, nil
 }
 
 // DeleteInstance stops and removes a service instance.

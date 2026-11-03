@@ -21,6 +21,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
+	"github.com/raythurman2386/goforge/internal/web/templates/pages"
 	"github.com/raythurman2386/goforge/internal/web/templates/pages/settings"
 )
 
@@ -347,13 +348,15 @@ func (h *SettingsHandler) PruneSystem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.instanceService.PruneSystem(r.Context()); err != nil {
-		RenderError(w, r, http.StatusInternalServerError, "Failed to prune system")
+	summary, err := h.instanceService.PruneSystem(r.Context())
+	if err != nil {
+		h.logger.Error("system prune failed", "error", err, "space_reclaimed", summary.SpaceReclaimed)
+		RenderError(w, r, http.StatusInternalServerError, pruneFailedMessage)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	if err := components.Toast("System pruned successfully", "success").Render(r.Context(), w); err != nil {
+	if err := components.Toast(pages.PruneSummaryText(summary), "success").Render(r.Context(), w); err != nil {
 		h.logger.Error("failed to render prune toast", "error", err)
 	}
 }
