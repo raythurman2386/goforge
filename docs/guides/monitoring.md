@@ -77,7 +77,13 @@ Returns `200 OK` when the server is running.
 GET /health/ready
 ```
 
-Checks the database and Docker. Returns `200` when both are reachable and `503` otherwise, with a JSON body of per-check results. Both endpoints are public, and the `/health/ready` body includes the error text (see `SECURITY.md`).
+Checks the database and Docker. Returns `200` when no configured check fails and `503` otherwise. Both endpoints are public. Each entry in `checks` is only `ok`, `unavailable`, or `not_configured`, for every caller:
+
+```json
+{"status":"not_ready","timestamp":"2026-11-02T23:59:00Z","checks":{"database":"ok","docker":"unavailable"}}
+```
+
+The error behind `unavailable` is never in the response. It is in the GoForge log as a `readiness check failed` warning with `check` and `error` fields (for example `docker compose logs goforge | grep "readiness check failed"`).
 
 ### Docker System Status
 

@@ -2,6 +2,7 @@ package web
 
 import (
 	"database/sql"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -142,6 +143,7 @@ func TestRouter_HealthReadyEndpoint(t *testing.T) {
 	server := httptest.NewServer(router)
 	defer server.Close()
 
+	// Anonymous request: no cookie, no token. The route stays public.
 	resp, err := http.Get(server.URL + "/health/ready")
 	if err != nil {
 		t.Fatalf("GET /health/ready failed: %v", err)
@@ -150,6 +152,20 @@ func TestRouter_HealthReadyEndpoint(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("GET /health/ready status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	var body struct {
+		Status string            `json:"status"`
+		Checks map[string]string `json:"checks"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode /health/ready body: %v", err)
+	}
+	if body.Status != "ready" {
+		t.Errorf("status = %q, want ready", body.Status)
+	}
+	// setupTestRouter wires the health handler with no DB or Docker client.
+	if body.Checks["database"] != "not_configured" || body.Checks["docker"] != "not_configured" {
+		t.Errorf("checks = %v, want database and docker not_configured", body.Checks)
 	}
 }
 

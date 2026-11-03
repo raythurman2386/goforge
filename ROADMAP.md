@@ -22,7 +22,7 @@ The cycle order is locked. This section records the order only: each cycle is sc
 Open blockers between v0.3.0 and v1.0. Each line says where the gap is recorded today.
 
 - [ ] **2FA** for local accounts. Not started (`SECURITY.md`, Not started); there is no TOTP or WebAuthn code.
-- [ ] **HEALTH-READY-PUBLIC**: `/health/ready` is unauthenticated and its JSON includes database and Docker error text (`SECURITY.md`). It is on the parked list below and needs Raymond's OK before work starts.
+- [x] **HEALTH-READY-PUBLIC** (v0.5.0 S1, t1858u): `/health/ready` stays public, but each check now reports only `ok`, `unavailable`, or `not_configured`; the error text goes to the server log (`SECURITY.md`, Closed).
 - [ ] **Session revoke on password change**: changing the password does not end the account's other sessions (`SECURITY.md`, Sessions).
 - [ ] **Remaining audit gaps**: Git source changes, profile and password changes, and webhook-triggered deploys write no audit row, and the log has no retention setting or tamper protection. Web UI writes are covered since #103.
 - [ ] **Custom domain DNS check**: `DomainValidator` in `internal/proxy/acme.go` (`IsDomainRoutable`, `VerifyDNSRecord`, `VerifyDomainFull`) is tested but nothing outside its tests calls it. The project and environment forms check only the name format. The SSL certificate dashboard matters for direct installs that use Let's Encrypt through Traefik; on the recommended Cloudflare Tunnel path Traefik holds no certificate to watch, so whether the dashboard blocks v1.0 is Raymond's call.
@@ -371,7 +371,7 @@ Parked items need Raymond's OK before anyone starts them.
 - [x] **Aesthetics Goal 3 nits** (#68 leftovers): `class_check.py` also checks `class={ ... }`, `*Class()` helpers, and `app.js` classes; `make css` fails unless it runs Tailwind v3.4.17 (standalone or `npx`); unused `.sidebar-link*` removed; dark `select` chevron; auth-aware error page (B17)
 - [ ] **Deadcode sweep** (parked): `deadcode ./...` reported 96 unreachable functions on 2026-10-29. Not removed in the cleanup goal; needs a reviewed pass
 - [ ] **Stale remote branches** (needs Raymond's OK): about 30 squash-merged branches remain on `origin` (for example `ui/shell-fixes`, `security/auth-edge-hardening`, `fix/4x-*`). Delete only with approval
-- [ ] **Open security findings**, documented in `SECURITY.md`: `/health/ready` is public and returns error text (HEALTH-READY-PUBLIC); main image runs as root. Empty `WEBHOOK_SECRET` outside dev mode is closed: GoForge refuses to start (#92). ENV-CREDS is closed for the repo Compose file (#80)
+- [ ] **Open security findings**, documented in `SECURITY.md`: main image runs as root. HEALTH-READY-PUBLIC is closed: `/health/ready` returns only `ok`, `unavailable`, or `not_configured` per check and logs the error (v0.5.0 S1, t1858u). Empty `WEBHOOK_SECRET` outside dev mode is closed: GoForge refuses to start (#92). ENV-CREDS is closed for the repo Compose file (#80)
 - [ ] **Rollback feedback** in the UI (see Developer Experience)
 
 ---
