@@ -98,7 +98,7 @@ Nothing is stopped and no volume is changed, apart from the short-lived files be
 
 The date is the run's start date in the schedule's zone (UTC when the schedule is `off`). The second segment is the start time in UTC and is the run id.
 
-`manifest.json` is written last and only when every step succeeded. It lists each object's key, kind, size, and SHA-256, the instances that were skipped and why, the GoForge version, and the start and finish times. A run directory without a manifest is incomplete; do not restore from it.
+`manifest.json` is written last and only when every step succeeded. It lists each object's key, kind, size, and SHA-256, the instances that were skipped and why, the GoForge version, and the start and finish times. It also records `audit_chain_head` (`seq` and `hash`) so the backup is an anchor for the audit hash chain, kept outside the database. A run directory without a manifest is incomplete; do not restore from it.
 
 Retention runs after a successful run only:
 

@@ -64,12 +64,57 @@ API rows and links to the page filtered to agents.
   agent are the webhook sender's. A push that matches no auto-deploy
   environment, or has a bad signature, writes nothing.
 
-## Retention and tamper protection
+## Retention and tamper detection
 
-Neither exists yet. Rows are kept until someone deletes them from the
-database; GoForge never purges the log. The log is a normal table: anyone
-who can write to the GoForge database can change or remove rows. Keep the
-nightly database backup if you need an older copy.
+Rows are kept forever unless you set a retention. Admins set it in
+Settings → Profile → **Audit log**, or with `GOFORGE_AUDIT_RETENTION_DAYS`
+until someone saves the card (a saved value wins). `0` keeps every row.
+Any other value must be 30 to 3650 days. The page above the table says
+which rule is in effect. About five minutes after startup, and then once
+a day, GoForge hard-deletes rows older than that cutoff when doing so
+does not punch a hole in the hash chain: a prefix of the chain, and a
+tail of rows that were sealed after every row you are keeping. A
+backdated row that was sealed between two newer rows stays, because
+removing it would break the chain. The job writes one
+`audit.retention.purge` row (`deleted`, `cutoff`, `through_seq`,
+`through_hash`) when it deleted something. Saving the card
+writes `audit.settings.update` with `old_days` and `new_days`.
+
+The 30-day floor is there so an API `approval_ref` cannot be replayed by
+waiting for the row to disappear. Deletes younger than 30 days are refused
+even by the purge job.
+
+`UPDATE`, `DELETE`, and `TRUNCATE` on `audit_logs` and `audit_log_seals`
+are rejected unless the purge job set `goforge.audit_purge` for that
+transaction. Deleting a user does not blank `user_id` (the foreign key was
+dropped in migration 031) so a sealed row stays byte-for-byte the same.
+
+Every row older than about five seconds is sealed into an HMAC-SHA256
+chain. The key is derived from `ENCRYPTION_KEY` and is not stored.
+`goforge audit verify` exits 0 when the chain is intact and prints
+`audit chain verified head_seq=N head_hash=...`. It exits 1 and names the
+first bad seq when a row was changed, removed, or left unsealed, or when
+the retention boundary does not match. `goforge serve` runs the same check
+about 30 seconds after startup and then daily, and logs that line. Each
+backup `manifest.json` includes `audit_chain_head` with the same seq and
+hash. Admins see the last result on this page.
+
+What this does not do:
+
+- It does not stop someone who can read `ENCRYPTION_KEY`. The Docker
+  socket and root on the host can. They can drop the triggers, rewrite
+  the rows, recompute the chain, and replace the log line and the backup.
+- A row deleted in the few seconds before it is sealed leaves no seal.
+- Rows that were already in the database at upgrade are only proven
+  unchanged since the first seal after the upgrade, not since they were
+  written.
+- There is no separate database role that can only insert. The app still
+  connects as the table owner.
+
+Keep a copy of the nightly backup off the host if you need a record that
+a host administrator cannot rewrite. A backup restored onto an install
+with a different `ENCRYPTION_KEY` will fail `goforge audit verify`, which
+is expected.
 
 ## Outcomes of queued work
 

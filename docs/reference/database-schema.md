@@ -2,7 +2,7 @@
 
 GoForge uses PostgreSQL with UUID primary keys (via the `uuid-ossp` extension). All tables use `TIMESTAMPTZ` for timestamps.
 
-Migrations are located in `internal/database/migrations/postgres/` and are applied in order (001-019). The runtime applies them at startup; `goforge migrate up` applies them by hand.
+Migrations are located in `internal/database/migrations/postgres/` and are applied in order (001-031). The runtime applies them at startup; `goforge migrate up` applies them by hand.
 
 ---
 
@@ -314,7 +314,7 @@ Tracks user actions for auditing and compliance.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | `UUID` | PK, default `uuid_generate_v4()` | Unique identifier |
-| `user_id` | `UUID` | FK -> users(id) ON DELETE SET NULL | Acting user (nullable) |
+| `user_id` | `UUID` | Nullable, no foreign key (dropped in 031) | Acting user. Kept after the user is deleted so a sealed row does not change |
 | `action` | `VARCHAR(100)` | NOT NULL | Action performed |
 | `resource_type` | `VARCHAR(50)` | NOT NULL | Resource type affected |
 | `resource_id` | `UUID` | Nullable | Resource identifier |
@@ -327,7 +327,43 @@ Tracks user actions for auditing and compliance.
 
 **Details keys**: `via` (`ui` or `api_v1`), `approval_ref`, `token_id`, `token_name`, `audit_id` (on outcome rows: the row that started the change), `error` (500 characters at most), `resource_ref` (a non-UUID resource id such as a Docker container id). Settings → Activity reads them; see [Activity and audit log](../guides/activity.md).
 
-**Migrations**: `010_create_audit_logs`, `023_audit_approval_idempotency`
+**Migrations**: `010_create_audit_logs`, `023_audit_approval_idempotency`, `031_audit_retention_and_seals` (drops `audit_logs_user_id_fkey`; adds the append-only triggers)
+
+`BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers reject changes unless the transaction set `goforge.audit_purge` to `on`. `DELETE` is then allowed only when the row is older than 30 days. `UPDATE` is never allowed. See [Activity and audit log](../guides/activity.md).
+
+### audit_settings
+
+One row at most (`id = 1`). Holds the admin retention choice and the hash-chain boundary left by the last purge.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `SMALLINT` | PK, default 1, CHECK = 1 | Single row |
+| `retention_days` | `INT` | NOT NULL, default 0, CHECK 0 or 30–3650 | How long to keep rows. 0 keeps them |
+| `retention_saved` | `BOOLEAN` | NOT NULL, default false | True after an admin saves the Profile card. Until then `GOFORGE_AUDIT_RETENTION_DAYS` wins |
+| `boundary_seq` | `BIGINT` | NOT NULL, default 0 | Highest seal seq removed by retention |
+| `boundary_hash` | `BYTEA` | NOT NULL, 32 bytes, default 32 zero bytes | `row_hash` of that seal. The oldest remaining seal's `prev_hash` must equal it |
+| `updated_by` | `UUID` | FK -> users(id) ON DELETE SET NULL | Admin who last saved retention |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Row creation |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Last retention save. A purge does not bump this |
+
+**Migration**: `031_audit_retention_and_seals`
+
+### audit_log_seals
+
+HMAC-SHA256 chain over `audit_logs`. The audit row itself is never updated to store a hash.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `seq` | `BIGINT` | PK | Chain order. Not reused |
+| `audit_id` | `UUID` | UNIQUE, NOT NULL | The sealed `audit_logs.id`. No foreign key, so the purge can delete in either order under the trigger |
+| `prev_hash` | `BYTEA` | NOT NULL, 32 bytes | Previous seal's `row_hash`, or 32 zero bytes for the first seal |
+| `row_hash` | `BYTEA` | NOT NULL, 32 bytes | HMAC of `prev_hash` and the canonical row text |
+| `key_epoch` | `SMALLINT` | NOT NULL, default 1 | 1 is the key derived from `ENCRYPTION_KEY` with info `goforge-audit-chain-v1` |
+| `sealed_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | When the sealer wrote the row |
+
+The same append-only triggers as `audit_logs` protect this table. A seal delete looks up the audit row's `created_at` and still requires it to be older than 30 days.
+
+**Migration**: `031_audit_retention_and_seals`
 
 ---
 
@@ -522,5 +558,6 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 025 | `notify_settings` | Admin-edited outbound notifier (ntfy or webhook), URL and token sealed with `ENCRYPTION_KEY` |
 | 028 | `notify_smtp` | `notify_settings.kind` may be `email`; sealed SMTP host, username, password, From, To, plus `smtp_port` and `smtp_tls`. Down turns an email notifier off (kind `ntfy`) |
 | 030 | `two_factor` | Opt-in TOTP 2FA: `user_totp` (key sealed with `ENCRYPTION_KEY`), `user_recovery_codes` (SHA-256 hashes), `login_challenges` (token hashes) |
+| 031 | `audit_retention_and_seals` | `audit_settings`, `audit_log_seals`, drop `audit_logs.user_id` foreign key, append-only triggers |
 
 All migrations have corresponding `.down.sql` files for rollback support.
