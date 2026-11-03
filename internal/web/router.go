@@ -250,6 +250,7 @@ func Router(
 						r.Put("/notifications", settingsHandler.UpdateNotifySettings)
 						r.Post("/notifications/test", settingsHandler.TestNotifySettings)
 						r.Put("/error-reporting", settingsHandler.UpdateErrorReportingSettings)
+						r.Put("/audit-retention", settingsHandler.UpdateAuditRetention)
 						r.Post("/error-reporting/test", settingsHandler.TestErrorReportingSettings)
 						r.Route("/tokens", func(r chi.Router) {
 							r.Get("/", settingsHandler.ListAPITokens)

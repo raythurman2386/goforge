@@ -14,7 +14,8 @@ Every change made in the web UI, through `/api/v1`, or by an MCP agent is a row 
 - `audit-git-source` (v0.5.0 S3) `POST /settings/git` writes `git_source.create` and `DELETE /settings/git/{id}` writes `git_source.delete`, both `resource_type` `git_source`, `via` = `ui`, with `name`, `type`, `has_access_token`, `has_api_url`, and never the token or URL. Another account's delete is `403` and writes nothing.
 - `audit-profile` (v0.5.0 S3) `PUT /settings/profile` writes `user.profile.update` with `changed` and `old_email_domain` / `new_email_domain`; the full address is never in `details`.
 - `audit-webhook-deploy` (v0.5.0 S3) a signed push to an auto-deploy branch writes `deployment.trigger` with `via` = `webhook`, `provider`, `branch`, `commit`, the project owner as `user_id`, and the queue item's `audit_id` set to it, so `deployment.run.*` links back. The row shows the `Webhook` badge; `?source=webhook` lists it and `?source=ui` does not.
-- `audit-retention-off` no purge exists: rows stay until deleted by hand. Tamper protection is open (`SECURITY.md`).
+- `audit-retention` an admin sets retention on Settings → Profile. `0` keeps rows. `30` to `3650` deletes older rows daily. `10` and `abc` are field errors. A non-admin does not see the card and gets `403` on `PUT /settings/audit-retention`. See [audit-retention.md](./audit-retention.md).
+- `audit-integrity` sealed rows reject `UPDATE`, `DELETE`, and `TRUNCATE`. `goforge audit verify` exits 0 on a clean chain and 1 after a bypassed edit or delete. See [audit-integrity.md](./audit-integrity.md).
 
 ## How to get to it (user POV)
 
@@ -61,6 +62,6 @@ The status is `200`. The body has `api_v1.restart_service`, `>verify-write<`, `v
 - `deployment.run.completed` is written when the queue worker finishes the pipeline; the deployment row itself may read `running`.
 - Webhook-triggered deploys write `deployment.trigger` (`via` = `webhook`) since v0.5.0 S3, so their `deployment.run.*` row links back and inherits `via`, user, IP, and user agent. A push to a branch no auto-deploy environment builds writes nothing.
 - `verify.sh psql` refuses SQL containing `password` and other secret-looking words. Use `like 'user.%'` for account rows.
-- Retention is off: there is no `GOFORGE_AUDIT_RETENTION_DAYS` and no purge. Do not expect old rows to disappear.
+- Retention defaults to forever (`0`). `GOFORGE_AUDIT_RETENTION_DAYS` applies only until an admin saves the Profile card. Do not expect rows to disappear unless retention is set to 30 or more. The page shows the rule in `data-testid="audit-retention-note"`.
 - `UI` rows never hold variable values or service config values: `env_var.set` has the key and `is_secret`, `service.update_config` the field names.
 - Only on the verify stack, never live.

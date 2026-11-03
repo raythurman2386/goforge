@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap tracks the development of GoForge. Last brought up to date through #124 and the v0.3.0 tag (2026-11-02). [CHANGELOG.md](CHANGELOG.md) has the detail for every release.
+This roadmap tracks the development of GoForge. Last brought up to date through v0.5.1 (audit retention and tamper detection, 2026-11-03). [CHANGELOG.md](CHANGELOG.md) has the detail for every release.
 
 Version names: releases are tagged v0.x (v0.1.0, v0.2.0, v0.2.1, v0.3.0). Headings that used to say "V1.0", "V1.0.x", and "V1.1" were internal milestone labels from before tagging started, not releases; they are renamed below. The next cycles are in [Release plan](#release-plan), and what still stands between v0.3.0 and v1.0 is in [Path to v1.0](#path-to-v10).
 
@@ -12,6 +12,7 @@ The cycle order is locked. This section records the order only: each cycle is sc
 |-------|-------|-----------------|
 | **v0.4.0** | Docs truth | ROADMAP, README, SPECIFICATION, and the docs site match what shipped through v0.3.0; the [production validation plan](docs/deployment/production-validation.md) is written |
 | **v0.5.0** | Trust and security | HEALTH-READY-PUBLIC, session revoke on password change, the remaining audit gaps, 2FA |
+| **v0.5.1** | Audit retention and tamper protection | Retention setting (default off, 30-day floor), append-only triggers, HMAC chain, `goforge audit verify`, backup manifest anchor |
 | **v0.6.0** | PaaS: DNS and deploy feel | Wire the custom domain DNS check into the domain forms; deploy feedback such as the rollback result and progress for long operations |
 | **v0.7.0** | UX polish | Back navigation, client-side validation, inline errors, mobile card views |
 | **v0.8.0 to v0.9.x** | Validation drills | Run the [production validation plan](docs/deployment/production-validation.md) on a throwaway stack and commit dated records |
@@ -24,7 +25,7 @@ Open blockers between v0.3.0 and v1.0. Each line says where the gap is recorded 
 - [x] **2FA** for local accounts (v0.5.0 S4, t1873u): opt-in TOTP with 10 single-use recovery codes in Settings → Profile, a second login step at `/auth/2fa` that shares the login lockout, disable with password plus code, and `goforge user reset-2fa <email>`; all audited (`SECURITY.md`, Closed). By Raymond's call: TOTP only (no WebAuthn), GitHub sign-in relies on GitHub's own 2FA, and API tokens and `/mcp` are unaffected.
 - [x] **HEALTH-READY-PUBLIC** (v0.5.0 S1, t1858u): `/health/ready` stays public, but each check now reports only `ok`, `unavailable`, or `not_configured`; the error text goes to the server log (`SECURITY.md`, Closed).
 - [x] **Session revoke on password change** (v0.5.0 S2, t1861u): a password change ends the account's other sessions and keeps the current one; Profile has **Sign out other sessions**; both audited with `sessions_revoked` (`SECURITY.md`, Closed).
-- [x] **Remaining audit gaps** (v0.5.0 S3, t1870u): Git source create and delete, profile (email) saves, and webhook-triggered deploys now write audit rows; webhook runs link their `deployment.run.*` outcome (`SECURITY.md`, Closed). Left open in v0.5 by Raymond's call: no audit retention setting (nothing is purged) and no tamper protection (`SECURITY.md`, Audit logging).
+- [x] **Remaining audit gaps** (v0.5.0 S3, t1870u): Git source create and delete, profile (email) saves, and webhook-triggered deploys now write audit rows; webhook runs link their `deployment.run.*` outcome (`SECURITY.md`, Closed). v0.5.1 adds retention (default off, 30-day floor) and hash-chain tamper detection. A host or Docker-socket attacker can still rewrite the log (`SECURITY.md`, Audit logging).
 - [ ] **Custom domain DNS check**: `DomainValidator` in `internal/proxy/acme.go` (`IsDomainRoutable`, `VerifyDNSRecord`, `VerifyDomainFull`) is tested but nothing outside its tests calls it. The project and environment forms check only the name format. The SSL certificate dashboard matters for direct installs that use Let's Encrypt through Traefik; on the recommended Cloudflare Tunnel path Traefik holds no certificate to watch, so whether the dashboard blocks v1.0 is Raymond's call.
 - [ ] **Production validation record**: no load test, resource limit check, or restore drill against a full GoForge stack has been run and written down. The plan is in [docs/deployment/production-validation.md](docs/deployment/production-validation.md). Raymond runs GoForge every day (Gitea and about 14 containers), but that use is not a recorded validation, and the README "Not Production-Ready" note stays until the record exists.
 
@@ -192,7 +193,7 @@ Hardening the platform and improving the developer experience for power users. I
 
 ### 3. Team & Security
 - [ ] **Team Management:** Invite users, Role-based Access Control (RBAC). *(Moved to Critical Phase. The `admin`/`user` role and `GOFORGE_ADMIN_EMAIL` grant shipped in #28; teams, invites, and per-project roles have not.)*
-- [x] **Audit Logs:** Track who did what and when (13.4). *(Every real `/api/v1` and `/mcp` mutation writes an `api_v1.<action>` row first (#61). Since #103, web UI changes to projects, deployments, environments, variables (key only), services, and containers are recorded with `details.via` = `ui`, queued work writes linked outcome rows, and Settings → Activity shows the log. Since v0.5.0 S2 and S3, password changes, session sign-outs, Git source changes, profile saves, and webhook-triggered deploys are recorded too. Retention and tamper protection are still open.)*
+- [x] **Audit Logs:** Track who did what and when (13.4). *(Every real `/api/v1` and `/mcp` mutation writes an `api_v1.<action>` row first (#61). Since #103, web UI changes to projects, deployments, environments, variables (key only), services, and containers are recorded with `details.via` = `ui`, queued work writes linked outcome rows, and Settings → Activity shows the log. Since v0.5.0 S2 and S3, password changes, session sign-outs, Git source changes, profile saves, and webhook-triggered deploys are recorded too. v0.5.1 adds retention, default off, and an HMAC chain that detects database-only edits. A host or Docker-socket attacker is outside that boundary.)*
 - [x] **2FA:** Two-factor authentication for local accounts. *(Opt-in TOTP plus recovery codes, v0.5.0 S4, t1873u. GitHub sign-in relies on GitHub's 2FA.)*
 - [x] **Data Encryption:** Encrypt project variables marked as secret and OAuth access tokens at rest. *(AES-GCM with `ENCRYPTION_KEY`. Git source tokens and SSH keys and one-click service credentials are encrypted too. Legacy plaintext rows are encrypted on their next update.)*
 - [ ] **API Key Management:** Secure storage and rotation of service API keys

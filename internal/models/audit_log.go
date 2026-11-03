@@ -96,6 +96,12 @@ const (
 	// "challenge_ended": bool}, never the code. A successful second step
 	// writes the usual login row with details.second_factor.
 	AuditActionLogin2FAFailed = "login.2fa_failed"
+	// AuditActionAuditSettingsUpdate records an admin save of audit log
+	// retention. Details hold {"old_days": n, "new_days": n}.
+	AuditActionAuditSettingsUpdate = "audit.settings.update"
+	// AuditActionAuditRetentionPurge records one retention run that deleted
+	// rows. Details hold {"deleted", "cutoff", "through_seq", "through_hash"}.
+	AuditActionAuditRetentionPurge = "audit.retention.purge"
 )
 
 // Values of details.second_factor on login and user.2fa.disable rows.
@@ -118,6 +124,8 @@ const (
 	ResourceTypeNotifySettings  = "notify_settings"
 	// ResourceTypeErrorReportingSettings is the Sentry settings row.
 	ResourceTypeErrorReportingSettings = "error_reporting_settings"
+	// ResourceTypeAuditSettings is the audit retention settings row.
+	ResourceTypeAuditSettings = "audit_settings"
 )
 
 // Audit sources. Source classifies a row by who made the change; the

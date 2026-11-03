@@ -15,4 +15,8 @@ type ActivityFilters struct {
 	// page in that direction.
 	OlderURL templ.SafeURL
 	NewerURL templ.SafeURL
+	// RetentionNote is the one-line retention sentence above the table.
+	RetentionNote string
+	// IntegrityNote is the admin chain status. Empty hides the line.
+	IntegrityNote string
 }

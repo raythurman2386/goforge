@@ -52,6 +52,17 @@ type Manifest struct {
 	FinishedAt     time.Time          `json:"finished_at"`
 	Artifacts      []ManifestArtifact `json:"artifacts"`
 	Skipped        []Skipped          `json:"skipped"`
+	// AuditChainHead is the audit hash-chain head at the end of the run.
+	// It is an anchor kept outside the database. Omitted when the head
+	// could not be read.
+	AuditChainHead *AuditChainHead `json:"audit_chain_head,omitempty"`
+}
+
+// AuditChainHead is the newest audit seal, or the retention boundary when
+// nothing is sealed. Hash is lowercase hex of the 32-byte HMAC.
+type AuditChainHead struct {
+	Seq  int64  `json:"seq"`
+	Hash string `json:"hash"`
 }
 
 // ManifestArtifact describes one uploaded object.

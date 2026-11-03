@@ -20,6 +20,12 @@ var activitySourceOptions = []ui.SelectOption{
 templ Activity(rows []components.ActivityRow, f ActivityFilters, csrfToken string) {
 	@layouts.AppLayout("Activity", csrfToken) {
 		@components.PageHeader("Activity", "Every change to your projects and services, from the UI, the API, or an MCP agent.")
+		if f.RetentionNote != "" {
+			<p class="mb-4 text-sm text-foreground-secondary" data-testid="audit-retention-note">{ f.RetentionNote }</p>
+		}
+		if f.IsAdmin && f.IntegrityNote != "" {
+			<p class="mb-4 text-sm text-foreground-secondary" data-testid="audit-integrity">{ f.IntegrityNote }</p>
+		}
 		@ui.Card(ui.CardProps{Class: "mb-6"}) {
 			<form method="GET" action="/settings/activity" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end" aria-label="Filter activity">
 				@ui.Select(ui.SelectProps{

@@ -7,7 +7,7 @@ Configuration lives in the `backup_settings` row (migration 020) that an admin e
 ## Sub-features
 
 - `backup-disabled` shows "Backups are off" on Settings → Profile and `"enabled": false` from `GET /api/v1/backups` while the bucket is unset. Startup is not blocked.
-- `backup-run` uploads every artifact and `manifest.json`. Each manifest entry's `sha256` and `bytes` match the object. The `backup_runs` row is `succeeded`.
+- `backup-run` uploads every artifact and `manifest.json`. Each manifest entry's `sha256` and `bytes` match the object. The manifest includes `audit_chain_head` (`seq`, `hash`) when the chain head can be read. The `backup_runs` row is `succeeded`.
 - `backup-skip` records a stopped instance ("container is not running") and a template with no v1 target, such as redis, in `manifest.json` `skipped`, and the run still succeeds.
 - `backup-failure` leaves a `failed` row with a one-line, redacted `error_summary`, writes no manifest, and prunes nothing.
 - `backup-retention` deletes dates older than the newest N complete dates, and superseded runs within a kept date. Keys that do not match `<date>/<run id>/...` are never touched.

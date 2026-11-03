@@ -49,14 +49,14 @@ func TestErrorReportingCard_OffEnvAndUnreadable(t *testing.T) {
 func TestErrorReportingCard_OnProfileOnlyWhenGiven(t *testing.T) {
 	user := &models.User{Email: "a@x", Role: models.RoleAdmin}
 	var b strings.Builder
-	if err := Profile(user, "tok", nil, nil, nil, &errreport.SettingsView{EffectiveEnvironment: "production"}, nil, nil).Render(context.Background(), &b); err != nil {
+	if err := Profile(user, "tok", nil, nil, nil, &errreport.SettingsView{EffectiveEnvironment: "production"}, nil, nil, nil).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(b.String(), `id="error-reporting-settings"`) {
 		t.Fatal("profile missing the card")
 	}
 	b.Reset()
-	if err := Profile(user, "tok", nil, nil, nil, nil, nil, nil).Render(context.Background(), &b); err != nil {
+	if err := Profile(user, "tok", nil, nil, nil, nil, nil, nil, nil).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(b.String(), "error-reporting-settings") {

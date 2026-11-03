@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/raythurman2386/goforge/internal/apiv1"
+	"github.com/raythurman2386/goforge/internal/audit"
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/config"
@@ -239,6 +240,11 @@ func runBackupOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if chainKey, kerr := audit.DeriveChainKey(cfg.EncryptionKey); kerr != nil {
+		log.Warn("audit chain head will not be recorded in the manifest", "error", kerr)
+	} else {
+		setup.Runner.ChainHead = audit.NewChain(db.DB, chainKey, logger.WithComponent(log, "audit")).Head
+	}
 	// A failed run alerts like a scheduled one; Wait lets the alert finish
 	// sending before the command exits.
 	notifier := &notify.Service{
@@ -398,7 +404,29 @@ func runServer() error {
 	// Runs after srv.Shutdown returns, so events from the last requests
 	// get 2s to send.
 	defer errReporter.Flush(2 * time.Second)
-	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version).WithNotifier(notifier)
+	auditSettingsRepo := repositories.NewAuditSettingsRepository(db.DB)
+	if cerr := audit.CheckEnv(backgroundCtx, auditSettingsRepo, cfg.AuditRetentionEnvErr); cerr != nil {
+		cancelBackground()
+		return fmt.Errorf("invalid audit retention configuration: %w", cerr)
+	}
+	if cfg.AuditRetentionEnvErr != nil {
+		log.Warn("GOFORGE_AUDIT_RETENTION_DAYS is invalid and ignored because saved audit settings exist", "error", cfg.AuditRetentionEnvErr)
+	}
+	chainKey, keyErr := audit.DeriveChainKey(cfg.EncryptionKey)
+	if keyErr != nil {
+		cancelBackground()
+		return fmt.Errorf("audit chain key: %w", keyErr)
+	}
+	auditChain := audit.NewChain(db.DB, chainKey, logger.WithComponent(log, "audit"))
+	auditSettings := &audit.SettingsService{Store: auditSettingsRepo, EnvDays: cfg.AuditRetentionDays, EnvSet: cfg.AuditRetentionSet}
+	go auditChain.RunSealer(backgroundCtx, audit.SealInterval)
+	go auditChain.RunPurge(backgroundCtx, func(ctx context.Context) (int, error) {
+		days, _, daysErr := auditSettings.Effective(ctx)
+		return days, daysErr
+	}, audit.PurgeStartupDelay, audit.DailyInterval)
+	go auditChain.RunVerify(backgroundCtx, audit.VerifyStartupDelay, audit.DailyInterval)
+
+	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version).WithNotifier(notifier).WithChainHead(auditChain.Head)
 	notifyRedactor.WithFunc(func(s string) string {
 		bc, _ := backupManager.Current()
 		return backup.RedactorFor(cfg, bc).Redact(s)
@@ -511,7 +539,7 @@ func runServer() error {
 	serviceHandler.WithEnvProtected(cfg.ProtectedServices)
 	apiTokenRepo := repositories.NewAPITokenRepository(db.DB)
 	settingsHandler := handlers.NewSettingsHandler(gitSourceRepo, instanceService, userRepo, apiTokenRepo, logger.WithComponent(log, "settings")).WithTokenResources(projectService, instanceService).WithBackups(backupStatus).WithBackupSettings(backupSettings, auditService).WithNotifySettings(notifySettings).WithErrorReporting(errReportSettings).
-		WithRestorePoints(restorePoints).WithAudit(auditService).WithSessions(sessionRepo).WithMCP(cfg.BaseURL, cfg.MCPHTTP).WithTwoFactor(twoFactor)
+		WithRestorePoints(restorePoints).WithAudit(auditService).WithSessions(sessionRepo).WithMCP(cfg.BaseURL, cfg.MCPHTTP).WithTwoFactor(twoFactor).WithAuditRetention(auditSettings)
 	gitHandler := handlers.NewGitHandler(gitSourceRepo, gitService, logger.WithComponent(log, "git"))
 	webhookHandler := webhook.NewHandler(deployService, projectRepo, environmentRepo, deployWorker, cfg.WebhookSecret, logger.WithComponent(log, "webhook"))
 	healthHandler := handlers.NewHealthHandler(db, dockerClient, logger.WithComponent(log, "health"))
@@ -583,7 +611,12 @@ func runServer() error {
 		sseHandler,
 		healthHandler,
 		containerHandler,
-		handlers.NewActivityHandler(auditLogRepo, logger.WithComponent(log, "activity")),
+		handlers.NewActivityHandler(auditLogRepo, logger.WithComponent(log, "activity")).
+			WithRetention(func(ctx context.Context) (int, error) {
+				days, _, daysErr := auditSettings.Effective(ctx)
+				return days, daysErr
+			}).
+			WithIntegrity(auditChain.Integrity),
 		apiV1,
 		mcpHTTP,
 	)
