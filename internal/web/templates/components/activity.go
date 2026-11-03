@@ -148,6 +148,8 @@ func activitySourceLabel(source string) string {
 		return "MCP"
 	case models.AuditSourceAPI:
 		return "API"
+	case models.AuditSourceWebhook:
+		return "Webhook"
 	default:
 		return "UI"
 	}
@@ -159,6 +161,8 @@ func activitySourceTone(source string) ui.BadgeTone {
 		return ui.BadgePrimary
 	case models.AuditSourceAPI:
 		return ui.BadgeInfo
+	case models.AuditSourceWebhook:
+		return ui.BadgeWarning
 	default:
 		return ui.BadgeNeutral
 	}

@@ -167,10 +167,36 @@ func (h *SettingsHandler) revokeOtherSessions(r *http.Request, userID string) (i
 
 // recordUser writes a via=ui audit row about the signed-in account.
 func (h *SettingsHandler) recordUser(r *http.Request, userID, action string, details map[string]interface{}) {
+	h.recordUI(r, userID, action, models.ResourceTypeUser, userID, details)
+}
+
+// recordUI writes a via=ui audit row for a Settings change.
+func (h *SettingsHandler) recordUI(r *http.Request, userID, action, resourceType, resourceID string, details map[string]interface{}) {
 	if h.audit == nil {
 		return
 	}
-	h.audit.Record(r.Context(), userID, action, models.ResourceTypeUser, userID, uiDetails(details), getClientIP(r), r.UserAgent())
+	h.audit.Record(r.Context(), userID, action, resourceType, resourceID, uiDetails(details), getClientIP(r), r.UserAgent())
+}
+
+// gitSourceAuditDetails is what an audit row says about a Git source:
+// never the access token, SSH key, or API URL.
+func gitSourceAuditDetails(s *models.GitSource) map[string]interface{} {
+	return map[string]interface{}{
+		"name":             s.Name,
+		"type":             string(s.Type),
+		"has_access_token": s.AccessToken.Valid && s.AccessToken.String != "",
+		"has_api_url":      s.APIURL.Valid && s.APIURL.String != "",
+	}
+}
+
+// emailDomain returns the part of an address after the last "@",
+// lowercased, or "" when there is none.
+func emailDomain(email string) string {
+	i := strings.LastIndex(email, "@")
+	if i < 0 {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(email[i+1:]))
 }
 
 // WithAudit records API token create, rotate, and revoke in the audit log.
@@ -269,10 +295,14 @@ func (h *SettingsHandler) CreateGitSource(w http.ResponseWriter, r *http.Request
 		source.APIURL = sql.NullString{String: apiURL, Valid: true}
 	}
 
+	// Capture the audit details before Create: it encrypts the token in
+	// place.
+	details := gitSourceAuditDetails(source)
 	if err := h.gitSourceRepo.Create(r.Context(), source); err != nil {
 		http.Error(w, "failed to create git source", http.StatusInternalServerError)
 		return
 	}
+	h.recordUI(r, user.ID, models.AuditActionGitSourceCreate, models.ResourceTypeGitSource, source.ID, details)
 
 	w.Header().Set("HX-Redirect", "/settings/git")
 	w.WriteHeader(http.StatusCreated)
@@ -304,6 +334,7 @@ func (h *SettingsHandler) DeleteGitSource(w http.ResponseWriter, r *http.Request
 		http.Error(w, "failed to delete git source", http.StatusInternalServerError)
 		return
 	}
+	h.recordUI(r, user.ID, models.AuditActionGitSourceDelete, models.ResourceTypeGitSource, source.ID, gitSourceAuditDetails(source))
 
 	w.Header().Set("HX-Redirect", "/settings/git")
 	w.WriteHeader(http.StatusOK)
@@ -400,12 +431,28 @@ func (h *SettingsHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Read the stored address first so the audit row can say whether it
+	// changed; the session copy may be stale.
+	oldEmail := user.Email
+	if current, err := h.userRepo.GetByID(r.Context(), user.ID); err == nil {
+		oldEmail = current.Email
+	}
+
 	// Update user email
 	if err := h.userRepo.UpdateEmail(r.Context(), user.ID, email); err != nil {
 		h.logger.Error("failed to update user email", "error", err, "user_id", user.ID)
 		RenderError(w, r, http.StatusInternalServerError, "Failed to update email")
 		return
 	}
+	changed := []string{}
+	if models.NormalizeEmail(oldEmail) != models.NormalizeEmail(email) {
+		changed = append(changed, "email")
+	}
+	h.recordUser(r, user.ID, models.AuditActionUserProfileUpdate, map[string]interface{}{
+		"changed":          changed,
+		"old_email_domain": emailDomain(oldEmail),
+		"new_email_domain": emailDomain(models.NormalizeEmail(email)),
+	})
 
 	w.WriteHeader(http.StatusOK)
 	if err := components.Toast("Profile updated successfully", "success").Render(r.Context(), w); err != nil {

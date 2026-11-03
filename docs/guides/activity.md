@@ -8,7 +8,7 @@ first: every change made in the web UI, through `/api/v1`, or by an MCP agent.
 | Column | Meaning |
 |--------|---------|
 | Time | When the row was written |
-| Source | `MCP` (user agent starts with `goforge-mcp`), `API` (an `api_v1.` action or `details.via` = `api_v1`), or `UI` |
+| Source | `MCP` (user agent starts with `goforge-mcp`), `API` (an `api_v1.` action or `details.via` = `api_v1`), `Webhook` (`details.via` = `webhook`), or `UI` |
 | Action | The action, for example `service.delete` or `api_v1.restart_service`. It links to the change and its outcome rows |
 | Token | The API token name that made the change (API and MCP rows) |
 | Resource | A link to the project, service, deployment, environment's project, container, API token, or Git source |
@@ -19,7 +19,7 @@ Rows whose action ends in `.failed` are tinted red.
 
 ## Filters
 
-- **Source**: Agents (MCP or API), MCP, API, or UI.
+- **Source**: Agents (MCP or API), MCP, API, UI, or Webhook.
 - **Token name**: exact token name, for example `ci-bot`.
 - **Action**: part of the action, ignoring case (`restart`, `delete`).
 - `?audit_id=<id>` shows one change and every row whose `details.audit_id`
@@ -43,6 +43,26 @@ API rows and links to the page filtered to agents.
 - Every `/api/v1` and `/mcp` write, recorded before it acts, as before.
 - Login, logout, registration, API token create, rotate, and revoke, backup
   settings, and `goforge backup restore`, as before.
+- Settings changes about your account, with `details.via` = `ui`: password
+  change (`user.password.change`) and **Sign out other sessions**
+  (`user.sessions.revoke`), both with `sessions_revoked`; Profile save
+  (`user.profile.update`) with `changed` and `old_email_domain` and
+  `new_email_domain`, never the full address; Git source add and remove
+  (`git_source.create`, `git_source.delete`) with the name, type,
+  `has_access_token`, and `has_api_url`, never the token, SSH key, or URL.
+- Webhook deploys: each deployment a signed GitHub, Gitea, or GitLab push
+  starts writes `deployment.trigger` with `details.via` = `webhook`,
+  `provider`, `branch`, `commit`, `repository`, `project_id`, and
+  `environment_id`. The row's user is the project owner, and its IP and user
+  agent are the webhook sender's. A push that matches no auto-deploy
+  environment, or has a bad signature, writes nothing.
+
+## Retention and tamper protection
+
+Neither exists yet. Rows are kept until someone deletes them from the
+database; GoForge never purges the log. The log is a normal table: anyone
+who can write to the GoForge database can change or remove rows. Keep the
+nightly database backup if you need an older copy.
 
 ## Outcomes of queued work
 
@@ -57,12 +77,16 @@ returns writes an outcome row when it finishes:
 | `service.run.completed` / `service.run.failed` | A service deploy, config edit, or image update finished or failed |
 
 The outcome row's `details.audit_id` is the id of the row that started the
-change (the UI row or the `api_v1.*` row), and it copies that row's user,
+change (the UI row, the `api_v1.*` row, or the webhook `deployment.trigger`
+row), and it copies that row's user,
 IP, user agent, `via`, `approval_ref`, `token_name`, and project. So a
 failed deploy started by an MCP agent shows up as an MCP row with the
 agent's token and approval. The queue keeps the id in
 `deployment_queue.audit_id` (migration `024`), so a deploy that waits in
 the queue or runs after a restart still links back.
+
+If a webhook deployment cannot be queued, `deployment.trigger.failed` is
+written with `details.audit_id` set to its trigger row.
 
 A UI change that is refused before it runs (for example a service that is
 already busy) writes `<action>.failed` with `details.audit_id` set to the
