@@ -1,0 +1,42 @@
+package settings
+
+import (
+	"github.com/raythurman2386/goforge/internal/audit"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// AuditRetentionCard is the admin-only audit log retention card. When the
+// environment variable is the source, the value is shown and cannot be saved.
+templ AuditRetentionCard(v *audit.SettingsView, csrfToken string) {
+	if v != nil {
+		@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "audit-retention-settings", "data-testid": "audit-retention-card"}}) {
+			@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
+				Audit log
+			}
+			<p class="text-sm text-foreground-secondary" data-testid="audit-retention-status">{ auditRetentionStatus(v) }</p>
+			if !v.ReadOnly {
+				<form class="mt-6 border-t border-divider pt-4" data-testid="audit-retention-form" hx-put="/settings/audit-retention" hx-target="#audit-retention-settings" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+					<input type="hidden" name="csrf_token" value={ csrfToken }/>
+					@ui.Input(ui.InputProps{
+						ID: "audit-retention-days", Name: "retention_days", Type: "text", Label: "Retention days",
+						Value: auditRetentionValue(v), Autocomplete: "off",
+						Help: "0 keeps rows forever. Otherwise 30 to 3650. Rows older than that are hard-deleted once a day, in batches, and the deletion is itself an audit row.",
+						Attrs: templ.Attributes{"inputmode": "numeric", "spellcheck": "false"},
+					})
+					<p class="mt-4 text-xs text-foreground-secondary">Updates and deletes are rejected unless they are that purge. A keyed hash chain detects other changes. Someone with the Docker socket or root on the host can still rewrite the log, because they can read the encryption key.</p>
+					<div class="mt-4 flex justify-end">
+						@ui.Button(ui.ButtonProps{
+							Variant: ui.ButtonPrimary,
+							Type: "submit",
+							Attrs: templ.Attributes{"data-testid": "audit-retention-save"},
+						}) {
+							Save audit retention
+							@components.Spinner()
+						}
+					</div>
+				</form>
+			}
+		}
+	}
+}

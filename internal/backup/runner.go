@@ -43,6 +43,21 @@ type Runner struct {
 	Now      func() time.Time
 	// Notifier, when set, gets a backup.failed alert for every failed run.
 	Notifier notify.Notifier
+	// ChainHead, when set, records the audit hash-chain head in the manifest.
+	// A read error is logged and the field is left off; the backup still succeeds.
+	ChainHead func(ctx context.Context) (seq int64, hash string, err error)
+}
+
+func (r *Runner) recordChainHead(ctx context.Context, m *Manifest, log *slog.Logger) {
+	if r.ChainHead == nil {
+		return
+	}
+	seq, hash, err := r.ChainHead(ctx)
+	if err != nil {
+		log.Warn("audit chain head not recorded in the manifest", "error", err)
+		return
+	}
+	m.AuditChainHead = &AuditChainHead{Seq: seq, Hash: hash}
 }
 
 func (r *Runner) now() time.Time {
@@ -146,6 +161,7 @@ func (r *Runner) Run(ctx context.Context, trigger models.BackupTrigger) (*models
 
 	if len(failures) == 0 {
 		manifest.FinishedAt = r.now().UTC()
+		r.recordChainHead(ctx, &manifest, log)
 		if merr := r.putManifest(ctx, run.RunKey, &manifest); merr != nil {
 			fail("manifest", merr)
 		} else {

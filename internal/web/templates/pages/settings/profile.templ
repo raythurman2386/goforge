@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/raythurman2386/goforge/internal/audit"
 	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/errreport"
 	"github.com/raythurman2386/goforge/internal/models"
@@ -19,7 +20,8 @@ import (
 // which hides the MCP card. notifyForm is the admin Notifications form; nil
 // hides that card. errReportForm is the admin Error reporting (Sentry) form;
 // nil hides that card. twoFactor is the opt-in TOTP card; nil hides it.
-templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, errReportForm *errreport.SettingsView, mcp *MCPCard, twoFactor *TwoFactorCard) {
+// auditRetention is the admin audit log card; nil hides it.
+templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, errReportForm *errreport.SettingsView, mcp *MCPCard, twoFactor *TwoFactorCard, auditRetention *audit.SettingsView) {
 	@layouts.AppLayout("Profile Settings", csrfToken) {
 		<div class="max-w-2xl mx-auto">
 			@components.PageHeader("Profile Settings", "Manage your account information and security.")
@@ -125,6 +127,10 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 
 			if errReportForm != nil {
 				@ErrorReportingCard(errReportForm, csrfToken)
+			}
+
+			if auditRetention != nil {
+				@AuditRetentionCard(auditRetention, csrfToken)
 			}
 
 			if mcp != nil {

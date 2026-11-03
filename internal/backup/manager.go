@@ -20,11 +20,12 @@ import (
 // next run uses the new settings. Shutdown is the parent context passed to
 // NewManager; Wait returns once every loop and run has stopped.
 type Manager struct {
-	parent context.Context
-	build  func(cfg config.BackupConfig) (*Setup, error)
-	log    *slog.Logger
-	red    func(extra ...config.BackupConfig) *Redactor
-	notify notify.Notifier
+	parent    context.Context
+	build     func(cfg config.BackupConfig) (*Setup, error)
+	log       *slog.Logger
+	red       func(extra ...config.BackupConfig) *Redactor
+	notify    notify.Notifier
+	chainHead func(ctx context.Context) (seq int64, hash string, err error)
 
 	mu     sync.Mutex
 	cfg    config.BackupConfig
@@ -43,6 +44,15 @@ func NewManager(parent context.Context, app *config.Config, db *sql.DB, dockerCl
 		log: log,
 		red: func(extra ...config.BackupConfig) *Redactor { return RedactorFor(app, extra...) },
 	}
+}
+
+// WithChainHead records the audit hash-chain head on manifests written
+// after this call. Call it before the first Apply.
+func (m *Manager) WithChainHead(fn func(ctx context.Context) (seq int64, hash string, err error)) *Manager {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.chainHead = fn
+	return m
 }
 
 // WithNotifier makes every scheduled run started after this call send a
@@ -95,6 +105,7 @@ func (m *Manager) Apply(cfg config.BackupConfig, source string) {
 		return
 	}
 	setup.Runner.Notifier = m.notify
+	setup.Runner.ChainHead = m.chainHead
 	loopCtx, cancel := context.WithCancel(m.parent)
 	m.cancel = cancel
 	m.wg.Add(1)

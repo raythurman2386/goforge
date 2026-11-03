@@ -262,6 +262,32 @@ func TestRunner_PutFailureFailsRun(t *testing.T) {
 	}
 }
 
+func TestRunner_ManifestRecordsAuditChainHead(t *testing.T) {
+	store := newMemStore()
+	runs := &memRuns{}
+	now := time.Date(2026, 10, 30, 7, 0, 0, 0, time.UTC)
+	r := newTestRunner(store, runs, &now, Static{&fakeTarget{name: "app-db", arts: []Artifact{bytesArtifact("app/goforge-db.dump", []byte("ok"))}}})
+	r.ChainHead = func(context.Context) (int64, string, error) {
+		return 4, "abc123", nil
+	}
+	if _, err := r.Run(context.Background(), models.BackupTriggerManual); err != nil {
+		t.Fatal(err)
+	}
+	var m Manifest
+	var raw []byte
+	for k, v := range store.objects {
+		if strings.HasSuffix(k, "/manifest.json") {
+			raw = v
+		}
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.AuditChainHead == nil || m.AuditChainHead.Seq != 4 || m.AuditChainHead.Hash != "abc123" {
+		t.Fatalf("audit_chain_head = %+v", m.AuditChainHead)
+	}
+}
+
 func TestRunner_LockHeld(t *testing.T) {
 	runs := &memRuns{}
 	unlock, _ := runs.Lock(context.Background())

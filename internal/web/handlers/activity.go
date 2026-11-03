@@ -10,6 +10,7 @@ import (
 
 	"github.com/a-h/templ"
 
+	"github.com/raythurman2386/goforge/internal/audit"
 	"github.com/raythurman2386/goforge/internal/auth"
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/models"
@@ -32,8 +33,22 @@ type AuditLister interface {
 // ActivityHandler serves /settings/activity and the dashboard's recent agent
 // actions card.
 type ActivityHandler struct {
-	audit  AuditLister
-	logger *slog.Logger
+	audit     AuditLister
+	logger    *slog.Logger
+	retention func(context.Context) (int, error)
+	integrity func() audit.IntegrityView
+}
+
+// WithRetention shows the retention sentence. days 0 means keep forever.
+func (h *ActivityHandler) WithRetention(fn func(context.Context) (int, error)) *ActivityHandler {
+	h.retention = fn
+	return h
+}
+
+// WithIntegrity shows admins the last chain check.
+func (h *ActivityHandler) WithIntegrity(fn func() audit.IntegrityView) *ActivityHandler {
+	h.integrity = fn
+	return h
 }
 
 // NewActivityHandler creates an ActivityHandler.
@@ -103,11 +118,28 @@ func (h *ActivityHandler) Page(w http.ResponseWriter, r *http.Request) {
 	if offset > 0 {
 		f.NewerURL = activityURL(f, max(offset-activityPageSize, 0))
 	}
+	f.RetentionNote = h.retentionNote(r.Context())
+	if f.IsAdmin && h.integrity != nil {
+		f.IntegrityNote = h.integrity().Line()
+	}
 
 	page := settings.Activity(components.ActivityRows(logs), f, auth.GetCSRFToken(r))
 	if err := page.Render(r.Context(), w); err != nil {
 		h.logger.Error("failed to render activity", "error", err)
 	}
+}
+
+func (h *ActivityHandler) retentionNote(ctx context.Context) string {
+	days := 0
+	if h.retention != nil {
+		n, err := h.retention(ctx)
+		if err != nil {
+			h.logger.Error("failed to read audit retention", "error", err)
+		} else {
+			days = n
+		}
+	}
+	return audit.RetentionNote(days)
 }
 
 func activityURL(f settings.ActivityFilters, offset int) templ.SafeURL {

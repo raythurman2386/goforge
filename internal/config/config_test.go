@@ -7,6 +7,31 @@ import (
 	"time"
 )
 
+func TestLoad_AuditRetentionEnv(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("GOFORGE_DEV_MODE", "true")
+	os.Setenv("GOFORGE_DEV_SECRETS_FILE", filepath.Join(t.TempDir(), "dev-secrets.json"))
+	os.Setenv("GOFORGE_AUDIT_RETENTION_DAYS", "90")
+	defer os.Clearenv()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AuditRetentionSet || cfg.AuditRetentionDays != 90 || cfg.AuditRetentionEnvErr != nil {
+		t.Fatalf("retention = %d set=%v err=%v", cfg.AuditRetentionDays, cfg.AuditRetentionSet, cfg.AuditRetentionEnvErr)
+	}
+
+	os.Setenv("GOFORGE_AUDIT_RETENTION_DAYS", "10")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuditRetentionEnvErr == nil || !cfg.AuditRetentionSet {
+		t.Fatalf("invalid env err=%v set=%v", cfg.AuditRetentionEnvErr, cfg.AuditRetentionSet)
+	}
+}
+
 func TestLoad_DevMode(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("GOFORGE_DEV_MODE", "true")

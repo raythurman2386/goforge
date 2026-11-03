@@ -113,6 +113,15 @@ type Config struct {
 	// open (see backup.CheckEnv). Messages never contain the keys.
 	BackupEnvErr error
 
+	// AuditRetentionDays is GOFORGE_AUDIT_RETENTION_DAYS when AuditRetentionSet.
+	// 0 keeps rows forever. Used only while no admin has saved the Profile card.
+	AuditRetentionDays int
+	AuditRetentionSet  bool
+	// AuditRetentionEnvErr is why GOFORGE_AUDIT_RETENTION_DAYS is invalid, or
+	// nil. Load does not fail on it. serve checks it after the database is
+	// open, and ignores it once an admin has saved a retention row.
+	AuditRetentionEnvErr error
+
 	// Development mode - relaxes security requirements
 	DevMode bool
 }
@@ -188,6 +197,7 @@ func Load() (*Config, error) {
 		// Dev mode
 		DevMode: devMode,
 	}
+	cfg.loadAuditRetention()
 
 	// Apply defaults and dev mode settings
 	cfg.applyDefaults()
@@ -319,6 +329,25 @@ func (c *Config) Addr() string {
 // IsDevelopment returns true if running in development mode.
 func (c *Config) IsDevelopment() bool {
 	return c.DevMode || c.LogLevel == "debug"
+}
+
+// loadAuditRetention reads GOFORGE_AUDIT_RETENTION_DAYS. Unset or blank
+// leaves retention at the default (keep forever) until an admin saves it.
+// An invalid value is kept on AuditRetentionEnvErr and does not fail Load.
+func (c *Config) loadAuditRetention() {
+	raw, ok := os.LookupEnv("GOFORGE_AUDIT_RETENTION_DAYS")
+	if !ok || strings.TrimSpace(raw) == "" {
+		return
+	}
+	c.AuditRetentionSet = true
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	// 0 keeps rows forever. Anything else is 30 to 3650, the same range the
+	// audit settings form and migration 031 enforce.
+	if err != nil || n < 0 || (n != 0 && (n < 30 || n > 3650)) {
+		c.AuditRetentionEnvErr = errors.New("GOFORGE_AUDIT_RETENTION_DAYS must be 0 (keep forever) or between 30 and 3650")
+		return
+	}
+	c.AuditRetentionDays = n
 }
 
 // getEnv returns the environment variable value or a default.

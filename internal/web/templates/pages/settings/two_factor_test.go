@@ -15,7 +15,7 @@ import (
 func renderProfileTF(t *testing.T, u *models.User, c *TwoFactorCard) string {
 	t.Helper()
 	var b bytes.Buffer
-	if err := Profile(u, "tok", nil, nil, nil, nil, nil, c).Render(context.Background(), &b); err != nil {
+	if err := Profile(u, "tok", nil, nil, nil, nil, nil, c, nil).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	return html.UnescapeString(b.String())
