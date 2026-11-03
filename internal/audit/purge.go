@@ -111,9 +111,8 @@ func (c *Chain) purgeBatch(ctx context.Context, days, limit int) (purgeStep, err
 		}
 		step.n += unsealed
 	}
-	// The boundary and the purge row commit together. A later session can
-	// still rewrite audit_settings; verify rejects a boundary that no
-	// sealed purge row records.
+	// The boundary, the purge row, and its chain-key MAC commit together.
+	// Sealing that row later is not what makes the boundary authentic.
 	if step.n > 0 {
 		bseq, bhash, berr := c.boundary(ctx, tx)
 		if step.moved {
@@ -249,17 +248,27 @@ type purgeDetails struct {
 	Cutoff      string `json:"cutoff"`
 	ThroughSeq  int64  `json:"through_seq"`
 	ThroughHash string `json:"through_hash"`
+	// PurgeMAC is HMAC(chainKey, "goforge-audit-purge-v1" ‖ through_seq ‖
+	// through_hash ‖ deleted ‖ cutoff). A row without it does not prove
+	// the boundary, even after the sealer seals the row.
+	PurgeMAC string `json:"purge_mac"`
 }
 
 func (c *Chain) insertPurgeRow(ctx context.Context, q queryer, deleted int64, cutoff time.Time, seq int64, hash []byte) error {
-	raw, err := json.Marshal(purgeDetails{
-		Deleted:     deleted,
-		Cutoff:      cutoff.UTC().Format(time.RFC3339),
-		ThroughSeq:  seq,
-		ThroughHash: hexEncode(hash),
-	})
+	cutoffText := cutoff.UTC().Format(time.RFC3339)
+	mac, err := purgeMAC(c.key, seq, hash, deleted, cutoffText)
 	if err != nil {
 		return err
+	}
+	raw, marshalErr := json.Marshal(purgeDetails{
+		Deleted:     deleted,
+		Cutoff:      cutoffText,
+		ThroughSeq:  seq,
+		ThroughHash: hexEncode(hash),
+		PurgeMAC:    hexEncode(mac),
+	})
+	if marshalErr != nil {
+		return marshalErr
 	}
 	_, err = q.ExecContext(ctx, `
 		INSERT INTO audit_logs (id, action, resource_type, details, created_at)

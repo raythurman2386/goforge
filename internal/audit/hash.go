@@ -3,9 +3,42 @@ package audit
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 )
+
+// purgeMACLabel is the domain separator for the retention-boundary MAC.
+const purgeMACLabel = "goforge-audit-purge-v1"
+
+// purgeMAC is HMAC-SHA256(chainKey, label ‖ through_seq ‖ through_hash ‖ deleted ‖ cutoff).
+// through_seq and deleted are 8-byte big-endian. through_hash is the raw
+// 32-byte digest. cutoff is the RFC3339 string stored on the purge row.
+// Anyone who can write the database can insert a purge row; only the chain
+// key can produce this MAC.
+func purgeMAC(key []byte, seq int64, hash []byte, deleted int64, cutoff string) ([]byte, error) {
+	mac := hmac.New(sha256.New, key)
+	if _, err := mac.Write([]byte(purgeMACLabel)); err != nil {
+		return nil, err
+	}
+	var seqBuf [8]byte
+	binary.BigEndian.PutUint64(seqBuf[:], uint64(seq))
+	if _, err := mac.Write(seqBuf[:]); err != nil {
+		return nil, err
+	}
+	if _, err := mac.Write(hash); err != nil {
+		return nil, err
+	}
+	var deletedBuf [8]byte
+	binary.BigEndian.PutUint64(deletedBuf[:], uint64(deleted))
+	if _, err := mac.Write(deletedBuf[:]); err != nil {
+		return nil, err
+	}
+	if _, err := mac.Write([]byte(cutoff)); err != nil {
+		return nil, err
+	}
+	return mac.Sum(nil), nil
+}
 
 // rowHash is HMAC-SHA256(key, prev_hash || canonical). prev_hash is the raw
 // 32-byte digest, not its hex form. hash.Hash.Write does not return an

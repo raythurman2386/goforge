@@ -22,8 +22,10 @@
 -- rows older than 30 days, and UPDATE is never allowed. TRUNCATE is
 -- allowed only when every row is older than 30 days. The triggers stop
 -- accidents. Detection is the hash chain: a boundary_seq above 0 is
--- accepted only when a sealed audit.retention.purge row records the same
--- through_seq and through_hash. A superuser can still bypass triggers
+-- accepted only when an audit.retention.purge row records the same
+-- through_seq and through_hash and a purge_mac HMAC under the chain key
+-- (goforge-audit-purge-v1). Sealing that row is not the proof: the sealer
+-- seals every row. A superuser can still bypass triggers
 -- (session_replication_role = replica). That is detected by the chain,
 -- not prevented.
 

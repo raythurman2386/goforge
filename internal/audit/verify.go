@@ -3,7 +3,10 @@ package audit
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -110,30 +113,61 @@ func (c *Chain) walkSeals(ctx context.Context, fromSeq, minSeq, boundarySeq int6
 	return headSeq, append([]byte(nil), headHash...), nil, nil
 }
 
-// checkBoundaryPurge fails closed when the stored boundary has moved and
-// no sealed retention-purge row records that same seq and hash. The purge
-// row has to be sealed: inserting the row is allowed for anyone who can
-// write the table, and only the chain key can seal it.
+// checkBoundaryPurge fails closed when boundary_seq is past genesis and no
+// audit.retention.purge row carries a chain-key MAC over that boundary.
+// The row does not have to be sealed. The sealer will seal a forged purge
+// row; it cannot invent purge_mac.
 func (c *Chain) checkBoundaryPurge(ctx context.Context, seq int64, hash []byte) (*ChainError, error) {
 	if seq <= 0 {
 		return nil, nil
 	}
-	var n int
-	err := c.db.QueryRowContext(ctx, `
-		SELECT count(*)
-		FROM audit_logs a
-		JOIN audit_log_seals s ON s.audit_id = a.id
-		WHERE a.action = $1
-		  AND (a.details->>'through_seq')::bigint = $2
-		  AND a.details->>'through_hash' = $3`,
-		models.AuditActionAuditRetentionPurge, seq, hexEncode(hash)).Scan(&n)
+	rows, err := c.db.QueryContext(ctx, `
+		SELECT details
+		FROM audit_logs
+		WHERE action = $1
+		  AND (details->>'through_seq')::bigint = $2
+		  AND details->>'through_hash' = $3`,
+		models.AuditActionAuditRetentionPurge, seq, hexEncode(hash))
 	if err != nil {
 		return nil, err
 	}
-	if n == 0 {
-		return &ChainError{Seq: seq, Reason: ReasonBoundaryPurge}, nil
+	defer rows.Close()
+	for rows.Next() {
+		var raw []byte
+		if scanErr := rows.Scan(&raw); scanErr != nil {
+			return nil, scanErr
+		}
+		ok, matchErr := c.purgeMACMatches(seq, hash, raw)
+		if matchErr != nil {
+			return nil, matchErr
+		}
+		if ok {
+			return nil, nil
+		}
 	}
-	return nil, nil
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, rowsErr
+	}
+	return &ChainError{Seq: seq, Reason: ReasonBoundaryPurge}, nil
+}
+
+func (c *Chain) purgeMACMatches(seq int64, hash, raw []byte) (bool, error) {
+	var details purgeDetails
+	if err := json.Unmarshal(raw, &details); err != nil {
+		return false, err
+	}
+	if details.PurgeMAC == "" {
+		return false, nil
+	}
+	got, err := hex.DecodeString(details.PurgeMAC)
+	if err != nil {
+		return false, err
+	}
+	want, macErr := purgeMAC(c.key, seq, hash, details.Deleted, details.Cutoff)
+	if macErr != nil {
+		return false, macErr
+	}
+	return hmac.Equal(want, got), nil
 }
 
 func (c *Chain) minSeq(ctx context.Context) (int64, error) {

@@ -25,8 +25,8 @@ const (
 	ReasonUnsealed     = "unsealed row older than 5 minutes"
 	ReasonBoundary     = "boundary mismatch"
 	// ReasonBoundaryPurge means boundary_seq is past the genesis value but
-	// no sealed audit.retention.purge row carries that same through_seq and
-	// through_hash. Any session can set goforge.audit_purge and rewrite
-	// audit_settings, so the boundary is not evidence by itself.
+	// no audit.retention.purge row carries a valid chain-key MAC over that
+	// boundary. A sealed purge row is not enough: the sealer seals every
+	// row, including one an attacker inserted.
 	ReasonBoundaryPurge = "boundary without purge"
 )

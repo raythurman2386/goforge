@@ -90,9 +90,13 @@ are rejected unless the transaction has set `goforge.audit_purge` to `on`.
 Any database session can set that flag. The table owner can also
 `DISABLE TRIGGER`. The triggers stop accidents and buggy writes. They are
 not a security boundary. Detection is the hash chain. When the stored
-boundary is past seq 0, `goforge audit verify` requires a sealed
+boundary is past seq 0, `goforge audit verify` requires an
 `audit.retention.purge` row whose `through_seq` and `through_hash` match
-it, and exits 1 with `boundary without purge` when that row is missing.
+it and whose `purge_mac` is an HMAC of those fields under the chain key.
+A sealed purge row is not enough: the sealer seals every row, including
+one inserted by someone who can write the database. A missing or wrong
+MAC exits 1 with `boundary without purge`. The MAC is checked as soon as
+the purge transaction commits, before that row is sealed.
 Deleting a user does not blank `user_id` (the foreign key was dropped in
 migration 031) so a sealed row stays byte-for-byte the same.
 
@@ -101,8 +105,8 @@ chain. The key is derived from `ENCRYPTION_KEY` and is not stored.
 `goforge audit verify` exits 0 when the chain is intact and prints
 `audit chain verified head_seq=N head_hash=...`. It exits 1 and names the
 first bad seq when a row was changed, removed, or left unsealed, when the
-retention boundary does not match, or when that boundary has no sealed
-`audit.retention.purge` row (`boundary without purge`). `goforge serve` runs the same check
+retention boundary does not match, or when that boundary has no
+chain-key `purge_mac` (`boundary without purge`). `goforge serve` runs the same check
 about 30 seconds after startup and then daily, and logs that line. Each
 backup `manifest.json` includes `audit_chain_head` with the same seq and
 hash. Admins see the last result on this page.

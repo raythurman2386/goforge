@@ -35,7 +35,7 @@ Put the action back the same way before the missing-row check, or use a copy of 
 ## Gotchas
 
 - The chain proves rows are unchanged since they were sealed. On an upgrade, the first sealer pass seals existing rows. It does not prove they were unchanged before that.
-- `goforge.audit_purge` is not a privilege. Any database session can set it, and the table owner can disable the triggers. A boundary with no sealed `audit.retention.purge` row matching `through_seq` and `through_hash` makes `goforge audit verify` exit 1 (`boundary without purge`).
+- `goforge.audit_purge` is not a privilege. Any database session can set it, and the table owner can disable the triggers. A boundary whose matching `audit.retention.purge` row has no valid chain-key `purge_mac` makes `goforge audit verify` exit 1 (`boundary without purge`), including after the sealer seals a forged row.
 - A delete in the few seconds before a row is sealed is not detected.
 - Host root and the Docker socket can read `ENCRYPTION_KEY` and rewrite the chain, the log line, and the backup. This feature does not claim to stop that.
 - Restoring a backup taken with a different `ENCRYPTION_KEY` fails verify. That is expected.

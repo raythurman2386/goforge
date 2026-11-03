@@ -288,11 +288,8 @@ func TestChain_TriggersSealPurgeAndTamper(t *testing.T) {
 	if latestHash == "" || latestDeleted < 1 || latestSeq < 1 {
 		t.Fatalf("purge row seq=%d hash=%s deleted=%d", latestSeq, latestHash, latestDeleted)
 	}
-	// The purge row is the boundary proof only after the sealer has sealed it.
-	time.Sleep(6 * time.Second)
-	if sealed, sealErr = chain.SealOnce(ctx); sealErr != nil || sealed < 1 {
-		t.Fatalf("seal purge row = %d %v", sealed, sealErr)
-	}
+	// The MAC on the purge row is the boundary proof. Verify must pass
+	// before the sealer has sealed that row.
 	headSeq, headHash, fail, verifyErr := chain.Verify(ctx, 0)
 	if verifyErr != nil || fail != nil {
 		t.Fatalf("verify across purge = %+v %v", fail, verifyErr)
@@ -410,8 +407,35 @@ func TestVerify_BoundaryWithoutPurge(t *testing.T) {
 	if purgeRows != 0 {
 		t.Fatalf("purge rows = %d, want 0", purgeRows)
 	}
-	_, _, fail, err := chain.Verify(ctx, 0)
-	if err != nil || fail == nil || fail.Reason != ReasonBoundaryPurge || fail.Seq != boundarySeq {
-		t.Fatalf("forged boundary verify = %+v %v", fail, err)
+	_, _, fail, verifyErr := chain.Verify(ctx, 0)
+	if verifyErr != nil || fail == nil || fail.Reason != ReasonBoundaryPurge || fail.Seq != boundarySeq {
+		t.Fatalf("forged boundary verify = %+v %v", fail, verifyErr)
+	}
+
+	// B1′: insert a matching purge row with a bogus MAC and let SealOnce
+	// seal it. The head may move. Verify must still fail.
+	forged := fmt.Sprintf(
+		`{"deleted":3,"cutoff":"2026-10-04T00:00:00Z","through_seq":%d,"through_hash":"%s","purge_mac":"%s"}`,
+		boundarySeq, hexEncode(boundaryHash), "0000000000000000000000000000000000000000000000000000000000000000")
+	if _, execErr := db.ExecContext(ctx, `
+		INSERT INTO audit_logs (action, resource_type, details, created_at)
+		VALUES ('audit.retention.purge', 'audit_settings', $1::jsonb, NOW() - INTERVAL '6 seconds')`,
+		forged); execErr != nil {
+		t.Fatal(execErr)
+	}
+	sealedForged, forgedSealErr := chain.SealOnce(ctx)
+	if forgedSealErr != nil || sealedForged < 1 {
+		t.Fatalf("seal forged purge = %d %v", sealedForged, forgedSealErr)
+	}
+	var headAfterSeal int64
+	if scanErr := db.QueryRowContext(ctx, `SELECT MAX(seq) FROM audit_log_seals`).Scan(&headAfterSeal); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if headAfterSeal <= headAfter {
+		t.Fatalf("head after seal = %d, want > %d", headAfterSeal, headAfter)
+	}
+	_, _, fail, verifyErr = chain.Verify(ctx, 0)
+	if verifyErr != nil || fail == nil || fail.Reason != ReasonBoundaryPurge || fail.Seq != boundarySeq {
+		t.Fatalf("forged sealed purge verify = %+v %v", fail, verifyErr)
 	}
 }

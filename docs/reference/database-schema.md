@@ -329,7 +329,7 @@ Tracks user actions for auditing and compliance.
 
 **Migrations**: `010_create_audit_logs`, `023_audit_approval_idempotency`, `031_audit_retention_and_seals` (drops `audit_logs_user_id_fkey`; adds the append-only triggers)
 
-`BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers reject changes unless the transaction set `goforge.audit_purge` to `on`. Any session can set that flag, and the table owner can `DISABLE TRIGGER`. The triggers stop accidents. `DELETE` is then allowed only when the row is older than 30 days. `UPDATE` is never allowed. A `boundary_seq` above 0 verifies only when a sealed `audit.retention.purge` row records the same `through_seq` and `through_hash`. See [Activity and audit log](../guides/activity.md).
+`BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers reject changes unless the transaction set `goforge.audit_purge` to `on`. Any session can set that flag, and the table owner can `DISABLE TRIGGER`. The triggers stop accidents. `DELETE` is then allowed only when the row is older than 30 days. `UPDATE` is never allowed. A `boundary_seq` above 0 verifies only when an `audit.retention.purge` row records the same `through_seq` and `through_hash` and a `purge_mac` HMAC under the chain key. Sealing that row is not the proof. See [Activity and audit log](../guides/activity.md).
 
 ### audit_settings
 
