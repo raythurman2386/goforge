@@ -40,9 +40,9 @@ These routes are **not** protected by CSRF (machine-to-machine communication).
 
 | Method | Path | Handler | Auth | Description |
 |--------|------|---------|------|-------------|
-| `POST` | `/webhooks/github` | `webhookHandler.HandleGitHub` | No | GitHub push webhook receiver |
-| `POST` | `/webhooks/gitlab` | `webhookHandler.HandleGitLab` | No | GitLab push webhook receiver |
-| `POST` | `/webhooks/gitea` | `webhookHandler.HandleGitea` | No | Gitea push webhook receiver |
+| `POST` | `/webhooks/github` | `webhookHandler.HandleGitHub` | No | GitHub push webhook receiver. Each deployment it starts is audited as `deployment.trigger` with `via` = `webhook` and `provider` = `github` |
+| `POST` | `/webhooks/gitlab` | `webhookHandler.HandleGitLab` | No | GitLab push webhook receiver. Each deployment it starts is audited as `deployment.trigger` with `via` = `webhook` and `provider` = `gitlab` |
+| `POST` | `/webhooks/gitea` | `webhookHandler.HandleGitea` | No | Gitea push webhook receiver. Each deployment it starts is audited as `deployment.trigger` with `via` = `webhook` and `provider` = `gitea` |
 
 ---
 
@@ -179,7 +179,7 @@ Used by HTMX components for dynamic repository/branch selection.
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
 | `GET` | `/settings/profile` | `settingsHandler.Profile` | User profile page |
-| `PUT` | `/settings/profile` | `settingsHandler.UpdateProfile` | Update email |
+| `PUT` | `/settings/profile` | `settingsHandler.UpdateProfile` | Update email. Audited as `user.profile.update` with `changed` and the old and new email domain only |
 | `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password. On success every other session of the account is deleted (the current one is kept). Audited as `user.password.change` with `sessions_revoked` |
 | `POST` | `/settings/sessions/revoke-others` | `settingsHandler.RevokeOtherSessions` | Sign out other sessions: deletes every session of the account except the current one. Audited as `user.sessions.revoke` with `sessions_revoked` |
 | `GET` | `/settings/tokens` | `settingsHandler.ListAPITokens` | List API tokens (HTMX partial) |
@@ -190,9 +190,9 @@ Used by HTMX components for dynamic repository/branch selection.
 | `DELETE` | `/settings/tokens/{id}` | `settingsHandler.DeleteAPIToken` | Revoke API token (`404` for another user's token). Audited as `api_token.revoke` |
 | `POST` | `/settings/prune` | `settingsHandler.PruneSystem` | Prune Docker system resources |
 | `GET` | `/settings/git` | `settingsHandler.GitSources` | List configured git sources |
-| `POST` | `/settings/git` | `settingsHandler.CreateGitSource` | Add a git source |
+| `POST` | `/settings/git` | `settingsHandler.CreateGitSource` | Add a git source. Audited as `git_source.create` (name, type, never the token or URL) |
 | `GET` | `/settings/git/new` | `settingsHandler.NewGitSourceModal` | New git source modal (HTMX) |
-| `DELETE` | `/settings/git/{id}` | `settingsHandler.DeleteGitSource` | Remove a git source |
+| `DELETE` | `/settings/git/{id}` | `settingsHandler.DeleteGitSource` | Remove a git source. Audited as `git_source.delete` |
 | `PUT` | `/settings/backups` | `settingsHandler.UpdateBackupSettings` | Save backup settings, admin only (`403` otherwise). Applies without a restart. A blank secret keeps the stored one. Audited as `backup.settings.update` with changed field names only. Returns the Backups card; `400` names the bad field. `Cache-Control: no-store` |
 | `GET` | `/settings/backups/restore-points` | `settingsHandler.RestorePoints` | Read-only Restore points list for the Backups card (HTMX fragment), admin only (`403` otherwise). Lists complete runs in the bucket and the `goforge backup restore` command; no restore action. `Cache-Control: no-store` |
 | `PUT` | `/settings/notifications` | `settingsHandler.UpdateNotifySettings` | Save the Notifications form (`enabled`, `kind` = `ntfy`, `webhook`, or `email`, `url`, `token`, `clear_token`; for email `smtp_host`, `smtp_port`, `smtp_tls` = `starttls`, `implicit`, or `none`, `smtp_username`, `smtp_password`, `clear_smtp_password`, `smtp_from`, `smtp_to`), admin only (`403` otherwise). A blank URL, token, or SMTP password keeps the stored one; URL and token apply only to ntfy and webhook, the SMTP fields only to email. Applies without a restart. Audited as `notify.settings.update` with changed field names only. Returns the Notifications card; `400` names the bad field. `Cache-Control: no-store` |

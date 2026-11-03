@@ -16,9 +16,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/deploy"
 	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/httputil"
 )
 
 // Webhook errors.
@@ -45,14 +48,59 @@ func (e *PushEvent) IsBranchPush() bool {
 	return strings.HasPrefix(e.Ref, "refs/heads/")
 }
 
+// Webhook providers, written to details.provider on deployment.trigger.
+const (
+	ProviderGitHub = "github"
+	ProviderGitea  = "gitea"
+	ProviderGitLab = "gitlab"
+)
+
+// projectLister finds the projects built from a repository
+// (repositories.ProjectRepository).
+type projectLister interface {
+	ListByRepoURL(ctx context.Context, repoURL string) ([]*models.Project, error)
+}
+
+// environmentLister lists a project's environments
+// (repositories.EnvironmentRepository).
+type environmentLister interface {
+	ListByProjectID(ctx context.Context, projectID string) ([]*models.Environment, error)
+}
+
+// deploymentCreator stores a new deployment row (deploy.Service).
+type deploymentCreator interface {
+	CreateDeployment(ctx context.Context, d *models.Deployment) error
+}
+
+// deploymentEnqueuer queues a deployment; an audit id on ctx
+// (models.WithAuditID) is kept with the queue item (deploy.Worker).
+type deploymentEnqueuer interface {
+	Enqueue(ctx context.Context, deploymentID string) error
+}
+
+// AuditRecorder writes an audit row with a chosen id before it returns
+// (services.AuditService).
+type AuditRecorder interface {
+	RecordAs(ctx context.Context, id, userID, action, resourceType, resourceID string, details map[string]interface{}, ip, userAgent string)
+}
+
 // Handler handles webhook requests from git providers.
 type Handler struct {
-	deployService   *deploy.Service
-	projectRepo     *repositories.ProjectRepository
-	environmentRepo *repositories.EnvironmentRepository
-	worker          *deploy.Worker
+	deployService   deploymentCreator
+	projectRepo     projectLister
+	environmentRepo environmentLister
+	worker          deploymentEnqueuer
+	audit           AuditRecorder
+	proxyTrust      httputil.ProxyTrust
 	webhookSecret   string
 	logger          *slog.Logger
+}
+
+// pushSource says where a push event came from, for the audit row.
+type pushSource struct {
+	provider  string
+	ip        string
+	userAgent string
 }
 
 // NewHandler creates a new webhook Handler.
@@ -64,14 +112,37 @@ func NewHandler(
 	secret string,
 	logger *slog.Logger,
 ) *Handler {
-	return &Handler{
-		deployService:   ds,
-		projectRepo:     pr,
-		environmentRepo: er,
-		worker:          w,
-		webhookSecret:   secret,
-		logger:          logger,
+	h := &Handler{webhookSecret: secret, logger: logger}
+	// Keep nil pointers out of the interface fields so the nil checks in
+	// processPushEvent still work.
+	if ds != nil {
+		h.deployService = ds
 	}
+	if pr != nil {
+		h.projectRepo = pr
+	}
+	if er != nil {
+		h.environmentRepo = er
+	}
+	if w != nil {
+		h.worker = w
+	}
+	return h
+}
+
+// WithAudit records a deployment.trigger row (via=webhook) for every
+// deployment a push starts, owned by the project's owner, and links the
+// queued run to it so its deployment.run.* row connects. trust decides
+// which proxy headers give the client IP.
+func (h *Handler) WithAudit(a AuditRecorder, trust httputil.ProxyTrust) *Handler {
+	h.audit = a
+	h.proxyTrust = trust
+	return h
+}
+
+// source describes the request for the audit row.
+func (h *Handler) source(r *http.Request, provider string) pushSource {
+	return pushSource{provider: provider, ip: httputil.ClientIP(r, h.proxyTrust), userAgent: r.UserAgent()}
 }
 
 // writeJSONResponse writes a JSON response. Write errors are ignored as they
@@ -124,7 +195,7 @@ func (h *Handler) HandleGitHub(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Process the push event (trigger deployment if needed)
-		h.processPushEvent(r.Context(), event)
+		h.processPushEvent(r.Context(), h.source(r, ProviderGitHub), event)
 
 		w.WriteHeader(http.StatusOK)
 		writeJSONResponse(w, `{"status": "accepted"}`)
@@ -258,7 +329,7 @@ func (h *Handler) HandleGitea(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.processPushEvent(r.Context(), event)
+		h.processPushEvent(r.Context(), h.source(r, ProviderGitea), event)
 		w.WriteHeader(http.StatusOK)
 		writeJSONResponse(w, `{"status": "accepted"}`)
 
@@ -269,7 +340,7 @@ func (h *Handler) HandleGitea(w http.ResponseWriter, r *http.Request) {
 }
 
 // processPushEvent processes a push event and triggers deployments.
-func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
+func (h *Handler) processPushEvent(ctx context.Context, src pushSource, event *PushEvent) {
 	h.logger.Info("received push event",
 		"repo", event.RepositoryName, "branch", event.Branch, "commit", event.CommitSHA)
 
@@ -277,7 +348,7 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 		return
 	}
 
-	if h.projectRepo == nil {
+	if h.projectRepo == nil || h.environmentRepo == nil || h.deployService == nil || h.worker == nil {
 		return
 	}
 
@@ -336,12 +407,55 @@ func (h *Handler) processPushEvent(ctx context.Context, event *PushEvent) {
 				continue
 			}
 
+			// Record who started it (the project owner, via the webhook) and
+			// carry the row id to the queue so deployment.run.* links back.
+			auditID := h.recordTrigger(ctx, src, proj, env, d, event)
+
 			// Enqueue for background processing
-			if err := h.worker.Enqueue(ctx, d.ID); err != nil {
+			if err := h.worker.Enqueue(models.WithAuditID(ctx, auditID), d.ID); err != nil {
 				h.logger.Error("failed to enqueue deployment", "deployment_id", d.ID, "error", err)
+				h.recordTriggerFailed(ctx, src, proj, d, auditID, err)
 			}
 		}
 	}
+}
+
+// maxAuditErrorLen caps the error kept on a .failed row.
+const maxAuditErrorLen = 500
+
+// recordTrigger writes deployment.trigger for a webhook deployment and
+// returns its id ("" without a recorder).
+func (h *Handler) recordTrigger(ctx context.Context, src pushSource, proj *models.Project, env *models.Environment, d *models.Deployment, event *PushEvent) string {
+	if h.audit == nil {
+		return ""
+	}
+	id := uuid.New().String()
+	h.audit.RecordAs(ctx, id, proj.UserID, models.AuditActionDeploymentTrigger, models.ResourceTypeDeployment, d.ID,
+		map[string]interface{}{
+			"via":            models.AuditViaWebhook,
+			"provider":       src.provider,
+			"project_id":     proj.ID,
+			"environment_id": env.ID,
+			"repository":     event.RepositoryName,
+			"branch":         event.Branch,
+			"commit":         event.CommitSHA,
+		}, src.ip, src.userAgent)
+	return id
+}
+
+// recordTriggerFailed writes deployment.trigger.failed linked to auditID
+// when the deployment could not be queued.
+func (h *Handler) recordTriggerFailed(ctx context.Context, src pushSource, proj *models.Project, d *models.Deployment, auditID string, err error) {
+	if h.audit == nil || auditID == "" {
+		return
+	}
+	msg := err.Error()
+	if len(msg) > maxAuditErrorLen {
+		msg = strings.ToValidUTF8(msg[:maxAuditErrorLen-3], "") + "..."
+	}
+	h.audit.RecordAs(ctx, "", proj.UserID, models.AuditActionDeploymentTrigger+".failed", models.ResourceTypeDeployment, d.ID,
+		map[string]interface{}{"via": models.AuditViaWebhook, "provider": src.provider, "audit_id": auditID, "error": msg},
+		src.ip, src.userAgent)
 }
 
 // GitLabPushEvent represents a push event from GitLab.
@@ -398,7 +512,7 @@ func (h *Handler) HandleGitLab(w http.ResponseWriter, r *http.Request) {
 			pushEvent.Branch = strings.TrimPrefix(event.Ref, "refs/heads/")
 		}
 
-		h.processPushEvent(r.Context(), pushEvent)
+		h.processPushEvent(r.Context(), h.source(r, ProviderGitLab), pushEvent)
 
 		w.WriteHeader(http.StatusOK)
 		writeJSONResponse(w, `{"status": "accepted"}`)

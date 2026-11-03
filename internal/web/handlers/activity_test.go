@@ -191,3 +191,41 @@ func TestActivityRecent_ShowsOwnAgentActions(t *testing.T) {
 		t.Errorf("card filter = %+v", f)
 	}
 }
+
+// The v0.5 S3 rows show on Settings → Activity: a webhook deploy with the
+// Webhook badge and a deployment link, a Git source change linked to
+// /settings/git, and a profile save. ?source=webhook reaches the store.
+func TestActivityPage_RendersS3AuditRows(t *testing.T) {
+	const (
+		hookID = "55555555-5555-4555-8555-555555555555"
+		depID  = "66666666-6666-4666-8666-666666666666"
+		projID = "77777777-7777-4777-8777-777777777777"
+		gsID   = "88888888-8888-4888-8888-888888888888"
+	)
+	store := &fakeAuditLister{logs: []*models.AuditLog{
+		auditRow(t, hookID, models.AuditActionDeploymentTrigger, models.ResourceTypeDeployment, depID,
+			"GitHub-Hookshot/abc", map[string]any{"via": "webhook", "provider": "github", "branch": "main", "project_id": projID}),
+		auditRow(t, "99999999-9999-4999-8999-999999999991", models.AuditActionGitSourceCreate, models.ResourceTypeGitSource, gsID,
+			"Mozilla/5.0", map[string]any{"via": "ui", "name": "my-gitea", "type": "gitea"}),
+		auditRow(t, "99999999-9999-4999-8999-999999999992", models.AuditActionUserProfileUpdate, models.ResourceTypeUser, "user-1",
+			"Mozilla/5.0", map[string]any{"via": "ui", "changed": []string{"email"}}),
+	}}
+	h := NewActivityHandler(store, slog.Default())
+	w := activityGet(t, h.Page, "/settings/activity?source=webhook", &models.User{ID: "user-1", Role: models.RoleUser})
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	html := w.Body.String()
+	for _, want := range []string{
+		"deployment.trigger", ">Webhook<", `href="/projects/` + projID + `/deployments/` + depID + `"`,
+		"git_source.create", "git_source my-gitea", `href="/settings/git"`,
+		"user.profile.update",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("activity page missing %q", want)
+		}
+	}
+	if len(store.got) != 1 || store.got[0].Source != models.AuditSourceWebhook {
+		t.Errorf("filter = %+v, want source webhook", store.got)
+	}
+}

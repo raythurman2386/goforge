@@ -519,6 +519,7 @@ func runServer() error {
 	// Rate limiter (stopped during graceful shutdown)
 	// CF-Connecting-IP is only read with CLOUDFLARE_PROXY_MODE (see httputil.ProxyTrust).
 	proxyTrust := httputil.NewProxyTrust(cfg.TrustedProxies, cfg.CloudflareProxyMode)
+	webhookHandler.WithAudit(auditService, proxyTrust)
 	rateLimiter := middleware.NewRateLimiter(30, 60, proxyTrust)
 	defer rateLimiter.Stop()
 

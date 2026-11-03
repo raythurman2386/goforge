@@ -69,6 +69,17 @@ const (
 	// AuditActionUserSessionsRevoke records Settings → Profile "Sign out
 	// other sessions". Details hold {"sessions_revoked": n, "via": "ui"}.
 	AuditActionUserSessionsRevoke = "user.sessions.revoke"
+	// AuditActionUserProfileUpdate records a save of the Settings → Profile
+	// form. Details hold {"changed": [field names], "old_email_domain",
+	// "new_email_domain", "via": "ui"}: the domain part only, never the full
+	// address.
+	AuditActionUserProfileUpdate = "user.profile.update"
+	// AuditActionGitSourceCreate and AuditActionGitSourceDelete record
+	// Settings → Git sources changes. Details hold the name, the type, and
+	// whether an access token or API URL was set, never the token, key, or
+	// URL.
+	AuditActionGitSourceCreate = "git_source.create"
+	AuditActionGitSourceDelete = "git_source.delete"
 )
 
 // Common resource types
@@ -94,6 +105,9 @@ const (
 	AuditSourceMCP = "mcp"
 	AuditSourceAPI = "api"
 	AuditSourceUI  = "ui"
+	// AuditSourceWebhook is a row written for a signed push webhook
+	// (details.via "webhook") and the run outcomes linked to it.
+	AuditSourceWebhook = "webhook"
 	// AuditSourceAgent matches MCP and API rows together (filter only).
 	AuditSourceAgent = "agent"
 )
@@ -108,7 +122,8 @@ const AuditAPIActionPrefix = "api_v1."
 
 // Source reports who made the change: MCP when the User-Agent is an MCP
 // client, API for other api_v1 rows (or rows whose details.via is api_v1,
-// such as a background run started by the API), and UI for everything else.
+// such as a background run started by the API), webhook for rows whose
+// details.via is webhook, and UI for everything else.
 func (a *AuditLog) Source() string {
 	if a.UserAgent.Valid && strings.HasPrefix(a.UserAgent.String, AuditMCPUserAgentPrefix) {
 		return AuditSourceMCP
@@ -116,8 +131,13 @@ func (a *AuditLog) Source() string {
 	if strings.HasPrefix(a.Action, AuditAPIActionPrefix) {
 		return AuditSourceAPI
 	}
-	if d, err := a.GetDetails(); err == nil && d["via"] == AuditViaAPI {
-		return AuditSourceAPI
+	if d, err := a.GetDetails(); err == nil {
+		switch d["via"] {
+		case AuditViaAPI:
+			return AuditSourceAPI
+		case AuditViaWebhook:
+			return AuditSourceWebhook
+		}
 	}
 	return AuditSourceUI
 }
@@ -126,6 +146,10 @@ func (a *AuditLog) Source() string {
 const (
 	AuditViaAPI = "api_v1"
 	AuditViaUI  = "ui"
+	// AuditViaWebhook marks a deployment.trigger row written for a signed
+	// push webhook. user_id is the project owner; details carry the
+	// provider, branch, and commit.
+	AuditViaWebhook = "webhook"
 )
 
 // Failed reports whether the row records a failed change (<action>.failed).

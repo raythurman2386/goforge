@@ -47,6 +47,8 @@ func TestAuditLogRepository_ListFiltered_Activity(t *testing.T) {
 	ui := mk(uid, "service.delete", "Mozilla/5.0", map[string]any{"via": "ui"})
 	run := mk(uid, "deployment.run.failed", "goforge-mcp/1.0", map[string]any{"via": "api_v1", "audit_id": api.ID, "token_name": token})
 	foreign := mk(sql.NullString{String: other.ID, Valid: true}, "service.delete", "", map[string]any{"via": "ui"})
+	hook := mk(uid, "deployment.trigger", "GitHub-Hookshot/abc", map[string]any{"via": "webhook", "provider": "github"})
+	hookRun := mk(uid, "deployment.run.completed", "GitHub-Hookshot/abc", map[string]any{"via": "webhook", "audit_id": hook.ID})
 
 	ids := func(f AuditFilter) map[string]bool {
 		t.Helper()
@@ -83,13 +85,20 @@ func TestAuditLogRepository_ListFiltered_Activity(t *testing.T) {
 	check("mcp", AuditFilter{UserID: u.ID, Source: models.AuditSourceMCP}, []*models.AuditLog{mcp, outcome, run}, []*models.AuditLog{api, ui})
 	check("api", AuditFilter{UserID: u.ID, Source: models.AuditSourceAPI}, []*models.AuditLog{api}, []*models.AuditLog{mcp, ui, run})
 	check("agent", AuditFilter{UserID: u.ID, Source: models.AuditSourceAgent}, []*models.AuditLog{mcp, outcome, api, run}, []*models.AuditLog{ui})
-	check("ui", AuditFilter{UserID: u.ID, Source: models.AuditSourceUI}, []*models.AuditLog{ui}, []*models.AuditLog{mcp, api, run})
+	check("ui", AuditFilter{UserID: u.ID, Source: models.AuditSourceUI}, []*models.AuditLog{ui}, []*models.AuditLog{mcp, api, run, hook, hookRun})
+	check("webhook", AuditFilter{UserID: u.ID, Source: models.AuditSourceWebhook}, []*models.AuditLog{hook, hookRun}, []*models.AuditLog{mcp, outcome, api, ui, run})
+	check("agent-no-webhook", AuditFilter{UserID: u.ID, Source: models.AuditSourceAgent}, nil, []*models.AuditLog{hook, hookRun})
+	for _, l := range []*models.AuditLog{hook, hookRun} {
+		if l.Source() != models.AuditSourceWebhook {
+			t.Errorf("%s Source() = %s, want webhook", l.Action, l.Source())
+		}
+	}
 	check("token", AuditFilter{TokenName: token}, []*models.AuditLog{mcp, outcome, api, run}, []*models.AuditLog{ui, foreign})
 	check("contains", AuditFilter{UserID: u.ID, ActionContains: "RESTART"}, []*models.AuditLog{mcp, outcome}, []*models.AuditLog{api, ui})
 	check("audit_id", AuditFilter{AuditID: api.ID}, []*models.AuditLog{api, run}, []*models.AuditLog{mcp, outcome, ui})
 
 	page, err := repo.ListFiltered(ctx, AuditFilter{UserID: u.ID, Limit: 2})
-	if err != nil || len(page) != 2 || page[0].ID != run.ID {
+	if err != nil || len(page) != 2 || page[0].ID != hookRun.ID {
 		t.Errorf("limit 2: %d rows, err %v", len(page), err)
 	}
 
