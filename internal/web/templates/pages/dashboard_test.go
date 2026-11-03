@@ -33,6 +33,9 @@ func TestDashboardStatsLoaderMirrorsStats(t *testing.T) {
 		`id="dashboard-stats"`,
 		`hx-get="/dashboard/stats"`,
 		`hx-trigger="load"`,
+		// outerHTML, so the loaded stats replace the loader instead of nesting a
+		// second #dashboard-stats inside it (Prune System targets that id).
+		`hx-swap="outerHTML"`,
 		`role="status"`,
 		`aria-label="Loading stats"`,
 		`aria-busy="true"`,

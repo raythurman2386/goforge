@@ -27,8 +27,8 @@ A plain form POST (no `HX-Request`) still answers `303` to `/dashboard`. A `user
 sudo -n docker system df > "$PROOF/minis-df-before.txt"
 sudo -n docker run -d --privileged --name gf-prune-dind -p 127.0.0.1:23750:2375 -e DOCKER_TLS_CERTDIR= docker:27-dind
 export DOCKER_HOST=tcp://127.0.0.1:23750   # every docker call below talks to the dind engine only
-# Seed: a small build (build cache) and one stopped container with the managed label.
-printf 'FROM alpine:3.20\nRUN head -c 8388608 /dev/urandom > /blob\n' | docker build -t goforge-prune-seed:1 -
+# Seed: a small managed-label build (build cache plus a prunable image) and one stopped managed container.
+printf 'FROM alpine:3.20\nLABEL goforge.managed=true\nRUN head -c 8388608 /dev/urandom > /blob\n' | docker build -t goforge-prune-seed:1 -
 docker run --name gf-prune-seed --label goforge.managed=true goforge-prune-seed:1 true
 docker system df > "$PROOF/dind-df-before.txt"
 ```
@@ -39,7 +39,7 @@ Use `docker inspect` on a GoForge-created container, or `ManagedLabelFilter` in 
 - Click the button, then the dialog's **Prune**. While the request runs, the button is `:disabled`, has class `htmx-request`, and its visible text is `Pruning…` (`pruning-pending`). Slow the request with `page.route` (continue after a short delay) if the dind prune is too fast to catch.
 - `#toast` has the `Pruned …` text, `#dashboard-stats` shows the new numbers, `window.__gfNoReload` is still `1`, and the URL is `/dashboard` (`pruned-summary`, `no-reload`).
 - Click sidebar **Containers**, then `page.goBack()`. The Dashboard shows the post-prune card and no toast.
-- Stop the dind container (`sudo -n docker stop gf-prune-dind`), reload, and prune again: an error toast appears, `#dashboard-stats` keeps its content, and the URL is `/dashboard` (`prune-error`). The button only renders enabled when stats loaded while the engine was up, so stop dind after the page has loaded, or seed again first.
+- Seed dind again (the success step left nothing to prune, so the button is disabled), reload while dind is up, then stop the dind container (`sudo -n docker stop gf-prune-dind`) and prune again: an error toast appears, `#dashboard-stats` keeps its content, the button is enabled again, and the URL is `/dashboard` (`prune-error`). `sudo -n docker start gf-prune-dind` before `drive-ui-a11y` so the disk card renders.
 - `docker system df` on the dind engine after the success step is the second view. `verify.sh drive-ui-a11y` against `18080` should keep `axe-gate=pass` on `/dashboard` in light and dark.
 
 Cleanup: stop serve by its PID, `sudo -n docker rm -f -v gf-prune-dind <pg-container>`, and compare `sudo -n docker system df` on the host with `minis-df-before.txt`.
@@ -48,5 +48,6 @@ Cleanup: stop serve by its PID, `sudo -n docker rm -f -v gf-prune-dind <pg-conta
 
 - `/dashboard/prune` sits under the 15 s route timeout. A very large build cache prune could hit it and show the error toast even though Docker keeps pruning. Not changed by t1905u.
 - The image count is entries in `ImagesDeleted` with `Deleted` set. Untag entries are not counted, so one image with two tags counts once.
+- The stats loader swaps with `hx-swap="outerHTML"`, so there is exactly one `#dashboard-stats` on the page for the prune response to replace. Before t1905u the loaded stats nested a second `#dashboard-stats` inside the loader.
 - `#dashboard-stats` loads once on page load and does not poll, so the swapped card stays until the next navigation.
 - Host mode without `DOCKER_HOST` has no Docker, so the disk card does not render and there is no button to press.

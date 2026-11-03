@@ -43,7 +43,7 @@ templ statCardSkeleton(valueHeight string) {
 // Usage, Docker Disk Usage) with matching line heights so the page does not
 // jump when the real stats land.
 templ DashboardStatsLoader() {
-	<div id="dashboard-stats" hx-get="/dashboard/stats" hx-trigger="load">
+	<div id="dashboard-stats" hx-get="/dashboard/stats" hx-trigger="load" hx-swap="outerHTML">
 		<div role="status" aria-label="Loading stats" aria-busy="true">
 			<div class="mt-8">
 				@ui.Skeleton(ui.SkeletonLine, "h-7 w-40")
