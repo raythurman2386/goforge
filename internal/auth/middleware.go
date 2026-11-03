@@ -118,6 +118,15 @@ func GetUserFromContext(ctx context.Context) *models.User {
 	return nil
 }
 
+// GetSessionFromContext returns the session that authenticated the request,
+// or nil for API token and anonymous requests.
+func GetSessionFromContext(ctx context.Context) *models.Session {
+	if session, ok := ctx.Value(SessionContextKey).(*models.Session); ok {
+		return session
+	}
+	return nil
+}
+
 // Middleware handles authentication by checking the session cookie.
 func Middleware(manager *SessionManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

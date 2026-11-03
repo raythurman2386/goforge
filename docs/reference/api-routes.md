@@ -180,7 +180,8 @@ Used by HTMX components for dynamic repository/branch selection.
 |--------|------|---------|-------------|
 | `GET` | `/settings/profile` | `settingsHandler.Profile` | User profile page |
 | `PUT` | `/settings/profile` | `settingsHandler.UpdateProfile` | Update email |
-| `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password |
+| `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password. On success every other session of the account is deleted (the current one is kept). Audited as `user.password.change` with `sessions_revoked` |
+| `POST` | `/settings/sessions/revoke-others` | `settingsHandler.RevokeOtherSessions` | Sign out other sessions: deletes every session of the account except the current one. Audited as `user.sessions.revoke` with `sessions_revoked` |
 | `GET` | `/settings/tokens` | `settingsHandler.ListAPITokens` | List API tokens (HTMX partial) |
 | `GET` | `/settings/tokens/new` | `settingsHandler.NewAPITokenModal` | New token modal (HTMX) |
 | `GET` | `/settings/tokens/new?preset=mcp` | `settingsHandler.NewAPITokenModal` | MCP token modal: `read` + `write` checked, 90 days, no never-expiring option |

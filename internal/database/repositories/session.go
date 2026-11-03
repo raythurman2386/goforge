@@ -117,6 +117,25 @@ func (r *SessionRepository) DeleteByUserID(ctx context.Context, userID string) e
 	return err
 }
 
+// DeleteByUserIDExcept deletes every session of userID except keepSessionID
+// and returns how many rows it removed. An empty keepSessionID keeps none,
+// for a request that was not made with a session (for example an API token).
+func (r *SessionRepository) DeleteByUserIDExcept(ctx context.Context, userID, keepSessionID string) (int64, error) {
+	var (
+		result sql.Result
+		err    error
+	)
+	if keepSessionID == "" {
+		result, err = r.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
+	} else {
+		result, err = r.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = $1 AND id <> $2`, userID, keepSessionID)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 // DeleteExpired deletes all expired sessions.
 func (r *SessionRepository) DeleteExpired(ctx context.Context) (int64, error) {
 	query := `DELETE FROM sessions WHERE expires_at < $1`
