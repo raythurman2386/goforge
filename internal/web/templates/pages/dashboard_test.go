@@ -71,3 +71,33 @@ func TestRecentAgentActionsLoaderMirrorsCard(t *testing.T) {
 		}
 	}
 }
+
+// t1876u: Prune System enables when the only reclaimable space is build cache
+// (folded into ReclaimableSize), the alert names the build cache share, and
+// the confirm copy says build cache is engine-wide.
+func TestDashboardStatsPruneBuildCacheOnly(t *testing.T) {
+	du := &models.DiskUsageInfo{BuildCacheSize: 3 << 30, BuildCacheReclaimable: 2 << 30, ReclaimableSize: 2 << 30}
+	out := render(t, DashboardStats("tok", &models.SystemStats{DiskUsage: du}, true))
+	if strings.Contains(out, "Nothing to prune") {
+		t.Fatal("prune button disabled although build cache is reclaimable")
+	}
+	for _, want := range []string{
+		`action="/dashboard/prune"`,
+		"unused Docker build cache on this host",
+		"engine-wide",
+		"can be freed by pruning",
+		"of unused build cache",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("stats missing %q", want)
+		}
+	}
+
+	none := render(t, DashboardStats("tok", &models.SystemStats{DiskUsage: &models.DiskUsageInfo{BuildCacheSize: 1 << 30}}, true))
+	if !strings.Contains(none, "Nothing to prune") {
+		t.Fatal("prune button enabled with nothing reclaimable")
+	}
+	if strings.Contains(none, "of unused build cache") {
+		t.Fatal("build cache note shown with nothing reclaimable")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/moby/moby/api/types/build"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
@@ -38,13 +39,30 @@ func (c *Client) PruneContainers(ctx context.Context) (container.PruneReport, er
 	return res.Report, nil
 }
 
-// CleanupSystem runs both image and container pruning.
+// PruneBuildCache removes build cache that no build is using. Build cache
+// records carry no labels, so this is engine-wide, like the Build Cache size
+// on the dashboard. All is set so every unused record goes, not only dangling
+// ones; that matches the reclaimable figure docker system df reports. Records
+// in use by a running build are kept by the daemon.
+func (c *Client) PruneBuildCache(ctx context.Context) (build.CachePruneReport, error) {
+	res, err := c.docker.BuildCachePrune(ctx, client.BuildCachePruneOptions{All: true})
+	if err != nil {
+		return build.CachePruneReport{}, err
+	}
+	return res.Report, nil
+}
+
+// CleanupSystem prunes stopped managed containers, unused managed images, and
+// unused (engine-wide) build cache, in that order.
 func (c *Client) CleanupSystem(ctx context.Context) error {
 	if _, err := c.PruneContainers(ctx); err != nil {
 		return fmt.Errorf("failed to prune containers: %w", err)
 	}
 	if _, err := c.PruneImages(ctx); err != nil {
 		return fmt.Errorf("failed to prune images: %w", err)
+	}
+	if _, err := c.PruneBuildCache(ctx); err != nil {
+		return fmt.Errorf("failed to prune build cache: %w", err)
 	}
 	return nil
 }

@@ -102,7 +102,11 @@ This removes, for containers and images that carry the GoForge managed label onl
 - Stopped containers
 - Unused images (tagged or dangling)
 
-Volumes, networks, build cache, and anything GoForge did not create are left alone.
+It then removes all unused Docker build cache (`BuildCachePrune` with `all`, like `docker builder prune -a`). Build cache records carry no labels, so this step is engine-wide: it also clears unused cache from builds GoForge did not run. Cache a running build is using is kept.
+
+The button is enabled when **Reclaimable Space** is above zero. That figure is unused managed images, stopped managed containers, and build cache that is neither in use nor shared (the reclaimable build cache `docker system df` reports), so a host whose only waste is build cache can still be pruned. The alert names the build cache share. The **Build Cache** card still shows the full engine-wide cache size, in use or not.
+
+Volumes, networks, and containers or images GoForge did not create are left alone.
 
 ## Metrics Storage
 

@@ -145,7 +145,9 @@ func (c *Collector) CollectSystemStats(ctx context.Context, userID string) (*mod
 // calculateDiskUsage extracts disk usage for objects GoForge created.
 // Images and containers must carry goforge.managed=true. Volumes are included
 // when their name contains "goforge". Build cache cannot be filtered by label,
-// so that total is the engine-wide cache size.
+// so that total is the engine-wide cache size. The build cache that is neither
+// in use nor shared is reclaimable (as docker system df counts it) and is
+// part of ReclaimableSize, because Prune System prunes it.
 func (c *Collector) calculateDiskUsage(diskUsage *client.DiskUsageResult) *models.DiskUsageInfo {
 	info := &models.DiskUsageInfo{}
 	if diskUsage == nil {
@@ -183,8 +185,13 @@ func (c *Collector) calculateDiskUsage(diskUsage *client.DiskUsageResult) *model
 	}
 
 	for i := range diskUsage.BuildCache.Items {
-		info.BuildCacheSize += diskUsage.BuildCache.Items[i].Size
+		rec := &diskUsage.BuildCache.Items[i]
+		info.BuildCacheSize += rec.Size
+		if !rec.InUse && !rec.Shared && rec.Size > 0 {
+			info.BuildCacheReclaimable += rec.Size
+		}
 	}
+	info.ReclaimableSize += info.BuildCacheReclaimable
 
 	return info
 }

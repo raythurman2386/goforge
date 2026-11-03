@@ -174,7 +174,7 @@ Docker Engine SDK wrapper.
 | `container.go` | Container create, start, stop, remove |
 | `logs.go` | Container log streaming |
 | `compose.go` | Docker Compose YAML parser |
-| `prune.go` | System prune (images, containers) |
+| `prune.go` | System prune (managed containers and images, engine-wide unused build cache) |
 
 ### `internal/git/`
 
