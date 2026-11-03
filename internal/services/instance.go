@@ -1157,7 +1157,8 @@ func (s *InstanceService) RestartInstance(ctx context.Context, id string) error 
 	return s.instanceRepo.Update(ctx, instance)
 }
 
-// PruneSystem cleans up unused containers and images.
+// PruneSystem removes stopped managed containers, unused managed images, and
+// unused build cache (engine-wide).
 func (s *InstanceService) PruneSystem(ctx context.Context) error {
 	if err := s.dockerClient.CleanupSystem(ctx); err != nil {
 		return fmt.Errorf("failed to prune system: %w", err)

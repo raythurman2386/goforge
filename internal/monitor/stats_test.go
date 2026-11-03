@@ -47,9 +47,56 @@ func TestCalculateDiskUsage_ManagedOnly(t *testing.T) {
 	if info.BuildCacheSize != 3 {
 		t.Fatalf("build cache = %d, want 3", info.BuildCacheSize)
 	}
-	// Unused managed image plus the stopped managed container.
-	if info.ReclaimableSize != 14 {
-		t.Fatalf("reclaimable = %d, want 14", info.ReclaimableSize)
+	if info.BuildCacheReclaimable != 3 {
+		t.Fatalf("build cache reclaimable = %d, want 3", info.BuildCacheReclaimable)
+	}
+	// Unused managed image, the stopped managed container, and unused build cache.
+	if info.ReclaimableSize != 17 {
+		t.Fatalf("reclaimable = %d, want 17", info.ReclaimableSize)
+	}
+}
+
+// t1876u: build cache that is neither in use nor shared is reclaimable and is
+// folded into ReclaimableSize, so a host whose only waste is build cache still
+// enables Prune System.
+func TestCalculateDiskUsage_BuildCacheReclaimable(t *testing.T) {
+	t.Parallel()
+
+	usage := &client.DiskUsageResult{
+		BuildCache: client.BuildCacheDiskUsage{Items: []build.CacheRecord{
+			{ID: "unused", Size: 100},
+			{ID: "in-use", Size: 20, InUse: true},
+			{ID: "shared", Size: 7, Shared: true},
+			{ID: "unused-2", Size: 1},
+		}},
+	}
+
+	info := (&Collector{}).calculateDiskUsage(usage)
+	if info.BuildCacheSize != 128 {
+		t.Fatalf("build cache = %d, want 128", info.BuildCacheSize)
+	}
+	if info.BuildCacheReclaimable != 101 {
+		t.Fatalf("build cache reclaimable = %d, want 101", info.BuildCacheReclaimable)
+	}
+	if info.ReclaimableSize != 101 {
+		t.Fatalf("reclaimable = %d, want 101 (build cache only)", info.ReclaimableSize)
+	}
+}
+
+func TestCalculateDiskUsage_BuildCacheAllInUse(t *testing.T) {
+	t.Parallel()
+
+	usage := &client.DiskUsageResult{
+		BuildCache: client.BuildCacheDiskUsage{Items: []build.CacheRecord{
+			{Size: 20, InUse: true},
+			{Size: 7, Shared: true},
+		}},
+	}
+
+	info := (&Collector{}).calculateDiskUsage(usage)
+	if info.BuildCacheSize != 27 || info.BuildCacheReclaimable != 0 || info.ReclaimableSize != 0 {
+		t.Fatalf("got size=%d reclaimable=%d total=%d, want 27/0/0",
+			info.BuildCacheSize, info.BuildCacheReclaimable, info.ReclaimableSize)
 	}
 }
 

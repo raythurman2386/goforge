@@ -46,6 +46,7 @@ type mockDockerAPI struct {
 	containerStatsFunc   func(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
 	containerLogsFunc    func(ctx context.Context, containerID string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error)
 	containersPrune      func(ctx context.Context, options client.ContainerPruneOptions) (client.ContainerPruneResult, error)
+	buildCachePruneFunc  func(ctx context.Context, options client.BuildCachePruneOptions) (client.BuildCachePruneResult, error)
 	pingFunc             func(ctx context.Context) (client.PingResult, error)
 	closeFunc            func() error
 	containerInspectFunc func(ctx context.Context, containerID string) (client.ContainerInspectResult, error)
@@ -158,6 +159,13 @@ func (m *mockDockerAPI) ContainerPrune(ctx context.Context, options client.Conta
 		return m.containersPrune(ctx, options)
 	}
 	return client.ContainerPruneResult{}, nil
+}
+
+func (m *mockDockerAPI) BuildCachePrune(ctx context.Context, options client.BuildCachePruneOptions) (client.BuildCachePruneResult, error) {
+	if m.buildCachePruneFunc != nil {
+		return m.buildCachePruneFunc(ctx, options)
+	}
+	return client.BuildCachePruneResult{}, nil
 }
 
 func (m *mockDockerAPI) Ping(ctx context.Context, _ client.PingOptions) (client.PingResult, error) {

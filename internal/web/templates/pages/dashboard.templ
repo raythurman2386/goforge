@@ -135,7 +135,7 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 									Type: "submit",
 									Class: "text-sm",
 									Attrs: templ.Attributes{
-										"hx-confirm": "This will remove all stopped containers and unused images. Continue?",
+										"hx-confirm": "This removes stopped GoForge containers, unused GoForge images, and all unused Docker build cache on this host (build cache is engine-wide, not only GoForge builds). Continue?",
 										"data-ui-confirm-tone": "danger",
 										"data-ui-confirm-label": "Prune",
 									},
@@ -179,6 +179,9 @@ templ DashboardStats(csrfToken string, stats *models.SystemStats, admin bool) {
 						<div class="mt-4">
 							@ui.Alert(ui.AlertProps{Tone: ui.AlertWarning}) {
 								<p><strong>Reclaimable Space:</strong> { formatBytes(stats.DiskUsage.ReclaimableSize) } can be freed by pruning.</p>
+								if stats.DiskUsage.BuildCacheReclaimable > 0 {
+									<p class="mt-1 text-sm">Includes { formatBytes(stats.DiskUsage.BuildCacheReclaimable) } of unused build cache.</p>
+								}
 							}
 						</div>
 					}

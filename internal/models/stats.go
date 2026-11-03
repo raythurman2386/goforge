@@ -21,9 +21,14 @@ type SystemStats struct {
 
 // DiskUsageInfo contains Docker disk usage information.
 type DiskUsageInfo struct {
-	ImagesSize      int64 // Total size of images
-	ContainersSize  int64 // Total size of containers
-	VolumesSize     int64 // Total size of volumes
-	BuildCacheSize  int64 // Total size of build cache
-	ReclaimableSize int64 // Total reclaimable space
+	ImagesSize     int64 // Total size of images
+	ContainersSize int64 // Total size of containers
+	VolumesSize    int64 // Total size of volumes
+	BuildCacheSize int64 // Total size of build cache
+	// BuildCacheReclaimable is the engine-wide build cache that is neither in
+	// use nor shared, the part a build cache prune frees.
+	BuildCacheReclaimable int64
+	// ReclaimableSize is what Prune System frees: unused managed images,
+	// stopped managed containers, and BuildCacheReclaimable.
+	ReclaimableSize int64
 }
