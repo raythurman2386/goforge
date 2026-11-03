@@ -88,6 +88,15 @@ func TestDetailMetricsStreamPreservedByDockerID(t *testing.T) {
 	if !strings.Contains(html[start:end], `data-metrics-frame`) {
 		t.Error("stream has no frame for its stats and unavailable messages")
 	}
+	// t1953u: the frame opens on the mirrored StatsSkeleton (a busy status
+	// region), not the old spinner, so the first frame does not shift the page.
+	frame := html[start:end]
+	if !strings.Contains(frame, `<div data-metrics-frame><div role="status" aria-label="Loading resource usage" aria-busy="true" data-stats-skeleton>`) {
+		t.Errorf("frame does not hold the StatsSkeleton: %s", frame)
+	}
+	if strings.Contains(frame, "Connecting to metrics stream") {
+		t.Error("frame still holds the spinner")
+	}
 	other := renderDetail(t, models.ServiceStatusPending, &models.Container{DockerID: "def456"}, nil)
 	if !strings.Contains(other, `id="metrics-stream-def456"`) || strings.Contains(other, "metrics-stream-abc123") {
 		t.Error("stream id does not follow the Docker ID")

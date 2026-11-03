@@ -60,7 +60,7 @@ templ Detail(containerID string, csrfToken string) {
 				}
 			}
 			@ui.CardContent(templ.Attributes{"id": "container-stats", "hx-sse:connect": fmt.Sprintf("/containers/%s/stats", containerID)}) {
-				@components.LoadingState("Waiting for stats...")
+				@components.StatsSkeleton()
 			}
 		}
 

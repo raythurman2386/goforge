@@ -12,6 +12,7 @@
 //   GOFORGE_UI_SERVICE_ID     optional service instance id (else first on /services)
 //   GOFORGE_UI_CONTAINER_ID   optional docker id (else first on /containers)
 //   GOFORGE_UI_DEPLOYMENT_PATH optional /projects/{id}/deployments/{id} path
+//   GOFORGE_UI_SHIFT_ONLY     "1" runs only login and the layout-shift checks
 //   GOFORGE_VERIFY_CHROMIUM   optional Chromium executable path
 //
 // Writes ui-a11y-verdict.txt, ui-a11y-report.json, and screenshots under
@@ -35,6 +36,7 @@ const BASE = (process.env.GOFORGE_UI_BASE || "").replace(/\/$/, "");
 const EVIDENCE = process.env.GOFORGE_UI_EVIDENCE;
 const EMAIL = process.env.GOFORGE_UI_EMAIL || "";
 const PASSWORD_FILE = process.env.GOFORGE_UI_PASSWORD_FILE || "";
+const SHIFT_ONLY = process.env.GOFORGE_UI_SHIFT_ONLY === "1";
 const SCHEMES = (process.env.GOFORGE_UI_SCHEMES || "light,dark").split(",").map((s) => s.trim()).filter(Boolean);
 
 const PUBLIC_ROUTES = ["/login", "/auth/register", "/dev/ui", "/ui-a11y-missing-page"];
@@ -1637,7 +1639,8 @@ async function appDetailChecks(scheme, page, ids) {
       lines.push(`check ${scheme} app-restore-points skip reason=card-not-rendered (needs admin and a backed-up template)`);
       return;
     }
-    await page.waitForFunction(() => !/Loading restore points/.test(document.getElementById("service-restore-points").textContent), null, { timeout: 8000 });
+    // t1953u: the card loads into a busy skeleton region; wait for the swap.
+    await page.waitForFunction(() => !document.querySelector('#service-restore-points [aria-busy="true"]'), null, { timeout: 8000 });
     const state = await page.evaluate(() => {
       const el = document.getElementById("service-restore-points");
       return el.querySelector('[data-testid="service-restore-point-table"]') ? "table" : el.querySelector('[data-testid="service-restore-points-empty"]') ? "empty" : el.querySelector('[data-testid="service-restore-points-error"]') ? "error" : "other";
@@ -1647,6 +1650,115 @@ async function appDetailChecks(scheme, page, ids) {
   });
   page.setDefaultTimeout(30000);
 }
+
+// t1953u (D4): placeholder-to-content layout shift. Before the page runs,
+// record layout-shift entries and, per region, the height at
+// DOMContentLoaded (the placeholder) and two frames after the first swap
+// (the content). Regions: the Resource Usage frame (service detail, project
+// Overview), #container-stats (container detail), #service-restore-points,
+// and #dashboard-stats (baseline, outerHTML swap).
+const SHIFT_PROBE = () => {
+  const S = (window.__shift = { entries: [], frames: {} });
+  try {
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) if (!e.hadRecentInput) S.entries.push({ t: e.startTime, v: e.value });
+    }).observe({ type: "layout-shift", buffered: true });
+  } catch (e) {
+    S.unsupported = true;
+  }
+  const specs = [
+    ["metrics", "[data-metrics-frame]", "dl, [data-stats-unavailable]", "[data-stats-unavailable]"],
+    ["container", "#container-stats", "dl, [data-stats-unavailable]", "[data-stats-unavailable]"],
+    ["restore", "#service-restore-points", '[data-testid="service-restore-point-table"], [data-testid="service-restore-points-empty"], [data-testid="service-restore-points-error"]', '[data-testid="service-restore-points-empty"], [data-testid="service-restore-points-error"]'],
+    ["dashboard", "#dashboard-stats", "#dashboard-stats:not([hx-get])", null],
+  ];
+  const loaded = (el, sel) => el.matches(sel) || el.querySelector(sel);
+  const tick = () => {
+    for (const [key, frameSel, loadedSel, shortSel] of specs) {
+      const f = S.frames[key];
+      if (!f || f.swapAt != null) continue;
+      const el = document.querySelector(frameSel);
+      if (!el || !loaded(el, loadedSel)) continue;
+      f.swapAt = performance.now();
+      f.state = shortSel && loaded(el, shortSel) ? "short" : "content";
+      if (key === "metrics" || key === "container") f.state = el.querySelector("[data-stats-unavailable]") ? "unavailable" : "stats";
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const now = document.querySelector(frameSel);
+          f.after = now ? now.getBoundingClientRect().height : -1;
+        }),
+      );
+    }
+  };
+  document.addEventListener("DOMContentLoaded", () => {
+    for (const [key, frameSel] of specs) {
+      const el = document.querySelector(frameSel);
+      if (el) S.frames[key] = { before: el.getBoundingClientRect().height, placeholder: el.querySelector('[aria-busy="true"]') ? "busy" : "other" };
+    }
+    tick();
+    new MutationObserver(tick).observe(document.body, { childList: true, subtree: true });
+  });
+};
+
+// One page load at one width: wait for the region's first swap, let the
+// page settle, then return the placeholder and content heights and the CLS
+// summed over the swap window (100 ms before to 1 s after).
+async function measureShift(ctx, route, key, width) {
+  const page = await ctx.newPage();
+  try {
+    await page.setViewportSize({ width, height: width < 640 ? 812 : 900 });
+    await page.addInitScript(SHIFT_PROBE);
+    await page.goto(BASE + route, { waitUntil: "load" });
+    const has = await page.evaluate((k) => Boolean(window.__shift.frames[k]), key);
+    if (!has) return null;
+    await page.waitForFunction((k) => window.__shift.frames[k].after != null, key, { timeout: 15000 });
+    await page.waitForTimeout(1100);
+    return await page.evaluate((k) => {
+      const S = window.__shift;
+      const f = S.frames[k];
+      const swap = S.entries.filter((e) => e.t >= f.swapAt - 100 && e.t <= f.swapAt + 1000).reduce((a, e) => a + e.v, 0);
+      const total = S.entries.reduce((a, e) => a + e.v, 0);
+      return { ...f, swapCLS: swap, totalCLS: total, unsupported: Boolean(S.unsupported) };
+    }, key);
+  } finally {
+    await page.close();
+  }
+}
+
+async function layoutShiftChecks(scheme, page, ids, projectHref) {
+  const ctx = page.context();
+  const targets = [];
+  if (ids.service) targets.push(["service-detail", `/services/${ids.service}`, "metrics", true]);
+  if (projectHref) targets.push(["project-overview", projectHref, "metrics", true]);
+  if (ids.container) targets.push(["container-detail", `/containers/${ids.container}`, "container", true]);
+  if (ids.service) targets.push(["restore-points", `/services/${ids.service}`, "restore", false]);
+  targets.push(["dashboard-baseline", "/dashboard", "dashboard", false]);
+  const fmt = (n) => (Math.round(n * 10000) / 10000).toString();
+  for (const [name, route, key, gate] of targets) {
+    for (const width of [1280, 375]) {
+      const label = `layout-shift-${name}-${width}`;
+      try {
+        const m = await measureShift(ctx, route, key, width);
+        if (!m) {
+          lines.push(`check ${scheme} ${label} skip reason=region-not-rendered`);
+          continue;
+        }
+        const delta = Math.abs(m.after - m.before);
+        const detail = `state=${m.state} placeholder=${m.placeholder} before=${m.before.toFixed(1)}px after=${m.after.toFixed(1)}px delta=${delta.toFixed(1)}px swap-cls=${fmt(m.swapCLS)} total-cls=${fmt(m.totalCLS)}${m.unsupported ? " layout-shift-unsupported" : ""}`;
+        // The restore points empty and error states are shorter than the list
+        // (data-dependent), and the dashboard is a baseline: record, do not gate.
+        if (!gate && (key === "dashboard" || m.state === "short")) {
+          lines.push(`info ${scheme} ${label} ${detail}`);
+          continue;
+        }
+        check(scheme, label, delta <= 2 && m.swapCLS < 0.01 && !m.unsupported, detail);
+      } catch (e) {
+        check(scheme, label, false, "threw " + String(e.message || e).split("\n")[0]);
+      }
+    }
+  }
+}
+
 
 // ROADMAP item 5 (t1681u gap 2): below md every visible text button and
 // field is at least 44px tall; from md up ButtonSM keeps its compact size.
@@ -1839,6 +1951,20 @@ async function main() {
       const results = [];
       const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1280, height: 900 } });
       const page = await ctx.newPage();
+      if (SHIFT_ONLY) {
+        // Layout shift only (t1953u): for comparing a build without the
+        // skeletons. No axe scans, so the axe gate line is not a result.
+        if (canLogin && (await login(page))) {
+          const projectTabs = await projectRoutes(page);
+          const ids = await detailIDs(page, projectTabs[0]);
+          lines.push(`detail-ids ${scheme} service=${ids.service ? "yes" : "none"} container=${ids.container ? "yes" : "none"} project=${projectTabs[0] ? "yes" : "none"}`);
+          await layoutShiftChecks(scheme, page, ids, projectTabs[0]);
+        } else {
+          lines.push(`login ${scheme} ${canLogin ? "fail" : "skip reason=no-register-password"}`);
+        }
+        await ctx.close();
+        break;
+      }
       for (const route of custom || PUBLIC_ROUTES) results.push(await scan(page, scheme, route));
       await galleryChecks(browser, scheme, page);
       await dialogChecks(scheme, page);
@@ -1855,6 +1981,8 @@ async function main() {
           const ids = await detailIDs(page, projectTabs[0]);
           lines.push(`detail-ids ${scheme} service=${ids.service ? "yes" : "none"} container=${ids.container ? "yes" : "none"} deployment=${ids.deployment ? "yes" : "none"}`);
           await appDetailChecks(scheme, page, ids);
+          // Layout shift is the same in both schemes; measure it once.
+          if (scheme === SCHEMES[0]) await layoutShiftChecks(scheme, page, ids, projectTabs[0]);
           await touchTargetChecks(scheme, page);
           await buttonCenteringChecks(scheme, page, ["/dev/ui", "/settings/profile", "/settings/git", "/projects/new", ...projectTabs, ...detailRouteList(ids)]);
           await agentActionsCardCheck(scheme, page);
@@ -1870,7 +1998,8 @@ async function main() {
   } finally {
     await browser.close();
   }
-  lines.push(`axe-gate=${axeGate ? "pass" : "fail"} (zero serious or critical across scanned pages)`);
+  if (SHIFT_ONLY) lines.push("mode=shift-only (no axe scans)");
+  else lines.push(`axe-gate=${axeGate ? "pass" : "fail"} (zero serious or critical across scanned pages)`);
   lines.push(`checks=${checksOK ? "pass" : "fail"}`);
   lines.push(`axe-core=${AXE_VERSION} playwright-core=${PW_VERSION}`);
   lines.push("harness=ok");
