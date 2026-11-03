@@ -32,43 +32,16 @@ func (c *Chain) PurgeOnce(ctx context.Context, days int) (int64, error) {
 	if days < MinRetentionDays || days > MaxRetentionDays {
 		return 0, fmt.Errorf("audit retention days %d is outside %d-%d", days, MinRetentionDays, MaxRetentionDays)
 	}
-	var (
-		total    int64
-		cutoff   time.Time
-		moved    bool
-		boundary int64
-		hash     []byte
-	)
+	var total int64
 	for {
 		step, err := c.purgeBatch(ctx, days, PurgeBatch)
 		if err != nil {
 			return total, err
 		}
-		if cutoff.IsZero() && !step.cutoff.IsZero() {
-			cutoff = step.cutoff
-		}
 		total += step.n
-		if step.moved {
-			moved = true
-			boundary = step.boundary
-			hash = step.hash
-		}
 		if step.n < int64(PurgeBatch) {
 			break
 		}
-	}
-	if total == 0 {
-		return 0, nil
-	}
-	if !moved {
-		var err error
-		boundary, hash, err = c.boundary(ctx, c.db)
-		if err != nil {
-			return total, err
-		}
-	}
-	if err := c.insertPurgeRow(ctx, total, cutoff, boundary, hash); err != nil {
-		return total, err
 	}
 	return total, nil
 }
@@ -137,6 +110,20 @@ func (c *Chain) purgeBatch(ctx context.Context, days, limit int) (purgeStep, err
 			return step, uerr
 		}
 		step.n += unsealed
+	}
+	// The boundary and the purge row commit together. A later session can
+	// still rewrite audit_settings; verify rejects a boundary that no
+	// sealed purge row records.
+	if step.n > 0 {
+		bseq, bhash, berr := c.boundary(ctx, tx)
+		if step.moved {
+			bseq, bhash = step.boundary, step.hash
+		} else if berr != nil {
+			return step, berr
+		}
+		if insErr := c.insertPurgeRow(ctx, tx, step.n, step.cutoff, bseq, bhash); insErr != nil {
+			return step, insErr
+		}
 	}
 	if commitErr := tx.Commit(); commitErr != nil {
 		return step, commitErr
@@ -264,7 +251,7 @@ type purgeDetails struct {
 	ThroughHash string `json:"through_hash"`
 }
 
-func (c *Chain) insertPurgeRow(ctx context.Context, deleted int64, cutoff time.Time, seq int64, hash []byte) error {
+func (c *Chain) insertPurgeRow(ctx context.Context, q queryer, deleted int64, cutoff time.Time, seq int64, hash []byte) error {
 	raw, err := json.Marshal(purgeDetails{
 		Deleted:     deleted,
 		Cutoff:      cutoff.UTC().Format(time.RFC3339),
@@ -274,7 +261,7 @@ func (c *Chain) insertPurgeRow(ctx context.Context, deleted int64, cutoff time.T
 	if err != nil {
 		return err
 	}
-	_, err = c.db.ExecContext(ctx, `
+	_, err = q.ExecContext(ctx, `
 		INSERT INTO audit_logs (id, action, resource_type, details, created_at)
 		VALUES ($1, $2, $3, $4, NOW())`,
 		uuid.New().String(), models.AuditActionAuditRetentionPurge, models.ResourceTypeAuditSettings, raw)

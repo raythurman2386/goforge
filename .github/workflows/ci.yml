@@ -53,6 +53,10 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: postgres://goforge:testpassword@localhost:5432/goforge_test?sslmode=disable
+          # The official Postgres image makes POSTGRES_USER a superuser, so
+          # this DSN can CREATE DATABASE and SET session_replication_role.
+          # Audit chain tests use it instead of sudo.
+          GOFORGE_TEST_SUPERUSER_DSN: postgres://goforge:testpassword@localhost:5432/goforge_test?sslmode=disable
         run: make test
 
       - name: Lint

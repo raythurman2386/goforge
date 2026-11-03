@@ -71,30 +71,38 @@ Settings → Profile → **Audit log**, or with `GOFORGE_AUDIT_RETENTION_DAYS`
 until someone saves the card (a saved value wins). `0` keeps every row.
 Any other value must be 30 to 3650 days. The page above the table says
 which rule is in effect. About five minutes after startup, and then once
-a day, GoForge hard-deletes rows older than that cutoff when doing so
-does not punch a hole in the hash chain: a prefix of the chain, and a
-tail of rows that were sealed after every row you are keeping. A
-backdated row that was sealed between two newer rows stays, because
-removing it would break the chain. The job writes one
-`audit.retention.purge` row (`deleted`, `cutoff`, `through_seq`,
-`through_hash`) when it deleted something. Saving the card
-writes `audit.settings.update` with `old_days` and `new_days`.
+a day, GoForge hard-deletes old rows when doing so does not punch a hole
+in the hash chain: a prefix of the chain, a suffix of rows sealed after
+every row still inside the window, and unsealed rows older than the
+cutoff. A backdated row sealed between two newer rows stays. The job
+writes one `audit.retention.purge` row (`deleted`, `cutoff`,
+`through_seq`, `through_hash`) in the same transaction that moves the
+chain boundary, when it deleted something.
+Saving the card writes `audit.settings.update` with `old_days` and
+`new_days`.
 
 The 30-day floor is there so an API `approval_ref` cannot be replayed by
 waiting for the row to disappear. Deletes younger than 30 days are refused
 even by the purge job.
 
 `UPDATE`, `DELETE`, and `TRUNCATE` on `audit_logs` and `audit_log_seals`
-are rejected unless the purge job set `goforge.audit_purge` for that
-transaction. Deleting a user does not blank `user_id` (the foreign key was
-dropped in migration 031) so a sealed row stays byte-for-byte the same.
+are rejected unless the transaction has set `goforge.audit_purge` to `on`.
+Any database session can set that flag. The table owner can also
+`DISABLE TRIGGER`. The triggers stop accidents and buggy writes. They are
+not a security boundary. Detection is the hash chain. When the stored
+boundary is past seq 0, `goforge audit verify` requires a sealed
+`audit.retention.purge` row whose `through_seq` and `through_hash` match
+it, and exits 1 with `boundary without purge` when that row is missing.
+Deleting a user does not blank `user_id` (the foreign key was dropped in
+migration 031) so a sealed row stays byte-for-byte the same.
 
 Every row older than about five seconds is sealed into an HMAC-SHA256
 chain. The key is derived from `ENCRYPTION_KEY` and is not stored.
 `goforge audit verify` exits 0 when the chain is intact and prints
 `audit chain verified head_seq=N head_hash=...`. It exits 1 and names the
-first bad seq when a row was changed, removed, or left unsealed, or when
-the retention boundary does not match. `goforge serve` runs the same check
+first bad seq when a row was changed, removed, or left unsealed, when the
+retention boundary does not match, or when that boundary has no sealed
+`audit.retention.purge` row (`boundary without purge`). `goforge serve` runs the same check
 about 30 seconds after startup and then daily, and logs that line. Each
 backup `manifest.json` includes `audit_chain_head` with the same seq and
 hash. Admins see the last result on this page.

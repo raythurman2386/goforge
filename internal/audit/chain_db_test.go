@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -53,16 +54,10 @@ func openThrowaway(t *testing.T, name string) *sql.DB {
 	} else {
 		_ = admin.Close()
 	}
-	// The app role cannot create databases. The local postgres superuser
-	// can, via peer auth through sudo. The new database is owned by the
-	// app role so migrations and triggers run as they do in serve.
+	// CREATE DATABASE needs a superuser. CI sets GOFORGE_TEST_SUPERUSER_DSN.
+	// Without it, a local sudo -u postgres is the fallback.
 	psqlSuper := func(sql string) error {
-		cmd := exec.Command("sudo", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", sql)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmtErr(string(out), err)
-		}
-		return nil
+		return execSuperSQL(t, "", sql)
 	}
 	if err := psqlSuper(`DROP DATABASE IF EXISTS ` + name + ` WITH (FORCE)`); err != nil {
 		t.Skipf("superuser drop %s: %v", name, err)
@@ -85,6 +80,36 @@ func openThrowaway(t *testing.T, name string) *sql.DB {
 		t.Fatalf("migrate %s: %v", name, err)
 	}
 	return gdb.DB
+}
+
+// execSuperSQL runs statement as a superuser. dbName empty uses the DSN's
+// own database (for CREATE DATABASE). GOFORGE_TEST_SUPERUSER_DSN is the
+// CI path. Unset, the local peer superuser via sudo is used.
+func execSuperSQL(t *testing.T, dbName, statement string) error {
+	t.Helper()
+	if dsn := os.Getenv("GOFORGE_TEST_SUPERUSER_DSN"); dsn != "" {
+		if dbName != "" {
+			dsn = withDatabase(t, dsn, dbName)
+		}
+		db, err := sql.Open("postgres", dsn)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		_, err = db.Exec(statement)
+		return err
+	}
+	args := []string{"-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1"}
+	if dbName != "" {
+		args = append(args, "-d", dbName)
+	}
+	args = append(args, "-c", statement)
+	cmd := exec.Command("sudo", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmtErr(string(out), err)
+	}
+	return nil
 }
 
 type cmdError struct{ msg string }
@@ -263,6 +288,11 @@ func TestChain_TriggersSealPurgeAndTamper(t *testing.T) {
 	if latestHash == "" || latestDeleted < 1 || latestSeq < 1 {
 		t.Fatalf("purge row seq=%d hash=%s deleted=%d", latestSeq, latestHash, latestDeleted)
 	}
+	// The purge row is the boundary proof only after the sealer has sealed it.
+	time.Sleep(6 * time.Second)
+	if sealed, sealErr = chain.SealOnce(ctx); sealErr != nil || sealed < 1 {
+		t.Fatalf("seal purge row = %d %v", sealed, sealErr)
+	}
 	headSeq, headHash, fail, verifyErr := chain.Verify(ctx, 0)
 	if verifyErr != nil || fail != nil {
 		t.Fatalf("verify across purge = %+v %v", fail, verifyErr)
@@ -271,18 +301,16 @@ func TestChain_TriggersSealPurgeAndTamper(t *testing.T) {
 		t.Fatalf("head = %d %x", headSeq, headHash)
 	}
 
-	// The app role is not superuser, so it cannot set session_replication_role.
-	// The local postgres superuser can. That is the bypass the chain detects.
+	// session_replication_role is superuser-only. CI sets
+	// GOFORGE_TEST_SUPERUSER_DSN (the Compose Postgres user is superuser).
+	// A local run without that variable uses sudo -u postgres.
 	if _, err := uuid.Parse(youngID); err != nil {
 		t.Fatal(err)
 	}
 	super := func(sql string) {
 		t.Helper()
-		cmd := exec.Command("sudo", "-u", "postgres", "psql", "-d", "goforge_audit_chain",
-			"-v", "ON_ERROR_STOP=1", "-c", sql)
-		out, runErr := cmd.CombinedOutput()
-		if runErr != nil {
-			t.Fatalf("superuser sql: %v\n%s", runErr, out)
+		if err := execSuperSQL(t, "goforge_audit_chain", sql); err != nil {
+			t.Fatalf("superuser sql: %v", err)
 		}
 	}
 	super(fmt.Sprintf(`SET session_replication_role = replica; UPDATE audit_logs SET action = 'tampered' WHERE id = '%s'`, youngID))
@@ -298,5 +326,92 @@ func TestChain_TriggersSealPurgeAndTamper(t *testing.T) {
 	_, _, fail, verifyErr = chain.Verify(ctx, 0)
 	if verifyErr != nil || fail == nil || fail.Reason != ReasonMissingRow {
 		t.Fatalf("missing verify = %+v %v", fail, verifyErr)
+	}
+}
+
+// TestVerify_BoundaryWithoutPurge is the Gatekeeper B1 attack: the app role
+// sets goforge.audit_purge, deletes a prefix older than 30 days, and copies
+// the last deleted seal into audit_settings. No purge row is written. The
+// remaining head is unchanged, and verify must still exit 1.
+func TestVerify_BoundaryWithoutPurge(t *testing.T) {
+	db := openThrowaway(t, "goforge_audit_b1")
+	ctx := context.Background()
+	key, keyErr := DeriveChainKey("boundary-without-purge-key")
+	if keyErr != nil {
+		t.Fatal(keyErr)
+	}
+	chain := NewChain(db, key, nil)
+	for i, age := range []string{"40 days", "38 days", "36 days", "1 day"} {
+		if _, err := db.ExecContext(ctx, `
+			INSERT INTO audit_logs (action, resource_type, details, created_at)
+			VALUES ('keep', 'user', $1::jsonb, NOW() - $2::interval)`,
+			fmt.Sprintf(`{"n":%d}`, i), age); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sealed, sealErr := chain.SealOnce(ctx)
+	if sealErr != nil || sealed != 4 {
+		t.Fatalf("sealed = %d %v", sealed, sealErr)
+	}
+	if _, _, fail, err := chain.Verify(ctx, 0); err != nil || fail != nil {
+		t.Fatalf("verify before attack = %+v %v", fail, err)
+	}
+	var boundarySeq int64
+	var boundaryHash []byte
+	if err := db.QueryRowContext(ctx, `
+		SELECT seq, row_hash FROM audit_log_seals WHERE seq = 3`).Scan(&boundarySeq, &boundaryHash); err != nil {
+		t.Fatal(err)
+	}
+	var headBefore int64
+	var headHash []byte
+	if err := db.QueryRowContext(ctx, `
+		SELECT seq, row_hash FROM audit_log_seals ORDER BY seq DESC LIMIT 1`).Scan(&headBefore, &headHash); err != nil {
+		t.Fatal(err)
+	}
+	tx, txErr := db.BeginTx(ctx, nil)
+	if txErr != nil {
+		t.Fatal(txErr)
+	}
+	if _, err := tx.ExecContext(ctx, `SELECT set_config('goforge.audit_purge', 'on', true)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM audit_log_seals WHERE seq <= 3`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '30 days'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO audit_settings (id, boundary_seq, boundary_hash)
+		VALUES (1, $1, $2)
+		ON CONFLICT (id) DO UPDATE SET
+			boundary_seq = EXCLUDED.boundary_seq,
+			boundary_hash = EXCLUDED.boundary_hash`, boundarySeq, boundaryHash); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	var headAfter int64
+	var headHashAfter []byte
+	if err := db.QueryRowContext(ctx, `
+		SELECT seq, row_hash FROM audit_log_seals ORDER BY seq DESC LIMIT 1`).Scan(&headAfter, &headHashAfter); err != nil {
+		t.Fatal(err)
+	}
+	if headAfter != headBefore || !bytes.Equal(headHash, headHashAfter) {
+		t.Fatalf("head changed %d %x -> %d %x", headBefore, headHash, headAfter, headHashAfter)
+	}
+	var purgeRows int
+	if err := db.QueryRowContext(ctx, `
+		SELECT count(*) FROM audit_logs WHERE action = 'audit.retention.purge'`).Scan(&purgeRows); err != nil {
+		t.Fatal(err)
+	}
+	if purgeRows != 0 {
+		t.Fatalf("purge rows = %d, want 0", purgeRows)
+	}
+	_, _, fail, err := chain.Verify(ctx, 0)
+	if err != nil || fail == nil || fail.Reason != ReasonBoundaryPurge || fail.Seq != boundarySeq {
+		t.Fatalf("forged boundary verify = %+v %v", fail, err)
 	}
 }

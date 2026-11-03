@@ -16,12 +16,16 @@
 -- the deleted user's id remains for forensics. Activity does not join users.
 --
 -- Triggers reject UPDATE, DELETE, and TRUNCATE unless this transaction has
--- set goforge.audit_purge to on (the purge job uses SET LOCAL / set_config
--- with is_local). Even then, DELETE is allowed only for rows older than 30
--- days, and UPDATE is never allowed. TRUNCATE is allowed only when every
--- row is older than 30 days. A superuser can still bypass triggers
--- (session_replication_role = replica, or by dropping them). That is
--- detected by the hash chain, not prevented.
+-- set goforge.audit_purge to on. Any database session can set that flag;
+-- it is not a privilege reserved for the purge job. The table owner can
+-- also DISABLE TRIGGER. Even with the flag, DELETE is allowed only for
+-- rows older than 30 days, and UPDATE is never allowed. TRUNCATE is
+-- allowed only when every row is older than 30 days. The triggers stop
+-- accidents. Detection is the hash chain: a boundary_seq above 0 is
+-- accepted only when a sealed audit.retention.purge row records the same
+-- through_seq and through_hash. A superuser can still bypass triggers
+-- (session_replication_role = replica). That is detected by the chain,
+-- not prevented.
 
 CREATE TABLE IF NOT EXISTS audit_settings (
     id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),

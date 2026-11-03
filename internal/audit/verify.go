@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/raythurman2386/goforge/internal/models"
 )
 
 const verifyBatch = 1000
@@ -38,6 +40,10 @@ func (c *Chain) Verify(ctx context.Context, fromSeq int64) (headSeq int64, headH
 	}
 
 	headSeq, headHash, failure, err = c.walkSeals(ctx, fromSeq, minSeq, boundarySeq, boundaryHash)
+	if err != nil || failure != nil {
+		return 0, nil, failure, err
+	}
+	failure, err = c.checkBoundaryPurge(ctx, boundarySeq, boundaryHash)
 	if err != nil || failure != nil {
 		return 0, nil, failure, err
 	}
@@ -102,6 +108,32 @@ func (c *Chain) walkSeals(ctx context.Context, fromSeq, minSeq, boundarySeq int6
 		return 0, nil, &ChainError{Seq: fromSeq, Reason: ReasonMissingRow}, nil
 	}
 	return headSeq, append([]byte(nil), headHash...), nil, nil
+}
+
+// checkBoundaryPurge fails closed when the stored boundary has moved and
+// no sealed retention-purge row records that same seq and hash. The purge
+// row has to be sealed: inserting the row is allowed for anyone who can
+// write the table, and only the chain key can seal it.
+func (c *Chain) checkBoundaryPurge(ctx context.Context, seq int64, hash []byte) (*ChainError, error) {
+	if seq <= 0 {
+		return nil, nil
+	}
+	var n int
+	err := c.db.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM audit_logs a
+		JOIN audit_log_seals s ON s.audit_id = a.id
+		WHERE a.action = $1
+		  AND (a.details->>'through_seq')::bigint = $2
+		  AND a.details->>'through_hash' = $3`,
+		models.AuditActionAuditRetentionPurge, seq, hexEncode(hash)).Scan(&n)
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return &ChainError{Seq: seq, Reason: ReasonBoundaryPurge}, nil
+	}
+	return nil, nil
 }
 
 func (c *Chain) minSeq(ctx context.Context) (int64, error) {

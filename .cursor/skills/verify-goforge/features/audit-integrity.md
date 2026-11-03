@@ -4,7 +4,7 @@ Audit rows and their seals reject ordinary `UPDATE`, `DELETE`, and `TRUNCATE`. A
 
 ## Sub-features
 
-- `integrity-trigger` without `goforge.audit_purge=on`, `UPDATE`, `DELETE`, and `TRUNCATE` fail with the append-only error.
+- `integrity-trigger` without `goforge.audit_purge=on`, `UPDATE`, `DELETE`, and `TRUNCATE` fail with the append-only error. Any session can set that flag. The table owner can `DISABLE TRIGGER`. The triggers stop accidents. The chain does the detection.
 - `integrity-verify-ok` `goforge audit verify` exits 0 and prints `audit chain verified head_seq=N head_hash=...`.
 - `integrity-tamper` after `SET session_replication_role = replica` and an edit of a sealed row, verify exits 1 with `hash mismatch` and that seq. Deleting the row and leaving the seal exits 1 with `missing row`.
 - `integrity-boundary` after a retention purge, verify still exits 0. The oldest remaining seal's `prev_hash` matches the newest purge row's `through_hash`.
@@ -35,6 +35,7 @@ Put the action back the same way before the missing-row check, or use a copy of 
 ## Gotchas
 
 - The chain proves rows are unchanged since they were sealed. On an upgrade, the first sealer pass seals existing rows. It does not prove they were unchanged before that.
+- `goforge.audit_purge` is not a privilege. Any database session can set it, and the table owner can disable the triggers. A boundary with no sealed `audit.retention.purge` row matching `through_seq` and `through_hash` makes `goforge audit verify` exit 1 (`boundary without purge`).
 - A delete in the few seconds before a row is sealed is not detected.
 - Host root and the Docker socket can read `ENCRYPTION_KEY` and rewrite the chain, the log line, and the backup. This feature does not claim to stop that.
 - Restoring a backup taken with a different `ENCRYPTION_KEY` fails verify. That is expected.
