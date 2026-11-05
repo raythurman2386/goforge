@@ -144,7 +144,7 @@ It prints the result and exits non-zero when the run failed. It does not run mig
 docker compose exec goforge ./goforge backup list
 ```
 
-It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run, and each Postgres, Gitea, or Vaultwarden service page lists the runs that hold that service's data (run key, time, size) with its `restore-service` command. There is no restore button in the web UI, the API, or MCP.
+It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run, and each Postgres, Gitea, Vaultwarden, or MinIO service page lists the runs that hold that service's data (run key, time, size) with its `restore-service` command. There is no restore button in the web UI, the API, or MCP.
 
 ### GoForge database
 

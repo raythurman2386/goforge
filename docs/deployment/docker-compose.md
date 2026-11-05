@@ -120,7 +120,7 @@ docker compose exec goforge ./goforge backup run
 
 `docker-compose.yml` does not pass `BACKUP_*` into the `goforge` container, so `BACKUP_*` in your env file (`.env`) has no effect. To import them once, put them in your own `docker-compose.override.yml` and remove them after the first start; see [Backup & Restore](backup.md#from-the-environment-host-runs-or-an-override).
 
-Settings → Profile shows admins the last run. Restore is a CLI command: `goforge backup restore <run key>` puts the GoForge database back (stop GoForge first), and `goforge backup restore-service <run key> <instance id>` puts one Postgres, Gitea, or Vaultwarden service's data back while GoForge keeps running. Both are dry runs unless you pass `--yes`, and there is no restore button. See [Restore](backup.md#restore). To rehearse a restore on a throwaway stack, see [Production validation](production-validation.md). Keep a copy of `.env`, including `ENCRYPTION_KEY`, off the server; backups never include it.
+Settings → Profile shows admins the last run. Restore is a CLI command: `goforge backup restore <run key>` puts the GoForge database back (stop GoForge first), and `goforge backup restore-service <run key> <instance id>` puts one Postgres, Gitea, Vaultwarden, or MinIO service's data back while GoForge keeps running. Both are dry runs unless you pass `--yes`, and there is no restore button. See [Restore](backup.md#restore). To rehearse a restore on a throwaway stack, see [Production validation](production-validation.md). Keep a copy of `.env`, including `ENCRYPTION_KEY`, off the server; backups never include it.
 
 ### Manual database backup
 

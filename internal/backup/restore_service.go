@@ -169,8 +169,8 @@ func (d DockerServiceOps) ExecStream(ctx context.Context, id string, opts docker
 	return d.Client.ExecStream(ctx, id, opts, w)
 }
 
-// ServiceRestorer restores one Postgres, Gitea, or Vaultwarden instance's
-// data volume from one backup run. It reads only <run>/manifest.json and
+// ServiceRestorer restores one Postgres, Gitea, Vaultwarden, or MinIO
+// (volume) instance's data volume from one backup run. It reads only <run>/manifest.json and
 // that instance's services/<id>/ objects, and only touches that instance's
 // container and a short-lived helper container that borrows its volume.
 //

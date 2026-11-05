@@ -54,7 +54,7 @@ func (m StrategyMap) BackupStrategy(name string) (string, bool) {
 	return strategy, true
 }
 
-// shippedStrategies is the map the three built-in templates declare. Tests
+// shippedStrategies is the map the original three built-in templates declare. Tests
 // that do not load the catalog use it.
 func shippedStrategies() StrategyMap {
 	return StrategyMap{
