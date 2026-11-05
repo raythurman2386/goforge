@@ -266,3 +266,43 @@ func TestVaultwardenTarScriptExitCodes(t *testing.T) {
 		}
 	}
 }
+
+// reloadingStrategies mimics the service catalog: ReloadIfChanged reports a
+// parse error for a broken custom.yaml while the valid templates stay loaded.
+type reloadingStrategies struct {
+	StrategyMap
+	dir string
+}
+
+func (r reloadingStrategies) ReloadIfChanged() (bool, error) {
+	if _, err := os.Stat(filepath.Join(r.dir, "custom.yaml")); err == nil {
+		return true, fmt.Errorf("parse %s: yaml: bad", filepath.Join(r.dir, "custom.yaml"))
+	}
+	return false, nil
+}
+
+// A broken template added between runs must not fail Targets: the postgres
+// instance is still backed up.
+func TestInstanceSource_BrokenTemplateReloadDoesNotFailTargets(t *testing.T) {
+	dir := t.TempDir()
+	ex := &fakeExec{running: map[string]bool{"goforge-service-pg1": true}}
+	src := &InstanceSource{
+		Docker:     ex,
+		Strategies: reloadingStrategies{StrategyMap: StrategyMap{"postgres": "postgres"}, dir: dir},
+		Instances:  fakeLister{{ID: "pg1", TemplateName: "postgres", Name: "pg", BackupEnabled: true}},
+	}
+	for run := 0; run < 2; run++ {
+		if run == 1 {
+			if err := os.WriteFile(filepath.Join(dir, "custom.yaml"), []byte("name: \"x\n  bad"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		targets, _, err := src.Targets(context.Background())
+		if err != nil {
+			t.Fatalf("run %d: Targets err = %v", run, err)
+		}
+		if len(targets) != 1 || !strings.Contains(targets[0].Name(), "pg") {
+			t.Fatalf("run %d: targets = %v", run, targets)
+		}
+	}
+}

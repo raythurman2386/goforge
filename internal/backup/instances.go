@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -115,9 +116,7 @@ func ContainerName(instanceID string) string { return "goforge-service-" + insta
 
 // Targets implements Source.
 func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, error) {
-	if err := reloadStrategies(s.Strategies); err != nil {
-		return nil, nil, err
-	}
+	reloadStrategies(s.Strategies)
 	list, err := s.Instances.ListAll(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list service instances: %w", err)
@@ -169,19 +168,21 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 }
 
 // reloadStrategies picks up a template edit before this run. Sources that
-// are not a service catalog, such as StrategyMap, are left alone.
-func reloadStrategies(src StrategySource) error {
+// are not a service catalog, such as StrategyMap, are left alone. A reload
+// error does not fail the run: the catalog has already installed every
+// template that parsed, so one broken file must not stop backups of the
+// rest. The error is logged and the run continues.
+func reloadStrategies(src StrategySource) {
 	type reloader interface {
 		ReloadIfChanged() (bool, error)
 	}
 	r, ok := src.(reloader)
 	if !ok || r == nil {
-		return nil
+		return
 	}
 	if _, err := r.ReloadIfChanged(); err != nil {
-		return fmt.Errorf("reload service templates: %w", err)
+		slog.Warn("backup: reload service templates failed; using templates that loaded", "error", err)
 	}
-	return nil
 }
 
 func targetFor(spec Spec, base instanceTarget) (Target, error) {
