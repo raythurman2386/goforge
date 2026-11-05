@@ -153,6 +153,25 @@ func TestMigration032_DownAndUp(t *testing.T) {
 	if col != 0 {
 		t.Fatalf("backup_enabled still present after down: count=%d", col)
 	}
+	// Keep 031's down coverage: step once more and check audit_settings
+	// is gone and the user_id FK is back.
+	if downErr := m.Down(); downErr != nil {
+		t.Fatal(downErr)
+	}
+	var settings sql.NullString
+	if scanErr := db.QueryRowContext(ctx, `SELECT to_regclass('public.audit_settings')::text`).Scan(&settings); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if settings.Valid {
+		t.Fatalf("audit_settings still present after 031 down: %s", settings.String)
+	}
+	var fk int
+	if scanErr := db.QueryRowContext(ctx, `SELECT count(*) FROM pg_constraint WHERE conname = 'audit_logs_user_id_fkey'`).Scan(&fk); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if fk != 1 {
+		t.Fatalf("user_id fk count = %d", fk)
+	}
 	if upErr := m.Up(); upErr != nil {
 		t.Fatal(upErr)
 	}
