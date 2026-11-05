@@ -15,6 +15,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 
+	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/notify"
@@ -33,6 +34,8 @@ type InstanceRepository interface {
 	UpdateIfStatus(ctx context.Context, s *models.ServiceInstance, expected models.ServiceInstanceStatus) (bool, error)
 	// SetProtected sets only the protected flag of an instance.
 	SetProtected(ctx context.Context, id string, protected bool) error
+	// SetBackupEnabled sets only the Allows backups flag of an instance.
+	SetBackupEnabled(ctx context.Context, id string, enabled bool) error
 	Delete(ctx context.Context, id string) error
 }
 
@@ -252,13 +255,14 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 	}
 
 	instance := &models.ServiceInstance{
-		UserID:       userID,
-		TemplateName: tmplName,
-		Name:         name,
-		Version:      sql.NullString{String: tmpl.DefaultVersion, Valid: true},
-		Config:       configJSON,
-		Domain:       sql.NullString{String: domain, Valid: domain != ""},
-		Status:       models.ServiceStatusPending,
+		UserID:        userID,
+		TemplateName:  tmplName,
+		Name:          name,
+		Version:       sql.NullString{String: tmpl.DefaultVersion, Valid: true},
+		Config:        configJSON,
+		Domain:        sql.NullString{String: domain, Valid: domain != ""},
+		Status:        models.ServiceStatusPending,
+		BackupEnabled: backup.BacksUpTemplate(tmplName),
 	}
 
 	if err = s.instanceRepo.Create(ctx, instance); err != nil {
@@ -1101,6 +1105,13 @@ func (s *InstanceService) GetInstance(ctx context.Context, id string) (*models.S
 // the protected scope. It changes nothing about the running container.
 func (s *InstanceService) SetProtected(ctx context.Context, id string, protected bool) error {
 	return s.instanceRepo.SetProtected(ctx, id, protected)
+}
+
+// SetBackupEnabled marks the instance for nightly backups or leaves it out.
+// It changes nothing about the running container. The runner still skips a
+// template it does not know how to dump, and a stopped container.
+func (s *InstanceService) SetBackupEnabled(ctx context.Context, id string, enabled bool) error {
+	return s.instanceRepo.SetBackupEnabled(ctx, id, enabled)
 }
 
 // StopInstance stops the service instance.

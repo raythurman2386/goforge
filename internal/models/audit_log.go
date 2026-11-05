@@ -220,6 +220,7 @@ const (
 	AuditActionServiceUpdateConfig   = "service.update_config"
 	AuditActionServiceUpdateImage    = "service.update_image"
 	AuditActionServiceSetProtected   = "service.set_protected"
+	AuditActionServiceSetBackup      = "service.set_backup"
 	AuditActionContainerStop         = "container.stop"
 	AuditActionContainerRestart      = "container.restart"
 )

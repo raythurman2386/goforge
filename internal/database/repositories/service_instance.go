@@ -74,8 +74,8 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 
 	query := `
 		INSERT INTO service_instances (id, user_id, template_name, name, version, 
-			config, domain, status, connection_info, created_at, updated_at, last_error)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+			config, domain, status, connection_info, created_at, updated_at, last_error, backup_enabled)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
 
 	_, err = r.db.ExecContext(ctx, query,
 		s.ID,
@@ -90,6 +90,7 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 		s.CreatedAt,
 		s.UpdatedAt,
 		s.LastError,
+		s.BackupEnabled,
 	)
 	return err
 }
@@ -98,7 +99,7 @@ func (r *ServiceInstanceRepository) Create(ctx context.Context, s *models.Servic
 func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*models.ServiceInstance, error) {
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
-			domain, status, connection_info, created_at, updated_at, last_error, protected
+			domain, status, connection_info, created_at, updated_at, last_error, protected, backup_enabled
 		FROM service_instances WHERE id = $1`
 
 	s := &models.ServiceInstance{}
@@ -116,6 +117,7 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 		&s.UpdatedAt,
 		&s.LastError,
 		&s.Protected,
+		&s.BackupEnabled,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -131,7 +133,7 @@ func (r *ServiceInstanceRepository) GetByID(ctx context.Context, id string) (*mo
 func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID string) ([]*models.ServiceInstance, error) {
 	query := `
 		SELECT id, user_id, template_name, name, version, config, 
-			domain, status, connection_info, created_at, updated_at, last_error, protected
+			domain, status, connection_info, created_at, updated_at, last_error, protected, backup_enabled
 		FROM service_instances WHERE user_id = $1
 		ORDER BY created_at DESC
 		LIMIT 1000`
@@ -159,6 +161,7 @@ func (r *ServiceInstanceRepository) ListByUserID(ctx context.Context, userID str
 			&s.UpdatedAt,
 			&s.LastError,
 			&s.Protected,
+			&s.BackupEnabled,
 		)
 		if err != nil {
 			return nil, err
@@ -275,6 +278,26 @@ func (r *ServiceInstanceRepository) SetProtected(ctx context.Context, id string,
 	return nil
 }
 
+// SetBackupEnabled sets the Allows backups flag of a service instance. It
+// touches nothing else, so a concurrent Update of config or status cannot
+// undo it.
+func (r *ServiceInstanceRepository) SetBackupEnabled(ctx context.Context, id string, enabled bool) error {
+	result, err := r.db.ExecContext(ctx,
+		`UPDATE service_instances SET backup_enabled = $2, updated_at = $3 WHERE id = $1`,
+		id, enabled, time.Now())
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // Delete deletes a service instance.
 func (r *ServiceInstanceRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM service_instances WHERE id = $1`
@@ -301,11 +324,11 @@ func (r *ServiceInstanceRepository) CountByUserID(ctx context.Context, userID st
 }
 
 // ListAll returns every service instance across all users with only ID,
-// UserID, TemplateName, Name, and Status set. Config and connection info are
-// not read, so nothing is decrypted. Used by backups.
+// UserID, TemplateName, Name, Status, and BackupEnabled set. Config and
+// connection info are not read, so nothing is decrypted. Used by backups.
 func (r *ServiceInstanceRepository) ListAll(ctx context.Context) ([]*models.ServiceInstance, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, user_id, template_name, name, status
+		SELECT id, user_id, template_name, name, status, backup_enabled
 		FROM service_instances
 		ORDER BY created_at, id`)
 	if err != nil {
@@ -316,7 +339,7 @@ func (r *ServiceInstanceRepository) ListAll(ctx context.Context) ([]*models.Serv
 	var instances []*models.ServiceInstance
 	for rows.Next() {
 		s := &models.ServiceInstance{}
-		if err := rows.Scan(&s.ID, &s.UserID, &s.TemplateName, &s.Name, &s.Status); err != nil {
+		if err := rows.Scan(&s.ID, &s.UserID, &s.TemplateName, &s.Name, &s.Status, &s.BackupEnabled); err != nil {
 			return nil, err
 		}
 		instances = append(instances, s)

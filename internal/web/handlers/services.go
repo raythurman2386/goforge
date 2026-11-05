@@ -185,7 +185,7 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	showRestorePoints := h.restorePoints != nil && user.IsAdmin() && backup.BacksUpTemplate(instance.TemplateName)
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages_services.Detail(instance, container, inspectSummary(r.Context(), h.inspector, container, h.logger), tmpl, showRestorePoints, h.protection(instance), csrfToken)
+	component := pages_services.Detail(instance, container, inspectSummary(r.Context(), h.inspector, container, h.logger), tmpl, showRestorePoints, h.protection(instance), backupChoice(instance), csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render detail page")
 	}

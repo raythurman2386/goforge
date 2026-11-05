@@ -115,21 +115,25 @@ func TestInstanceSource(t *testing.T) {
 		},
 	}
 	src := &InstanceSource{Docker: ex, Instances: fakeLister{
-		{ID: "pg1", TemplateName: "postgres", Name: "shared-pg"},
-		{ID: "pg2", TemplateName: "postgres", Name: "stopped-pg"},
-		{ID: "gt1", TemplateName: "gitea", Name: "git"},
-		{ID: "vw1", TemplateName: "vaultwarden", Name: "vw"},
+		{ID: "pg1", TemplateName: "postgres", Name: "shared-pg", BackupEnabled: true},
+		{ID: "pg2", TemplateName: "postgres", Name: "stopped-pg", BackupEnabled: true},
+		{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true},
+		{ID: "vw1", TemplateName: "vaultwarden", Name: "vw", BackupEnabled: true},
 		{ID: "rd1", TemplateName: "redis", Name: "shared-redis"},
+		{ID: "pg3", TemplateName: "postgres", Name: "opt-out"},
 	}}
 	targets, skipped, err := src.Targets(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(targets) != 3 || len(skipped) != 2 {
+	if len(targets) != 3 || len(skipped) != 3 {
 		t.Fatalf("targets=%d skipped=%+v", len(targets), skipped)
 	}
 	if skipped[0].InstanceID != "pg2" || skipped[0].Reason != "container is not running" || skipped[1].Template != "redis" {
 		t.Errorf("skipped = %+v", skipped)
+	}
+	if skipped[2].InstanceID != "pg3" || skipped[2].Reason != "backups disabled for this instance" {
+		t.Errorf("opt-out skip = %+v", skipped[2])
 	}
 
 	pgArts, err := targets[0].Plan(context.Background())
@@ -174,7 +178,7 @@ func TestInstanceTarget_NonZeroExitIsRedactedError(t *testing.T) {
 		running: map[string]bool{"goforge-service-gt1": true},
 		rules:   []execRule{{match: "sqlite3", stdout: "partial", exit: 3}},
 	}
-	src := &InstanceSource{Docker: ex, Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git"}}}
+	src := &InstanceSource{Docker: ex, Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true}}}
 	targets, _, _ := src.Targets(context.Background())
 	arts, _ := targets[0].Plan(context.Background())
 	err := arts[0].Dump(context.Background(), io.Discard)

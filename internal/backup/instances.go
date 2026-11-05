@@ -98,6 +98,10 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 			skip("template has no backup target in v1")
 			continue
 		}
+		if !in.BackupEnabled {
+			skip("backups disabled for this instance")
+			continue
+		}
 		running, rerr := s.Docker.Running(ctx, base.container)
 		if rerr != nil {
 			return nil, nil, fmt.Errorf("inspect %s: %w", base.container, rerr)

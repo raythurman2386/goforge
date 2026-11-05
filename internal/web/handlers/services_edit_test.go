@@ -67,6 +67,12 @@ func (f *fakeInstanceRepo) SetProtected(_ context.Context, _ string, protected b
 	f.inst.Protected = protected
 	return nil
 }
+func (f *fakeInstanceRepo) SetBackupEnabled(_ context.Context, _ string, enabled bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.inst.BackupEnabled = enabled
+	return nil
+}
 func (f *fakeInstanceRepo) Delete(context.Context, string) error { return nil }
 
 type fakeContainerRepo struct{}

@@ -72,11 +72,17 @@ Use a key that can only read, write, list, and delete in this one bucket. Encryp
 | Target | Objects | How |
 |--------|---------|-----|
 | GoForge database | `app/goforge-db.dump` | `pg_dump --format=custom` from the app container, using `DATABASE_URL`. The runtime image ships the PostgreSQL 17 client, which reads servers up to 17 |
-| Each running `postgres` service | `services/<id>/<database>.dump`, `services/<id>/roles.sql` | `docker exec` into the service container as its `POSTGRES_USER`: one `pg_dump --format=custom` per non-template database, and `pg_dumpall --roles-only`. GoForge does not decrypt the service's admin password |
-| Each running `gitea` service | `services/<id>/gitea.sqlite3`, `services/<id>/data.tar.gz` | SQLite online backup of the database, then a tar of `/data` |
-| Each running `vaultwarden` service | `services/<id>/vaultwarden.sqlite3`, `services/<id>/data.tar.gz` | `/vaultwarden backup`, then a tar of `/data` |
+| Each running `postgres` service with **Allows backups** on | `services/<id>/<database>.dump`, `services/<id>/roles.sql` | `docker exec` into the service container as its `POSTGRES_USER`: one `pg_dump --format=custom` per non-template database, and `pg_dumpall --roles-only`. GoForge does not decrypt the service's admin password |
+| Each running `gitea` service with **Allows backups** on | `services/<id>/gitea.sqlite3`, `services/<id>/data.tar.gz` | SQLite online backup of the database, then a tar of `/data` |
+| Each running `vaultwarden` service with **Allows backups** on | `services/<id>/vaultwarden.sqlite3`, `services/<id>/data.tar.gz` | `/vaultwarden backup`, then a tar of `/data` |
 
-Not backed up: Redis and every other template, stopped services (listed as skipped in the manifest), deployed projects' containers and images (rebuilt from Git), Traefik certificates (reissued), and your env file (`.env`).
+Not backed up: Redis and every other template, a Postgres, Gitea, or Vaultwarden service whose **Allows backups** switch is off, stopped services (listed as skipped in the manifest), deployed projects' containers and images (rebuilt from Git), Traefik certificates (reissued), and your env file (`.env`).
+
+### Allows backups
+
+Postgres, Gitea, and Vaultwarden each have an **Allows backups** switch on the service page. It starts on, including for instances that already existed when the switch was added. Turning it off leaves that instance out of the next nightly run and out of `goforge backup run`. The manifest lists it as skipped, with the reason `backups disabled for this instance`. A stopped service is skipped even when the switch is on (`container is not running`). Other templates have no switch; a request to turn backups on for one is refused. The GoForge database is still backed up whenever backups are enabled in Settings.
+
+The change applies on the next run, with no restart. Each change is an audit row, `service.set_backup`, with `details.backup_enabled`, `details.previous`, and `via` = `ui`. `GET /api/v1/services` and `GET /api/v1/services/{id}` include `backup_enabled`. The route is `POST /services/{id}/backup`.
 
 `roles.sql` holds the SCRAM password hashes of every role in that Postgres service. Treat it like a password file.
 
@@ -251,4 +257,4 @@ BACKUP_S3_ACCESS_KEY_ID=minioadmin BACKUP_S3_SECRET_ACCESS_KEY=change-me-please 
 BACKUP_S3_FORCE_PATH_STYLE=true ./bin/goforge backup run
 ```
 
-Point `DATABASE_URL` at a test database. On a host with live services, this also dumps every running Postgres, Gitea, and Vaultwarden service GoForge knows about.
+Point `DATABASE_URL` at a test database. On a host with live services, this also dumps every running Postgres, Gitea, and Vaultwarden service whose **Allows backups** switch is on.

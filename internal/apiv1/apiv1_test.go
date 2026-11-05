@@ -128,7 +128,7 @@ func (f *fakeInstances) GetInstance(_ context.Context, id string) (*models.Servi
 	case uiProtSvcID:
 		// Marked protected on its service page; not in the env list.
 		return &models.ServiceInstance{ID: id, UserID: ownerID, TemplateName: "pg", Name: "git", Config: cfg,
-			Status: models.ServiceStatusRunning, Protected: true}, nil
+			Status: models.ServiceStatusRunning, Protected: true, BackupEnabled: true}, nil
 	case dbErrSvcID:
 		return nil, errors.New("connection reset by peer")
 	}

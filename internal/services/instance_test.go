@@ -65,6 +65,8 @@ func (m *mockInstanceRepository) UpdateIfStatus(ctx context.Context, s *models.S
 
 func (m *mockInstanceRepository) SetProtected(context.Context, string, bool) error { return nil }
 
+func (m *mockInstanceRepository) SetBackupEnabled(context.Context, string, bool) error { return nil }
+
 func (m *mockInstanceRepository) Delete(ctx context.Context, id string) error {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, id)
@@ -257,6 +259,9 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 					if s.UserID != "user1" || s.TemplateName != "redis" || s.Name != "my-redis" {
 						return errors.New("unexpected instance data")
 					}
+					if s.BackupEnabled {
+						return errors.New("redis has no backup target; BackupEnabled must start false")
+					}
 					s.ID = "inst-1"
 					return nil
 				}
@@ -292,6 +297,9 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 					s.ID = "inst-2"
 					if !s.Domain.Valid || s.Domain.String != "gitea.example.com" {
 						return errors.New("expected domain to be set on instance")
+					}
+					if !s.BackupEnabled {
+						return errors.New("gitea must start with backups enabled")
 					}
 					return nil
 				}

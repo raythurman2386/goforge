@@ -134,7 +134,7 @@ func TestIntegration_RestoreService(t *testing.T) {
 		Sources: []Source{&InstanceSource{
 			Docker: DockerExecer{Client: dc}, Redactor: red,
 			Container: func(id string) string { return containers[id] },
-			Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git"}, {ID: "vw1", TemplateName: "vaultwarden", Name: "vw"}},
+			Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true}, {ID: "vw1", TemplateName: "vaultwarden", Name: "vw", BackupEnabled: true}},
 		}},
 	}
 	run, err := runner.Run(ctx, models.BackupTriggerManual)
@@ -341,7 +341,7 @@ func TestIntegration_RestoreServicePostgres(t *testing.T) {
 		Sources: []Source{&InstanceSource{
 			Docker: DockerExecer{Client: dc}, Redactor: red,
 			Container: func(id string) string { return containers[id] },
-			Instances: fakeLister{{ID: "pg1", TemplateName: "postgres", Name: "db"}},
+			Instances: fakeLister{{ID: "pg1", TemplateName: "postgres", Name: "db", BackupEnabled: true}},
 		}},
 	}
 	run, err := runner.Run(ctx, models.BackupTriggerManual)

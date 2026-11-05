@@ -209,6 +209,8 @@ service as protected.
 | `POST /services/{id}/image` | `write` + `protected` |
 | `POST /services/{id}/restart`, `POST /containers/{id}/restart` | `write` only |
 
+`backup_enabled` on `GET /services` and `GET /services/{id}` is the **Allows backups** switch. The nightly run includes the instance only when that flag is true, the template is `postgres`, `gitea`, or `vaultwarden`, and the container is running. The API does not change the flag; the service page does (`POST /services/{id}/backup`).
+
 ## Read routes (`read`)
 
 | Method | Path | Returns |
@@ -225,7 +227,7 @@ service as protected.
 | `GET` | `/api/v1/projects/{id}/deployments/{deploymentId}/logs?tail=` | Last log lines (200, max 5000) |
 | `GET` | `/api/v1/service-templates` | Templates |
 | `GET` | `/api/v1/service-templates/{name}` | One template; secret defaults are omitted |
-| `GET` | `/api/v1/services` | Your service instances with a `protected` flag |
+| `GET` | `/api/v1/services` | Your service instances with `protected` and `backup_enabled` flags |
 | `GET` | `/api/v1/services/{id}` | Masked config and connection info, immutable fields, named volumes, container state, and `last_error` (why the last deploy, start, or recreate failed; known secrets redacted, at most 500 characters; cleared on the next success) |
 | `GET` | `/api/v1/containers` | Your tracked containers |
 | `GET` | `/api/v1/containers/{id}` | State, ports, mounts, limits, networks. No env, no command, labels limited to Traefik routing |

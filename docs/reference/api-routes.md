@@ -160,6 +160,7 @@ Used by HTMX components for dynamic repository/branch selection.
 | `GET` | `/services/{id}/edit` | `serviceHandler.EditConfig` | Edit config form |
 | `POST` | `/services/{id}/edit` | `serviceHandler.UpdateConfig` | Save config and recreate the container (named volumes kept) |
 | `POST` | `/services/{id}/update` | `serviceHandler.UpdateImage` | Pull the image again and recreate the container (same config and volumes) |
+| `POST` | `/services/{id}/backup` | `serviceHandler.SetBackupEnabled` | Allows backups switch for Postgres, Gitea, and Vaultwarden (`backup_enabled=true`). Audited as `service.set_backup` |
 
 !!! note "Route Disambiguation"
     The `{id}` parameter for service instances uses a UUID regex pattern (`[a-f0-9-]{36}`) to disambiguate from `{template}` string routes.

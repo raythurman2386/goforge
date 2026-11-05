@@ -19,8 +19,9 @@ func isPending(instance *models.ServiceInstance) bool {
 // Detail renders a service instance. summary is the Docker inspect summary
 // of container, or nil when there is no container or inspect failed.
 // restorePoints adds the Restore points card (admins, backed-up templates).
-// protection drives the Protected card.
-templ Detail(instance *models.ServiceInstance, container *models.Container, summary *docker.InspectSummary, tmpl *services.ServiceTemplate, restorePoints bool, protection Protection, csrfToken string) {
+// protection drives the Protected card. backup drives Allows backups, and
+// is omitted when the template has no nightly backup.
+templ Detail(instance *models.ServiceInstance, container *models.Container, summary *docker.InspectSummary, tmpl *services.ServiceTemplate, restorePoints bool, protection Protection, backup BackupChoice, csrfToken string) {
 	@layouts.AppLayout(instance.Name, csrfToken) {
 		// Outside the polled region: the poll selects #service-detail-content
 		// only, so the trail is rendered once.
@@ -130,6 +131,7 @@ templ Detail(instance *models.ServiceInstance, container *models.Container, summ
 			</div>
 
 			@ProtectedCard(protection)
+			@BackupCard(backup)
 
 			if container != nil {
 				// hx-preserve on the stream keeps it open across pending polls

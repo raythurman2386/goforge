@@ -942,7 +942,9 @@ connection:
 No shipped template sets a `backup` block. The loader still parses one, but
 the nightly backup ignores it: which instances are backed up, and how, is
 decided in `internal/backup` by template name (`postgres`, `gitea`,
-`vaultwarden` in v1). See `docs/deployment/backup.md`.
+`vaultwarden` in v1) and the instance's **Allows backups** switch
+(`service_instances.backup_enabled`, on for those three). See
+`docs/deployment/backup.md`.
 
 ---
 

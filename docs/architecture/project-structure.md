@@ -92,7 +92,7 @@ Nightly, backup-only copies of GoForge state to S3-compatible storage. See [Back
 | `runner.go` | One run: advisory lock, `backup_runs` row, targets, manifest, retention |
 | `target.go` | Target and artifact types |
 | `appdb.go` | GoForge database dump with the local `pg_dump` |
-| `instances.go` | Postgres, Gitea, and Vaultwarden service targets via `docker exec` |
+| `instances.go` | Postgres, Gitea, and Vaultwarden service targets via `docker exec`, when **Allows backups** is on |
 | `store.go` | S3 object store |
 | `layout.go` | Run keys and object layout |
 | `retention.go` | Which old runs to prune |
