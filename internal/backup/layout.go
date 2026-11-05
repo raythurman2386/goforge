@@ -75,7 +75,10 @@ type ManifestArtifact struct {
 	SHA256     string `json:"sha256"`
 	InstanceID string `json:"instance_id,omitempty"`
 	Template   string `json:"template,omitempty"`
-	Database   string `json:"database,omitempty"`
+	// Strategy is backup.strategy from the template. Empty on runs from
+	// before templates declared one; restore then uses Template.
+	Strategy string `json:"strategy,omitempty"`
+	Database string `json:"database,omitempty"`
 }
 
 // Skipped is an instance the run did not back up, and why.

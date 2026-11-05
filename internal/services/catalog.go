@@ -13,6 +13,8 @@ import (
 	"sync"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/raythurman2386/goforge/internal/backup"
 )
 
 // ServiceTemplate represents a one-click service template.
@@ -145,10 +147,26 @@ type ConnectionConfig struct {
 	External string `yaml:"external" json:"external"`
 }
 
-// BackupConfig defines the backup configuration for a service.
+// BackupConfig is the template's backup.strategy block. The nightly run
+// includes an instance when this names a strategy the backup registry
+// knows, the instance's Allows backups switch is on, and the container
+// is running. An empty strategy leaves the template out.
 type BackupConfig struct {
-	Command   string `yaml:"command" json:"command"`
-	Extension string `yaml:"extension" json:"extension"`
+	Strategy string `yaml:"strategy" json:"strategy"`
+}
+
+// BackupStrategy returns the template's backup strategy. The second result
+// is false when the template is missing or declares none.
+func (c *Catalog) BackupStrategy(name string) (string, bool) {
+	tmpl, err := c.GetTemplate(name)
+	if err != nil || tmpl == nil {
+		return "", false
+	}
+	strategy := strings.TrimSpace(tmpl.Backup.Strategy)
+	if strategy == "" {
+		return "", false
+	}
+	return strategy, true
 }
 
 // Catalog manages service templates.
@@ -269,6 +287,9 @@ func (c *Catalog) load() error {
 			continue
 		}
 		tmpl.applyPortDefaults()
+		if strategy := strings.TrimSpace(tmpl.Backup.Strategy); strategy != "" && !backup.KnownStrategy(strategy) {
+			c.logger.Warn("template backup strategy is not registered; the nightly run will skip it", "template", tmpl.Name, "strategy", strategy)
+		}
 
 		loaded[tmpl.Name] = &tmpl
 	}

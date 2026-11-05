@@ -84,6 +84,8 @@ Postgres, Gitea, and Vaultwarden each have an **Allows backups** switch on the s
 
 The change applies on the next run, with no restart. Each change is an audit row, `service.set_backup`, with `details.backup_enabled`, `details.previous`, and `via` = `ui`. `GET /api/v1/services` and `GET /api/v1/services/{id}` include `backup_enabled`. The route is `POST /services/{id}/backup`.
 
+Which templates can be backed up is `backup.strategy` in the service template, not the template name. The runner knows `postgres`, `gitea`, and `vaultwarden`. The shipped templates set those. A template with no strategy, or a strategy the runner does not know, is skipped (`template has no backup strategy` or `unknown backup strategy`) and has no switch. A template can use another name and still set `strategy: postgres`. Each artifact in `manifest.json` records that strategy. `goforge backup restore-service` restores with it, and uses the template name when an older run has no strategy field. GoForge reloads template files at the start of each run, so a strategy edit applies on the next run without a restart. See [Service templates](../reference/service-templates.md#backup-strategy).
+
 `roles.sql` holds the SCRAM password hashes of every role in that Postgres service. Treat it like a password file.
 
 ### Consistency

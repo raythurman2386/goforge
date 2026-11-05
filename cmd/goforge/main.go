@@ -236,7 +236,12 @@ func runBackupOnce(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("read backup settings: %w", err)
 	}
-	setup, err := backup.NewFor(cfg, bc, db.DB, dockerClient, logger.WithComponent(log, "backup"), version)
+	catalog := services.NewCatalog(cfg.TemplatesDir)
+	catalog.SetLogger(logger.WithComponent(log, "catalog"))
+	if err := catalog.LoadTemplates(); err != nil {
+		log.Warn("some service templates failed to load; backup strategies come from the ones that did", "error", err)
+	}
+	setup, err := backup.NewFor(cfg, bc, db.DB, dockerClient, logger.WithComponent(log, "backup"), version, catalog)
 	if err != nil {
 		return err
 	}
@@ -426,7 +431,14 @@ func runServer() error {
 	}, audit.PurgeStartupDelay, audit.DailyInterval)
 	go auditChain.RunVerify(backgroundCtx, audit.VerifyStartupDelay, audit.DailyInterval)
 
-	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version).WithNotifier(notifier).WithChainHead(auditChain.Head)
+	// Templates decide which services the nightly run can dump. Load them
+	// before the backup manager so the first schedule reads the catalog.
+	catalog := services.NewCatalog(cfg.TemplatesDir)
+	catalog.SetLogger(logger.WithComponent(log, "catalog"))
+	if err := catalog.LoadTemplates(); err != nil {
+		log.Error("failed to load service templates", "error", err)
+	}
+	backupManager := backup.NewManager(backgroundCtx, cfg, db.DB, dockerClient, backupLog, version, catalog).WithNotifier(notifier).WithChainHead(auditChain.Head)
 	notifyRedactor.WithFunc(func(s string) string {
 		bc, _ := backupManager.Current()
 		return backup.RedactorFor(cfg, bc).Redact(s)
@@ -503,12 +515,6 @@ func runServer() error {
 
 	rollbackManager := deploy.NewRollbackManager(deployService)
 
-	// Initialize service catalog
-	catalog := services.NewCatalog(cfg.TemplatesDir)
-	catalog.SetLogger(logger.WithComponent(log, "catalog"))
-	if err := catalog.LoadTemplates(); err != nil {
-		log.Error("failed to load service templates", "error", err)
-	}
 	instanceService := services.NewInstanceService(instanceRepo, containerRepo, dockerClient, catalog, cfg.TraefikNetwork, cfg.CloudflareProxyMode, logger.WithComponent(log, "instance")).
 		WithAudit(auditLogRepo).WithNotifier(notifier)
 

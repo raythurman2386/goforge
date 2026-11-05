@@ -137,6 +137,8 @@ docker:
   volumes:
     - name: data
       path: /data
+backup:
+  strategy: vaultwarden
 `
 	if err := os.WriteFile(filepath.Join(dir, "vaultwarden.yaml"), []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)

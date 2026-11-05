@@ -158,14 +158,11 @@ func (l *RestorePointLister) ListInstance(ctx context.Context, instanceID string
 	return v
 }
 
-// BacksUpTemplate reports whether nightly backups include instances of the
-// template (postgres, gitea, vaultwarden).
-func BacksUpTemplate(name string) bool {
-	switch name {
-	case templatePostgres, templateGitea, templateVaultwarden:
-		return true
-	}
-	return false
+// BacksUpTemplate reports whether strategy is one the nightly run can dump.
+// Pass the template's backup.strategy from the catalog, not the template
+// name, unless the two are the same string.
+func BacksUpTemplate(strategy string) bool {
+	return KnownStrategy(strategy)
 }
 
 // RestoreTemplate reports whether goforge backup restore-service restores

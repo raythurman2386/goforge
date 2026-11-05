@@ -422,6 +422,28 @@ func putPostgresOnlyRun(t *testing.T, s *memStore, key string) {
 	mustPut(t, s, ObjectKey(testPrefix, key, ManifestName), string(body))
 }
 
+// A template named something other than postgres still restores as postgres
+// when the manifest records strategy postgres. A run with no strategy falls
+// back to the template name.
+func TestServiceRestorePlan_UsesStrategy(t *testing.T) {
+	s := newMemStore()
+	const key = "2026-10-31/20261031T070000Z"
+	b := []byte("pg")
+	m := &Manifest{Version: 1, RunKey: key, RunID: "r2", StartedAt: time.Date(2026, 10, 31, 7, 0, 0, 0, time.UTC),
+		Artifacts: []ManifestArtifact{{Key: "services/p2/app.dump", Kind: KindPgDump, InstanceID: "p2", Template: "shared-pg", Strategy: templatePostgres, Database: "app", Bytes: 2, SHA256: sha(b)}}}
+	mustPut(t, s, ObjectKey(testPrefix, key, "services/p2/app.dump"), string(b))
+	body, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustPut(t, s, ObjectKey(testPrefix, key, ManifestName), string(body))
+	r, _ := newSvcRestorer(t, s, &fakeSvcDocker{})
+	_, err = r.Plan(context.Background(), key, "p2")
+	if err == nil || !strings.Contains(err.Error(), "roles.sql") || strings.Contains(err.Error(), "supports postgres") {
+		t.Fatalf("err = %v, want the postgres plan", err)
+	}
+}
+
 func TestServiceRestorePlan_PostgresNeedsRoles(t *testing.T) {
 	s := newMemStore()
 	const key = "2026-10-31/20261031T070000Z"

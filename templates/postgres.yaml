@@ -70,3 +70,7 @@ docker:
 
 connection:
   internal: "postgres://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:5432/{{ .Config.database }}"
+
+# Nightly backups dump this instance when Allows backups is on.
+backup:
+  strategy: postgres

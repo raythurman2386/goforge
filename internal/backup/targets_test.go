@@ -114,7 +114,7 @@ func TestInstanceSource(t *testing.T) {
 			{match: "tar -C /data", stdout: "tgz"},
 		},
 	}
-	src := &InstanceSource{Docker: ex, Instances: fakeLister{
+	src := &InstanceSource{Docker: ex, Strategies: shippedStrategies(), Instances: fakeLister{
 		{ID: "pg1", TemplateName: "postgres", Name: "shared-pg", BackupEnabled: true},
 		{ID: "pg2", TemplateName: "postgres", Name: "stopped-pg", BackupEnabled: true},
 		{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true},
@@ -173,12 +173,48 @@ func TestInstanceSource(t *testing.T) {
 	}
 }
 
+// The strategy comes from the template, not the template name. A template
+// named shared-pg with strategy postgres is dumped. An unknown strategy is
+// skipped even when Allows backups is on.
+func TestInstanceSource_StrategyFromTemplate(t *testing.T) {
+	ex := &fakeExec{
+		running: map[string]bool{"goforge-service-x": true, "goforge-service-y": true},
+		rules:   []execRule{{match: "SELECT datname", stdout: "app\n"}},
+	}
+	src := &InstanceSource{
+		Docker:     ex,
+		Strategies: StrategyMap{"shared-pg": "postgres", "odd": "volume"},
+		Instances: fakeLister{
+			{ID: "x", TemplateName: "shared-pg", Name: "db", BackupEnabled: true},
+			{ID: "y", TemplateName: "odd", Name: "odd", BackupEnabled: true},
+			{ID: "z", TemplateName: "redis", Name: "cache", BackupEnabled: true},
+		},
+	}
+	targets, skipped, err := src.Targets(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 1 || targets[0].Name() == "" || !strings.Contains(targets[0].Name(), "shared-pg") {
+		t.Fatalf("targets = %v", targets)
+	}
+	if len(skipped) != 2 || skipped[0].Reason != "unknown backup strategy" || skipped[0].Template != "odd" {
+		t.Fatalf("skipped = %+v", skipped)
+	}
+	if skipped[1].Reason != "template has no backup strategy" || skipped[1].Template != "redis" {
+		t.Fatalf("missing strategy = %+v", skipped[1])
+	}
+	arts, err := targets[0].Plan(context.Background())
+	if err != nil || len(arts) < 1 || arts[0].Kind != KindPgDump {
+		t.Fatalf("plan = %+v %v", arts, err)
+	}
+}
+
 func TestInstanceTarget_NonZeroExitIsRedactedError(t *testing.T) {
 	ex := &fakeExec{
 		running: map[string]bool{"goforge-service-gt1": true},
 		rules:   []execRule{{match: "sqlite3", stdout: "partial", exit: 3}},
 	}
-	src := &InstanceSource{Docker: ex, Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true}}}
+	src := &InstanceSource{Docker: ex, Strategies: shippedStrategies(), Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true}}}
 	targets, _, _ := src.Targets(context.Background())
 	arts, _ := targets[0].Plan(context.Background())
 	err := arts[0].Dump(context.Background(), io.Discard)

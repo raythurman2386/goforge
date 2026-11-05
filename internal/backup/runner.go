@@ -255,7 +255,7 @@ func (r *Runner) upload(ctx context.Context, runKey, target string, a Artifact) 
 	return ManifestArtifact{
 		Key: a.Path, Target: target, Kind: a.Kind, Bytes: cw.n,
 		SHA256: hex.EncodeToString(h.Sum(nil)), InstanceID: a.InstanceID,
-		Template: a.Template, Database: a.Database,
+		Template: a.Template, Strategy: a.Strategy, Database: a.Database,
 	}, nil
 }
 

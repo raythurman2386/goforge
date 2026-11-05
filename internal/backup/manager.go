@@ -35,11 +35,11 @@ type Manager struct {
 }
 
 // NewManager builds a Manager for serve. Nothing runs until Apply.
-func NewManager(parent context.Context, app *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string) *Manager {
+func NewManager(parent context.Context, app *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string, strategies StrategySource) *Manager {
 	return &Manager{
 		parent: parent,
 		build: func(cfg config.BackupConfig) (*Setup, error) {
-			return NewFor(app, cfg, db, dockerClient, log, version)
+			return NewFor(app, cfg, db, dockerClient, log, version, strategies)
 		},
 		log: log,
 		red: func(extra ...config.BackupConfig) *Redactor { return RedactorFor(app, extra...) },

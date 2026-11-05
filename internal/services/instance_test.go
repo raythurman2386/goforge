@@ -216,6 +216,7 @@ func TestInstanceService_DeployInstance(t *testing.T) {
 	webTmpl := &ServiceTemplate{
 		Name:           "gitea",
 		DefaultVersion: "latest",
+		Backup:         BackupConfig{Strategy: "gitea"},
 		Docker: DockerConfig{
 			Image: "gitea/gitea:{{ .Version }}",
 			Ports: []PortConfig{

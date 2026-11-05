@@ -14,13 +14,53 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-// Templates with a backup target in v1. Everything else (redis, the shared
-// redis included) is reported as skipped, never silently dropped.
+// Strategies the registry can dump. A template opts in by setting
+// backup.strategy to one of these. The template name itself does not matter.
 const (
 	templatePostgres    = "postgres"
 	templateGitea       = "gitea"
 	templateVaultwarden = "vaultwarden"
 )
+
+// KnownStrategy reports whether the backup registry can dump strategy.
+func KnownStrategy(strategy string) bool {
+	switch strategy {
+	case templatePostgres, templateGitea, templateVaultwarden:
+		return true
+	default:
+		return false
+	}
+}
+
+// StrategySource is where a template's backup.strategy comes from. The
+// service catalog is the production source. Nil means no template has a
+// strategy, so every instance is skipped.
+type StrategySource interface {
+	BackupStrategy(templateName string) (string, bool)
+}
+
+// StrategyMap is a StrategySource with a fixed template-to-strategy map.
+type StrategyMap map[string]string
+
+// BackupStrategy implements StrategySource.
+func (m StrategyMap) BackupStrategy(name string) (string, bool) {
+	strategy, ok := m[name]
+	strategy = strings.TrimSpace(strategy)
+	if !ok || strategy == "" {
+		return "", false
+	}
+	return strategy, true
+}
+
+// shippedStrategies is the map the three built-in templates declare. Tests
+// that do not load the catalog use it.
+func shippedStrategies() StrategyMap {
+	return StrategyMap{
+		templatePostgres:    templatePostgres,
+		templateGitea:       templateGitea,
+		templateVaultwarden: templateVaultwarden,
+	}
+}
 
 // ContainerExecer is the slice of the Docker client the instance targets use.
 type ContainerExecer interface {
@@ -64,6 +104,9 @@ type InstanceSource struct {
 	// Container maps an instance ID to its container name. Nil uses
 	// ContainerName; tests point it at throwaway containers.
 	Container func(instanceID string) string
+	// Strategies reads backup.strategy for each template. Nil skips every
+	// instance.
+	Strategies StrategySource
 }
 
 // ContainerName is the Docker name GoForge gives an instance's container.
@@ -71,6 +114,9 @@ func ContainerName(instanceID string) string { return "goforge-service-" + insta
 
 // Targets implements Source.
 func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, error) {
+	if err := reloadStrategies(s.Strategies); err != nil {
+		return nil, nil, err
+	}
 	list, err := s.Instances.ListAll(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list service instances: %w", err)
@@ -86,16 +132,17 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 			name = s.Container
 		}
 		base := instanceTarget{inst: in, container: name(in.ID), docker: s.Docker, redactor: s.Redactor}
-		var t Target
-		switch in.TemplateName {
-		case templatePostgres:
-			t = &PostgresTarget{base}
-		case templateGitea:
-			t = &GiteaTarget{base}
-		case templateVaultwarden:
-			t = &VaultwardenTarget{base}
-		default:
-			skip("template has no backup target in v1")
+		strategy, ok := "", false
+		if s.Strategies != nil {
+			strategy, ok = s.Strategies.BackupStrategy(in.TemplateName)
+		}
+		if !ok {
+			skip("template has no backup strategy")
+			continue
+		}
+		t, ok := targetFor(strategy, base)
+		if !ok {
+			skip("unknown backup strategy")
 			continue
 		}
 		if !in.BackupEnabled {
@@ -115,11 +162,42 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 	return targets, skipped, nil
 }
 
+// reloadStrategies picks up a template edit before this run. Sources that
+// are not a service catalog, such as StrategyMap, are left alone.
+func reloadStrategies(src StrategySource) error {
+	type reloader interface {
+		ReloadIfChanged() (bool, error)
+	}
+	r, ok := src.(reloader)
+	if !ok || r == nil {
+		return nil
+	}
+	if _, err := r.ReloadIfChanged(); err != nil {
+		return fmt.Errorf("reload service templates: %w", err)
+	}
+	return nil
+}
+
+func targetFor(strategy string, base instanceTarget) (Target, bool) {
+	base.strategy = strategy
+	switch strategy {
+	case templatePostgres:
+		return &PostgresTarget{base}, true
+	case templateGitea:
+		return &GiteaTarget{base}, true
+	case templateVaultwarden:
+		return &VaultwardenTarget{base}, true
+	default:
+		return nil, false
+	}
+}
+
 type instanceTarget struct {
 	inst      *models.ServiceInstance
 	container string
 	docker    ContainerExecer
 	redactor  *Redactor
+	strategy  string
 }
 
 func (b instanceTarget) Name() string {
@@ -145,6 +223,7 @@ func (b instanceTarget) artifact(name string, kind Kind, db string, opts docker.
 		ContentType: ct,
 		InstanceID:  b.inst.ID,
 		Template:    b.inst.TemplateName,
+		Strategy:    b.strategy,
 		Database:    db,
 		Dump: func(ctx context.Context, w io.Writer) error {
 			return b.exec(ctx, opts, w)

@@ -47,3 +47,7 @@ docker:
 connection:
   internal: "http://{{ .ContainerName }}:80"
   external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:80{{ end }}"
+
+# Nightly backups dump this instance when Allows backups is on.
+backup:
+  strategy: vaultwarden

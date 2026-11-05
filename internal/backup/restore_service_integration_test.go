@@ -132,7 +132,7 @@ func TestIntegration_RestoreService(t *testing.T) {
 		Store: store, Runs: &memRuns{}, Prefix: srPrefix, Retention: 5, Location: time.UTC, Timeout: 10 * time.Minute,
 		Version: "it", Redactor: red,
 		Sources: []Source{&InstanceSource{
-			Docker: DockerExecer{Client: dc}, Redactor: red,
+			Docker: DockerExecer{Client: dc}, Redactor: red, Strategies: shippedStrategies(),
 			Container: func(id string) string { return containers[id] },
 			Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true}, {ID: "vw1", TemplateName: "vaultwarden", Name: "vw", BackupEnabled: true}},
 		}},
@@ -339,7 +339,7 @@ func TestIntegration_RestoreServicePostgres(t *testing.T) {
 		Store: store, Runs: &memRuns{}, Prefix: srPrefix, Retention: 5, Location: time.UTC, Timeout: 10 * time.Minute,
 		Version: "it", Redactor: red,
 		Sources: []Source{&InstanceSource{
-			Docker: DockerExecer{Client: dc}, Redactor: red,
+			Docker: DockerExecer{Client: dc}, Redactor: red, Strategies: shippedStrategies(),
 			Container: func(id string) string { return containers[id] },
 			Instances: fakeLister{{ID: "pg1", TemplateName: "postgres", Name: "db", BackupEnabled: true}},
 		}},

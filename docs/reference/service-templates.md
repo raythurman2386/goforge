@@ -179,6 +179,17 @@ GoForge checks `bool` and `select` values on the server when you deploy a servic
 
 A template is skipped at load, with an error in the log, if a `select` field has no `options`, a `select` default is not in `options`, or a `bool` default is not true or false.
 
+### Backup strategy
+
+```yaml
+backup:
+  strategy: postgres   # postgres, gitea, or vaultwarden
+```
+
+`backup.strategy` names how the nightly run dumps this template. The registry knows `postgres`, `gitea`, and `vaultwarden`. The template's `name` does not have to match: a template named `shared-pg` with `strategy: postgres` is dumped and restored like Postgres. The run records the strategy in `manifest.json`. Older runs have no strategy field, and `goforge backup restore-service` uses the template name then. No `backup` block, or a strategy the registry does not know, leaves the template out. Its service page has no **Allows backups** switch, and the run lists it as skipped. An unknown strategy is logged when the template loads and does not stop the template from deploying. The catalog reloads changed template files at the start of each backup run.
+
+The switch on the service page still decides whether a particular instance is included. See [Backup & Restore](../deployment/backup.md#allows-backups).
+
 ---
 
 ## Template Variables

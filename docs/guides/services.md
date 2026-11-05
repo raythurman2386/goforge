@@ -300,7 +300,7 @@ The flag is stored on the service (migration `026_service_instances_protected`) 
 
 ### Allows backups
 
-Postgres, Gitea, and Vaultwarden have an **Allows backups** switch on the service page. While it is on, the nightly backup and `goforge backup run` include that service when its container is running. Turning it off leaves the instance out of the next run; the manifest lists it as skipped. The switch changes nothing about the running container, and the GoForge database is backed up either way. Other templates have no switch.
+A service template with `backup.strategy` set to `postgres`, `gitea`, or `vaultwarden` has an **Allows backups** switch on the service page. The shipped Postgres, Gitea, and Vaultwarden templates set that field. Other templates have no switch. While it is on, the nightly backup and `goforge backup run` include that service when its container is running. Turning it off leaves the instance out of the next run; the manifest lists it as skipped. The switch changes nothing about the running container, and the GoForge database is backed up either way.
 
 The flag is stored on the service (migration `032_service_instances_backup_enabled`). Existing instances of those three templates stay on. A new deploy of one starts on. Each change is an audit row, `service.set_backup`, with `details.backup_enabled`, `details.previous`, and `via` = `ui`. See [Backup & Restore](../deployment/backup.md#allows-backups).
 

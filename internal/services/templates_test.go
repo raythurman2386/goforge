@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -22,6 +23,26 @@ func loadRepoCatalog(t *testing.T) *Catalog {
 		t.Fatalf("LoadTemplates(%s) error = %v", repoTemplatesDir, err)
 	}
 	return c
+}
+
+func TestRepoTemplates_BackupStrategies(t *testing.T) {
+	t.Parallel()
+	c := loadRepoCatalog(t)
+	for _, name := range []string{"postgres", "gitea", "vaultwarden"} {
+		got, ok := c.BackupStrategy(name)
+		if !ok || got != name {
+			t.Errorf("%s backup strategy = %q ok=%v, want %s", name, got, ok, name)
+		}
+		if !backup.KnownStrategy(got) {
+			t.Errorf("%s strategy %q is not registered", name, got)
+		}
+	}
+	if _, ok := c.BackupStrategy("redis"); ok {
+		t.Error("redis declares a backup strategy")
+	}
+	if _, ok := c.BackupStrategy("minio"); ok {
+		t.Error("minio declares a backup strategy")
+	}
 }
 
 func TestRepoTemplates_WebServices(t *testing.T) {

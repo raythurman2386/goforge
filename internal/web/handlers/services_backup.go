@@ -12,13 +12,23 @@ import (
 	pages_services "github.com/raythurman2386/goforge/internal/web/templates/pages/services"
 )
 
+// offersBackup reports whether the loaded template declares a strategy the
+// nightly run can dump. A missing template or an unknown strategy has no switch.
+func (h *ServiceHandler) offersBackup(name string) bool {
+	if h.catalog == nil {
+		return false
+	}
+	strategy, ok := h.catalog.BackupStrategy(name)
+	return ok && backup.KnownStrategy(strategy)
+}
+
 // backupChoice is what the service page's Allows backups card shows.
 // The card is omitted when the template has no nightly backup.
-func backupChoice(inst *models.ServiceInstance) pages_services.BackupChoice {
+func (h *ServiceHandler) backupChoice(inst *models.ServiceInstance) pages_services.BackupChoice {
 	return pages_services.BackupChoice{
 		InstanceID: inst.ID,
 		Enabled:    inst.BackupEnabled,
-		Offered:    backup.BacksUpTemplate(inst.TemplateName),
+		Offered:    h.offersBackup(inst.TemplateName),
 	}
 }
 
@@ -39,7 +49,7 @@ func (h *ServiceHandler) SetBackupEnabled(w http.ResponseWriter, r *http.Request
 		http.Error(w, "access denied", http.StatusForbidden)
 		return
 	}
-	if !backup.BacksUpTemplate(instance.TemplateName) {
+	if !h.offersBackup(instance.TemplateName) {
 		http.Error(w, "This service template has no nightly backup.", http.StatusConflict)
 		return
 	}
@@ -64,7 +74,7 @@ func (h *ServiceHandler) SetBackupEnabled(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
-	if err := pages_services.BackupCard(backupChoice(instance)).Render(r.Context(), w); err != nil {
+	if err := pages_services.BackupCard(h.backupChoice(instance)).Render(r.Context(), w); err != nil {
 		http.Error(w, "failed to render", http.StatusInternalServerError)
 	}
 }

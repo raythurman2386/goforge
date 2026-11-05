@@ -290,17 +290,22 @@ func (r *ServiceRestorer) Plan(ctx context.Context, runKey, instanceID string) (
 		}
 		return nil, fmt.Errorf("%w: %s in run %s", ErrServiceNotInRun, instanceID, runKey)
 	}
-	tpl := arts[0].Template
-	mount, ok := serviceMounts[tpl]
-	if !ok {
-		return nil, fmt.Errorf("%w (instance %s is %q)", ErrServiceRestoreUnsupported, instanceID, tpl)
+	// strategy is how the run was dumped. Older manifests only stored the
+	// template name, which matched the strategy for the three built-ins.
+	strategy := arts[0].Strategy
+	if strategy == "" {
+		strategy = arts[0].Template
 	}
-	plan := &ServiceRestorePlan{RunKey: runKey, Manifest: m, InstanceID: instanceID, Template: tpl, Mount: mount, Container: r.containerName(instanceID)}
+	mount, ok := serviceMounts[strategy]
+	if !ok {
+		return nil, fmt.Errorf("%w (instance %s is template %q, strategy %q)", ErrServiceRestoreUnsupported, instanceID, arts[0].Template, strategy)
+	}
+	plan := &ServiceRestorePlan{RunKey: runKey, Manifest: m, InstanceID: instanceID, Template: strategy, Mount: mount, Container: r.containerName(instanceID)}
 	dir := "services/" + instanceID + "/"
-	if tpl == templatePostgres {
+	if strategy == templatePostgres {
 		return planPostgres(plan, arts, dir)
 	}
-	dbName := serviceArtifactNames[tpl]
+	dbName := serviceArtifactNames[strategy]
 	var haveDB, haveData bool
 	for _, a := range arts {
 		switch a.Key {
@@ -317,7 +322,7 @@ func (r *ServiceRestorer) Plan(ctx context.Context, runKey, instanceID string) (
 		}
 	}
 	if !haveDB || !haveData {
-		return nil, fmt.Errorf("run %s is missing %s%s or %sdata.tar.gz for this %s instance", runKey, dir, dbName, dir, tpl)
+		return nil, fmt.Errorf("run %s is missing %s%s or %sdata.tar.gz for this %s instance", runKey, dir, dbName, dir, strategy)
 	}
 	return plan, nil
 }

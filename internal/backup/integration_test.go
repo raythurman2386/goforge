@@ -180,7 +180,7 @@ func TestIntegration_RunAgainstMinIO(t *testing.T) {
 		Sources: []Source{
 			Static{&AppDBTarget{DatabaseURL: dbURL, Redactor: red}},
 			&InstanceSource{
-				Docker: DockerExecer{Client: dc}, Redactor: red,
+				Docker: DockerExecer{Client: dc}, Redactor: red, Strategies: shippedStrategies(),
 				Container: func(id string) string { return containers[id] },
 				Instances: fakeLister{
 					{ID: "pg1", TemplateName: "postgres", Name: "tenant-pg", BackupEnabled: true},

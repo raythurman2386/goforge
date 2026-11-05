@@ -939,11 +939,11 @@ connection:
 
 ```
 
-No shipped template sets a `backup` block. The loader still parses one, but
-the nightly backup ignores it: which instances are backed up, and how, is
-decided in `internal/backup` by template name (`postgres`, `gitea`,
-`vaultwarden` in v1) and the instance's **Allows backups** switch
-(`service_instances.backup_enabled`, on for those three). See
+Shipped Postgres, Gitea, and Vaultwarden templates set `backup.strategy`
+to `postgres`, `gitea`, or `vaultwarden`. The nightly run reads that field
+from the catalog and dispatches to the matching target in `internal/backup`.
+An instance is included when the strategy is known, **Allows backups** is on
+(`service_instances.backup_enabled`), and the container is running. See
 `docs/deployment/backup.md`.
 
 ---

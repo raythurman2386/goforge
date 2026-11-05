@@ -262,7 +262,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		Config:        configJSON,
 		Domain:        sql.NullString{String: domain, Valid: domain != ""},
 		Status:        models.ServiceStatusPending,
-		BackupEnabled: backup.BacksUpTemplate(tmplName),
+		BackupEnabled: backup.KnownStrategy(tmpl.Backup.Strategy),
 	}
 
 	if err = s.instanceRepo.Create(ctx, instance); err != nil {
