@@ -23,9 +23,9 @@ var (
 	// ErrServiceNotInRun means the run's manifest has no artifacts for the
 	// instance (it did not exist, was stopped, or was skipped that night).
 	ErrServiceNotInRun = errors.New("the run has no artifacts for this service instance")
-	// ErrServiceRestoreUnsupported means the instance's template has no
-	// scripted restore (only postgres, gitea, and vaultwarden have one).
-	ErrServiceRestoreUnsupported = errors.New("restore-service supports postgres, gitea, and vaultwarden instances only")
+	// ErrServiceRestoreUnsupported means the run has no scripted restore
+	// for this instance (postgres, sqlite_volume, and volume have one).
+	ErrServiceRestoreUnsupported = errors.New("restore-service supports postgres, sqlite_volume, and volume backups only")
 	// ErrServiceContainerMissing means the instance's container does not
 	// exist. Redeploy the service from GoForge first, then restore into it.
 	ErrServiceContainerMissing = errors.New("the service container does not exist; deploy the service from GoForge first, then restore into it")
@@ -292,20 +292,19 @@ func (r *ServiceRestorer) Plan(ctx context.Context, runKey, instanceID string) (
 	}
 	// strategy is how the run was dumped. Older manifests only stored the
 	// template name, which matched the strategy for the three built-ins.
-	strategy := arts[0].Strategy
-	if strategy == "" {
-		strategy = arts[0].Template
-	}
-	mount, ok := serviceMounts[strategy]
+	kind, mount, ok := classifyRestore(arts[0])
 	if !ok {
-		return nil, fmt.Errorf("%w (instance %s is template %q, strategy %q)", ErrServiceRestoreUnsupported, instanceID, arts[0].Template, strategy)
+		return nil, fmt.Errorf("%w (instance %s is template %q, strategy %q)", ErrServiceRestoreUnsupported, instanceID, arts[0].Template, arts[0].Strategy)
 	}
-	plan := &ServiceRestorePlan{RunKey: runKey, Manifest: m, InstanceID: instanceID, Template: strategy, Mount: mount, Container: r.containerName(instanceID)}
+	plan := &ServiceRestorePlan{RunKey: runKey, Manifest: m, InstanceID: instanceID, Template: kind, Mount: mount, Container: r.containerName(instanceID)}
 	dir := "services/" + instanceID + "/"
-	if strategy == templatePostgres {
+	if kind == templatePostgres {
 		return planPostgres(plan, arts, dir)
 	}
-	dbName := serviceArtifactNames[strategy]
+	if kind == strategyVolume {
+		return planVolume(plan, arts, dir)
+	}
+	dbName := serviceArtifactNames[kind]
 	var haveDB, haveData bool
 	for _, a := range arts {
 		switch a.Key {
@@ -322,9 +321,70 @@ func (r *ServiceRestorer) Plan(ctx context.Context, runKey, instanceID string) (
 		}
 	}
 	if !haveDB || !haveData {
-		return nil, fmt.Errorf("run %s is missing %s%s or %sdata.tar.gz for this %s instance", runKey, dir, dbName, dir, strategy)
+		return nil, fmt.Errorf("run %s is missing %s%s or %sdata.tar.gz for this %s instance", runKey, dir, dbName, dir, kind)
 	}
 	return plan, nil
+}
+
+// classifyRestore picks the restore path and the volume mount. kind is
+// postgres, gitea, vaultwarden, or volume. sqlite_volume uses its snapshot
+// builtin as kind so the helper script can place the database file.
+func classifyRestore(a ManifestArtifact) (kind, mount string, ok bool) {
+	strategy := a.Strategy
+	if strategy == "" {
+		strategy = a.Template
+	}
+	switch strategy {
+	case templatePostgres:
+		mount = a.Mount
+		if mount == "" {
+			mount = postgresMount
+		}
+		return templatePostgres, mount, true
+	case strategyVolume:
+		if err := validateMount(a.Mount); err != nil {
+			return "", "", false
+		}
+		return strategyVolume, a.Mount, true
+	case strategySQLiteVolume:
+		if a.Snapshot != templateGitea && a.Snapshot != templateVaultwarden {
+			return "", "", false
+		}
+		mount = a.Mount
+		if mount == "" {
+			mount = serviceMount
+		}
+		if err := validateMount(mount); err != nil {
+			return "", "", false
+		}
+		return a.Snapshot, mount, true
+	case templateGitea, templateVaultwarden:
+		mount = a.Mount
+		if mount == "" {
+			mount = serviceMount
+		}
+		if err := validateMount(mount); err != nil {
+			return "", "", false
+		}
+		return strategy, mount, true
+	default:
+		return "", "", false
+	}
+}
+
+// planVolume finds the single data tar of a volume backup.
+func planVolume(plan *ServiceRestorePlan, arts []ManifestArtifact, dir string) (*ServiceRestorePlan, error) {
+	for _, a := range arts {
+		if a.Key != dir+"data.tar.gz" {
+			continue
+		}
+		if a.Kind != KindTarGz {
+			return nil, fmt.Errorf("%s has kind %q, want %q", a.Key, a.Kind, KindTarGz)
+		}
+		plan.Data = a
+		return plan, nil
+	}
+	return nil, fmt.Errorf("run %s is missing %sdata.tar.gz for this volume backup", plan.RunKey, dir)
 }
 
 // planPostgres finds a Postgres instance's roles.sql and one dump per
@@ -378,6 +438,9 @@ func (p *ServiceRestorePlan) stageFiles() []stageFile {
 		}
 		return out
 	}
+	if p.Template == strategyVolume {
+		return []stageFile{{name: "data.tar.gz", art: p.Data}}
+	}
 	return []stageFile{{name: "db.sqlite3", art: p.Database}, {name: "data.tar.gz", art: p.Data}}
 }
 
@@ -390,7 +453,7 @@ func (p *ServiceRestorePlan) restoreCmd(info *ServiceContainerInfo, stamp string
 		}
 		return cmd
 	}
-	return []string{"sh", "-c", restoreServiceScript, "sh", p.Template, stamp, info.GiteaDBPath}
+	return []string{"sh", "-c", restoreServiceScript, "sh", p.Template, stamp, info.GiteaDBPath, p.Mount}
 }
 
 // defaultPostgresSuperuser is the official image's superuser when
@@ -675,17 +738,30 @@ func (r *ServiceRestorer) execLines(ctx context.Context, hid string, opts docker
 // current contents are moved aside first.
 const restoreServiceScript = `set -eu
 tpl="$1"; stamp="$2"; override="$3"
-mnt=` + serviceMount + `; src=` + restoreStage + `
+mnt=` + serviceMount + `
+if [ -n "${4:-}" ]; then
+  mnt=$4
+  case "$mnt" in /*) ;; *) echo "mount must be absolute" >&2; exit 4 ;; esac
+  case "$mnt" in *..*) echo "mount contains .." >&2; exit 4 ;; esac
+fi
+src=` + restoreStage + `
 aside="$mnt/` + preRestorePrefix + `$stamp"
 [ -d "$mnt" ] || { echo "$mnt is not mounted in the helper" >&2; exit 3; }
-[ -s "$src/data.tar.gz" ] && [ -s "$src/db.sqlite3" ] || { echo "the staged artifacts are missing" >&2; exit 3; }
+case "$tpl" in gitea|vaultwarden|volume) ;; *) echo "unsupported template $tpl" >&2; exit 3 ;; esac
+if [ "$tpl" = volume ]; then
+  [ -s "$src/data.tar.gz" ] || { echo "the staged artifacts are missing" >&2; exit 3; }
+else
+  [ -s "$src/data.tar.gz" ] && [ -s "$src/db.sqlite3" ] || { echo "the staged artifacts are missing" >&2; exit 3; }
+fi
 [ ! -e "$aside" ] || { echo "$aside already exists" >&2; exit 3; }
-case "$tpl" in gitea|vaultwarden) ;; *) echo "unsupported template $tpl" >&2; exit 3 ;; esac
 mkdir -m 700 "$aside"
 find "$mnt" -mindepth 1 -maxdepth 1 ! -name '` + preRestorePrefix + `*' ! -name '` + failedRestorePrefix + `*' -exec mv -- {} "$aside"/ \;
 echo "moved the current contents of $mnt to $aside (kept)"
 tar -xzf "$src/data.tar.gz" -C "$mnt"
 echo "extracted data.tar.gz into $mnt"
+if [ "$tpl" = volume ]; then
+  exit 0
+fi
 if [ "$tpl" = gitea ]; then
   db="$override"
   if [ -z "$db" ]; then

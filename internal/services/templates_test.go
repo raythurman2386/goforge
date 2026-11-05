@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/docker"
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -28,20 +27,25 @@ func loadRepoCatalog(t *testing.T) *Catalog {
 func TestRepoTemplates_BackupStrategies(t *testing.T) {
 	t.Parallel()
 	c := loadRepoCatalog(t)
-	for _, name := range []string{"postgres", "gitea", "vaultwarden"} {
-		got, ok := c.BackupStrategy(name)
-		if !ok || got != name {
-			t.Errorf("%s backup strategy = %q ok=%v, want %s", name, got, ok, name)
+	pg, ok := c.BackupSpec("postgres")
+	if !ok || !pg.Usable() || pg.Strategy != "postgres" {
+		t.Fatalf("postgres spec = %+v ok=%v", pg, ok)
+	}
+	for _, name := range []string{"gitea", "vaultwarden"} {
+		spec, ok := c.BackupSpec(name)
+		if !ok || !spec.Usable() || spec.Strategy != "sqlite_volume" || spec.Snapshot != name || spec.Mount != "/data" {
+			t.Fatalf("%s spec = %+v ok=%v", name, spec, ok)
 		}
-		if !backup.KnownStrategy(got) {
-			t.Errorf("%s strategy %q is not registered", name, got)
-		}
+	}
+	if vw, _ := c.BackupSpec("vaultwarden"); !vw.ChangedOK {
+		t.Fatal("vaultwarden tar must accept GNU tar exit code 1")
+	}
+	minio, ok := c.BackupSpec("minio")
+	if !ok || !minio.Usable() || minio.Strategy != "volume" || minio.Mount != "/data" {
+		t.Fatalf("minio spec = %+v ok=%v", minio, ok)
 	}
 	if _, ok := c.BackupStrategy("redis"); ok {
 		t.Error("redis declares a backup strategy")
-	}
-	if _, ok := c.BackupStrategy("minio"); ok {
-		t.Error("minio declares a backup strategy")
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/raythurman2386/goforge/internal/auth"
-	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/models"
 	pages_services "github.com/raythurman2386/goforge/internal/web/templates/pages/services"
 )
@@ -18,8 +17,8 @@ func (h *ServiceHandler) offersBackup(name string) bool {
 	if h.catalog == nil {
 		return false
 	}
-	strategy, ok := h.catalog.BackupStrategy(name)
-	return ok && backup.KnownStrategy(strategy)
+	spec, ok := h.catalog.BackupSpec(name)
+	return ok && spec.Usable()
 }
 
 // backupChoice is what the service page's Allows backups card shows.

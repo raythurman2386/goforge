@@ -197,7 +197,7 @@ func TestInstanceSource_StrategyFromTemplate(t *testing.T) {
 	if len(targets) != 1 || targets[0].Name() == "" || !strings.Contains(targets[0].Name(), "shared-pg") {
 		t.Fatalf("targets = %v", targets)
 	}
-	if len(skipped) != 2 || skipped[0].Reason != "unknown backup strategy" || skipped[0].Template != "odd" {
+	if len(skipped) != 2 || skipped[0].Reason != "volume backup needs mount" || skipped[0].Template != "odd" {
 		t.Fatalf("skipped = %+v", skipped)
 	}
 	if skipped[1].Reason != "template has no backup strategy" || skipped[1].Template != "redis" {

@@ -233,7 +233,7 @@ func TestServiceRestore_OrderAndStaging(t *testing.T) {
 		t.Errorf("helper = %+v", d.helper)
 	}
 	args := d.execCmds[0]
-	if args[len(args)-3] != "gitea" || args[len(args)-2] != "20261101t130000z" || args[len(args)-1] != "/data/custom/g.db" {
+	if args[len(args)-4] != "gitea" || args[len(args)-3] != "20261101t130000z" || args[len(args)-2] != "/data/custom/g.db" || args[len(args)-1] != "/data" {
 		t.Errorf("script args = %v", args[3:])
 	}
 	if entries, _ := os.ReadDir(r.TempDir); len(entries) != 0 {
@@ -441,6 +441,31 @@ func TestServiceRestorePlan_UsesStrategy(t *testing.T) {
 	_, err = r.Plan(context.Background(), key, "p2")
 	if err == nil || !strings.Contains(err.Error(), "roles.sql") || strings.Contains(err.Error(), "supports postgres") {
 		t.Fatalf("err = %v, want the postgres plan", err)
+	}
+}
+
+func TestServiceRestorePlan_SQLiteVolumeAndVolume(t *testing.T) {
+	s := newMemStore()
+	const key = "2026-10-31/20261031T070000Z"
+	b := []byte("x")
+	m := &Manifest{Version: 1, RunKey: key, RunID: "r3", StartedAt: time.Date(2026, 10, 31, 7, 0, 0, 0, time.UTC), Artifacts: []ManifestArtifact{
+		{Key: "services/g9/gitea.sqlite3", Kind: KindSQLite, InstanceID: "g9", Template: "git", Strategy: strategySQLiteVolume, Snapshot: templateGitea, Mount: "/data", Bytes: 1, SHA256: sha(b)},
+		{Key: "services/g9/data.tar.gz", Kind: KindTarGz, InstanceID: "g9", Template: "git", Strategy: strategySQLiteVolume, Snapshot: templateGitea, Mount: "/data", Bytes: 1, SHA256: sha(b)},
+		{Key: "services/m9/data.tar.gz", Kind: KindTarGz, InstanceID: "m9", Template: "minio", Strategy: strategyVolume, Mount: "/data", Bytes: 1, SHA256: sha(b)},
+	}}
+	body, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustPut(t, s, ObjectKey(testPrefix, key, ManifestName), string(body))
+	r, _ := newSvcRestorer(t, s, &fakeSvcDocker{})
+	pg, err := r.Plan(context.Background(), key, "g9")
+	if err != nil || pg.Template != templateGitea || pg.Mount != "/data" || pg.Database.Key == "" || pg.Data.Key == "" {
+		t.Fatalf("sqlite plan = %+v %v", pg, err)
+	}
+	vol, err := r.Plan(context.Background(), key, "m9")
+	if err != nil || vol.Template != strategyVolume || vol.Mount != "/data" || len(vol.stageFiles()) != 1 || vol.stageFiles()[0].name != "data.tar.gz" {
+		t.Fatalf("volume plan = %+v files=%v %v", vol, vol.stageFiles(), err)
 	}
 }
 

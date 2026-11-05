@@ -63,3 +63,9 @@ docker:
 connection:
   internal: "http://{{ .Config.username }}:{{ .Config.password }}@{{ .ContainerName }}:9000"
   external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:9000{{ end }}"
+
+# Live tar of /data. An object written during the tar can be torn.
+# Existing instances stay out until Allows backups is turned on.
+backup:
+  strategy: volume
+  mount: /data

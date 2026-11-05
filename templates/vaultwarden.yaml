@@ -49,5 +49,18 @@ connection:
   external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:80{{ end }}"
 
 # Nightly backups dump this instance when Allows backups is on.
+# snapshot vaultwarden runs /vaultwarden backup. changed_ok accepts GNU
+# tar's exit code 1 ("file changed as we read it").
 backup:
-  strategy: vaultwarden
+  strategy: sqlite_volume
+  mount: /data
+  snapshot: vaultwarden
+  tar:
+    changed_ok: true
+    exclude:
+      - ./db.sqlite3
+      - ./db.sqlite3-wal
+      - ./db.sqlite3-shm
+      - ./db_*.sqlite3
+      - ./icon_cache
+      - ./tmp

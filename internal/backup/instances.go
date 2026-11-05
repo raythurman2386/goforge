@@ -23,9 +23,10 @@ const (
 )
 
 // KnownStrategy reports whether the backup registry can dump strategy.
+// gitea and vaultwarden are the older names of the sqlite_volume builtins.
 func KnownStrategy(strategy string) bool {
 	switch strategy {
-	case templatePostgres, templateGitea, templateVaultwarden:
+	case templatePostgres, templateGitea, templateVaultwarden, strategySQLiteVolume, strategyVolume:
 		return true
 	default:
 		return false
@@ -36,7 +37,7 @@ func KnownStrategy(strategy string) bool {
 // service catalog is the production source. Nil means no template has a
 // strategy, so every instance is skipped.
 type StrategySource interface {
-	BackupStrategy(templateName string) (string, bool)
+	BackupSpec(templateName string) (BackupSpec, bool)
 }
 
 // StrategyMap is a StrategySource with a fixed template-to-strategy map.
@@ -132,17 +133,22 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 			name = s.Container
 		}
 		base := instanceTarget{inst: in, container: name(in.ID), docker: s.Docker, redactor: s.Redactor}
-		strategy, ok := "", false
+		var spec BackupSpec
+		var ok bool
 		if s.Strategies != nil {
-			strategy, ok = s.Strategies.BackupStrategy(in.TemplateName)
+			spec, ok = s.Strategies.BackupSpec(in.TemplateName)
 		}
 		if !ok {
 			skip("template has no backup strategy")
 			continue
 		}
-		t, ok := targetFor(strategy, base)
-		if !ok {
+		if !KnownStrategy(spec.Strategy) {
 			skip("unknown backup strategy")
+			continue
+		}
+		t, err := targetFor(spec, base)
+		if err != nil {
+			skip(err.Error())
 			continue
 		}
 		if !in.BackupEnabled {
@@ -178,17 +184,22 @@ func reloadStrategies(src StrategySource) error {
 	return nil
 }
 
-func targetFor(strategy string, base instanceTarget) (Target, bool) {
-	base.strategy = strategy
-	switch strategy {
+func targetFor(spec BackupSpec, base instanceTarget) (Target, error) {
+	if err := spec.Normalize(); err != nil {
+		return nil, err
+	}
+	base.strategy = spec.Strategy
+	base.mount = spec.Mount
+	base.snapshot = spec.Snapshot
+	switch spec.Strategy {
 	case templatePostgres:
-		return &PostgresTarget{base}, true
-	case templateGitea:
-		return &GiteaTarget{base}, true
-	case templateVaultwarden:
-		return &VaultwardenTarget{base}, true
+		return &PostgresTarget{base}, nil
+	case strategySQLiteVolume, templateGitea, templateVaultwarden:
+		return &sqliteVolumeTarget{instanceTarget: base, spec: spec}, nil
+	case strategyVolume:
+		return &volumeTarget{instanceTarget: base, spec: spec}, nil
 	default:
-		return nil, false
+		return nil, fmt.Errorf("unknown backup strategy %q", spec.Strategy)
 	}
 }
 
@@ -198,6 +209,8 @@ type instanceTarget struct {
 	docker    ContainerExecer
 	redactor  *Redactor
 	strategy  string
+	mount     string
+	snapshot  string
 }
 
 func (b instanceTarget) Name() string {
@@ -224,6 +237,8 @@ func (b instanceTarget) artifact(name string, kind Kind, db string, opts docker.
 		InstanceID:  b.inst.ID,
 		Template:    b.inst.TemplateName,
 		Strategy:    b.strategy,
+		Mount:       b.mount,
+		Snapshot:    b.snapshot,
 		Database:    db,
 		Dump: func(ctx context.Context, w io.Writer) error {
 			return b.exec(ctx, opts, w)
@@ -333,12 +348,11 @@ const giteaTar = `exec tar -C /data -czf - \
 
 // Plan implements Target.
 func (t *GiteaTarget) Plan(context.Context) ([]Artifact, error) {
-	snap := sh(giteaSnapshot)
-	snap.User = "git"
-	return []Artifact{
-		t.artifact("gitea.sqlite3", KindSQLite, "gitea", snap),
-		t.artifact("data.tar.gz", KindTarGz, "", sh(giteaTar)),
-	}, nil
+	spec := BackupSpec{Strategy: templateGitea}
+	if err := spec.Normalize(); err != nil {
+		return nil, err
+	}
+	return planSQLiteVolume(t.instanceTarget, spec)
 }
 
 // VaultwardenTarget backs up a Vaultwarden instance's /data volume.
@@ -351,16 +365,20 @@ func (t *GiteaTarget) Plan(context.Context) ([]Artifact, error) {
 type VaultwardenTarget struct{ instanceTarget }
 
 const vaultwardenSnapshot = `set -eu
+mnt="${1:-/data}"
+case "$mnt" in /*) ;; *) echo "unexpected vaultwarden data mount" >&2; exit 4 ;; esac
+case "$mnt" in *..*) echo "unexpected vaultwarden data mount" >&2; exit 4 ;; esac
 out=$(/vaultwarden backup 2>&1) || { printf '%s\n' "$out" >&2; exit 3; }
 p=$(printf '%s\n' "$out" | sed -n "s/.*Backup to '\(.*\)' was successful.*/\1/p" | tail -n 1)
 # With the default DATA_FOLDER the path is relative to the working dir
 # ("data/db_....sqlite3").
 case "$p" in /*) ;; ?*) p="${PWD%/}/$p" ;; esac
 case "$p" in
-  /data/db_*.sqlite3) ;;
+  "$mnt"/db_*.sqlite3) ;;
   *) echo "unexpected vaultwarden backup path" >&2; exit 4 ;;
 esac
-case "${p#/data/}" in */*) echo "unexpected vaultwarden backup path" >&2; exit 4 ;; esac
+rel=${p#"$mnt"/}
+case "$rel" in */*) echo "unexpected vaultwarden backup path" >&2; exit 4 ;; esac
 trap 'rm -f -- "$p"' EXIT
 cat -- "$p"`
 
@@ -374,8 +392,9 @@ tar -C /data --warning=no-file-changed -czf - \
 
 // Plan implements Target.
 func (t *VaultwardenTarget) Plan(context.Context) ([]Artifact, error) {
-	return []Artifact{
-		t.artifact("vaultwarden.sqlite3", KindSQLite, "vaultwarden", sh(vaultwardenSnapshot)),
-		t.artifact("data.tar.gz", KindTarGz, "", sh(vaultwardenTar)),
-	}, nil
+	spec := BackupSpec{Strategy: templateVaultwarden}
+	if err := spec.Normalize(); err != nil {
+		return nil, err
+	}
+	return planSQLiteVolume(t.instanceTarget, spec)
 }

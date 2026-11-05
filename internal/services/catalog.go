@@ -147,26 +147,52 @@ type ConnectionConfig struct {
 	External string `yaml:"external" json:"external"`
 }
 
-// BackupConfig is the template's backup.strategy block. The nightly run
-// includes an instance when this names a strategy the backup registry
-// knows, the instance's Allows backups switch is on, and the container
-// is running. An empty strategy leaves the template out.
+// BackupConfig is the template's backup block. The nightly run includes an
+// instance when the strategy is one the registry knows, the instance's
+// Allows backups switch is on, and the container is running. An empty
+// strategy leaves the template out.
 type BackupConfig struct {
-	Strategy string `yaml:"strategy" json:"strategy"`
+	Strategy string    `yaml:"strategy" json:"strategy"`
+	Mount    string    `yaml:"mount,omitempty" json:"mount,omitempty"`
+	Snapshot string    `yaml:"snapshot,omitempty" json:"snapshot,omitempty"`
+	Tar      BackupTar `yaml:"tar,omitempty" json:"tar,omitempty"`
 }
 
-// BackupStrategy returns the template's backup strategy. The second result
-// is false when the template is missing or declares none.
-func (c *Catalog) BackupStrategy(name string) (string, bool) {
+// BackupTar is the tar half of a sqlite_volume or volume backup.
+type BackupTar struct {
+	// ChangedOK accepts GNU tar's exit code 1 ("file changed as we read it").
+	ChangedOK bool     `yaml:"changed_ok,omitempty" json:"changed_ok,omitempty"`
+	Exclude   []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+}
+
+// BackupSpec returns the template's backup block. The second result is
+// false when the template is missing or declares no strategy. The spec
+// may still be unusable; callers check Usable.
+func (c *Catalog) BackupSpec(name string) (backup.BackupSpec, bool) {
 	tmpl, err := c.GetTemplate(name)
 	if err != nil || tmpl == nil {
+		return backup.BackupSpec{}, false
+	}
+	if strings.TrimSpace(tmpl.Backup.Strategy) == "" {
+		return backup.BackupSpec{}, false
+	}
+	return backup.BackupSpec{
+		Strategy:  tmpl.Backup.Strategy,
+		Mount:     tmpl.Backup.Mount,
+		Snapshot:  tmpl.Backup.Snapshot,
+		Excludes:  tmpl.Backup.Tar.Exclude,
+		ChangedOK: tmpl.Backup.Tar.ChangedOK,
+	}, true
+}
+
+// BackupStrategy returns the template's backup strategy name. The second
+// result is false when the template is missing or declares none.
+func (c *Catalog) BackupStrategy(name string) (string, bool) {
+	spec, ok := c.BackupSpec(name)
+	if !ok {
 		return "", false
 	}
-	strategy := strings.TrimSpace(tmpl.Backup.Strategy)
-	if strategy == "" {
-		return "", false
-	}
-	return strategy, true
+	return strings.TrimSpace(spec.Strategy), true
 }
 
 // Catalog manages service templates.
@@ -287,8 +313,11 @@ func (c *Catalog) load() error {
 			continue
 		}
 		tmpl.applyPortDefaults()
-		if strategy := strings.TrimSpace(tmpl.Backup.Strategy); strategy != "" && !backup.KnownStrategy(strategy) {
-			c.logger.Warn("template backup strategy is not registered; the nightly run will skip it", "template", tmpl.Name, "strategy", strategy)
+		if strategy := strings.TrimSpace(tmpl.Backup.Strategy); strategy != "" {
+			spec := backup.BackupSpec{Strategy: strategy, Mount: tmpl.Backup.Mount, Snapshot: tmpl.Backup.Snapshot, Excludes: tmpl.Backup.Tar.Exclude, ChangedOK: tmpl.Backup.Tar.ChangedOK}
+			if err := spec.Normalize(); err != nil {
+				c.logger.Warn("template backup strategy is not usable; the nightly run will skip it", "template", tmpl.Name, "strategy", strategy, "error", err)
+			}
 		}
 
 		loaded[tmpl.Name] = &tmpl

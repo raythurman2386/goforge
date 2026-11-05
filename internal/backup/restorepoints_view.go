@@ -96,6 +96,11 @@ type InstanceRestorePointsView struct {
 	// Template is the instance's template as recorded by the backups ("" when
 	// no run holds the instance).
 	Template string
+	// Strategy, Snapshot, and Mount come from the newest run that holds
+	// the instance. Older runs leave them empty.
+	Strategy string
+	Snapshot string
+	Mount    string
 	// Schedule is "HH:MM <zone>", used to show times in the schedule's zone.
 	Schedule string
 	Points   []InstanceRestorePoint
@@ -108,7 +113,8 @@ type InstanceRestorePointsView struct {
 // Restorable reports whether goforge backup restore-service handles the
 // instance's template.
 func (v *InstanceRestorePointsView) Restorable() bool {
-	return RestoreTemplate(v.Template)
+	_, _, ok := classifyRestore(ManifestArtifact{Strategy: v.Strategy, Template: v.Template, Snapshot: v.Snapshot, Mount: v.Mount})
+	return ok
 }
 
 // instanceScanRuns is how many of the newest runs ListInstance reads.
@@ -152,6 +158,9 @@ func (l *RestorePointLister) ListInstance(ctx context.Context, instanceID string
 		}
 		if v.Template == "" {
 			v.Template = arts[0].Template
+			v.Strategy = arts[0].Strategy
+			v.Snapshot = arts[0].Snapshot
+			v.Mount = arts[0].Mount
 		}
 		v.Points = append(v.Points, ip)
 	}
@@ -175,7 +184,14 @@ func RestoreTemplate(name string) bool {
 // KeptDir is where restore-service keeps the instance's previous data,
 // with a placeholder for the time.
 func (v *InstanceRestorePointsView) KeptDir() string {
-	return ServiceMount(v.Template) + "/" + preRestorePrefix + "<time>"
+	mnt := v.Mount
+	if mnt == "" {
+		mnt = ServiceMount(v.Template)
+	}
+	if mnt == "" {
+		mnt = ServiceMount(v.Strategy)
+	}
+	return mnt + "/" + preRestorePrefix + "<time>"
 }
 
 // Location is the backup schedule's time zone, or UTC.

@@ -939,12 +939,12 @@ connection:
 
 ```
 
-Shipped Postgres, Gitea, and Vaultwarden templates set `backup.strategy`
-to `postgres`, `gitea`, or `vaultwarden`. The nightly run reads that field
-from the catalog and dispatches to the matching target in `internal/backup`.
-An instance is included when the strategy is known, **Allows backups** is on
-(`service_instances.backup_enabled`), and the container is running. See
-`docs/deployment/backup.md`.
+Shipped templates set `backup.strategy`: Postgres uses `postgres`, Gitea
+and Vaultwarden use `sqlite_volume` with snapshot builtins `gitea` and
+`vaultwarden`, and MinIO uses `volume`. The nightly run reads the block
+from the catalog. An instance is included when the strategy is usable,
+**Allows backups** is on (`service_instances.backup_enabled`), and the
+container is running. See `docs/deployment/backup.md`.
 
 ---
 

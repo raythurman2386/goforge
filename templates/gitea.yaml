@@ -160,5 +160,17 @@ connection:
   external: "{{ if .Domain }}{{ .Protocol }}://{{ .Domain }}{{ else }}http://{{ .ContainerName }}:3000{{ end }}"
 
 # Nightly backups dump this instance when Allows backups is on.
+# snapshot gitea is the sqlite online-backup builtin. The tar is the rest
+# of the mount, minus the database files and rebuildable indexers.
 backup:
-  strategy: gitea
+  strategy: sqlite_volume
+  mount: /data
+  snapshot: gitea
+  tar:
+    exclude:
+      - ./gitea/gitea.db
+      - ./gitea/gitea.db-journal
+      - ./gitea/gitea.db-wal
+      - ./gitea/gitea.db-shm
+      - ./gitea/indexers
+      - ./gitea/queues
