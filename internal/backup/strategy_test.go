@@ -7,14 +7,14 @@ import (
 )
 
 func TestShippedTarScriptsStayPut(t *testing.T) {
-	g := BackupSpec{Strategy: strategySQLiteVolume, Mount: "/data", Snapshot: templateGitea, Excludes: append([]string(nil), snapshotBuiltins[templateGitea].excludes...)}
+	g := Spec{Strategy: strategySQLiteVolume, Mount: "/data", Snapshot: templateGitea, Excludes: append([]string(nil), snapshotBuiltins[templateGitea].excludes...)}
 	if err := g.Normalize(); err != nil {
 		t.Fatal(err)
 	}
 	if g.tarCommand() != giteaTar {
 		t.Fatalf("gitea tar script changed:\n%s", g.tarCommand())
 	}
-	v := BackupSpec{
+	v := Spec{
 		Strategy: strategySQLiteVolume, Mount: "/data", Snapshot: templateVaultwarden, ChangedOK: true,
 		Excludes: append([]string(nil), snapshotBuiltins[templateVaultwarden].excludes...),
 	}
@@ -26,8 +26,8 @@ func TestShippedTarScriptsStayPut(t *testing.T) {
 	}
 }
 
-func TestBackupSpec_RejectsBadPaths(t *testing.T) {
-	bad := []BackupSpec{
+func TestSpec_RejectsBadPaths(t *testing.T) {
+	bad := []Spec{
 		{Strategy: strategyVolume, Mount: "data"},
 		{Strategy: strategyVolume, Mount: "/data/../etc"},
 		{Strategy: strategySQLiteVolume, Mount: "/data", Snapshot: templateGitea, Excludes: []string{"--checkpoint"}},
@@ -41,9 +41,9 @@ func TestBackupSpec_RejectsBadPaths(t *testing.T) {
 	}
 }
 
-type specSource map[string]BackupSpec
+type specSource map[string]Spec
 
-func (m specSource) BackupSpec(name string) (BackupSpec, bool) {
+func (m specSource) BackupSpec(name string) (Spec, bool) {
 	s, ok := m[name]
 	return s, ok
 }

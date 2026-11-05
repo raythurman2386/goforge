@@ -306,18 +306,18 @@ func (r *ServiceRestorer) Plan(ctx context.Context, runKey, instanceID string) (
 	}
 	dbName := serviceArtifactNames[kind]
 	var haveDB, haveData bool
-	for _, a := range arts {
-		switch a.Key {
+	for i := range arts {
+		switch arts[i].Key {
 		case dir + dbName:
-			if a.Kind != KindSQLite {
-				return nil, fmt.Errorf("%s has kind %q, want %q", a.Key, a.Kind, KindSQLite)
+			if arts[i].Kind != KindSQLite {
+				return nil, fmt.Errorf("%s has kind %q, want %q", arts[i].Key, arts[i].Kind, KindSQLite)
 			}
-			plan.Database, haveDB = a, true
+			plan.Database, haveDB = arts[i], true
 		case dir + "data.tar.gz":
-			if a.Kind != KindTarGz {
-				return nil, fmt.Errorf("%s has kind %q, want %q", a.Key, a.Kind, KindTarGz)
+			if arts[i].Kind != KindTarGz {
+				return nil, fmt.Errorf("%s has kind %q, want %q", arts[i].Key, arts[i].Kind, KindTarGz)
 			}
-			plan.Data, haveData = a, true
+			plan.Data, haveData = arts[i], true
 		}
 	}
 	if !haveDB || !haveData {
@@ -374,14 +374,14 @@ func classifyRestore(a ManifestArtifact) (kind, mount string, ok bool) {
 
 // planVolume finds the single data tar of a volume backup.
 func planVolume(plan *ServiceRestorePlan, arts []ManifestArtifact, dir string) (*ServiceRestorePlan, error) {
-	for _, a := range arts {
-		if a.Key != dir+"data.tar.gz" {
+	for i := range arts {
+		if arts[i].Key != dir+"data.tar.gz" {
 			continue
 		}
-		if a.Kind != KindTarGz {
-			return nil, fmt.Errorf("%s has kind %q, want %q", a.Key, a.Kind, KindTarGz)
+		if arts[i].Kind != KindTarGz {
+			return nil, fmt.Errorf("%s has kind %q, want %q", arts[i].Key, arts[i].Kind, KindTarGz)
 		}
-		plan.Data = a
+		plan.Data = arts[i]
 		return plan, nil
 	}
 	return nil, fmt.Errorf("run %s is missing %sdata.tar.gz for this volume backup", plan.RunKey, dir)
@@ -392,25 +392,25 @@ func planVolume(plan *ServiceRestorePlan, arts []ManifestArtifact, dir string) (
 func planPostgres(plan *ServiceRestorePlan, arts []ManifestArtifact, dir string) (*ServiceRestorePlan, error) {
 	var haveRoles bool
 	seen := map[string]bool{}
-	for _, a := range arts {
+	for i := range arts {
 		switch {
-		case a.Key == dir+"roles.sql":
-			if a.Kind != KindPgRoles {
-				return nil, fmt.Errorf("%s has kind %q, want %q", a.Key, a.Kind, KindPgRoles)
+		case arts[i].Key == dir+"roles.sql":
+			if arts[i].Kind != KindPgRoles {
+				return nil, fmt.Errorf("%s has kind %q, want %q", arts[i].Key, arts[i].Kind, KindPgRoles)
 			}
-			plan.Roles, haveRoles = a, true
-		case strings.HasPrefix(a.Key, dir) && strings.HasSuffix(a.Key, ".dump"):
-			if a.Kind != KindPgDump {
-				return nil, fmt.Errorf("%s has kind %q, want %q", a.Key, a.Kind, KindPgDump)
+			plan.Roles, haveRoles = arts[i], true
+		case strings.HasPrefix(arts[i].Key, dir) && strings.HasSuffix(arts[i].Key, ".dump"):
+			if arts[i].Kind != KindPgDump {
+				return nil, fmt.Errorf("%s has kind %q, want %q", arts[i].Key, arts[i].Kind, KindPgDump)
 			}
-			if a.Database == "" {
-				return nil, fmt.Errorf("%s does not name its database in the manifest", a.Key)
+			if arts[i].Database == "" {
+				return nil, fmt.Errorf("%s does not name its database in the manifest", arts[i].Key)
 			}
-			if seen[a.Database] {
-				return nil, fmt.Errorf("the run has two dumps of database %q for this instance", a.Database)
+			if seen[arts[i].Database] {
+				return nil, fmt.Errorf("the run has two dumps of database %q for this instance", arts[i].Database)
 			}
-			seen[a.Database] = true
-			plan.Dumps = append(plan.Dumps, a)
+			seen[arts[i].Database] = true
+			plan.Dumps = append(plan.Dumps, arts[i])
 		}
 	}
 	if !haveRoles || len(plan.Dumps) == 0 {
@@ -433,8 +433,8 @@ func (p *ServiceRestorePlan) stageFiles() []stageFile {
 	if p.Template == templatePostgres {
 		out := make([]stageFile, 0, len(p.Dumps)+1)
 		out = append(out, stageFile{name: "roles.sql", art: p.Roles})
-		for i, d := range p.Dumps {
-			out = append(out, stageFile{name: strconv.Itoa(i) + ".dump", art: d})
+		for i := range p.Dumps {
+			out = append(out, stageFile{name: strconv.Itoa(i) + ".dump", art: p.Dumps[i]})
 		}
 		return out
 	}
@@ -448,8 +448,8 @@ func (p *ServiceRestorePlan) stageFiles() []stageFile {
 func (p *ServiceRestorePlan) restoreCmd(info *ServiceContainerInfo, stamp string) []string {
 	if p.Template == templatePostgres {
 		cmd := []string{"sh", "-c", restorePostgresScript, "sh", p.Mount, stamp, info.Superuser()}
-		for _, d := range p.Dumps {
-			cmd = append(cmd, d.Database)
+		for i := range p.Dumps {
+			cmd = append(cmd, p.Dumps[i].Database)
 		}
 		return cmd
 	}
@@ -864,9 +864,9 @@ echo "put the previous contents of $mnt back; the partial restore is kept in $fa
 // InstanceArtifacts returns the manifest entries for one service instance.
 func (m *Manifest) InstanceArtifacts(instanceID string) []ManifestArtifact {
 	var out []ManifestArtifact
-	for _, a := range m.Artifacts {
-		if a.InstanceID == instanceID && instanceID != "" {
-			out = append(out, a)
+	for i := range m.Artifacts {
+		if m.Artifacts[i].InstanceID == instanceID && instanceID != "" {
+			out = append(out, m.Artifacts[i])
 		}
 	}
 	return out

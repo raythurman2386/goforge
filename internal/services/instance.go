@@ -262,7 +262,7 @@ func (s *InstanceService) DeployInstance(ctx context.Context, userID, tmplName s
 		Config:       configJSON,
 		Domain:       sql.NullString{String: domain, Valid: domain != ""},
 		Status:       models.ServiceStatusPending,
-		BackupEnabled: backup.BackupSpec{
+		BackupEnabled: backup.Spec{
 			Strategy: tmpl.Backup.Strategy, Mount: tmpl.Backup.Mount, Snapshot: tmpl.Backup.Snapshot,
 			Excludes: tmpl.Backup.Tar.Exclude, ChangedOK: tmpl.Backup.Tar.ChangedOK,
 		}.Usable(),

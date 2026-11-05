@@ -37,7 +37,7 @@ func KnownStrategy(strategy string) bool {
 // service catalog is the production source. Nil means no template has a
 // strategy, so every instance is skipped.
 type StrategySource interface {
-	BackupSpec(templateName string) (BackupSpec, bool)
+	BackupSpec(templateName string) (Spec, bool)
 }
 
 // StrategyMap is a StrategySource with a fixed template-to-strategy map.
@@ -133,7 +133,7 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 			name = s.Container
 		}
 		base := instanceTarget{inst: in, container: name(in.ID), docker: s.Docker, redactor: s.Redactor}
-		var spec BackupSpec
+		var spec Spec
 		var ok bool
 		if s.Strategies != nil {
 			spec, ok = s.Strategies.BackupSpec(in.TemplateName)
@@ -184,7 +184,7 @@ func reloadStrategies(src StrategySource) error {
 	return nil
 }
 
-func targetFor(spec BackupSpec, base instanceTarget) (Target, error) {
+func targetFor(spec Spec, base instanceTarget) (Target, error) {
 	if err := spec.Normalize(); err != nil {
 		return nil, err
 	}
@@ -348,7 +348,7 @@ const giteaTar = `exec tar -C /data -czf - \
 
 // Plan implements Target.
 func (t *GiteaTarget) Plan(context.Context) ([]Artifact, error) {
-	spec := BackupSpec{Strategy: templateGitea}
+	spec := Spec{Strategy: templateGitea}
 	if err := spec.Normalize(); err != nil {
 		return nil, err
 	}
@@ -392,7 +392,7 @@ tar -C /data --warning=no-file-changed -czf - \
 
 // Plan implements Target.
 func (t *VaultwardenTarget) Plan(context.Context) ([]Artifact, error) {
-	spec := BackupSpec{Strategy: templateVaultwarden}
+	spec := Spec{Strategy: templateVaultwarden}
 	if err := spec.Normalize(); err != nil {
 		return nil, err
 	}

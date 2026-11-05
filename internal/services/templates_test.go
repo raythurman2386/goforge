@@ -32,8 +32,8 @@ func TestRepoTemplates_BackupStrategies(t *testing.T) {
 		t.Fatalf("postgres spec = %+v ok=%v", pg, ok)
 	}
 	for _, name := range []string{"gitea", "vaultwarden"} {
-		spec, ok := c.BackupSpec(name)
-		if !ok || !spec.Usable() || spec.Strategy != "sqlite_volume" || spec.Snapshot != name || spec.Mount != "/data" {
+		spec, specOK := c.BackupSpec(name)
+		if !specOK || !spec.Usable() || spec.Strategy != "sqlite_volume" || spec.Snapshot != name || spec.Mount != "/data" {
 			t.Fatalf("%s spec = %+v ok=%v", name, spec, ok)
 		}
 	}

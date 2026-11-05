@@ -13,10 +13,10 @@ const (
 	strategyVolume       = "volume"
 )
 
-// BackupSpec is one template's backup block. Strategy is postgres,
+// Spec is one template's backup block. Strategy is postgres,
 // sqlite_volume, or volume. gitea and vaultwarden are the older names for
 // the two sqlite_volume builtins and still work.
-type BackupSpec struct {
+type Spec struct {
 	Strategy  string
 	Mount     string
 	Snapshot  string
@@ -25,14 +25,14 @@ type BackupSpec struct {
 }
 
 // Usable reports whether a nightly run can dump this spec.
-func (s BackupSpec) Usable() bool {
+func (s Spec) Usable() bool {
 	cp := s
 	return cp.Normalize() == nil
 }
 
 // Normalize fills builtin defaults and checks mount and excludes. It
 // rejects an unknown strategy.
-func (s *BackupSpec) Normalize() error {
+func (s *Spec) Normalize() error {
 	s.Strategy = strings.TrimSpace(s.Strategy)
 	s.Mount = strings.TrimSpace(s.Mount)
 	s.Snapshot = strings.TrimSpace(s.Snapshot)
@@ -65,7 +65,7 @@ func (s *BackupSpec) Normalize() error {
 	}
 }
 
-func (s *BackupSpec) applyBuiltin(name string) error {
+func (s *Spec) applyBuiltin(name string) error {
 	b, ok := snapshotBuiltins[name]
 	if !ok {
 		return fmt.Errorf("unknown snapshot %q", name)
@@ -90,14 +90,14 @@ func (s *BackupSpec) applyBuiltin(name string) error {
 
 // BackupSpec implements StrategySource for a template name mapped to a
 // strategy name. postgres, gitea, and vaultwarden expand to their builtins.
-func (m StrategyMap) BackupSpec(name string) (BackupSpec, bool) {
+func (m StrategyMap) BackupSpec(name string) (Spec, bool) {
 	strategy, ok := m.BackupStrategy(name)
 	if !ok {
-		return BackupSpec{}, false
+		return Spec{}, false
 	}
 	// Return the name even when it still needs a mount or snapshot. targetFor
 	// reports that, instead of treating a known strategy as "no strategy".
-	return BackupSpec{Strategy: strategy}, true
+	return Spec{Strategy: strategy}, true
 }
 
 var (
@@ -121,7 +121,7 @@ func validateExcludes(excludes []string) error {
 	return nil
 }
 
-func (s BackupSpec) tarCommand() string {
+func (s Spec) tarCommand() string {
 	if s.sameTar(templateGitea) {
 		return giteaTar
 	}
@@ -131,7 +131,7 @@ func (s BackupSpec) tarCommand() string {
 	return buildTarScript(s.Mount, s.Excludes, s.ChangedOK)
 }
 
-func (s BackupSpec) sameTar(builtin string) bool {
+func (s Spec) sameTar(builtin string) bool {
 	b, ok := snapshotBuiltins[builtin]
 	if !ok || s.Mount != b.mount || s.ChangedOK != b.changedOK || len(s.Excludes) != len(b.excludes) {
 		return false
@@ -145,7 +145,7 @@ func (s BackupSpec) sameTar(builtin string) bool {
 }
 
 func buildTarScript(mount string, excludes []string, changedOK bool) string {
-	var quoted []string
+	quoted := make([]string, 0, len(excludes))
 	for _, ex := range excludes {
 		quoted = append(quoted, "--exclude="+quoteExclude(ex))
 	}
@@ -177,7 +177,7 @@ type snapshotBuiltin struct {
 
 type sqliteVolumeTarget struct {
 	instanceTarget
-	spec BackupSpec
+	spec Spec
 }
 
 // Plan implements Target. The snapshot script is a named builtin. The tar
@@ -187,7 +187,7 @@ func (t *sqliteVolumeTarget) Plan(context.Context) ([]Artifact, error) {
 	return planSQLiteVolume(t.instanceTarget, t.spec)
 }
 
-func planSQLiteVolume(base instanceTarget, spec BackupSpec) ([]Artifact, error) {
+func planSQLiteVolume(base instanceTarget, spec Spec) ([]Artifact, error) {
 	b, ok := snapshotBuiltins[spec.Snapshot]
 	if !ok {
 		return nil, fmt.Errorf("unknown snapshot %q", spec.Snapshot)
@@ -206,7 +206,7 @@ func planSQLiteVolume(base instanceTarget, spec BackupSpec) ([]Artifact, error) 
 
 type volumeTarget struct {
 	instanceTarget
-	spec BackupSpec
+	spec Spec
 }
 
 // Plan implements Target. It tars the mount while the container runs.

@@ -180,7 +180,8 @@ func printServiceRestorePlan(out io.Writer, plan *backup.ServiceRestorePlan, inf
 	}
 	if plan.IsPostgres() {
 		fmt.Fprintf(out, "  roles:      %s, %d bytes, sha256 %s\n", plan.Roles.Key, plan.Roles.Bytes, plan.Roles.SHA256)
-		for _, d := range plan.Dumps {
+		for i := range plan.Dumps {
+			d := &plan.Dumps[i]
 			fmt.Fprintf(out, "  database:   %s (%s), %d bytes, sha256 %s\n", d.Database, d.Key, d.Bytes, d.SHA256)
 		}
 		if info != nil {

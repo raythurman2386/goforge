@@ -165,36 +165,6 @@ type BackupTar struct {
 	Exclude   []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
 }
 
-// BackupSpec returns the template's backup block. The second result is
-// false when the template is missing or declares no strategy. The spec
-// may still be unusable; callers check Usable.
-func (c *Catalog) BackupSpec(name string) (backup.BackupSpec, bool) {
-	tmpl, err := c.GetTemplate(name)
-	if err != nil || tmpl == nil {
-		return backup.BackupSpec{}, false
-	}
-	if strings.TrimSpace(tmpl.Backup.Strategy) == "" {
-		return backup.BackupSpec{}, false
-	}
-	return backup.BackupSpec{
-		Strategy:  tmpl.Backup.Strategy,
-		Mount:     tmpl.Backup.Mount,
-		Snapshot:  tmpl.Backup.Snapshot,
-		Excludes:  tmpl.Backup.Tar.Exclude,
-		ChangedOK: tmpl.Backup.Tar.ChangedOK,
-	}, true
-}
-
-// BackupStrategy returns the template's backup strategy name. The second
-// result is false when the template is missing or declares none.
-func (c *Catalog) BackupStrategy(name string) (string, bool) {
-	spec, ok := c.BackupSpec(name)
-	if !ok {
-		return "", false
-	}
-	return strings.TrimSpace(spec.Strategy), true
-}
-
 // Catalog manages service templates.
 //
 // Templates are read from templatesDir at startup and re-read whenever the
@@ -211,6 +181,36 @@ type Catalog struct {
 
 	// reloadMu serializes reloads so concurrent requests do not parse twice.
 	reloadMu sync.Mutex
+}
+
+// BackupSpec returns the template's backup block. The second result is
+// false when the template is missing or declares no strategy. The spec
+// may still be unusable; callers check Usable.
+func (c *Catalog) BackupSpec(name string) (backup.Spec, bool) {
+	tmpl, err := c.GetTemplate(name)
+	if err != nil || tmpl == nil {
+		return backup.Spec{}, false
+	}
+	if strings.TrimSpace(tmpl.Backup.Strategy) == "" {
+		return backup.Spec{}, false
+	}
+	return backup.Spec{
+		Strategy:  tmpl.Backup.Strategy,
+		Mount:     tmpl.Backup.Mount,
+		Snapshot:  tmpl.Backup.Snapshot,
+		Excludes:  tmpl.Backup.Tar.Exclude,
+		ChangedOK: tmpl.Backup.Tar.ChangedOK,
+	}, true
+}
+
+// BackupStrategy returns the template's backup strategy name. The second
+// result is false when the template is missing or declares none.
+func (c *Catalog) BackupStrategy(name string) (string, bool) {
+	spec, ok := c.BackupSpec(name)
+	if !ok {
+		return "", false
+	}
+	return strings.TrimSpace(spec.Strategy), true
 }
 
 // NewCatalog creates a new service catalog.
@@ -314,7 +314,7 @@ func (c *Catalog) load() error {
 		}
 		tmpl.applyPortDefaults()
 		if strategy := strings.TrimSpace(tmpl.Backup.Strategy); strategy != "" {
-			spec := backup.BackupSpec{Strategy: strategy, Mount: tmpl.Backup.Mount, Snapshot: tmpl.Backup.Snapshot, Excludes: tmpl.Backup.Tar.Exclude, ChangedOK: tmpl.Backup.Tar.ChangedOK}
+			spec := backup.Spec{Strategy: strategy, Mount: tmpl.Backup.Mount, Snapshot: tmpl.Backup.Snapshot, Excludes: tmpl.Backup.Tar.Exclude, ChangedOK: tmpl.Backup.Tar.ChangedOK}
 			if err := spec.Normalize(); err != nil {
 				c.logger.Warn("template backup strategy is not usable; the nightly run will skip it", "template", tmpl.Name, "strategy", strategy, "error", err)
 			}

@@ -153,8 +153,8 @@ func (l *RestorePointLister) ListInstance(ctx context.Context, instanceID string
 			continue
 		}
 		ip := InstanceRestorePoint{RunKey: p.RunKey, StartedAt: p.Manifest.StartedAt, Artifacts: len(arts)}
-		for _, a := range arts {
-			ip.Bytes += a.Bytes
+		for i := range arts {
+			ip.Bytes += arts[i].Bytes
 		}
 		if v.Template == "" {
 			v.Template = arts[0].Template

@@ -238,8 +238,8 @@ func runBackupOnce(ctx context.Context) error {
 	}
 	catalog := services.NewCatalog(cfg.TemplatesDir)
 	catalog.SetLogger(logger.WithComponent(log, "catalog"))
-	if err := catalog.LoadTemplates(); err != nil {
-		log.Warn("some service templates failed to load; backup strategies come from the ones that did", "error", err)
+	if loadErr := catalog.LoadTemplates(); loadErr != nil {
+		log.Warn("some service templates failed to load; backup strategies come from the ones that did", "error", loadErr)
 	}
 	setup, err := backup.NewFor(cfg, bc, db.DB, dockerClient, logger.WithComponent(log, "backup"), version, catalog)
 	if err != nil {
