@@ -124,7 +124,7 @@ func TestBackupCard_SwitchesAndCheckboxes(t *testing.T) {
 		`<label for="backup-schedule-off" class="font-medium text-label">No nightly schedule (run with <code>goforge backup run</code>)`,
 		`<input type="checkbox" id="backup-path-style" name="force_path_style" value="true" checked class="checkbox">`,
 		`<input type="checkbox" id="backup-clear-creds" name="clear_credentials" value="true" class="checkbox">`,
-		`<label for="backup-endpoint" class="label">Endpoint</label>`,
+		`<label for="backup-endpoint" class="label mb-0">Endpoint</label>`,
 		`aria-describedby="backup-access-key-state"`, `<p id="backup-access-key-state"`,
 		`aria-describedby="backup-secret-state"`, `<p id="backup-secret-state"`,
 		`name="retention_daily" type="number"`, `min="1"`, `max="366"`,

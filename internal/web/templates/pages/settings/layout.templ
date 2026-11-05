@@ -1,0 +1,56 @@
+package settings
+
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
+// SettingsSection replaces the former filled cards with a flat settings group.
+templ SettingsSection(title string, attrs templ.Attributes) {
+	<section class="border-t border-divider py-6 first:border-t-0 first:pt-0" { attrs... }>
+		<h2 class="text-base font-semibold text-foreground">{ title }</h2>
+		<div class="mt-2">
+			{ children... }
+		</div>
+	</section>
+}
+
+// SettingsRow keeps the setting's label and help together, with its control
+// alongside on wide screens and below it on touch screens.
+templ SettingsRow(label, description, controlID string) {
+	<div class="flex flex-col gap-3 border-t border-divider py-4 first:border-t-0 sm:flex-row sm:items-start sm:justify-between sm:gap-6 md:flex-row md:items-start md:justify-between">
+		<div class="min-w-0 flex-1">
+			if controlID != "" {
+				@ui.Label(ui.LabelProps{For: controlID, Class: "mb-0"}) {
+					{ label }
+				}
+			} else {
+				<p class="text-sm font-semibold text-label">{ label }</p>
+			}
+			if description != "" {
+				<p class="mt-1 text-sm text-foreground-secondary">{ description }</p>
+			}
+		</div>
+		<div class="min-w-0 w-full shrink-0 md:w-72">
+			{ children... }
+		</div>
+	</div>
+}
+
+// SettingsActions aligns a form's actions with the setting rows.
+templ SettingsActions() {
+	<div class="flex flex-wrap justify-end gap-2 border-t border-divider pt-4">
+		{ children... }
+	</div>
+}
+
+// StatusPill is the single status-pill treatment used by settings rows.
+templ StatusPill(tone ui.BadgeTone) {
+	@ui.Badge(ui.BadgeProps{Tone: tone, Variant: ui.BadgeSoft, Size: ui.BadgeSM}) {
+		{ children... }
+	}
+}
+
+// SettingsFormGrid groups related fields without reintroducing a card.
+templ SettingsFormGrid() {
+	<div class="grid gap-x-4 sm:grid-cols-2">
+		{ children... }
+	</div>
+}

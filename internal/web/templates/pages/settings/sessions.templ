@@ -1,0 +1,31 @@
+package settings
+
+import (
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// SessionRows presents only metadata the session store actually records.
+// Other sessions share the existing revoke-others action; the current session
+// stays signed in.
+templ SessionRows(sessions []*models.Session, currentID string) {
+	if len(sessions) == 0 {
+		<p class="py-4 text-sm text-foreground-secondary">No active sessions.</p>
+	} else {
+		<div class="divide-y divide-divider">
+			for _, session := range sessions {
+				<div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between" data-testid="session-row">
+					<div class="min-w-0">
+						<p class="text-sm font-semibold text-label">Browser session</p>
+						<p class="mt-1 text-sm text-foreground-secondary">Started { session.CreatedAt.Format("Jan 2, 2006") } · Active { session.LastActiveAt.Format("Jan 2, 2006") }</p>
+					</div>
+					if session.ID == currentID {
+						@StatusPill(ui.BadgeSuccess) { This browser }
+					} else {
+						@StatusPill(ui.BadgeNeutral) { Other session }
+					}
+				</div>
+			}
+		</div>
+	}
+}

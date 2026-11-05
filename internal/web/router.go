@@ -240,6 +240,7 @@ func Router(
 						r.Get("/activity", activityHandler.Page)
 						r.Put("/profile", settingsHandler.UpdateProfile)
 						r.Put("/password", settingsHandler.UpdatePassword)
+						r.Get("/sessions", settingsHandler.ListSessions)
 						r.Post("/sessions/revoke-others", settingsHandler.RevokeOtherSessions)
 						r.Post("/2fa/setup", settingsHandler.SetupTwoFactor)
 						r.Post("/2fa/enable", settingsHandler.EnableTwoFactor)

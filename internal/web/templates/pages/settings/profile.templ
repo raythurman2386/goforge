@@ -23,75 +23,68 @@ import (
 // auditRetention is the admin audit log card; nil hides it.
 templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, errReportForm *errreport.SettingsView, mcp *MCPCard, twoFactor *TwoFactorCard, auditRetention *audit.SettingsView) {
 	@layouts.AppLayout("Profile Settings", csrfToken) {
-		<div class="max-w-2xl mx-auto">
-			@components.PageHeader("Profile Settings", "Manage your account information and security.")
+		<div class="mx-auto max-w-5xl lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-10">
+			<nav class="mb-6 flex gap-1 overflow-x-auto border-b border-divider lg:sticky lg:top-0 lg:mb-0 lg:h-fit lg:flex-col lg:border-b-0" aria-label="Profile settings navigation">
+				<a href="/settings/profile" aria-current="page" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-foreground">Profile</a>
+				<a href="/settings/activity" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-foreground-secondary">Activity</a>
+				<a href="/settings/git" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-foreground-secondary">Settings</a>
+			</nav>
+			<div class="min-w-0 max-w-3xl">
+				<div class="mb-6"><h1 class="text-2xl font-semibold tracking-tight text-foreground">Profile Settings</h1><p class="mt-1 text-sm text-foreground-secondary">Manage your account information and security.</p></div>
 
 			<!-- Profile Information -->
-			@ui.Card(ui.CardProps{Class: "mb-8"}) {
-				<div class="mb-4 flex items-center gap-4">
-					@ui.Avatar(ui.AvatarProps{Name: components.UserDisplayName(user), Size: ui.AvatarLG})
-					<div class="min-w-0">
-						@ui.CardTitle(3, nil) {
-							Account Information
-						}
-						<p class="truncate text-sm text-foreground-secondary">{ components.UserDisplayName(user) }</p>
-					</div>
-				</div>
-				<form hx-put="/settings/profile" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
-					<input type="hidden" name="csrf_token" value={ csrfToken } />
-					
-					@ui.Input(ui.InputProps{ID: "profile-email", Name: "email", Type: "email", Label: "Email Address", Value: user.Email, Autocomplete: "email", Required: true, Class: "mb-4"})
-
-					<div class="mb-4">
-						<p class={ ui.LabelClass("") }>Account Type</p>
-						<div class="mt-1">
-							if user.IsGitHubUser() {
-								@ui.Badge(ui.BadgeProps{Variant: ui.BadgeSolid, Size: ui.BadgeMD}) {
-									<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-										<path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
-									</svg>
-									GitHub Account
-								}
-								<p class="mt-1 text-sm text-foreground-secondary">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
-							} else {
-								@ui.Badge(ui.BadgeProps{Tone: ui.BadgePrimary, Size: ui.BadgeMD}) {
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-									</svg>
-									Local Account
-								}
-							}
-						</div>
-					</div>
-
-					<div class="flex justify-end">
-						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+			@SettingsSection("Account Information", nil) {
+				@SettingsRow("Username", components.UserDisplayName(user), "") {
+					<div class="flex items-center justify-between gap-3">
+						@ui.Avatar(ui.AvatarProps{Name: components.UserDisplayName(user), Size: ui.AvatarLG})
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Type: "submit", Attrs: templ.Attributes{"form": "profile-form", "hx-put": "/settings/profile", "hx-swap": "none", "hx-disable": "find button[type='submit']", "hx-indicator": "find .htmx-indicator"}}) {
 							Save Changes
 							@components.Spinner()
 						}
 					</div>
+				}
+				<form id="profile-form" hx-put="/settings/profile" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
+					<input type="hidden" name="csrf_token" value={ csrfToken } />
+					@SettingsRow("Email Address", "The address used for your GoForge account.", "profile-email") {
+						<div class="relative">
+							@ui.Input(ui.InputProps{ID: "profile-email", Name: "email", Type: "email", Value: user.Email, Autocomplete: "email", Required: true, ControlClass: "pr-11"})
+							<svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+						</div>
+					}
+					@SettingsRow("Account Type", "Your sign-in connection.", "") {
+						if user.IsGitHubUser() {
+							<div class="flex items-center gap-2">
+								@StatusPill(ui.BadgePrimary) { GitHub Account }
+							</div>
+							<p class="mt-2 text-sm text-foreground-secondary">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
+						} else {
+							@StatusPill(ui.BadgePrimary) { Local Account }
+						}
+					}
+
 				</form>
 			}
 
 			<!-- Change Password (Local accounts only) -->
 			if !user.IsGitHubUser() {
-				@ui.Card(ui.CardProps{Class: "mb-8"}) {
-					@ui.CardTitle(3, templ.Attributes{"class": "mb-4"}) {
-						Change Password
-					}
+				@SettingsSection("Change Password", nil) {
 					<form hx-put="/settings/password" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
 						<input type="hidden" name="csrf_token" value={ csrfToken } />
-						
-						@ui.Input(ui.InputProps{ID: "password-current", Name: "current_password", Type: "password", Label: "Current Password", Autocomplete: "current-password", Required: true, Class: "mb-4"})
-						@ui.Input(ui.InputProps{ID: "password-new", Name: "new_password", Type: "password", Label: "New Password", Autocomplete: "new-password", Required: true, Help: "At least 8 characters.", Class: "mb-4", Attrs: templ.Attributes{"minlength": "8"}})
-						@ui.Input(ui.InputProps{ID: "password-confirm", Name: "confirm_password", Type: "password", Label: "Confirm New Password", Autocomplete: "new-password", Required: true, Class: "mb-4", Attrs: templ.Attributes{"minlength": "8"}})
-
-						<div class="flex justify-end">
-							@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Type: "submit"}) {
+						@SettingsRow("Current Password", "Confirm your current password.", "password-current") {
+							@ui.Input(ui.InputProps{ID: "password-current", Name: "current_password", Type: "password", Autocomplete: "current-password", Required: true})
+						}
+						@SettingsRow("New Password", "At least 8 characters.", "password-new") {
+							@ui.Input(ui.InputProps{ID: "password-new", Name: "new_password", Type: "password", Autocomplete: "new-password", Required: true, Attrs: templ.Attributes{"minlength": "8"}})
+						}
+						@SettingsRow("Confirm New Password", "Repeat your new password.", "password-confirm") {
+							@ui.Input(ui.InputProps{ID: "password-confirm", Name: "confirm_password", Type: "password", Autocomplete: "new-password", Required: true, Attrs: templ.Attributes{"minlength": "8"}})
+						}
+						@SettingsActions() {
+							@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Type: "submit"}) {
 								Update Password
 								@components.Spinner()
 							}
-						</div>
+						}
 					</form>
 				}
 			}
@@ -101,19 +94,19 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 			}
 
 			<!-- Sessions -->
-			@ui.Card(ui.CardProps{Class: "mb-8"}) {
-				@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
-					Sessions
-				}
+			@SettingsSection("Sessions", nil) {
 				<p class="mb-4 text-sm text-foreground-secondary">Changing your password signs out every other browser. You can also sign them out now; this browser stays signed in. API tokens are not affected.</p>
+				<div hx-get="/settings/sessions" hx-trigger="load" hx-swap="innerHTML" class="border-t border-divider">
+					@components.LoadingState("Loading sessions...")
+				</div>
 				<form hx-post="/settings/sessions/revoke-others" hx-swap="none" hx-confirm="Sign out every other session of this account?" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="revoke-other-sessions">
 					<input type="hidden" name="csrf_token" value={ csrfToken } />
-					<div class="flex justify-end">
-						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Type: "submit"}) {
+					@SettingsActions() {
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Type: "submit"}) {
 							Sign out other sessions
 							@components.Spinner()
 						}
-					</div>
+					}
 				</form>
 			}
 
@@ -138,32 +131,20 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 			}
 
 			<!-- API Tokens -->
-			@ui.Card(ui.CardProps{}) {
-				<div class="flex items-center justify-between mb-4">
-					@ui.CardTitle(3, nil) {
-						API Tokens
-					}
-					@ui.Button(ui.ButtonProps{
-						Variant: ui.ButtonSecondary,
-						Size: ui.ButtonSM,
-						Attrs: ui.OpenDialogAttrs("/settings/tokens/new"),
-					}) {
-						<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-						</svg>
+			@SettingsSection("API Tokens", nil) {
+				<div class="mb-4 flex items-center justify-between gap-4">
+					<p class="text-sm text-foreground-secondary">API tokens allow programmatic access to your account. Keep them secure!</p>
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Attrs: ui.OpenDialogAttrs("/settings/tokens/new")}) {
+						<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
 						Generate Token
 					}
 				</div>
-				<p class="text-sm text-foreground-secondary mb-4">API tokens allow programmatic access to your account. Keep them secure!</p>
-				
-				<div class="mb-4">
-					@ui.AlertMessage(ui.AlertInfo, "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1 and on the MCP endpoint at /mcp. Full tokens also work on the web routes and are refused on /mcp.")
-				</div>
-
-				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-divider animate-fade-in">
+				<div class="mb-4">@ui.AlertMessage(ui.AlertInfo, "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1 and on the MCP endpoint at /mcp. Full tokens also work on the web routes and are refused on /mcp.")</div>
+				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-divider border-t border-divider animate-fade-in">
 					@components.LoadingState("Loading tokens...")
 				</div>
 			}
+			</div>
 		</div>
 	}
 }
@@ -171,39 +152,26 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 // MCPCardView shows the /mcp endpoint, a copy-ready mcp.json, and the MCP
 // token preset.
 templ MCPCardView(mcp *MCPCard) {
-	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "mcp-card"}}) {
-		<div class="flex items-center justify-between mb-4">
-			@ui.CardTitle(3, nil) {
-				MCP
-			}
-			@ui.Button(ui.ButtonProps{
-				Variant: ui.ButtonPrimary,
-				Size: ui.ButtonSM,
-				Attrs: ui.OpenDialogAttrs("/settings/tokens/new?preset=mcp"),
-			}) {
-				Generate MCP token
-			}
-		</div>
-		<p class="text-sm text-foreground-secondary mb-4">
-			Point an MCP client (Cursor, Claude, or any streamable HTTP client) at this endpoint with an MCP token. A read token gets { fmt.Sprint(MCPReadTools) } read-only tools; a token with write gets all { fmt.Sprint(MCPWriteTools) }, and every change is a dry run until you pass an approval_ref. Full tokens are refused.
-		</p>
-		<p class={ ui.LabelClass("") }>Endpoint</p>
-		<code id="mcp-endpoint" class="mb-4 block w-full rounded-lg bg-code p-3 text-sm font-mono break-all border border-border">{ mcp.Endpoint }</code>
-		<p class={ ui.LabelClass("") }>mcp.json</p>
-		<pre id="mcp-snippet" class="mb-2 w-full overflow-x-auto rounded-lg bg-code p-3 text-xs font-mono border border-border">{ mcp.Snippet }</pre>
-		<p class="text-xs text-foreground-secondary mb-4">Set <code>{ MCPTokenEnv }</code> in the client's environment to the token. The token is not stored in the file.</p>
-		<div class="flex justify-end">
-			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Attrs: ui.CopyAttrs("mcp-snippet")}) {
-				Copy mcp.json
-			}
-		</div>
+	@SettingsSection("MCP", templ.Attributes{"id": "mcp-card"}) {
+		<p class="mb-4 text-sm text-foreground-secondary">Point an MCP client (Cursor, Claude, or any streamable HTTP client) at this endpoint with an MCP token. A read token gets { fmt.Sprint(MCPReadTools) } read-only tools; a token with write gets all { fmt.Sprint(MCPWriteTools) }, and every change is a dry run until you pass an approval_ref. Full tokens are refused.</p>
+		@SettingsRow("Endpoint", "The streamable HTTP endpoint.", "") {
+			<code id="mcp-endpoint" class="block w-full rounded-md bg-code p-3 text-sm font-mono break-all border border-border">{ mcp.Endpoint }</code>
+		}
+		@SettingsRow("mcp.json", "Client configuration.", "") {
+			<pre id="mcp-snippet" class="w-full overflow-x-auto rounded-md bg-code p-3 text-xs font-mono border border-border">{ mcp.Snippet }</pre>
+		}
+		<p class="mt-2 text-xs text-foreground-secondary">Set <code>{ MCPTokenEnv }</code> in the client's environment to the token. The token is not stored in the file.</p>
+		@SettingsActions() {
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Attrs: ui.CopyAttrs("mcp-snippet")}) { Copy mcp.json }
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Attrs: ui.OpenDialogAttrs("/settings/tokens/new?preset=mcp")}) { Generate MCP token }
+		}
 	}
 }
 
 // APITokenRow is one token on the Profile list. res names the token's
 // projects and services; nil shows short IDs.
 templ APITokenRow(token *models.APIToken, res *TokenResources) {
-	<div class="py-4 flex items-center justify-between hover:bg-muted/50 -mx-4 px-4" id={ "token-" + token.ID }>
+	<div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between" id={ "token-" + token.ID }>
 		<div>
 			<p class="text-sm font-medium text-foreground">
 				{ token.Name }
@@ -335,7 +303,7 @@ templ AddAPITokenModal(csrfToken string, mcp bool, res *TokenResources) {
 				@ui.Checkbox(ui.CheckboxProps{ID: "token-scope-protected", Name: "scopes", Value: "protected", Label: "protected: stop, reconfigure, or re-image protected services"})
 			}
 			if res.hasAny() {
-				@ui.CheckboxGroup(ui.CheckboxGroupProps{Legend: "Restrict to (optional)", DescribedBy: "token-restrict-help", Class: "mb-4", Attrs: templ.Attributes{"data-token-restrict": true}}) {
+				@ui.CheckboxGroup(ui.CheckboxGroupProps{Legend: "Restrict to (optional)", DescribedBy: "token-restrict-help", Class: "", Attrs: templ.Attributes{"data-token-restrict": true}}) {
 					<p id="token-restrict-help" class="text-xs text-foreground-secondary">Leave all unchecked for every project and service. Check some to limit this token to them on <code>/api/v1</code> and <code>/mcp</code> (a project includes its deployments and containers). A restricted token needs at least one scope above.</p>
 					for _, p := range res.Projects {
 						@ui.Checkbox(ui.CheckboxProps{ID: "token-project-" + p.ID, Name: "project_ids", Value: p.ID, Label: "Project: " + p.Name})
@@ -418,10 +386,8 @@ func formatDate(t time.Time) string {
 // access key; it only says whether one is stored. There is no run-now
 // button; use `goforge backup run`.
 templ BackupCard(st *backup.Status, form *backup.SettingsView, csrfToken string) {
-	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "backup-status"}}) {
-		@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
-			Backups
-		}
+	@SettingsSection("Backups", templ.Attributes{"id": "backup-status"}) {
+
 		if !st.Enabled {
 			<p class={ "text-sm", backupOffClass(form) } data-testid="backup-off">
 				{ backupOffLine(st, form) }
@@ -502,36 +468,56 @@ templ BackupRestorePoints(v *backup.RestorePointsView) {
 }
 
 templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
-	<form class="mt-6 border-t border-divider pt-4" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+	<form class="mt-4 border-t border-divider pt-4" data-testid="backup-settings-form" hx-put="/settings/backups" hx-target="#backup-status" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
 		<input type="hidden" name="csrf_token" value={ csrfToken }/>
 		<p class="mb-4 text-xs text-foreground-secondary" data-testid="backup-source">{ backupSourceLine(f) }</p>
-		@ui.Switch(ui.CheckboxProps{ID: "backup-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops the schedule and keeps the settings.", Checked: f.Enabled, Class: "mb-4"})
-		<div class="grid gap-4 sm:grid-cols-2">
-			@ui.Input(ui.InputProps{ID: "backup-endpoint", Name: "endpoint", Type: "url", Label: "Endpoint", Value: f.Endpoint, Placeholder: "https://<account>.r2.cloudflarestorage.com", Class: "sm:col-span-2"})
-			@ui.Input(ui.InputProps{ID: "backup-bucket", Name: "bucket", Label: "Bucket", Value: f.Bucket})
-			@ui.Input(ui.InputProps{ID: "backup-prefix", Name: "prefix", Label: "Prefix", Value: f.Prefix, Placeholder: "goforge/"})
-			@ui.Input(ui.InputProps{ID: "backup-region", Name: "region", Label: "Region", Value: f.Region, Placeholder: "auto"})
+		@ui.Switch(ui.CheckboxProps{ID: "backup-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops the schedule and keeps the settings.", Checked: f.Enabled, Class: ""})
+		<div>
+			@SettingsRow("Endpoint", "", "backup-endpoint") {
+				@ui.Input(ui.InputProps{ID: "backup-endpoint", Name: "endpoint", Type: "url", Value: f.Endpoint, Placeholder: "https://<account>.r2.cloudflarestorage.com", Class: ""})
+			}
+			@SettingsRow("Bucket", "", "backup-bucket") {
+				@ui.Input(ui.InputProps{ID: "backup-bucket", Name: "bucket", Value: f.Bucket})
+			}
+			@SettingsRow("Prefix", "", "backup-prefix") {
+				@ui.Input(ui.InputProps{ID: "backup-prefix", Name: "prefix", Value: f.Prefix, Placeholder: "goforge/"})
+			}
+			@SettingsRow("Region", "", "backup-region") {
+				@ui.Input(ui.InputProps{ID: "backup-region", Name: "region", Value: f.Region, Placeholder: "auto"})
+			}
 			@ui.Checkbox(ui.CheckboxProps{ID: "backup-path-style", Name: "force_path_style", Value: "true", Label: "Path-style URLs (MinIO, Garage)", Checked: f.ForcePathStyle, Class: "self-end pb-2"})
 			<div>
-				@ui.Input(ui.InputProps{ID: "backup-access-key", Name: "access_key_id", Label: "Access key ID", Autocomplete: "off", Placeholder: accessKeyPlaceholder(f), DescribedBy: "backup-access-key-state", Attrs: templ.Attributes{"spellcheck": "false"}})
+				@SettingsRow("Access key ID", "", "backup-access-key") {
+					@ui.Input(ui.InputProps{ID: "backup-access-key", Name: "access_key_id", Autocomplete: "off", Placeholder: accessKeyPlaceholder(f), DescribedBy: "backup-access-key-state", Attrs: templ.Attributes{"spellcheck": "false"}})
+				}
 				<p id="backup-access-key-state" class="mt-1 text-xs text-foreground-secondary" data-testid="backup-access-key-state">{ accessKeyState(f) }</p>
 			</div>
 			<div>
-				@ui.Input(ui.InputProps{ID: "backup-secret", Name: "secret_access_key", Type: "password", Label: "Secret access key", Autocomplete: "new-password", Placeholder: secretPlaceholder(f), DescribedBy: "backup-secret-state"})
+				@SettingsRow("Secret access key", "", "backup-secret") {
+					@ui.Input(ui.InputProps{ID: "backup-secret", Name: "secret_access_key", Type: "password", Autocomplete: "new-password", Placeholder: secretPlaceholder(f), DescribedBy: "backup-secret-state"})
+				}
 				<p id="backup-secret-state" class="mt-1 text-xs text-foreground-secondary" data-testid="backup-secret-state">{ secretState(f) }</p>
 			</div>
 			if f.AccessKeySet || f.SecretSet {
-				@ui.Checkbox(ui.CheckboxProps{ID: "backup-clear-creds", Name: "clear_credentials", Value: "true", Label: "Remove the stored keys (backups must be off)", Class: "sm:col-span-2"})
+				@ui.Checkbox(ui.CheckboxProps{ID: "backup-clear-creds", Name: "clear_credentials", Value: "true", Label: "Remove the stored keys (backups must be off)", Class: ""})
 			}
-			@ui.Input(ui.InputProps{ID: "backup-schedule-time", Name: "schedule_time", Type: "time", Label: "Nightly at", Value: f.ScheduleTime})
-			@ui.Input(ui.InputProps{ID: "backup-schedule-zone", Name: "schedule_zone", Label: "Time zone", Value: f.ScheduleZone, Placeholder: "America/Chicago"})
-			@ui.Switch(ui.CheckboxProps{ID: "backup-schedule-off", Name: "schedule_off", Value: "true", Checked: f.ScheduleOff, Class: "sm:col-span-2"}) {
+			@SettingsRow("Nightly at", "", "backup-schedule-time") {
+				@ui.Input(ui.InputProps{ID: "backup-schedule-time", Name: "schedule_time", Type: "time", Value: f.ScheduleTime})
+			}
+			@SettingsRow("Time zone", "", "backup-schedule-zone") {
+				@ui.Input(ui.InputProps{ID: "backup-schedule-zone", Name: "schedule_zone", Value: f.ScheduleZone, Placeholder: "America/Chicago"})
+			}
+			@ui.Switch(ui.CheckboxProps{ID: "backup-schedule-off", Name: "schedule_off", Value: "true", Checked: f.ScheduleOff, Class: ""}) {
 				No nightly schedule (run with <code>goforge backup run</code>)
 			}
-			@ui.Input(ui.InputProps{ID: "backup-retention", Name: "retention_daily", Type: "number", Label: "Keep daily backups (days)", Value: fmt.Sprint(f.RetentionDaily), Attrs: templ.Attributes{"min": "1", "max": "366"}})
-			@ui.Input(ui.InputProps{ID: "backup-timeout", Name: "timeout", Label: "Run timeout", Value: f.Timeout, Placeholder: "2h"})
+			@SettingsRow("Keep daily backups (days)", "", "backup-retention") {
+				@ui.Input(ui.InputProps{ID: "backup-retention", Name: "retention_daily", Type: "number", Value: fmt.Sprint(f.RetentionDaily), Attrs: templ.Attributes{"min": "1", "max": "366"}})
+			}
+			@SettingsRow("Run timeout", "", "backup-timeout") {
+				@ui.Input(ui.InputProps{ID: "backup-timeout", Name: "timeout", Value: f.Timeout, Placeholder: "2h"})
+			}
 		</div>
-		<div class="mt-4 flex justify-end gap-2">
+		@SettingsActions() {
 			@ui.Button(ui.ButtonProps{
 				Variant: ui.ButtonSecondary,
 				Attrs: templ.Attributes{
@@ -554,6 +540,6 @@ templ backupSettingsForm(f *backup.SettingsView, csrfToken string) {
 				Save backup settings
 				@components.Spinner()
 			}
-		</div>
+		}
 	</form>
 }

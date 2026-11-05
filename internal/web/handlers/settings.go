@@ -40,6 +40,7 @@ type SettingsHandler struct {
 	auditRetention  AuditRetentionSettings
 	audit           AuditRecorder
 	sessions        SessionRevoker
+	sessionLister   SessionLister
 	tokenProjects   TokenProjectLister
 	tokenServices   TokenServiceLister
 	twoFactor       *auth.TwoFactor
@@ -146,11 +147,22 @@ type SessionRevoker interface {
 	DeleteByUserIDExcept(ctx context.Context, userID, keepSessionID string) (int64, error)
 }
 
+// SessionLister reads the current account's sessions for the Profile row list.
+type SessionLister interface {
+	GetByUserID(ctx context.Context, userID string) ([]*models.Session, error)
+}
+
 // WithSessions lets a password change and "Sign out other sessions" end the
 // account's other sessions. Without it (most tests) the password still
 // changes and no session is touched.
 func (h *SettingsHandler) WithSessions(s SessionRevoker) *SettingsHandler {
 	h.sessions = s
+	return h
+}
+
+// WithSessionLister enables the read-only session rows on Profile.
+func (h *SettingsHandler) WithSessionLister(s SessionLister) *SettingsHandler {
+	h.sessionLister = s
 	return h
 }
 
@@ -413,6 +425,32 @@ func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
 	component := settings.Profile(currentUser, csrfToken, st, form, h.notifyForm(r, currentUser), h.errReportForm(r, currentUser), h.mcp, h.twoFactorCard(r, currentUser), h.auditRetentionForm(r, currentUser))
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render profile page")
+	}
+}
+
+// ListSessions renders the account's active browser-session rows.
+func (h *SettingsHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
+	user, ok := r.Context().Value(auth.UserContextKey).(*models.User)
+	if !ok {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+	if h.sessionLister == nil {
+		RenderError(w, r, http.StatusNotFound, "Session list unavailable")
+		return
+	}
+	sessions, err := h.sessionLister.GetByUserID(r.Context(), user.ID)
+	if err != nil {
+		h.logger.Error("failed to list sessions", "error", err)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to load sessions")
+		return
+	}
+	currentID := ""
+	if session := auth.GetSessionFromContext(r.Context()); session != nil {
+		currentID = session.ID
+	}
+	if err := settings.SessionRows(sessions, currentID).Render(r.Context(), w); err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to render sessions")
 	}
 }
 
