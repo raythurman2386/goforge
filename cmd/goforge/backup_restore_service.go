@@ -25,9 +25,9 @@ var (
 
 var backupRestoreServiceCmd = &cobra.Command{
 	Use:   "restore-service <run-key> <instance-id>",
-	Short: "Restore one Postgres, Gitea, or Vaultwarden service's data from a backup run (dry run unless --yes)",
-	Long: `Restore the data volume of one Postgres, Gitea, or Vaultwarden service
-instance from one backup run (services/<instance-id>/ in that run). The
+	Short: "Restore one Postgres, Gitea, Vaultwarden, or MinIO service's data from a backup run (dry run unless --yes)",
+	Long: `Restore the data volume of one Postgres, Gitea, Vaultwarden, or MinIO
+service instance from one backup run (services/<instance-id>/ in that run). The
 GoForge database and other services are not touched.
 
 Without --yes this is a dry run: it reads the manifest, inspects the
@@ -42,6 +42,9 @@ never deleted).
 
 Gitea and Vaultwarden: it extracts data.tar.gz with its file owners, puts
 the SQLite snapshot at the database path with its directory's owner.
+
+MinIO (and other volume templates): it extracts data.tar.gz with its file
+owners into the template's backup.mount (MinIO: /data).
 
 Postgres: it builds a new cluster in the volume with the service's own
 image (initdb as the data directory's owner, superuser POSTGRES_USER, the

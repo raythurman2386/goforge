@@ -112,7 +112,7 @@ docker compose up -d goforge
 
 ### Built-in nightly backups
 
-Use the built-in backups for production. Once an admin sets them up in **Settings → Profile → Backups**, `goforge serve` uploads the GoForge database and running Postgres, Gitea, and Vaultwarden services whose **Allows backups** switch is on to S3-compatible storage every night (default `02:00 America/Chicago`) and prunes old runs. Run one now with:
+Use the built-in backups for production. Once an admin sets them up in **Settings → Profile → Backups**, `goforge serve` uploads the GoForge database and running Postgres, Gitea, Vaultwarden, and MinIO services whose **Allows backups** switch is on to S3-compatible storage every night (default `02:00 America/Chicago`) and prunes old runs. Run one now with:
 
 ```bash
 docker compose exec goforge ./goforge backup run

@@ -212,12 +212,13 @@ docker compose exec goforge ./goforge backup restore-service 2026-10-29/20261029
 With `--yes` it:
 
 1. Takes the backup lock, so no backup run can read the service halfway.
-2. Downloads the service's files and checks each size and SHA-256 against `manifest.json`: for Postgres, `services/<id>/roles.sql` and every `services/<id>/<database>.dump`; for Gitea or Vaultwarden, `gitea.sqlite3` (or `vaultwarden.sqlite3`) and `data.tar.gz`. A mismatch stops here, with the service still running.
+2. Downloads the service's files and checks each size and SHA-256 against `manifest.json`: for Postgres, `services/<id>/roles.sql` and every `services/<id>/<database>.dump`; for Gitea or Vaultwarden, `gitea.sqlite3` (or `vaultwarden.sqlite3`) and `data.tar.gz`; for MinIO (`volume`), `data.tar.gz`. A mismatch stops here, with the service still running.
 3. Stops the service container.
 4. Starts a helper container from the service's own image with `--volumes-from` the service, no network, as root, and copies the files into it.
-5. Moves everything in the data volume (Postgres: `/var/lib/postgresql/data`; Gitea and Vaultwarden: `/data`) to `<volume>/.goforge-pre-restore-<UTC time>/` (kept, never deleted), then restores:
+5. Moves everything in the data volume (Postgres: `/var/lib/postgresql/data`; Gitea and Vaultwarden: `/data`; MinIO and other `volume` templates: the template's `backup.mount`, `/data` for MinIO) to `<volume>/.goforge-pre-restore-<UTC time>/` (kept, never deleted), then restores:
     - **Postgres**: `initdb` builds a new, empty cluster as the data directory's owner, with the service's `POSTGRES_USER` as superuser, and copies `postgresql.conf`, `postgresql.auto.conf`, `pg_hba.conf`, and `pg_ident.conf` over from the kept cluster. A temporary server starts on a private socket only (no TCP), loads `roles.sql` (role names, attributes, and password hashes, so existing passwords keep working), then runs `pg_restore --create --exit-on-error` for each dump. The server stops and the new cluster is moved into place. GoForge never reads the service's admin password.
     - **Gitea or Vaultwarden**: extracts `data.tar.gz` with its file owners, and copies the SQLite snapshot to the database path (Gitea: `GITEA__database__PATH`, else `PATH` in the restored `app.ini`, else `/data/gitea/gitea.db`; Vaultwarden: `/data/db.sqlite3`) with the owner of its directory.
+    - **MinIO (volume)**: extracts `data.tar.gz` with its file owners.
 6. Removes the helper (never its volumes), starts the service, and waits for its health check.
 
 If step 5 fails (a bad dump, a role that cannot be created, a full disk), the partial restore is moved to `<volume>/.goforge-failed-restore-<UTC time>/`, the previous contents are moved back, and the service is started again on its old data. Nightly backups leave both kinds of kept folder out of `data.tar.gz`; Postgres backups are logical dumps, so a kept cluster is never in them. Delete a kept folder by hand once the restored service checks out:
@@ -260,4 +261,4 @@ BACKUP_S3_ACCESS_KEY_ID=minioadmin BACKUP_S3_SECRET_ACCESS_KEY=change-me-please 
 BACKUP_S3_FORCE_PATH_STYLE=true ./bin/goforge backup run
 ```
 
-Point `DATABASE_URL` at a test database. On a host with live services, this also dumps every running Postgres, Gitea, and Vaultwarden service whose **Allows backups** switch is on.
+Point `DATABASE_URL` at a test database. On a host with live services, this also dumps every running Postgres, Gitea, Vaultwarden, and MinIO service whose **Allows backups** switch is on.

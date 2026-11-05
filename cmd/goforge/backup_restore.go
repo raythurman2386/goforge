@@ -249,7 +249,7 @@ func printRestorePlan(out io.Writer, t *backupTarget, plan *backup.RestorePlan, 
 		plan.SideDB, plan.Database, plan.Database, plan.SideDB, plan.Database)
 	fmt.Fprintf(out, "  replaces:      every GoForge table (users, API tokens, projects, env vars, service records, backup settings, audit log) with its state at %s; all sessions are cleared\n", started)
 	if n := len(m.Artifacts) - 1; n > 0 {
-		fmt.Fprintf(out, "  not restored:  %d service artifact(s) under services/; containers and volumes are not touched (gitea and vaultwarden: goforge backup restore-service; others: docs/deployment/backup.md)\n", n)
+		fmt.Fprintf(out, "  not restored:  %d service artifact(s) under services/; containers and volumes are not touched (postgres, gitea, vaultwarden, and minio: goforge backup restore-service; others: docs/deployment/backup.md)\n", n)
 	}
 	if preErr != nil {
 		fmt.Fprintf(out, "  preflight:     REFUSED: %s\n", t.redactor.Redact(preErr.Error()))

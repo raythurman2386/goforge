@@ -244,7 +244,7 @@ One-click service instances (PostgreSQL, Redis, etc.) deployed from templates.
 | `config` | `JSONB` | Default `'{}'` | Configuration values. Encrypted as `{"_goforge_enc":"..."}` when an encryption key is configured |
 | `domain` | `VARCHAR(255)` | Nullable | Assigned domain |
 | `status` | `VARCHAR(50)` | NOT NULL, CHECK, default `'pending'` | Instance status |
-| `backup_enabled` | `BOOLEAN` | NOT NULL, default `false` | **Allows backups**. The nightly run includes this instance when the template is `postgres`, `gitea`, or `vaultwarden`, this is true, and the container is running. Migration `032` sets it true for existing rows of those three templates |
+| `backup_enabled` | `BOOLEAN` | NOT NULL, default `false` | **Allows backups**. The nightly run includes this instance when its template declares a usable `backup.strategy`, this is true, and the container is running. Migration `032` sets it true for existing `postgres`, `gitea`, and `vaultwarden` rows (`minio` and others stay false) |
 | `connection_info` | `JSONB` | Default `'{}'` | Connection strings/details, encrypted the same way as `config` |
 | `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Creation time |
 | `updated_at` | `TIMESTAMPTZ` | Default `NOW()` | Last update time |
