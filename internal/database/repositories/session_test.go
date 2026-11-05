@@ -103,3 +103,48 @@ func TestSessionRepository_DeleteByUserIDExcept(t *testing.T) {
 		t.Errorf("another user's session removed by empty keep: %v", err)
 	}
 }
+
+func TestSessionRepository_DeleteByIDAndUserID(t *testing.T) {
+	db := getTestDB(t)
+	ctx := context.Background()
+	users := NewUserRepository(db, nil)
+	sessions := NewSessionRepository(db)
+
+	owner := &models.User{Email: uniqueEmail("session-revoke-one")}
+	other := &models.User{Email: uniqueEmail("session-revoke-one-other")}
+	for _, u := range []*models.User{owner, other} {
+		if err := users.Create(ctx, u); err != nil {
+			t.Fatalf("create user: %v", err)
+		}
+	}
+	newSession := func(userID string) *models.Session {
+		t.Helper()
+		s := &models.Session{UserID: userID, TokenHash: "one-" + uniqueID(), ExpiresAt: time.Now().Add(time.Hour)}
+		if err := sessions.Create(ctx, s); err != nil {
+			t.Fatalf("create session: %v", err)
+		}
+		return s
+	}
+	owned := newSession(owner.ID)
+	otherOwned := newSession(other.ID)
+
+	// The wrong owner gets no deletion, including when the ID exists.
+	n, deleteErr := sessions.DeleteByIDAndUserID(ctx, otherOwned.ID, owner.ID)
+	if deleteErr != nil || n != 0 {
+		t.Fatalf("cross-user delete: n=%d err=%v", n, deleteErr)
+	}
+	if _, err := sessions.GetByTokenHash(ctx, otherOwned.TokenHash); err != nil {
+		t.Fatalf("other user's session deleted: %v", err)
+	}
+
+	n, deleteErr = sessions.DeleteByIDAndUserID(ctx, owned.ID, owner.ID)
+	if deleteErr != nil || n != 1 {
+		t.Fatalf("owned delete: n=%d err=%v", n, deleteErr)
+	}
+	if _, err := sessions.GetByTokenHash(ctx, owned.TokenHash); !errors.Is(err, ErrNotFound) {
+		t.Errorf("owned session remains: %v", err)
+	}
+	if _, err := sessions.GetByTokenHash(ctx, otherOwned.TokenHash); err != nil {
+		t.Errorf("unrelated session deleted: %v", err)
+	}
+}

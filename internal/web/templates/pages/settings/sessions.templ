@@ -1,0 +1,41 @@
+package settings
+
+import (
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// SessionRows presents only metadata the session store actually records.
+// Other sessions have a scoped sign-out action. The current session is
+// labelled and intentionally has no action, so this page cannot log itself out.
+templ SessionRows(sessions []*models.Session, currentID, csrfToken string) {
+	if len(sessions) == 0 {
+		<p class="py-4 text-sm text-foreground-secondary">No active sessions.</p>
+	} else {
+		<div class="divide-y divide-divider">
+			for _, session := range sessions {
+				<div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between" data-testid="session-row">
+					<div class="min-w-0">
+						<p class="text-sm font-semibold text-label">Browser session</p>
+						<p class="mt-1 text-sm text-foreground-secondary">Started { session.CreatedAt.Format("Jan 2, 2006") } · Active { session.LastActiveAt.Format("Jan 2, 2006") }</p>
+					</div>
+					<div class="flex shrink-0 flex-wrap items-center gap-3">
+						if session.ID == currentID {
+							@StatusPill(ui.BadgeSuccess) { This browser }
+						} else {
+							@StatusPill(ui.BadgeNeutral) { Other session }
+							<form hx-post={ "/settings/sessions/" + session.ID + "/revoke" } hx-swap="none" hx-confirm="Sign out this browser session?" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="revoke-session">
+								<input type="hidden" name="csrf_token" value={ csrfToken }/>
+								@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Type: "submit"}) {
+									Sign out
+									@components.Spinner()
+								}
+							</form>
+						}
+					</div>
+				</div>
+			}
+		</div>
+	}
+}

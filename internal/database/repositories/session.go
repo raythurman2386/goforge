@@ -110,6 +110,17 @@ func (r *SessionRepository) Delete(ctx context.Context, id string) error {
 	return err
 }
 
+// DeleteByIDAndUserID deletes one session only when it belongs to userID.
+// The ownership predicate is part of the mutation, so a session ID from
+// another account can never be revoked by the signed-in user.
+func (r *SessionRepository) DeleteByIDAndUserID(ctx context.Context, id, userID string) (int64, error) {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM sessions WHERE id = $1 AND user_id = $2`, id, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 // DeleteByUserID deletes all sessions for a user.
 func (r *SessionRepository) DeleteByUserID(ctx context.Context, userID string) error {
 	query := `DELETE FROM sessions WHERE user_id = $1`

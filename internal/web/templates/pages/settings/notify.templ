@@ -10,51 +10,69 @@ import (
 // JSON webhook, or email (SMTP). The form never contains the URL path, the
 // token, or the SMTP password; it only says whether each is stored.
 templ NotifyCard(v *notify.SettingsView, csrfToken string) {
-	@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "notify-settings"}}) {
-		@ui.CardTitle(3, templ.Attributes{"class": "mb-2"}) {
-			Notifications
-		}
+	@SettingsSection("Notifications", templ.Attributes{"id": "notify-settings"}) {
 		<p class="text-sm text-foreground-secondary" data-testid="notify-status">{ notifyStatusLine(v) }</p>
-		<form class="mt-6 border-t border-divider pt-4" data-testid="notify-settings-form" hx-put="/settings/notifications" hx-target="#notify-settings" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
+		<form class="mt-4" data-testid="notify-settings-form" hx-put="/settings/notifications" hx-target="#notify-settings" hx-swap="outerHTML" hx-disable="find button" hx-indicator="find .htmx-indicator" autocomplete="off">
 			<input type="hidden" name="csrf_token" value={ csrfToken }/>
-			@ui.Switch(ui.CheckboxProps{ID: "notify-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops every alert and keeps the settings.", Checked: v.Enabled, Class: "mb-4"})
-			<div class="grid gap-4 sm:grid-cols-2">
-				@ui.Select(ui.SelectProps{ID: "notify-kind", Name: "kind", Label: "Type", Options: notifyKindOptions(), Selected: v.Kind})
+			@ui.Switch(ui.CheckboxProps{ID: "notify-enabled", Name: "enabled", Value: "true", Label: "Enabled", Description: "Turning this off stops every alert and keeps the settings.", Checked: v.Enabled, Class: ""})
+			<div>
+				@SettingsRow("Type", "", "notify-kind") {
+					@ui.Select(ui.SelectProps{ID: "notify-kind", Name: "kind", Options: notifyKindOptions(), Selected: v.Kind})
+				}
 				<div class="sm:col-span-2">
-					@ui.Input(ui.InputProps{ID: "notify-url", Name: "url", Type: "url", Label: "URL", Autocomplete: "off", Placeholder: notifyURLPlaceholder(v), DescribedBy: "notify-url-state", Attrs: templ.Attributes{"spellcheck": "false"}})
+					@SettingsRow("URL", "", "notify-url") {
+						@ui.Input(ui.InputProps{ID: "notify-url", Name: "url", Type: "url", Autocomplete: "off", Placeholder: notifyURLPlaceholder(v), DescribedBy: "notify-url-state", Attrs: templ.Attributes{"spellcheck": "false"}})
+					}
 					<p id="notify-url-state" class="mt-1 text-xs text-foreground-secondary" data-testid="notify-url-state">{ notifyURLState(v) }</p>
 				</div>
 				<div class="sm:col-span-2">
-					@ui.Input(ui.InputProps{ID: "notify-token", Name: "token", Type: "password", Label: "Access token", Autocomplete: "new-password", Placeholder: notifyTokenPlaceholder(v), DescribedBy: "notify-token-state"})
+					@SettingsRow("Access token", "", "notify-token") {
+						@ui.Input(ui.InputProps{ID: "notify-token", Name: "token", Type: "password", Autocomplete: "new-password", Placeholder: notifyTokenPlaceholder(v), DescribedBy: "notify-token-state"})
+					}
 					<p id="notify-token-state" class="mt-1 text-xs text-foreground-secondary" data-testid="notify-token-state">{ notifyTokenState(v) }</p>
 				</div>
 				if v.TokenSet {
-					@ui.Checkbox(ui.CheckboxProps{ID: "notify-clear-token", Name: "clear_token", Value: "true", Label: "Remove the stored token", Class: "sm:col-span-2"})
+					@ui.Checkbox(ui.CheckboxProps{ID: "notify-clear-token", Name: "clear_token", Value: "true", Label: "Remove the stored token", Class: ""})
 				}
 			</div>
-			<fieldset class="mt-6 border-t border-divider pt-4" data-testid="notify-smtp">
+			<fieldset class="mt-4" data-testid="notify-smtp">
 				<legend class="text-sm font-medium text-foreground">Email (SMTP)</legend>
 				<p class="mt-1 text-xs text-foreground-secondary">Used when Type is Email. URL and token above are used for ntfy and webhook.</p>
-				<div class="mt-4 grid gap-4 sm:grid-cols-2">
-					@ui.Input(ui.InputProps{ID: "notify-smtp-host", Name: "smtp_host", Type: "text", Label: "SMTP host", Value: v.SMTPHost, Autocomplete: "off", Placeholder: "smtp.example.com", Attrs: templ.Attributes{"spellcheck": "false"}})
-					@ui.Input(ui.InputProps{ID: "notify-smtp-port", Name: "smtp_port", Type: "number", Label: "SMTP port", Value: notifySMTPPort(v), Placeholder: "587", Attrs: templ.Attributes{"min": "1", "max": "65535"}})
-					@ui.Select(ui.SelectProps{ID: "notify-smtp-tls", Name: "smtp_tls", Label: "TLS", Options: notifySMTPTLSOptions(), Selected: v.SMTPTLS})
-					@ui.Input(ui.InputProps{ID: "notify-smtp-username", Name: "smtp_username", Type: "text", Label: "SMTP username", Value: v.SMTPUsername, Autocomplete: "off", Attrs: templ.Attributes{"spellcheck": "false"}})
+				<div class="mt-4 grid gap-x-4 sm:grid-cols-2">
+					@SettingsRow("SMTP host", "", "notify-smtp-host") {
+						@ui.Input(ui.InputProps{ID: "notify-smtp-host", Name: "smtp_host", Type: "text", Value: v.SMTPHost, Autocomplete: "off", Placeholder: "smtp.example.com", Attrs: templ.Attributes{"spellcheck": "false"}})
+					}
+					@SettingsRow("SMTP port", "", "notify-smtp-port") {
+						@ui.Input(ui.InputProps{ID: "notify-smtp-port", Name: "smtp_port", Type: "number", Value: notifySMTPPort(v), Placeholder: "587", Attrs: templ.Attributes{"min": "1", "max": "65535"}})
+					}
+					@SettingsRow("TLS", "", "notify-smtp-tls") {
+						@ui.Select(ui.SelectProps{ID: "notify-smtp-tls", Name: "smtp_tls", Options: notifySMTPTLSOptions(), Selected: v.SMTPTLS})
+					}
+					@SettingsRow("SMTP username", "", "notify-smtp-username") {
+						@ui.Input(ui.InputProps{ID: "notify-smtp-username", Name: "smtp_username", Type: "text", Value: v.SMTPUsername, Autocomplete: "off", Attrs: templ.Attributes{"spellcheck": "false"}})
+					}
 					<div class="sm:col-span-2">
-						@ui.Input(ui.InputProps{ID: "notify-smtp-password", Name: "smtp_password", Type: "password", Label: "SMTP password", Autocomplete: "new-password", Placeholder: notifySMTPPasswordPlaceholder(v), DescribedBy: "notify-smtp-password-state"})
+						@SettingsRow("SMTP password", "", "notify-smtp-password") {
+							@ui.Input(ui.InputProps{ID: "notify-smtp-password", Name: "smtp_password", Type: "password", Autocomplete: "new-password", Placeholder: notifySMTPPasswordPlaceholder(v), DescribedBy: "notify-smtp-password-state"})
+						}
 						<p id="notify-smtp-password-state" class="mt-1 text-xs text-foreground-secondary" data-testid="notify-smtp-password-state">{ notifySMTPPasswordState(v) }</p>
 					</div>
 					if v.SMTPPasswordSet {
-						@ui.Checkbox(ui.CheckboxProps{ID: "notify-clear-smtp-password", Name: "clear_smtp_password", Value: "true", Label: "Remove the stored SMTP password", Class: "sm:col-span-2"})
+						@ui.Checkbox(ui.CheckboxProps{ID: "notify-clear-smtp-password", Name: "clear_smtp_password", Value: "true", Label: "Remove the stored SMTP password", Class: ""})
 					}
-					@ui.Input(ui.InputProps{ID: "notify-smtp-from", Name: "smtp_from", Type: "text", Label: "From", Value: v.SMTPFrom, Autocomplete: "off", Placeholder: "GoForge <goforge@example.com>"})
-					@ui.Input(ui.InputProps{ID: "notify-smtp-to", Name: "smtp_to", Type: "text", Label: "To", Value: v.SMTPTo, Autocomplete: "off", Placeholder: "ops@example.com, me@example.com", Help: "Up to 10 addresses, separated by commas."})
+					@SettingsRow("From", "", "notify-smtp-from") {
+						@ui.Input(ui.InputProps{ID: "notify-smtp-from", Name: "smtp_from", Type: "text", Value: v.SMTPFrom, Autocomplete: "off", Placeholder: "GoForge <goforge@example.com>"})
+					}
+					@SettingsRow("To", "Up to 10 addresses, separated by commas.", "notify-smtp-to") {
+						@ui.Input(ui.InputProps{ID: "notify-smtp-to", Name: "smtp_to", Type: "text", Value: v.SMTPTo, Autocomplete: "off", Placeholder: "ops@example.com, me@example.com",})
+					}
 				</div>
 			</fieldset>
 			<p class="mt-4 text-xs text-foreground-secondary">Alerts carry the event, the resource, a redacted error, a link, and the audit id. Never passwords, tokens, or connection strings.</p>
-			<div class="mt-4 flex justify-end gap-2">
+			@SettingsActions() {
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonSecondary,
+					Size: ui.ButtonSM,
 					Attrs: templ.Attributes{
 						"data-testid": "notify-test",
 						"hx-post": "/settings/notifications/test",
@@ -67,6 +85,7 @@ templ NotifyCard(v *notify.SettingsView, csrfToken string) {
 				}
 				@ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonPrimary,
+					Size: ui.ButtonSM,
 					Type: "submit",
 					Attrs: templ.Attributes{
 						"data-testid": "notify-save",
@@ -75,7 +94,7 @@ templ NotifyCard(v *notify.SettingsView, csrfToken string) {
 					Save notification settings
 					@components.Spinner()
 				}
-			</div>
+			}
 		</form>
 	}
 }
