@@ -95,8 +95,8 @@ templ Profile(user *models.User, csrfToken string, backups *backup.Status, backu
 
 			<!-- Sessions -->
 			@SettingsSection("Sessions", nil) {
-				<p class="mb-4 text-sm text-foreground-secondary">Changing your password signs out every other browser. You can also sign them out now; this browser stays signed in. API tokens are not affected.</p>
-				<div hx-get="/settings/sessions" hx-trigger="load" hx-swap="innerHTML" class="border-t border-divider">
+				<p class="mb-4 text-sm text-foreground-secondary">Sign out another browser individually or sign out every other session at once. This browser stays signed in. API tokens are not affected.</p>
+				<div id="sessions-list" hx-get="/settings/sessions" hx-trigger="load, sessionRevoked from:body" hx-swap="innerHTML" class="border-t border-divider">
 					@components.LoadingState("Loading sessions...")
 				</div>
 				<form hx-post="/settings/sessions/revoke-others" hx-swap="none" hx-confirm="Sign out every other session of this account?" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="revoke-other-sessions">

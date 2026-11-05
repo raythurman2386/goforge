@@ -141,10 +141,11 @@ func (h *SettingsHandler) WithAPITokens(s APITokenStore) *SettingsHandler {
 	return h
 }
 
-// SessionRevoker ends an account's sessions except the one making the
-// request (repositories.SessionRepository).
+// SessionRevoker ends an account's sessions, either individually or except
+// the one making the request (repositories.SessionRepository).
 type SessionRevoker interface {
 	DeleteByUserIDExcept(ctx context.Context, userID, keepSessionID string) (int64, error)
+	DeleteByIDAndUserID(ctx context.Context, id, userID string) (int64, error)
 }
 
 // SessionLister reads the current account's sessions for the Profile row list.
@@ -449,7 +450,7 @@ func (h *SettingsHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	if session := auth.GetSessionFromContext(r.Context()); session != nil {
 		currentID = session.ID
 	}
-	if err := settings.SessionRows(sessions, currentID).Render(r.Context(), w); err != nil {
+	if err := settings.SessionRows(sessions, currentID, auth.GetCSRFToken(r)).Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render sessions")
 	}
 }
@@ -618,9 +619,50 @@ func (h *SettingsHandler) RevokeOtherSessions(w http.ResponseWriter, r *http.Req
 		return
 	}
 	h.recordUser(r, user.ID, models.AuditActionUserSessionsRevoke, map[string]interface{}{"sessions_revoked": revoked})
+	triggerOnBody(w, "sessionRevoked")
 
 	w.WriteHeader(http.StatusOK)
 	if err := components.Toast(signedOutMessage(revoked), "success").Render(r.Context(), w); err != nil {
+		h.logger.Error("failed to render toast", "error", err)
+	}
+}
+
+// RevokeSession signs out one of the caller's other browser sessions.
+// Current-session revocation is deliberately refused: the UI marks that row
+// "This browser" and offers no action, rather than unexpectedly logging out.
+func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return
+	}
+	if h.sessions == nil {
+		RenderError(w, r, http.StatusServiceUnavailable, "Session management is not available")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		RenderError(w, r, http.StatusBadRequest, "Session ID is required")
+		return
+	}
+	if current := auth.GetSessionFromContext(r.Context()); current != nil && current.ID == id {
+		RenderError(w, r, http.StatusBadRequest, "The current browser session cannot be signed out here")
+		return
+	}
+	revoked, err := h.sessions.DeleteByIDAndUserID(r.Context(), id, user.ID)
+	if err != nil {
+		h.logger.Error("failed to revoke session", "error", err, "user_id", user.ID, "session_id", id)
+		RenderError(w, r, http.StatusInternalServerError, "Failed to sign out session")
+		return
+	}
+	if revoked == 0 {
+		RenderError(w, r, http.StatusNotFound, "Session not found")
+		return
+	}
+	h.recordUser(r, user.ID, models.AuditActionUserSessionsRevoke, map[string]interface{}{"sessions_revoked": revoked})
+	triggerOnBody(w, "sessionRevoked")
+	w.WriteHeader(http.StatusOK)
+	if err := components.Toast("Signed out 1 session.", "success").Render(r.Context(), w); err != nil {
 		h.logger.Error("failed to render toast", "error", err)
 	}
 }

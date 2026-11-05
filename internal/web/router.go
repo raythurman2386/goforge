@@ -242,6 +242,7 @@ func Router(
 						r.Put("/password", settingsHandler.UpdatePassword)
 						r.Get("/sessions", settingsHandler.ListSessions)
 						r.Post("/sessions/revoke-others", settingsHandler.RevokeOtherSessions)
+						r.Post("/sessions/{id}/revoke", settingsHandler.RevokeSession)
 						r.Post("/2fa/setup", settingsHandler.SetupTwoFactor)
 						r.Post("/2fa/enable", settingsHandler.EnableTwoFactor)
 						r.Post("/2fa/disable", settingsHandler.DisableTwoFactor)

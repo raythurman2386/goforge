@@ -40,8 +40,8 @@ templ TwoFactorCardView(c *TwoFactorCard, csrfToken string) {
 				}
 			</form>
 		} else {
-			<form hx-post="/settings/2fa/setup" hx-target="body" hx-swap="beforeend" aria-haspopup="dialog" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="two-factor-setup">
-				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+			<details class="group" data-testid="two-factor-disclosure">
+				<summary class="block cursor-pointer list-none">
 				<div class="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between sm:gap-6">
 					<div class="min-w-0 flex-1">
 						<p class="text-sm font-semibold text-label">Authenticator app</p>
@@ -52,14 +52,23 @@ templ TwoFactorCardView(c *TwoFactorCard, csrfToken string) {
 					</div>
 					<div class="flex shrink-0 items-center gap-3">
 						@StatusPill(ui.BadgeNeutral) { Off }
-						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Type: "submit", Attrs: templ.Attributes{"aria-haspopup": "dialog"}}) { Set up 2FA
-							@components.Spinner() }
+						<span class={ ui.ButtonClass(ui.ButtonPrimary, ui.ButtonSM) + " group-open:hidden max-md:min-h-11" } data-testid="two-factor-enable">Enable</span>
 					</div>
 				</div>
-				@SettingsRow("Current Password", "Required to set up two-factor authentication.", "two-factor-setup-password") {
-					@ui.Input(ui.InputProps{ID: "two-factor-setup-password", Name: "password", Type: "password", Autocomplete: "current-password", Required: true})
-				}
-			</form>
+				</summary>
+				<form hx-post="/settings/2fa/setup" hx-target="body" hx-swap="beforeend" aria-haspopup="dialog" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="two-factor-setup">
+					<input type="hidden" name="csrf_token" value={ csrfToken }/>
+					<div class="border-t border-divider">
+						@SettingsRow("Current Password", "Required to set up two-factor authentication.", "two-factor-setup-password") {
+							@ui.Input(ui.InputProps{ID: "two-factor-setup-password", Name: "password", Type: "password", Autocomplete: "current-password", Required: true})
+						}
+					</div>
+					@SettingsActions() {
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Type: "submit", Attrs: templ.Attributes{"aria-haspopup": "dialog"}}) { Set up 2FA
+							@components.Spinner() }
+					}
+				</form>
+			</details>
 		}
 	}
 }

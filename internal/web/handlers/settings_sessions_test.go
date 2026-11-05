@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/raythurman2386/goforge/internal/auth"
@@ -146,9 +147,16 @@ func TestSettingsHandler_UpdatePassword_RevokesOtherSessions(t *testing.T) {
 // fakeRevoker records DeleteByUserIDExcept calls.
 type fakeRevoker struct {
 	userID, keep string
+	id           string
 	n            int64
 	err          error
 	calls        int
+}
+
+func (f *fakeRevoker) DeleteByIDAndUserID(_ context.Context, id, userID string) (int64, error) {
+	f.calls++
+	f.id, f.userID = id, userID
+	return f.n, f.err
 }
 
 func (f *fakeRevoker) DeleteByUserIDExcept(_ context.Context, userID, keep string) (int64, error) {
@@ -226,4 +234,128 @@ func TestSettingsHandler_RevokeOtherSessions(t *testing.T) {
 			t.Fatalf("status=%d calls=%d", rr.Code, rev.calls)
 		}
 	})
+}
+
+func revokeSessionRequest(h *SettingsHandler, user *models.User, current *models.Session, id string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/settings/sessions/"+id+"/revoke", nil)
+	ctx := context.WithValue(req.Context(), auth.UserContextKey, user)
+	if current != nil {
+		ctx = context.WithValue(ctx, auth.SessionContextKey, current)
+	}
+	routeCtx := chi.NewRouteContext()
+	routeCtx.URLParams.Add("id", id)
+	ctx = context.WithValue(ctx, chi.RouteCtxKey, routeCtx)
+	rr := httptest.NewRecorder()
+	h.RevokeSession(rr, req.WithContext(ctx))
+	return rr
+}
+
+func TestSettingsHandler_RevokeSession(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	user := &models.User{ID: uuid.NewString(), Email: "one-revoke@example.com"}
+	current := &models.Session{ID: uuid.NewString(), UserID: user.ID}
+	other := &models.Session{ID: uuid.NewString(), UserID: user.ID}
+
+	t.Run("revokes only the named owned session and audits", func(t *testing.T) {
+		rev := &fakeRevoker{n: 1}
+		rec := &fakeUIAudit{}
+		h := NewSettingsHandler(nil, nil, nil, nil, logger).WithAudit(rec).WithSessions(rev)
+		rr := revokeSessionRequest(h, user, current, other.ID)
+		if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Signed out 1 session.") {
+			t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+		}
+		if !strings.Contains(rr.Header().Get("HX-Trigger"), "sessionRevoked") || rev.id != other.ID || rev.userID != user.ID {
+			t.Errorf("trigger=%q revoker id=%q user=%q", rr.Header().Get("HX-Trigger"), rev.id, rev.userID)
+		}
+		rows := rec.snapshot()
+		if len(rows) != 1 || rows[0].action != models.AuditActionUserSessionsRevoke ||
+			rows[0].details["sessions_revoked"] != int64(1) || rows[0].details["via"] != models.AuditViaUI {
+			t.Errorf("audit rows = %+v", rows)
+		}
+	})
+
+	t.Run("current session is protected", func(t *testing.T) {
+		rev := &fakeRevoker{n: 1}
+		rec := &fakeUIAudit{}
+		h := NewSettingsHandler(nil, nil, nil, nil, logger).WithAudit(rec).WithSessions(rev)
+		if rr := revokeSessionRequest(h, user, current, current.ID); rr.Code != http.StatusBadRequest {
+			t.Fatalf("status=%d", rr.Code)
+		}
+		if rev.calls != 0 || len(rec.snapshot()) != 0 {
+			t.Errorf("current session reached store or audit")
+		}
+	})
+
+	t.Run("unknown or another users session is not found", func(t *testing.T) {
+		rev := &fakeRevoker{n: 0}
+		rec := &fakeUIAudit{}
+		h := NewSettingsHandler(nil, nil, nil, nil, logger).WithAudit(rec).WithSessions(rev)
+		if rr := revokeSessionRequest(h, user, current, uuid.NewString()); rr.Code != http.StatusNotFound {
+			t.Fatalf("status=%d", rr.Code)
+		}
+		if rev.userID != user.ID || len(rec.snapshot()) != 0 {
+			t.Errorf("store user=%q audit=%d", rev.userID, len(rec.snapshot()))
+		}
+	})
+
+	t.Run("store error does not audit", func(t *testing.T) {
+		rev := &fakeRevoker{err: errors.New("db down")}
+		rec := &fakeUIAudit{}
+		h := NewSettingsHandler(nil, nil, nil, nil, logger).WithAudit(rec).WithSessions(rev)
+		if rr := revokeSessionRequest(h, user, current, other.ID); rr.Code != http.StatusInternalServerError {
+			t.Fatalf("status=%d", rr.Code)
+		}
+		if len(rec.snapshot()) != 0 {
+			t.Error("failed revoke wrote an audit row")
+		}
+	})
+
+	t.Run("unauthenticated", func(t *testing.T) {
+		rev := &fakeRevoker{}
+		h := NewSettingsHandler(nil, nil, nil, nil, logger).WithSessions(rev)
+		if rr := revokeSessionRequest(h, nil, nil, other.ID); rr.Code != http.StatusUnauthorized {
+			t.Fatalf("status=%d", rr.Code)
+		}
+		if rev.calls != 0 {
+			t.Error("unauthenticated request reached store")
+		}
+	})
+}
+
+func TestSettingsHandler_RevokeSession_CSRF(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	user := &models.User{ID: uuid.NewString()}
+	current := &models.Session{ID: uuid.NewString(), UserID: user.ID, TokenHash: "0123456789abcdef"}
+	rev := &fakeRevoker{n: 1}
+	h := NewSettingsHandler(nil, nil, nil, nil, logger).WithSessions(rev)
+	handler := auth.NewCSRF("csrf-test-secret").Middleware(http.HandlerFunc(h.RevokeSession))
+
+	request := func() *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "/settings/sessions/"+uuid.NewString()+"/revoke", nil)
+		ctx := context.WithValue(req.Context(), auth.UserContextKey, user)
+		ctx = context.WithValue(ctx, auth.SessionContextKey, current)
+		routeCtx := chi.NewRouteContext()
+		routeCtx.URLParams.Add("id", uuid.NewString())
+		return req.WithContext(context.WithValue(ctx, chi.RouteCtxKey, routeCtx))
+	}
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, request())
+	if rr.Code != http.StatusForbidden || rev.calls != 0 {
+		t.Fatalf("missing CSRF: status=%d calls=%d", rr.Code, rev.calls)
+	}
+
+	var token string
+	auth.NewCSRF("csrf-test-secret").Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		token = auth.GetCSRFToken(r)
+	})).ServeHTTP(httptest.NewRecorder(), func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "/settings/profile", nil)
+		return req.WithContext(context.WithValue(req.Context(), auth.SessionContextKey, current))
+	}())
+	rr = httptest.NewRecorder()
+	valid := request()
+	valid.Header.Set("X-CSRF-Token", token)
+	handler.ServeHTTP(rr, valid)
+	if rr.Code != http.StatusOK || rev.calls != 1 {
+		t.Fatalf("valid CSRF: status=%d calls=%d", rr.Code, rev.calls)
+	}
 }
