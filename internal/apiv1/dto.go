@@ -155,8 +155,8 @@ type serviceSummaryDTO struct {
 	Status    string `json:"status"`
 	Protected bool   `json:"protected"`
 	// BackupEnabled is the Allows backups switch. The nightly run includes
-	// the instance only when this is true, the template is postgres, gitea,
-	// or vaultwarden, and the container is running.
+	// the instance only when this is true, the template declares a usable
+	// backup.strategy, and the container is running.
 	BackupEnabled bool `json:"backup_enabled"`
 	// LastError says why the service last failed (secrets redacted).
 	LastError string    `json:"last_error,omitempty"`

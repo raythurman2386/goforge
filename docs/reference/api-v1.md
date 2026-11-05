@@ -209,7 +209,7 @@ service as protected.
 | `POST /services/{id}/image` | `write` + `protected` |
 | `POST /services/{id}/restart`, `POST /containers/{id}/restart` | `write` only |
 
-`backup_enabled` on `GET /services` and `GET /services/{id}` is the **Allows backups** switch. The nightly run includes the instance only when that flag is true, the template is `postgres`, `gitea`, or `vaultwarden`, and the container is running. The API does not change the flag; the service page does (`POST /services/{id}/backup`).
+`backup_enabled` on `GET /services` and `GET /services/{id}` is the **Allows backups** switch. The nightly run includes the instance only when that flag is true, the template declares a usable `backup.strategy`, and the container is running. The API does not change the flag; the service page does (`POST /services/{id}/backup`).
 
 ## Read routes (`read`)
 

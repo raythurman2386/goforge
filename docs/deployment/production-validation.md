@@ -10,7 +10,7 @@ GoForge is used every day on one host (Gitea and about 14 other containers), and
 These run in throwaway containers from the test suite. They are useful, but they are not drills on a full stack:
 
 - `TestIntegration_Restore` restores the GoForge database into throwaway `postgres:15-alpine` and `postgres:17-alpine` servers, including every refusal.
-- `TestIntegration_RestoreService` and `TestIntegration_RestoreServicePostgres` round-trip throwaway Gitea, Vaultwarden, and Postgres services through `restore-service`, including a rollback. See [Backup & Restore](backup.md#a-service-postgres-gitea-or-vaultwarden).
+- `TestIntegration_RestoreService` and `TestIntegration_RestoreServicePostgres` round-trip throwaway Gitea, Vaultwarden, and Postgres services through `restore-service`, including a rollback. See [Backup & Restore](backup.md#a-service-postgres-gitea-vaultwarden-or-minio).
 - `formal/deploy-retire/` model-checks redeploy grace and retire of the previous container.
 - The `verify-goforge` skill (`.cursor/skills/verify-goforge/`) drives the UI on a throwaway Compose stack, including `backups.md`, `backup-restore.md`, and `service-restore.md`.
 
