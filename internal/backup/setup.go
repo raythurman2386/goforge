@@ -46,14 +46,14 @@ func RedactorFor(cfg *config.Config, extra ...config.BackupConfig) *Redactor {
 
 // New wires a Runner from the environment backup config. It returns
 // ErrDisabled when backups are off.
-func New(cfg *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string) (*Setup, error) {
-	return NewFor(cfg, cfg.Backup, db, dockerClient, log, version)
+func New(cfg *config.Config, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string, strategies StrategySource) (*Setup, error) {
+	return NewFor(cfg, cfg.Backup, db, dockerClient, log, version, strategies)
 }
 
 // NewFor wires a Runner for bc, the effective backup config (see
 // Effective). cfg supplies the app database URL and the secrets to redact.
 // It returns ErrDisabled when bc is off.
-func NewFor(cfg *config.Config, bc config.BackupConfig, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string) (*Setup, error) {
+func NewFor(cfg *config.Config, bc config.BackupConfig, db *sql.DB, dockerClient *docker.Client, log *slog.Logger, version string, strategies StrategySource) (*Setup, error) {
 	if !bc.Enabled() {
 		return nil, ErrDisabled
 	}
@@ -77,9 +77,10 @@ func NewFor(cfg *config.Config, bc config.BackupConfig, db *sql.DB, dockerClient
 			Sources: []Source{
 				Static{&AppDBTarget{DatabaseURL: cfg.DatabaseURL, Redactor: red}},
 				&InstanceSource{
-					Instances: repositories.NewServiceInstanceRepository(db),
-					Docker:    DockerExecer{Client: dockerClient},
-					Redactor:  red,
+					Instances:  repositories.NewServiceInstanceRepository(db),
+					Docker:     DockerExecer{Client: dockerClient},
+					Redactor:   red,
+					Strategies: strategies,
 				},
 			},
 			Prefix:    bc.Prefix,

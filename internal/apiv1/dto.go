@@ -154,6 +154,10 @@ type serviceSummaryDTO struct {
 	Domain    string `json:"domain,omitempty"`
 	Status    string `json:"status"`
 	Protected bool   `json:"protected"`
+	// BackupEnabled is the Allows backups switch. The nightly run includes
+	// the instance only when this is true, the template declares a usable
+	// backup.strategy, and the container is running.
+	BackupEnabled bool `json:"backup_enabled"`
 	// LastError says why the service last failed (secrets redacted).
 	LastError string    `json:"last_error,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
@@ -162,16 +166,17 @@ type serviceSummaryDTO struct {
 
 func (h *Handler) toServiceSummary(inst *models.ServiceInstance) serviceSummaryDTO {
 	return serviceSummaryDTO{
-		ID:        inst.ID,
-		Name:      inst.Name,
-		Template:  inst.TemplateName,
-		Version:   nullString(inst.Version),
-		Domain:    nullString(inst.Domain),
-		Status:    string(inst.Status),
-		Protected: h.instanceProtected(inst),
-		LastError: nullString(inst.LastError),
-		CreatedAt: inst.CreatedAt,
-		UpdatedAt: inst.UpdatedAt,
+		ID:            inst.ID,
+		Name:          inst.Name,
+		Template:      inst.TemplateName,
+		Version:       nullString(inst.Version),
+		Domain:        nullString(inst.Domain),
+		Status:        string(inst.Status),
+		Protected:     h.instanceProtected(inst),
+		BackupEnabled: inst.BackupEnabled,
+		LastError:     nullString(inst.LastError),
+		CreatedAt:     inst.CreatedAt,
+		UpdatedAt:     inst.UpdatedAt,
 	}
 }
 

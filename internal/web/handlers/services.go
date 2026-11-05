@@ -9,7 +9,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/raythurman2386/goforge/internal/auth"
-	"github.com/raythurman2386/goforge/internal/backup"
 	"github.com/raythurman2386/goforge/internal/models"
 	"github.com/raythurman2386/goforge/internal/services"
 	pages_services "github.com/raythurman2386/goforge/internal/web/templates/pages/services"
@@ -183,9 +182,9 @@ func (h *ServiceHandler) Show(w http.ResponseWriter, r *http.Request) {
 		tmpl = &services.ServiceTemplate{DisplayName: instance.TemplateName}
 	}
 
-	showRestorePoints := h.restorePoints != nil && user.IsAdmin() && backup.BacksUpTemplate(instance.TemplateName)
+	showRestorePoints := h.restorePoints != nil && user.IsAdmin() && h.offersBackup(instance.TemplateName)
 	csrfToken := auth.GetCSRFToken(r)
-	component := pages_services.Detail(instance, container, inspectSummary(r.Context(), h.inspector, container, h.logger), tmpl, showRestorePoints, h.protection(instance), csrfToken)
+	component := pages_services.Detail(instance, container, inspectSummary(r.Context(), h.inspector, container, h.logger), tmpl, showRestorePoints, h.protection(instance), h.backupChoice(instance), csrfToken)
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "failed to render detail page")
 	}

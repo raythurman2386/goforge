@@ -241,8 +241,7 @@ connection:
   internal: "redis://${password}@${host}:6379"
   external: "redis://${password}@${host}:${port}"
 backup:
-  command: "redis-cli save"
-  extension: ".rdb"
+  strategy: "redis"
 `
 
 	tests := []struct {
@@ -309,8 +308,8 @@ backup:
 				}
 
 				// Check Backup
-				if tmpl.Backup.Command != "redis-cli save" {
-					t.Errorf("Backup.Command mismatch: %q", tmpl.Backup.Command)
+				if tmpl.Backup.Strategy != "redis" {
+					t.Errorf("Backup.Strategy = %q, want redis", tmpl.Backup.Strategy)
 				}
 			},
 			wantErr: false,

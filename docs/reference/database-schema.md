@@ -244,6 +244,7 @@ One-click service instances (PostgreSQL, Redis, etc.) deployed from templates.
 | `config` | `JSONB` | Default `'{}'` | Configuration values. Encrypted as `{"_goforge_enc":"..."}` when an encryption key is configured |
 | `domain` | `VARCHAR(255)` | Nullable | Assigned domain |
 | `status` | `VARCHAR(50)` | NOT NULL, CHECK, default `'pending'` | Instance status |
+| `backup_enabled` | `BOOLEAN` | NOT NULL, default `false` | **Allows backups**. The nightly run includes this instance when its template declares a usable `backup.strategy`, this is true, and the container is running. Migration `032` sets it true for existing `postgres`, `gitea`, and `vaultwarden` rows (`minio` and others stay false) |
 | `connection_info` | `JSONB` | Default `'{}'` | Connection strings/details, encrypted the same way as `config` |
 | `created_at` | `TIMESTAMPTZ` | Default `NOW()` | Creation time |
 | `updated_at` | `TIMESTAMPTZ` | Default `NOW()` | Last update time |
@@ -559,5 +560,6 @@ This function should be called periodically via `pg_cron` or an external schedul
 | 028 | `notify_smtp` | `notify_settings.kind` may be `email`; sealed SMTP host, username, password, From, To, plus `smtp_port` and `smtp_tls`. Down turns an email notifier off (kind `ntfy`) |
 | 030 | `two_factor` | Opt-in TOTP 2FA: `user_totp` (key sealed with `ENCRYPTION_KEY`), `user_recovery_codes` (SHA-256 hashes), `login_challenges` (token hashes) |
 | 031 | `audit_retention_and_seals` | `audit_settings`, `audit_log_seals`, drop `audit_logs.user_id` foreign key, append-only triggers |
+| 032 | `service_instances_backup_enabled` | `service_instances.backup_enabled`. Existing `postgres`, `gitea`, and `vaultwarden` rows are set true |
 
 All migrations have corresponding `.down.sql` files for rollback support.

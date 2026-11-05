@@ -179,6 +179,42 @@ GoForge checks `bool` and `select` values on the server when you deploy a servic
 
 A template is skipped at load, with an error in the log, if a `select` field has no `options`, a `select` default is not in `options`, or a `bool` default is not true or false.
 
+### Backup strategy
+
+```yaml
+backup:
+  strategy: postgres
+
+backup:
+  strategy: sqlite_volume
+  mount: /data
+  snapshot: gitea          # gitea or vaultwarden
+  tar:
+    changed_ok: false
+    exclude:
+      - ./gitea/gitea.db
+
+backup:
+  strategy: volume
+  mount: /data
+```
+
+`backup.strategy` names how the nightly run dumps this template.
+
+| Strategy | What it dumps |
+|----------|----------------|
+| `postgres` | `pg_dump` of each database plus roles, inside the container |
+| `sqlite_volume` | One named snapshot builtin, then a tar of `mount` minus `tar.exclude` |
+| `volume` | A tar of `mount` while the container is running |
+
+The snapshot builtins are `gitea` (sqlite3 `.backup` as the `git` user) and `vaultwarden` (`/vaultwarden backup`). Their scripts stay in Go. `mount` is an absolute path. Each `tar.exclude` entry is a relative `./` path; `*` is allowed. `tar.changed_ok: true` accepts GNU tar's exit code 1, which Vaultwarden needs. A `volume` tar can tear a file that changes while tar reads it. The nightly tar also leaves out `.goforge-pre-restore-*` and `.goforge-failed-restore-*`.
+
+`gitea` and `vaultwarden` are still accepted as strategy names and mean those sqlite_volume builtins with their usual excludes and `/data`.
+
+The template's `name` does not have to match the strategy. A template named `files` with `strategy: volume` and `mount: /data` is dumped and restored as a volume. The run records `strategy`, `mount`, and `snapshot` in `manifest.json`. Older runs have no strategy field, and `goforge backup restore-service` uses the template name then. No `backup` block, or a strategy or path the registry rejects, leaves the template out. Its service page has no **Allows backups** switch, and the run lists it as skipped. A rejected block is logged when the template loads and does not stop the template from deploying. The catalog reloads changed template files at the start of each backup run. The shipped MinIO template uses `volume`. A MinIO instance that already exists stays out until **Allows backups** is turned on. A new one starts on.
+
+The switch on the service page still decides whether a particular instance is included. See [Backup & Restore](../deployment/backup.md#allows-backups).
+
 ---
 
 ## Template Variables

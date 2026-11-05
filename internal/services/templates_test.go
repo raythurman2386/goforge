@@ -24,6 +24,31 @@ func loadRepoCatalog(t *testing.T) *Catalog {
 	return c
 }
 
+func TestRepoTemplates_BackupStrategies(t *testing.T) {
+	t.Parallel()
+	c := loadRepoCatalog(t)
+	pg, ok := c.BackupSpec("postgres")
+	if !ok || !pg.Usable() || pg.Strategy != "postgres" {
+		t.Fatalf("postgres spec = %+v ok=%v", pg, ok)
+	}
+	for _, name := range []string{"gitea", "vaultwarden"} {
+		spec, specOK := c.BackupSpec(name)
+		if !specOK || !spec.Usable() || spec.Strategy != "sqlite_volume" || spec.Snapshot != name || spec.Mount != "/data" {
+			t.Fatalf("%s spec = %+v ok=%v", name, spec, ok)
+		}
+	}
+	if vw, _ := c.BackupSpec("vaultwarden"); !vw.ChangedOK {
+		t.Fatal("vaultwarden tar must accept GNU tar exit code 1")
+	}
+	minio, ok := c.BackupSpec("minio")
+	if !ok || !minio.Usable() || minio.Strategy != "volume" || minio.Mount != "/data" {
+		t.Fatalf("minio spec = %+v ok=%v", minio, ok)
+	}
+	if _, ok := c.BackupStrategy("redis"); ok {
+		t.Error("redis declares a backup strategy")
+	}
+}
+
 func TestRepoTemplates_WebServices(t *testing.T) {
 	t.Parallel()
 	c := loadRepoCatalog(t)

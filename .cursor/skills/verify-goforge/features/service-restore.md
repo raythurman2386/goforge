@@ -1,6 +1,6 @@
-# Restore a Postgres, Gitea, or Vaultwarden service from a backup run
+# Restore a Postgres, Gitea, Vaultwarden, or MinIO service from a backup run
 
-An operator restores one Postgres, Gitea, or Vaultwarden service's data volume (`/var/lib/postgresql/data` or `/data`) from one backup run with `goforge backup restore-service <run key> <instance id>`, run inside the running GoForge container. The current volume contents are kept in `<volume>/.goforge-pre-restore-<UTC time>/`. Admins who own the service see its restore points on the service page with the command. There is no restore in the web UI, the API, or MCP. Other templates (Redis, MinIO, ...) are refused.
+An operator restores one Postgres, Gitea, Vaultwarden, or MinIO service's data volume (`/var/lib/postgresql/data`, `/data`, or the template's `volume` mount) from one backup run with `goforge backup restore-service <run key> <instance id>`, run inside the running GoForge container. The current volume contents are kept in `<volume>/.goforge-pre-restore-<UTC time>/`. Admins who own the service see its restore points on the service page with the command. There is no restore in the web UI, the API, or MCP. Other templates (Redis and any template without a usable `backup.strategy`) are refused.
 
 ## Sub-features
 

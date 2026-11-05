@@ -144,10 +144,10 @@ func (r *Runner) Run(ctx context.Context, trigger models.BackupTrigger) (*models
 				fail(t.Name(), perr)
 				continue
 			}
-			for _, a := range arts {
-				ma, uerr := r.upload(ctx, run.RunKey, t.Name(), a)
+			for i := range arts {
+				ma, uerr := r.upload(ctx, run.RunKey, t.Name(), arts[i])
 				if uerr != nil {
-					fail(t.Name()+" "+a.Path, uerr)
+					fail(t.Name()+" "+arts[i].Path, uerr)
 					continue
 				}
 				manifest.Artifacts = append(manifest.Artifacts, ma)
@@ -255,7 +255,7 @@ func (r *Runner) upload(ctx context.Context, runKey, target string, a Artifact) 
 	return ManifestArtifact{
 		Key: a.Path, Target: target, Kind: a.Kind, Bytes: cw.n,
 		SHA256: hex.EncodeToString(h.Sum(nil)), InstanceID: a.InstanceID,
-		Template: a.Template, Database: a.Database,
+		Template: a.Template, Strategy: a.Strategy, Mount: a.Mount, Snapshot: a.Snapshot, Database: a.Database,
 	}, nil
 }
 

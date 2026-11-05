@@ -50,15 +50,23 @@ func TestUIProtectedFlagInReads(t *testing.T) {
 	if svc["protected"] != true {
 		t.Errorf("get_service protected = %v", svc["protected"])
 	}
+	if svc["backup_enabled"] != true {
+		t.Errorf("get_service backup_enabled = %v", svc["backup_enabled"])
+	}
 	_, out = h.do(t, http.MethodGet, "/services", "tok-read", "")
 	list, _ := out["services"].([]any)
 	got := map[string]any{}
+	backups := map[string]any{}
 	for _, it := range list {
 		m, _ := it.(map[string]any)
 		got[m["id"].(string)] = m["protected"]
+		backups[m["id"].(string)] = m["backup_enabled"]
 	}
 	if got[uiProtSvcID] != true || got[protSvcID] != true || got[svcID] != false {
 		t.Errorf("list_services protected = %v", got)
+	}
+	if backups[uiProtSvcID] != true || backups[svcID] != false {
+		t.Errorf("list_services backup_enabled = %v", backups)
 	}
 }
 

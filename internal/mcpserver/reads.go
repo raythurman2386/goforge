@@ -135,7 +135,7 @@ func (s *Server) registerReads() {
 		func(_ context.Context, in templateInput) (*call, error) {
 			return get("/service-templates/" + seg(in.Name)), required("name", in.Name)
 		})
-	addTool(s, "list_services", "List your service instances, with a protected flag on each.", readOnly,
+	addTool(s, "list_services", "List your service instances, with protected and backup_enabled flags on each.", readOnly,
 		func(context.Context, noInput) (*call, error) { return get("/services"), nil })
 	addTool(s, "get_service", "One service instance: masked config, immutable fields, volumes, and its container.", readOnly,
 		func(_ context.Context, in serviceInput) (*call, error) {

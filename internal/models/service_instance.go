@@ -40,8 +40,13 @@ type ServiceInstance struct {
 	// image update over /api/v1 and MCP then need the protected scope. It is
 	// merged with GOFORGE_PROTECTED_SERVICES, which the UI cannot turn off.
 	Protected bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	// BackupEnabled is the Allows backups switch. The nightly run includes an
+	// instance whose template declares a usable backup.strategy only when this
+	// is true and the container is running. New instances of those templates
+	// start true.
+	BackupEnabled bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // GetConfig parses the config JSON into a map.

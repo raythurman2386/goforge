@@ -1,0 +1,48 @@
+package pages_services
+
+import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+
+// BackupChoice is what the Allows backups card shows for one service.
+type BackupChoice struct {
+	InstanceID string
+	// Enabled is the stored flag.
+	Enabled bool
+	// Offered is false when the template has no nightly backup. The card
+	// is then omitted.
+	Offered bool
+}
+
+func backupStatus(b BackupChoice) string {
+	if b.Enabled {
+		return "Included in nightly backups while this service is running."
+	}
+	return "Left out of nightly backups."
+}
+
+// BackupCard is the service page's Allows backups toggle. Changing the
+// switch posts the form; the response is this card again.
+templ BackupCard(b BackupChoice) {
+	if b.Offered {
+		@ui.Card(ui.CardProps{Class: "mb-8", Attrs: templ.Attributes{"id": "service-backup"}}) {
+			<form
+				hx-post={ "/services/" + b.InstanceID + "/backup" }
+				hx-trigger="change"
+				hx-target="#service-backup"
+				hx-swap="outerHTML"
+				data-testid="service-backup-form"
+			>
+				@ui.Switch(ui.CheckboxProps{
+					ID:          "service-backup-switch",
+					Name:        "backup_enabled",
+					Value:       "true",
+					Label:       "Allows backups",
+					Description: "The nightly backup and goforge backup run include this service while its container is running. The GoForge database is backed up either way.",
+					Checked:     b.Enabled,
+					HiddenFalse: true,
+					Attrs:       templ.Attributes{"data-testid": "service-backup-switch"},
+				})
+				<p class="mt-3 text-xs text-foreground-secondary" role="status" aria-live="polite" data-testid="service-backup-status">{ backupStatus(b) }</p>
+			</form>
+		}
+	}
+}

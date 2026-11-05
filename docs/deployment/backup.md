@@ -1,6 +1,6 @@
 # Backup & Restore
 
-GoForge can upload a backup every night to S3-compatible storage: Cloudflare R2, Backblaze B2, MinIO, or AWS S3. `goforge backup restore` puts the GoForge database back from a run, and `goforge backup restore-service` puts one Postgres, Gitea, or Vaultwarden service back.
+GoForge can upload a backup every night to S3-compatible storage: Cloudflare R2, Backblaze B2, MinIO, or AWS S3. `goforge backup restore` puts the GoForge database back from a run, and `goforge backup restore-service` puts one Postgres, Gitea, Vaultwarden, or MinIO service back.
 
 ## Turn it on
 
@@ -72,11 +72,20 @@ Use a key that can only read, write, list, and delete in this one bucket. Encryp
 | Target | Objects | How |
 |--------|---------|-----|
 | GoForge database | `app/goforge-db.dump` | `pg_dump --format=custom` from the app container, using `DATABASE_URL`. The runtime image ships the PostgreSQL 17 client, which reads servers up to 17 |
-| Each running `postgres` service | `services/<id>/<database>.dump`, `services/<id>/roles.sql` | `docker exec` into the service container as its `POSTGRES_USER`: one `pg_dump --format=custom` per non-template database, and `pg_dumpall --roles-only`. GoForge does not decrypt the service's admin password |
-| Each running `gitea` service | `services/<id>/gitea.sqlite3`, `services/<id>/data.tar.gz` | SQLite online backup of the database, then a tar of `/data` |
-| Each running `vaultwarden` service | `services/<id>/vaultwarden.sqlite3`, `services/<id>/data.tar.gz` | `/vaultwarden backup`, then a tar of `/data` |
+| Each running `postgres` service with **Allows backups** on | `services/<id>/<database>.dump`, `services/<id>/roles.sql` | `docker exec` into the service container as its `POSTGRES_USER`: one `pg_dump --format=custom` per non-template database, and `pg_dumpall --roles-only`. GoForge does not decrypt the service's admin password |
+| Each running `gitea` service with **Allows backups** on | `services/<id>/gitea.sqlite3`, `services/<id>/data.tar.gz` | SQLite online backup of the database, then a tar of `/data` |
+| Each running `vaultwarden` service with **Allows backups** on | `services/<id>/vaultwarden.sqlite3`, `services/<id>/data.tar.gz` | `/vaultwarden backup`, then a tar of `/data` |
+| Each running `minio` service (strategy `volume`) with **Allows backups** on | `services/<id>/data.tar.gz` | A live tar of `/data` while the container runs, so an object written during the tar can be torn |
 
-Not backed up: Redis and every other template, stopped services (listed as skipped in the manifest), deployed projects' containers and images (rebuilt from Git), Traefik certificates (reissued), and your env file (`.env`).
+Not backed up: Redis and any template without a usable `backup.strategy`, a Postgres, Gitea, Vaultwarden, or MinIO service whose **Allows backups** switch is off, stopped services (listed as skipped in the manifest), deployed projects' containers and images (rebuilt from Git), Traefik certificates (reissued), and your env file (`.env`).
+
+### Allows backups
+
+Postgres, Gitea, Vaultwarden, and MinIO each have an **Allows backups** switch on the service page. It starts on for new instances and for Postgres, Gitea, and Vaultwarden instances that already existed when the switch was added. An existing MinIO instance stays off until you turn the switch on. Turning it off leaves that instance out of the next nightly run and out of `goforge backup run`. The manifest lists it as skipped, with the reason `backups disabled for this instance`. A stopped service is skipped even when the switch is on (`container is not running`). Other templates have no switch; a request to turn backups on for one is refused. The GoForge database is still backed up whenever backups are enabled in Settings.
+
+The change applies on the next run, with no restart. Each change is an audit row, `service.set_backup`, with `details.backup_enabled`, `details.previous`, and `via` = `ui`. `GET /api/v1/services` and `GET /api/v1/services/{id}` include `backup_enabled`. The route is `POST /services/{id}/backup`.
+
+Which templates can be backed up is `backup.strategy` in the service template, not the template name. The runner knows `postgres`, `sqlite_volume` (snapshot builtins `gitea` and `vaultwarden`), and `volume` (a live tar of `mount`). The shipped Postgres, Gitea, Vaultwarden, and MinIO templates set those. A `volume` tar can tear a file written while it is read. A template with no strategy, or a strategy or path the runner rejects, is skipped and has no switch. Each artifact in `manifest.json` records the strategy, mount, and snapshot. `goforge backup restore-service` restores with those, and uses the template name when an older run has no strategy field. GoForge reloads template files at the start of each run. See [Service templates](../reference/service-templates.md#backup-strategy).
 
 `roles.sql` holds the SCRAM password hashes of every role in that Postgres service. Treat it like a password file.
 
@@ -135,7 +144,7 @@ It prints the result and exits non-zero when the run failed. It does not run mig
 docker compose exec goforge ./goforge backup list
 ```
 
-It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run, and each Postgres, Gitea, or Vaultwarden service page lists the runs that hold that service's data (run key, time, size) with its `restore-service` command. There is no restore button in the web UI, the API, or MCP.
+It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run, and each Postgres, Gitea, Vaultwarden, or MinIO service page lists the runs that hold that service's data (run key, time, size) with its `restore-service` command. There is no restore button in the web UI, the API, or MCP.
 
 ### GoForge database
 
@@ -189,9 +198,9 @@ aws s3 cp --recursive --endpoint-url "$BACKUP_S3_ENDPOINT" \
   "s3://$BACKUP_S3_BUCKET/goforge/2026-10-29/20261029T070000Z/services/" ./restore/services/
 ```
 
-### A service: Postgres, Gitea, or Vaultwarden
+### A service: Postgres, Gitea, Vaultwarden, or MinIO
 
-`goforge backup restore-service` restores one Postgres, Gitea, or Vaultwarden service from one run. It runs inside the running GoForge container (it needs the Docker socket; GoForge keeps serving). Find the instance ID on the service page (it is in the URL, `/services/<id>`); admins also see the service's restore points there, with the command to copy. Other service types (Redis, MinIO, and the rest) are refused: they have no service backup to restore.
+`goforge backup restore-service` restores one Postgres, Gitea, Vaultwarden, or MinIO (`volume`) service from one run. It runs inside the running GoForge container (it needs the Docker socket; GoForge keeps serving). Find the instance ID on the service page (it is in the URL, `/services/<id>`); admins also see the service's restore points there, with the command to copy. Other service types (Redis and any template without a usable `backup.strategy`) are refused: they have no service backup to restore.
 
 ```bash
 # Dry run: reads the manifest, inspects the container, checks the backup lock; changes nothing
@@ -203,12 +212,13 @@ docker compose exec goforge ./goforge backup restore-service 2026-10-29/20261029
 With `--yes` it:
 
 1. Takes the backup lock, so no backup run can read the service halfway.
-2. Downloads the service's files and checks each size and SHA-256 against `manifest.json`: for Postgres, `services/<id>/roles.sql` and every `services/<id>/<database>.dump`; for Gitea or Vaultwarden, `gitea.sqlite3` (or `vaultwarden.sqlite3`) and `data.tar.gz`. A mismatch stops here, with the service still running.
+2. Downloads the service's files and checks each size and SHA-256 against `manifest.json`: for Postgres, `services/<id>/roles.sql` and every `services/<id>/<database>.dump`; for Gitea or Vaultwarden, `gitea.sqlite3` (or `vaultwarden.sqlite3`) and `data.tar.gz`; for MinIO (`volume`), `data.tar.gz`. A mismatch stops here, with the service still running.
 3. Stops the service container.
 4. Starts a helper container from the service's own image with `--volumes-from` the service, no network, as root, and copies the files into it.
-5. Moves everything in the data volume (Postgres: `/var/lib/postgresql/data`; Gitea and Vaultwarden: `/data`) to `<volume>/.goforge-pre-restore-<UTC time>/` (kept, never deleted), then restores:
+5. Moves everything in the data volume (Postgres: `/var/lib/postgresql/data`; Gitea and Vaultwarden: `/data`; MinIO and other `volume` templates: the template's `backup.mount`, `/data` for MinIO) to `<volume>/.goforge-pre-restore-<UTC time>/` (kept, never deleted), then restores:
     - **Postgres**: `initdb` builds a new, empty cluster as the data directory's owner, with the service's `POSTGRES_USER` as superuser, and copies `postgresql.conf`, `postgresql.auto.conf`, `pg_hba.conf`, and `pg_ident.conf` over from the kept cluster. A temporary server starts on a private socket only (no TCP), loads `roles.sql` (role names, attributes, and password hashes, so existing passwords keep working), then runs `pg_restore --create --exit-on-error` for each dump. The server stops and the new cluster is moved into place. GoForge never reads the service's admin password.
     - **Gitea or Vaultwarden**: extracts `data.tar.gz` with its file owners, and copies the SQLite snapshot to the database path (Gitea: `GITEA__database__PATH`, else `PATH` in the restored `app.ini`, else `/data/gitea/gitea.db`; Vaultwarden: `/data/db.sqlite3`) with the owner of its directory.
+    - **MinIO (volume)**: extracts `data.tar.gz` with its file owners.
 6. Removes the helper (never its volumes), starts the service, and waits for its health check.
 
 If step 5 fails (a bad dump, a role that cannot be created, a full disk), the partial restore is moved to `<volume>/.goforge-failed-restore-<UTC time>/`, the previous contents are moved back, and the service is started again on its old data. Nightly backups leave both kinds of kept folder out of `data.tar.gz`; Postgres backups are logical dumps, so a kept cluster is never in them. Delete a kept folder by hand once the restored service checks out:
@@ -251,4 +261,4 @@ BACKUP_S3_ACCESS_KEY_ID=minioadmin BACKUP_S3_SECRET_ACCESS_KEY=change-me-please 
 BACKUP_S3_FORCE_PATH_STYLE=true ./bin/goforge backup run
 ```
 
-Point `DATABASE_URL` at a test database. On a host with live services, this also dumps every running Postgres, Gitea, and Vaultwarden service GoForge knows about.
+Point `DATABASE_URL` at a test database. On a host with live services, this also dumps every running Postgres, Gitea, Vaultwarden, and MinIO service whose **Allows backups** switch is on.

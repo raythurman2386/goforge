@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -14,13 +15,54 @@ import (
 	"github.com/raythurman2386/goforge/internal/models"
 )
 
-// Templates with a backup target in v1. Everything else (redis, the shared
-// redis included) is reported as skipped, never silently dropped.
+// Strategies the registry can dump. A template opts in by setting
+// backup.strategy to one of these. The template name itself does not matter.
 const (
 	templatePostgres    = "postgres"
 	templateGitea       = "gitea"
 	templateVaultwarden = "vaultwarden"
 )
+
+// KnownStrategy reports whether the backup registry can dump strategy.
+// gitea and vaultwarden are the older names of the sqlite_volume builtins.
+func KnownStrategy(strategy string) bool {
+	switch strategy {
+	case templatePostgres, templateGitea, templateVaultwarden, strategySQLiteVolume, strategyVolume:
+		return true
+	default:
+		return false
+	}
+}
+
+// StrategySource is where a template's backup.strategy comes from. The
+// service catalog is the production source. Nil means no template has a
+// strategy, so every instance is skipped.
+type StrategySource interface {
+	BackupSpec(templateName string) (Spec, bool)
+}
+
+// StrategyMap is a StrategySource with a fixed template-to-strategy map.
+type StrategyMap map[string]string
+
+// BackupStrategy implements StrategySource.
+func (m StrategyMap) BackupStrategy(name string) (string, bool) {
+	strategy, ok := m[name]
+	strategy = strings.TrimSpace(strategy)
+	if !ok || strategy == "" {
+		return "", false
+	}
+	return strategy, true
+}
+
+// shippedStrategies is the map the original three built-in templates declare. Tests
+// that do not load the catalog use it.
+func shippedStrategies() StrategyMap {
+	return StrategyMap{
+		templatePostgres:    templatePostgres,
+		templateGitea:       templateGitea,
+		templateVaultwarden: templateVaultwarden,
+	}
+}
 
 // ContainerExecer is the slice of the Docker client the instance targets use.
 type ContainerExecer interface {
@@ -64,6 +106,9 @@ type InstanceSource struct {
 	// Container maps an instance ID to its container name. Nil uses
 	// ContainerName; tests point it at throwaway containers.
 	Container func(instanceID string) string
+	// Strategies reads backup.strategy for each template. Nil skips every
+	// instance.
+	Strategies StrategySource
 }
 
 // ContainerName is the Docker name GoForge gives an instance's container.
@@ -71,6 +116,7 @@ func ContainerName(instanceID string) string { return "goforge-service-" + insta
 
 // Targets implements Source.
 func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, error) {
+	reloadStrategies(s.Strategies)
 	list, err := s.Instances.ListAll(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list service instances: %w", err)
@@ -86,16 +132,26 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 			name = s.Container
 		}
 		base := instanceTarget{inst: in, container: name(in.ID), docker: s.Docker, redactor: s.Redactor}
-		var t Target
-		switch in.TemplateName {
-		case templatePostgres:
-			t = &PostgresTarget{base}
-		case templateGitea:
-			t = &GiteaTarget{base}
-		case templateVaultwarden:
-			t = &VaultwardenTarget{base}
-		default:
-			skip("template has no backup target in v1")
+		var spec Spec
+		var ok bool
+		if s.Strategies != nil {
+			spec, ok = s.Strategies.BackupSpec(in.TemplateName)
+		}
+		if !ok {
+			skip("template has no backup strategy")
+			continue
+		}
+		if !KnownStrategy(spec.Strategy) {
+			skip("unknown backup strategy")
+			continue
+		}
+		t, err := targetFor(spec, base)
+		if err != nil {
+			skip(err.Error())
+			continue
+		}
+		if !in.BackupEnabled {
+			skip("backups disabled for this instance")
 			continue
 		}
 		running, rerr := s.Docker.Running(ctx, base.container)
@@ -111,11 +167,51 @@ func (s *InstanceSource) Targets(ctx context.Context) ([]Target, []Skipped, erro
 	return targets, skipped, nil
 }
 
+// reloadStrategies picks up a template edit before this run. Sources that
+// are not a service catalog, such as StrategyMap, are left alone. A reload
+// error does not fail the run: the catalog has already installed every
+// template that parsed, so one broken file must not stop backups of the
+// rest. The error is logged and the run continues.
+func reloadStrategies(src StrategySource) {
+	type reloader interface {
+		ReloadIfChanged() (bool, error)
+	}
+	r, ok := src.(reloader)
+	if !ok || r == nil {
+		return
+	}
+	if _, err := r.ReloadIfChanged(); err != nil {
+		slog.Warn("backup: reload service templates failed; using templates that loaded", "error", err)
+	}
+}
+
+func targetFor(spec Spec, base instanceTarget) (Target, error) {
+	if err := spec.Normalize(); err != nil {
+		return nil, err
+	}
+	base.strategy = spec.Strategy
+	base.mount = spec.Mount
+	base.snapshot = spec.Snapshot
+	switch spec.Strategy {
+	case templatePostgres:
+		return &PostgresTarget{base}, nil
+	case strategySQLiteVolume, templateGitea, templateVaultwarden:
+		return &sqliteVolumeTarget{instanceTarget: base, spec: spec}, nil
+	case strategyVolume:
+		return &volumeTarget{instanceTarget: base, spec: spec}, nil
+	default:
+		return nil, fmt.Errorf("unknown backup strategy %q", spec.Strategy)
+	}
+}
+
 type instanceTarget struct {
 	inst      *models.ServiceInstance
 	container string
 	docker    ContainerExecer
 	redactor  *Redactor
+	strategy  string
+	mount     string
+	snapshot  string
 }
 
 func (b instanceTarget) Name() string {
@@ -141,6 +237,9 @@ func (b instanceTarget) artifact(name string, kind Kind, db string, opts docker.
 		ContentType: ct,
 		InstanceID:  b.inst.ID,
 		Template:    b.inst.TemplateName,
+		Strategy:    b.strategy,
+		Mount:       b.mount,
+		Snapshot:    b.snapshot,
 		Database:    db,
 		Dump: func(ctx context.Context, w io.Writer) error {
 			return b.exec(ctx, opts, w)
@@ -250,12 +349,11 @@ const giteaTar = `exec tar -C /data -czf - \
 
 // Plan implements Target.
 func (t *GiteaTarget) Plan(context.Context) ([]Artifact, error) {
-	snap := sh(giteaSnapshot)
-	snap.User = "git"
-	return []Artifact{
-		t.artifact("gitea.sqlite3", KindSQLite, "gitea", snap),
-		t.artifact("data.tar.gz", KindTarGz, "", sh(giteaTar)),
-	}, nil
+	spec := Spec{Strategy: templateGitea}
+	if err := spec.Normalize(); err != nil {
+		return nil, err
+	}
+	return planSQLiteVolume(t.instanceTarget, spec)
 }
 
 // VaultwardenTarget backs up a Vaultwarden instance's /data volume.
@@ -268,16 +366,20 @@ func (t *GiteaTarget) Plan(context.Context) ([]Artifact, error) {
 type VaultwardenTarget struct{ instanceTarget }
 
 const vaultwardenSnapshot = `set -eu
+mnt="${1:-/data}"
+case "$mnt" in /*) ;; *) echo "unexpected vaultwarden data mount" >&2; exit 4 ;; esac
+case "$mnt" in *..*) echo "unexpected vaultwarden data mount" >&2; exit 4 ;; esac
 out=$(/vaultwarden backup 2>&1) || { printf '%s\n' "$out" >&2; exit 3; }
 p=$(printf '%s\n' "$out" | sed -n "s/.*Backup to '\(.*\)' was successful.*/\1/p" | tail -n 1)
 # With the default DATA_FOLDER the path is relative to the working dir
 # ("data/db_....sqlite3").
 case "$p" in /*) ;; ?*) p="${PWD%/}/$p" ;; esac
 case "$p" in
-  /data/db_*.sqlite3) ;;
+  "$mnt"/db_*.sqlite3) ;;
   *) echo "unexpected vaultwarden backup path" >&2; exit 4 ;;
 esac
-case "${p#/data/}" in */*) echo "unexpected vaultwarden backup path" >&2; exit 4 ;; esac
+rel=${p#"$mnt"/}
+case "$rel" in */*) echo "unexpected vaultwarden backup path" >&2; exit 4 ;; esac
 trap 'rm -f -- "$p"' EXIT
 cat -- "$p"`
 
@@ -291,8 +393,9 @@ tar -C /data --warning=no-file-changed -czf - \
 
 // Plan implements Target.
 func (t *VaultwardenTarget) Plan(context.Context) ([]Artifact, error) {
-	return []Artifact{
-		t.artifact("vaultwarden.sqlite3", KindSQLite, "vaultwarden", sh(vaultwardenSnapshot)),
-		t.artifact("data.tar.gz", KindTarGz, "", sh(vaultwardenTar)),
-	}, nil
+	spec := Spec{Strategy: templateVaultwarden}
+	if err := spec.Normalize(); err != nil {
+		return nil, err
+	}
+	return planSQLiteVolume(t.instanceTarget, spec)
 }

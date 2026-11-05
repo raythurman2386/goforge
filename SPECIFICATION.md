@@ -939,10 +939,12 @@ connection:
 
 ```
 
-No shipped template sets a `backup` block. The loader still parses one, but
-the nightly backup ignores it: which instances are backed up, and how, is
-decided in `internal/backup` by template name (`postgres`, `gitea`,
-`vaultwarden` in v1). See `docs/deployment/backup.md`.
+Shipped templates set `backup.strategy`: Postgres uses `postgres`, Gitea
+and Vaultwarden use `sqlite_volume` with snapshot builtins `gitea` and
+`vaultwarden`, and MinIO uses `volume`. The nightly run reads the block
+from the catalog. An instance is included when the strategy is usable,
+**Allows backups** is on (`service_instances.backup_enabled`), and the
+container is running. See `docs/deployment/backup.md`.
 
 ---
 
@@ -1093,9 +1095,9 @@ labels := map[string]string{
    - Encryption key from environment (not in DB)
 
 2. **Backup Strategy**
-   - Nightly backups to S3-compatible storage when `BACKUP_S3_BUCKET` is set: GoForge database, Postgres service instances (per database plus roles), Gitea and Vaultwarden data
+   - Nightly backups to S3-compatible storage when `BACKUP_S3_BUCKET` is set: GoForge database, Postgres service instances (per database plus roles), Gitea, Vaultwarden, and MinIO data
    - Encryption is the storage provider's at-rest encryption. `ENCRYPTION_KEY` is never in a backup and must be kept separately
-   - `goforge backup restore` restores the GoForge database and `goforge backup restore-service` restores a Postgres, Gitea, or Vaultwarden service (CLI only). Other service volumes are the operator's responsibility
+   - `goforge backup restore` restores the GoForge database and `goforge backup restore-service` restores a Postgres, Gitea, Vaultwarden, or MinIO service (CLI only). Volumes of templates without a usable `backup.strategy` are the operator's responsibility
 
 ### Monitoring
 

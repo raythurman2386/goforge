@@ -114,22 +114,26 @@ func TestInstanceSource(t *testing.T) {
 			{match: "tar -C /data", stdout: "tgz"},
 		},
 	}
-	src := &InstanceSource{Docker: ex, Instances: fakeLister{
-		{ID: "pg1", TemplateName: "postgres", Name: "shared-pg"},
-		{ID: "pg2", TemplateName: "postgres", Name: "stopped-pg"},
-		{ID: "gt1", TemplateName: "gitea", Name: "git"},
-		{ID: "vw1", TemplateName: "vaultwarden", Name: "vw"},
+	src := &InstanceSource{Docker: ex, Strategies: shippedStrategies(), Instances: fakeLister{
+		{ID: "pg1", TemplateName: "postgres", Name: "shared-pg", BackupEnabled: true},
+		{ID: "pg2", TemplateName: "postgres", Name: "stopped-pg", BackupEnabled: true},
+		{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true},
+		{ID: "vw1", TemplateName: "vaultwarden", Name: "vw", BackupEnabled: true},
 		{ID: "rd1", TemplateName: "redis", Name: "shared-redis"},
+		{ID: "pg3", TemplateName: "postgres", Name: "opt-out"},
 	}}
 	targets, skipped, err := src.Targets(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(targets) != 3 || len(skipped) != 2 {
+	if len(targets) != 3 || len(skipped) != 3 {
 		t.Fatalf("targets=%d skipped=%+v", len(targets), skipped)
 	}
 	if skipped[0].InstanceID != "pg2" || skipped[0].Reason != "container is not running" || skipped[1].Template != "redis" {
 		t.Errorf("skipped = %+v", skipped)
+	}
+	if skipped[2].InstanceID != "pg3" || skipped[2].Reason != "backups disabled for this instance" {
+		t.Errorf("opt-out skip = %+v", skipped[2])
 	}
 
 	pgArts, err := targets[0].Plan(context.Background())
@@ -169,12 +173,48 @@ func TestInstanceSource(t *testing.T) {
 	}
 }
 
+// The strategy comes from the template, not the template name. A template
+// named shared-pg with strategy postgres is dumped. An unknown strategy is
+// skipped even when Allows backups is on.
+func TestInstanceSource_StrategyFromTemplate(t *testing.T) {
+	ex := &fakeExec{
+		running: map[string]bool{"goforge-service-x": true, "goforge-service-y": true},
+		rules:   []execRule{{match: "SELECT datname", stdout: "app\n"}},
+	}
+	src := &InstanceSource{
+		Docker:     ex,
+		Strategies: StrategyMap{"shared-pg": "postgres", "odd": "volume"},
+		Instances: fakeLister{
+			{ID: "x", TemplateName: "shared-pg", Name: "db", BackupEnabled: true},
+			{ID: "y", TemplateName: "odd", Name: "odd", BackupEnabled: true},
+			{ID: "z", TemplateName: "redis", Name: "cache", BackupEnabled: true},
+		},
+	}
+	targets, skipped, err := src.Targets(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 1 || targets[0].Name() == "" || !strings.Contains(targets[0].Name(), "shared-pg") {
+		t.Fatalf("targets = %v", targets)
+	}
+	if len(skipped) != 2 || skipped[0].Reason != "volume backup needs mount" || skipped[0].Template != "odd" {
+		t.Fatalf("skipped = %+v", skipped)
+	}
+	if skipped[1].Reason != "template has no backup strategy" || skipped[1].Template != "redis" {
+		t.Fatalf("missing strategy = %+v", skipped[1])
+	}
+	arts, err := targets[0].Plan(context.Background())
+	if err != nil || len(arts) < 1 || arts[0].Kind != KindPgDump {
+		t.Fatalf("plan = %+v %v", arts, err)
+	}
+}
+
 func TestInstanceTarget_NonZeroExitIsRedactedError(t *testing.T) {
 	ex := &fakeExec{
 		running: map[string]bool{"goforge-service-gt1": true},
 		rules:   []execRule{{match: "sqlite3", stdout: "partial", exit: 3}},
 	}
-	src := &InstanceSource{Docker: ex, Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git"}}}
+	src := &InstanceSource{Docker: ex, Strategies: shippedStrategies(), Instances: fakeLister{{ID: "gt1", TemplateName: "gitea", Name: "git", BackupEnabled: true}}}
 	targets, _, _ := src.Targets(context.Background())
 	arts, _ := targets[0].Plan(context.Background())
 	err := arts[0].Dump(context.Background(), io.Discard)
@@ -223,6 +263,46 @@ func TestVaultwardenTarScriptExitCodes(t *testing.T) {
 		got := cmd.ProcessState.ExitCode()
 		if got != tt.want || string(out) != "tgz" {
 			t.Errorf("tar exit %d: script exit %d out %q, want exit %d", tt.tarExit, got, out, tt.want)
+		}
+	}
+}
+
+// reloadingStrategies mimics the service catalog: ReloadIfChanged reports a
+// parse error for a broken custom.yaml while the valid templates stay loaded.
+type reloadingStrategies struct {
+	StrategyMap
+	dir string
+}
+
+func (r reloadingStrategies) ReloadIfChanged() (bool, error) {
+	if _, err := os.Stat(filepath.Join(r.dir, "custom.yaml")); err == nil {
+		return true, fmt.Errorf("parse %s: yaml: bad", filepath.Join(r.dir, "custom.yaml"))
+	}
+	return false, nil
+}
+
+// A broken template added between runs must not fail Targets: the postgres
+// instance is still backed up.
+func TestInstanceSource_BrokenTemplateReloadDoesNotFailTargets(t *testing.T) {
+	dir := t.TempDir()
+	ex := &fakeExec{running: map[string]bool{"goforge-service-pg1": true}}
+	src := &InstanceSource{
+		Docker:     ex,
+		Strategies: reloadingStrategies{StrategyMap: StrategyMap{"postgres": "postgres"}, dir: dir},
+		Instances:  fakeLister{{ID: "pg1", TemplateName: "postgres", Name: "pg", BackupEnabled: true}},
+	}
+	for run := 0; run < 2; run++ {
+		if run == 1 {
+			if err := os.WriteFile(filepath.Join(dir, "custom.yaml"), []byte("name: \"x\n  bad"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		targets, _, err := src.Targets(context.Background())
+		if err != nil {
+			t.Fatalf("run %d: Targets err = %v", run, err)
+		}
+		if len(targets) != 1 || !strings.Contains(targets[0].Name(), "pg") {
+			t.Fatalf("run %d: targets = %v", run, targets)
 		}
 	}
 }

@@ -28,7 +28,15 @@ type Artifact struct {
 	ContentType string
 	InstanceID  string
 	Template    string
-	Database    string
+	// Strategy is the backup.strategy that produced this artifact. Restore
+	// uses it, and falls back to Template for runs written before it existed.
+	Strategy string
+	// Mount is the data directory in the container. Snapshot is the
+	// sqlite_volume builtin (gitea or vaultwarden). Both are empty on
+	// postgres artifacts and on runs written before templates carried them.
+	Mount    string
+	Snapshot string
+	Database string
 	// Dump writes the artifact to w. It must return an error if the output
 	// is incomplete, so a truncated dump never looks like a good one.
 	Dump func(ctx context.Context, w io.Writer) error

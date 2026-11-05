@@ -298,6 +298,12 @@ The **Protected** switch on a service page keeps agents and API tokens away from
 
 The flag is stored on the service (migration `026_service_instances_protected`) and applies at once, with no restart. Each change is an audit row, `service.set_protected`, with `details.protected`, `details.previous`, and `via` = `ui`. A service listed in `GOFORGE_PROTECTED_SERVICES` shows the switch on and locked; remove it from that variable to turn protection off. GoForge protects a service when either the switch or the variable says so.
 
+### Allows backups
+
+A service template with a usable `backup.strategy` (`postgres`, `sqlite_volume`, or `volume`) has an **Allows backups** switch on the service page. The shipped Postgres, Gitea, Vaultwarden, and MinIO templates set that field. MinIO is a live tar of `/data`. A MinIO instance that already exists stays out until the switch is turned on. A new one starts on. Other templates have no switch. While it is on, the nightly backup and `goforge backup run` include that service when its container is running. Turning it off leaves the instance out of the next run; the manifest lists it as skipped. The switch changes nothing about the running container, and the GoForge database is backed up either way.
+
+The flag is stored on the service (migration `032_service_instances_backup_enabled`). Existing Postgres, Gitea, and Vaultwarden instances stay on. Each change is an audit row, `service.set_backup`, with `details.backup_enabled`, `details.previous`, and `via` = `ui`. See [Backup & Restore](../deployment/backup.md#allows-backups).
+
 A service runs one **Edit configuration** or **Update image** at a time. While one is recreating the container, the service is `pending`, and another edit or update is refused with `409 Conflict`, even one sent at the same moment.
 
 ### Image updates

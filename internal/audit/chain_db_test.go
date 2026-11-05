@@ -124,7 +124,7 @@ func fmtErr(out string, err error) error {
 	return cmdError{msg: out}
 }
 
-func TestMigration031_DownAndUp(t *testing.T) {
+func TestMigration032_DownAndUp(t *testing.T) {
 	db := openThrowaway(t, "goforge_audit_down")
 	ctx := context.Background()
 	cfg := &config.Config{DatabaseType: config.DatabaseTypePostgres, DatabaseURL: withDatabase(t, testAdminDSN(t), "goforge_audit_down")}
@@ -138,9 +138,23 @@ func TestMigration031_DownAndUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	version, dirty, verr := m.Version()
-	if verr != nil || dirty || version != 31 {
+	if verr != nil || dirty || version != 32 {
 		t.Fatalf("version after up = %d dirty=%v err=%v", version, dirty, verr)
 	}
+	if downErr := m.Down(); downErr != nil {
+		t.Fatal(downErr)
+	}
+	var col int
+	if scanErr := db.QueryRowContext(ctx, `
+		SELECT count(*) FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'service_instances' AND column_name = 'backup_enabled'`).Scan(&col); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if col != 0 {
+		t.Fatalf("backup_enabled still present after down: count=%d", col)
+	}
+	// Keep 031's down coverage: step once more and check audit_settings
+	// is gone and the user_id FK is back.
 	if downErr := m.Down(); downErr != nil {
 		t.Fatal(downErr)
 	}
@@ -149,7 +163,7 @@ func TestMigration031_DownAndUp(t *testing.T) {
 		t.Fatal(scanErr)
 	}
 	if settings.Valid {
-		t.Fatalf("audit_settings still present after down: %s", settings.String)
+		t.Fatalf("audit_settings still present after 031 down: %s", settings.String)
 	}
 	var fk int
 	if scanErr := db.QueryRowContext(ctx, `SELECT count(*) FROM pg_constraint WHERE conname = 'audit_logs_user_id_fkey'`).Scan(&fk); scanErr != nil {
@@ -162,8 +176,16 @@ func TestMigration031_DownAndUp(t *testing.T) {
 		t.Fatal(upErr)
 	}
 	version, dirty, verr = m.Version()
-	if verr != nil || dirty || version != 31 {
+	if verr != nil || dirty || version != 32 {
 		t.Fatalf("version after re-up = %d dirty=%v err=%v", version, dirty, verr)
+	}
+	if scanErr := db.QueryRowContext(ctx, `
+		SELECT count(*) FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'service_instances' AND column_name = 'backup_enabled'`).Scan(&col); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if col != 1 {
+		t.Fatalf("backup_enabled missing after re-up: count=%d", col)
 	}
 }
 

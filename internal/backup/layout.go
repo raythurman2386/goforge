@@ -75,7 +75,15 @@ type ManifestArtifact struct {
 	SHA256     string `json:"sha256"`
 	InstanceID string `json:"instance_id,omitempty"`
 	Template   string `json:"template,omitempty"`
-	Database   string `json:"database,omitempty"`
+	// Strategy is backup.strategy from the template. Empty on runs from
+	// before templates declared one; restore then uses Template.
+	Strategy string `json:"strategy,omitempty"`
+	// Mount is the data directory in the container. Snapshot is the
+	// sqlite_volume builtin. Empty on older runs; restore then uses the
+	// strategy or template name.
+	Mount    string `json:"mount,omitempty"`
+	Snapshot string `json:"snapshot,omitempty"`
+	Database string `json:"database,omitempty"`
 }
 
 // Skipped is an instance the run did not back up, and why.

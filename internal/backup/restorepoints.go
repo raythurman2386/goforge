@@ -86,8 +86,8 @@ func (m *Manifest) Artifact(key string) *ManifestArtifact {
 // TotalBytes is the sum of every artifact's size.
 func (m *Manifest) TotalBytes() int64 {
 	var n int64
-	for _, a := range m.Artifacts {
-		n += a.Bytes
+	for i := range m.Artifacts {
+		n += m.Artifacts[i].Bytes
 	}
 	return n
 }
