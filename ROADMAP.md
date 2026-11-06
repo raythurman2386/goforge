@@ -26,7 +26,7 @@ Open blockers between v0.3.0 and v1.0. Each line says where the gap is recorded 
 - [x] **HEALTH-READY-PUBLIC** (v0.5.0 S1, t1858u): `/health/ready` stays public, but each check now reports only `ok`, `unavailable`, or `not_configured`; the error text goes to the server log (`SECURITY.md`, Closed).
 - [x] **Session revoke on password change** (v0.5.0 S2, t1861u): a password change ends the account's other sessions and keeps the current one; Security has **Sign out other sessions**; both audited with `sessions_revoked` (`SECURITY.md`, Closed).
 - [x] **Remaining audit gaps** (v0.5.0 S3, t1870u): Git source create and delete, profile (email) saves, and webhook-triggered deploys now write audit rows; webhook runs link their `deployment.run.*` outcome (`SECURITY.md`, Closed). v0.5.1 adds retention (default off, 30-day floor) and hash-chain tamper detection. A host or Docker-socket attacker can still rewrite the log (`SECURITY.md`, Audit logging).
-- [ ] **Custom domain DNS check**: `DomainValidator` in `internal/proxy/acme.go` (`IsDomainRoutable`, `VerifyDNSRecord`, `VerifyDomainFull`) is tested but nothing outside its tests calls it. The project and environment forms check only the name format. The SSL certificate dashboard matters for direct installs that use Let's Encrypt through Traefik; on the recommended Cloudflare Tunnel path Traefik holds no certificate to watch, so whether the dashboard blocks v1.0 is Raymond's call.
+- [x] **Custom domain DNS check** (v0.6.0): project and environment domain settings validate DNS before saving. **Certificate dashboard demotion:** for the recommended Cloudflare Tunnel configuration (`CLOUDFLARE_PROXY_MODE=true`), Cloudflare terminates TLS and the dashboard is out of primary navigation and the v1.0 blocker path. The unbuilt certificate status/renewal UI remains a separate direct-Traefik-install gap, not a Tunnel blocker.
 - [ ] **Production validation record**: no load test, resource limit check, or restore drill against a full GoForge stack has been run and written down. The plan is in [docs/deployment/production-validation.md](docs/deployment/production-validation.md). Raymond runs GoForge every day (Gitea and about 14 containers), but that use is not a recorded validation, and the README "Not Production-Ready" note stays until the record exists.
 
 Also open, not yet called blockers: the main `goforge` image runs as root (parked below; low gain while the container holds the read-write Docker socket), and the QA and docs items in the [v1.0 readiness checklist](#v10-readiness-checklist).
@@ -76,7 +76,7 @@ Based on comprehensive user flow analysis, the following must be addressed befor
   - Certificate status and expiration dates
   - Force renew/refresh certificates
   - Domain validation status
-  - *Not built. Applies to direct installs (Let's Encrypt through Traefik); see [Path to v1.0](#path-to-v10).*
+  - **Deferred for direct Traefik installs.** Not built: no certificate status, expiration, or renewal UI. The recommended Tunnel install uses Cloudflare TLS instead; no primary-nav certificate item or working renewal action will be added without the underlying feature. See [Path to v1.0](#path-to-v10).
 - [ ] **Domain Configuration Validation**
   - DNS verification before adding custom domain
   - Error messages for misconfigured domains

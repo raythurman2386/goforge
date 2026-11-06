@@ -222,9 +222,9 @@ This checklist is ordered for incremental, testable implementation. Each task is
 - [x] **9.1** Create `internal/proxy/traefik.go` for Traefik management
 - [x] **9.2** Implement Docker labels generation for Traefik routing
 - [x] **9.3** Create Let's Encrypt certificate resolver configuration
-- [ ] **9.4** Implement domain validation (code present, not wired: `DomainValidator` in `internal/proxy/acme.go` does DNS checks but has no caller outside its tests; the forms check only the name format. Planned for v0.6.0)
+- [x] **9.4** Implement domain validation (project and environment domain settings use DNS checks before saving; see [SSL & Certificates](docs/deployment/ssl.md))
 - [x] **9.5** Add custom domain management UI
-- [ ] **9.6** Create SSL certificate status checking (not built: there is no certificate status code or dashboard; it applies to direct installs that use Let's Encrypt)
+- [ ] **9.6** Create SSL certificate status checking (**deferred for direct Traefik installs**; not a Tunnel or v1.0 blocker for the recommended `CLOUDFLARE_PROXY_MODE=true` configuration). There is no dashboard/API/renewal control. Tunnel installs use Cloudflare for TLS; `CLOUDFLARE_PROXY_MODE` is a configuration signal, not container detection. See [SSL & Certificates](docs/deployment/ssl.md).
 - [x] **9.7** Implement Traefik dashboard proxy (optional, secured)
 - [x] **9.8** Add HTTP to HTTPS redirect configuration
 - [x] **9.9** Create middleware configuration (rate limiting, headers)

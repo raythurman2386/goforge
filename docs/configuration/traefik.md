@@ -104,7 +104,7 @@ By default, Traefik uses Let's Encrypt for automatic certificate provisioning:
 
 ### Custom Domains
 
-Each project can have a default domain and a per-environment override. GoForge validates the format and requires a DNS address before saving either value; it does not track SSL certificate status in the UI. See [Custom Domains Guide](../guides/custom-domains.md).
+Each project can have a default domain and a per-environment override. GoForge validates the format and requires a DNS address before saving either value; it has no certificate status/expiration or renewal UI. The recommended Tunnel configuration uses Cloudflare TLS; this gap is for direct Traefik installs. See [Custom Domains Guide](../guides/custom-domains.md).
 
 ## Domain Validation
 

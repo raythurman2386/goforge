@@ -1,6 +1,6 @@
 # SSL & Certificates
 
-GoForge uses Traefik for automatic SSL certificate management via Let's Encrypt.
+For the recommended Cloudflare Tunnel configuration, Cloudflare terminates public TLS. Direct Traefik installations use Let's Encrypt for automatic certificates. The GoForge application uses `CLOUDFLARE_PROXY_MODE` as the configuration signal; it does not detect whether a `cloudflared` container is running.
 
 ## How SSL Works in GoForge
 
@@ -62,7 +62,7 @@ docker run --rm -v goforge_traefik_letsencrypt:/data -v $(pwd):/backup \
 
 ## Deployed Application SSL
 
-Each application deployed through GoForge gets its own SSL certificate:
+In **direct Traefik mode**, each application deployed through GoForge gets its own SSL certificate:
 
 1. Project is configured with a domain (e.g., `myapp.example.com`)
 2. GoForge creates a container with Traefik labels
@@ -74,9 +74,15 @@ Each application deployed through GoForge gets its own SSL certificate:
 
 Traefik supports wildcard certificates via DNS-01 challenge, but this requires additional DNS provider configuration. GoForge uses HTTP-01 challenge by default, which provisions individual certificates per domain.
 
+## Certificate dashboard scope
+
+GoForge does **not** provide a certificate status/expiration dashboard or a certificate renewal control. There is no primary-navigation certificate item or dead certificate route. For the recommended Cloudflare Tunnel configuration, the unbuilt dashboard is not a v1.0 blocker; manage TLS and its public hostnames in Cloudflare.
+
+For direct Traefik installations, certificate status, expiration, and forced renewal still require Traefik/Let's Encrypt operational inspection. A future certificate UI is separately scoped for this direct-install gap; it must not imply that Traefik holds certificates in Tunnel mode.
+
 ## Cloudflare SSL
 
-When using Cloudflare Tunnel (`CLOUDFLARE_PROXY_MODE=true`), SSL is handled by Cloudflare instead of Traefik. See [Cloudflare Tunnel Configuration](../configuration/cloudflare.md).
+When using Cloudflare Tunnel (`CLOUDFLARE_PROXY_MODE=true`), SSL is handled by Cloudflare instead of Traefik. Use the Cloudflare dashboard for certificate status and renewal, not GoForge. See [Cloudflare Tunnel Configuration](../configuration/cloudflare.md).
 
 ## Troubleshooting
 

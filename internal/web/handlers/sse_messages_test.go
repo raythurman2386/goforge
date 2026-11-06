@@ -28,6 +28,12 @@ func TestDeploymentStreamMessagesAreUnnamedOOBSwaps(t *testing.T) {
 			`data: <div id="deployment-log-lines" hx-swap-oob="innerHTML"><p class="text-foreground-secondary italic">No logs available yet...</p></div>`},
 		{"log", func(w *httptest.ResponseRecorder) { writeDeploymentLog(w, w, r, line) },
 			`data: <div hx-swap-oob="beforeend:#deployment-log-lines">`},
+		{"active actions", func(w *httptest.ResponseRecorder) {
+			writeDeploymentActions(w, w, r, &models.Deployment{ID: "d", EnvironmentID: "e", Status: models.DeploymentStatusBuilding}, "p", false, "csrf")
+		}, `data: <div id="deployment-actions" hx-swap-oob="innerHTML">`},
+		{"terminal actions", func(w *httptest.ResponseRecorder) {
+			writeDeploymentActions(w, w, r, &models.Deployment{ID: "d", EnvironmentID: "e", Status: models.DeploymentStatusRunning}, "p", true, "csrf")
+		}, `data: <div id="deployment-actions" hx-swap-oob="innerHTML">`},
 		{"status", func(w *httptest.ResponseRecorder) { writeDeploymentStatus(w, w, r, models.DeploymentStatusRunning) },
 			`data: <span id="deployment-live-status" hx-swap-oob="innerHTML">`},
 	} {
@@ -60,5 +66,21 @@ func TestContainerLogLineIsUnnamedMessage(t *testing.T) {
 	writeContainerLogLine(w, w, "a <b>")
 	if got, want := w.Body.String(), "data: <div class=\"py-0.5\">a &lt;b&gt;</div>\n\n"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestDeploymentActionsSwapCancelForEligibleRollback(t *testing.T) {
+	r := httptest.NewRequest("GET", "/projects/p/deployments/d/logs", nil)
+	w := httptest.NewRecorder()
+	writeDeploymentActions(w, w, r, &models.Deployment{ID: "d", EnvironmentID: "e", Status: models.DeploymentStatusBuilding}, "p", false, "csrf")
+	active := w.Body.String()
+	if !strings.Contains(active, "Cancel<svg") || strings.Contains(active, "Rollback<svg") {
+		t.Fatalf("active actions = %q", active)
+	}
+	w = httptest.NewRecorder()
+	writeDeploymentActions(w, w, r, &models.Deployment{ID: "d", EnvironmentID: "e", Status: models.DeploymentStatusRunning}, "p", true, "csrf")
+	terminal := w.Body.String()
+	if !strings.Contains(terminal, "Rollback<svg") || strings.Contains(terminal, "Cancel<svg") || !strings.Contains(terminal, `hx-post="/projects/p/deployments/d/rollback"`) {
+		t.Fatalf("terminal actions = %q", terminal)
 	}
 }

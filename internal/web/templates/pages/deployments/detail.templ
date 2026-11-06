@@ -50,45 +50,9 @@ templ Detail(props DetailProps) {
 		</div>
 
 		@components.PageHeaderWithBadge("Deployment "+truncateID(props.Deployment.ID), "", liveStatus(props.Deployment.Status)) {
-			if props.CanRollback && props.Deployment.Status == models.DeploymentStatusRunning {
-				@ui.Button(ui.ButtonProps{
-					Variant: ui.ButtonWarning,
-					Attrs: templ.Attributes{
-						"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/rollback", props.Project.ID, props.Deployment.ID),
-						"hx-confirm": "Are you sure you want to rollback this deployment?",
-						"data-ui-confirm-label": "Roll back",
-						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
-						"hx-disable": "this",
-						"hx-indicator": "find .htmx-indicator",
-					},
-				}) {
-					<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
-					</svg>
-					Rollback
-					@components.Spinner()
-				}
-			}
-			if !props.Deployment.IsTerminal() {
-				@ui.Button(ui.ButtonProps{
-					Variant: ui.ButtonSecondary,
-					Attrs: templ.Attributes{
-						"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/cancel", props.Project.ID, props.Deployment.ID),
-						"hx-confirm": "Are you sure you want to cancel this deployment?",
-						"data-ui-confirm-tone": "danger",
-						"data-ui-confirm-label": "Cancel deployment",
-						"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, props.CSRFToken),
-						"hx-disable": "this",
-						"hx-indicator": "find .htmx-indicator",
-					},
-				}) {
-					<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-					</svg>
-					Cancel
-					@components.Spinner()
-				}
-			}
+			<div id={ ActionBarID }>
+				@ActionButtons(props.Deployment, props.Project.ID, props.CanRollback, props.CSRFToken)
+			</div>
 		}
 
 		<!-- Deployment Info Grid -->
@@ -218,6 +182,54 @@ const LiveStatusID = "deployment-live-status"
 // LogLinesID is the id of the log list the stream's snapshot replaces and its
 // log lines append to.
 const LogLinesID = "deployment-log-lines"
+
+// ActionBarID is the target replaced when a status event makes Cancel and
+// Rollback eligibility change. It wraps the header's actions slot, not the title.
+const ActionBarID = "deployment-actions"
+
+// ActionButtons renders the same eligibility rules for an initial page and
+// each persisted status update. The SSE handler supplies the manager decision.
+templ ActionButtons(deployment *models.Deployment, projectID string, canRollback bool, csrfToken string) {
+	if canRollback && deployment.Status == models.DeploymentStatusRunning {
+		@ui.Button(ui.ButtonProps{
+			Variant: ui.ButtonWarning,
+			Attrs: templ.Attributes{
+				"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/rollback", projectID, deployment.ID),
+				"hx-confirm": "Are you sure you want to rollback this deployment?",
+				"data-ui-confirm-label": "Roll back",
+				"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken),
+				"hx-disable": "this",
+				"hx-indicator": "find .htmx-indicator",
+			},
+		}) {
+			<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+			</svg>
+			Rollback
+			@components.Spinner()
+		}
+	}
+	if !deployment.IsTerminal() {
+		@ui.Button(ui.ButtonProps{
+			Variant: ui.ButtonSecondary,
+			Attrs: templ.Attributes{
+				"hx-post": fmt.Sprintf("/projects/%s/deployments/%s/cancel", projectID, deployment.ID),
+				"hx-confirm": "Are you sure you want to cancel this deployment?",
+				"data-ui-confirm-tone": "danger",
+				"data-ui-confirm-label": "Cancel deployment",
+				"hx-headers": fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken),
+				"hx-disable": "this",
+				"hx-indicator": "find .htmx-indicator",
+			},
+		}) {
+			<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+			</svg>
+			Cancel
+			@components.Spinner()
+		}
+	}
+}
 
 // liveStatus is the status badge wrapped in the stream's out-of-band status
 // target.
