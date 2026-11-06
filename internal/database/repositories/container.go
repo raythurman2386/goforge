@@ -213,6 +213,22 @@ func (r *ContainerRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteByDockerID removes the container record without touching Docker.
+func (r *ContainerRepository) DeleteByDockerID(ctx context.Context, dockerID string) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM containers WHERE docker_id = $1`, dockerID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ListAll retrieves all containers.
 func (r *ContainerRepository) ListAll(ctx context.Context) ([]*models.Container, error) {
 	query := `

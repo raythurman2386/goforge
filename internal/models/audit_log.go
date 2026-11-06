@@ -188,7 +188,8 @@ const (
 	AuditViaWebhook = "webhook"
 	// AuditViaCLI marks a row written by a goforge host command, such as
 	// user reset-2fa.
-	AuditViaCLI = "cli"
+	AuditViaCLI    = "cli"
+	AuditViaSystem = "system"
 )
 
 // Failed reports whether the row records a failed change (<action>.failed).
@@ -223,6 +224,7 @@ const (
 	AuditActionServiceSetBackup      = "service.set_backup"
 	AuditActionContainerStop         = "container.stop"
 	AuditActionContainerRestart      = "container.restart"
+	AuditActionContainerOrphanRemove = "container.orphan.remove"
 )
 
 // Background run outcomes, written when a queued deployment or a service

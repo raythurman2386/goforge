@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
+
+	mobycontainer "github.com/moby/moby/api/types/container"
 
 	"github.com/raythurman2386/goforge/internal/database/repositories"
 	"github.com/raythurman2386/goforge/internal/docker"
@@ -15,14 +18,50 @@ import (
 
 // Service handles project and environment business logic.
 type Service struct {
-	projectRepo     *repositories.ProjectRepository
-	environmentRepo *repositories.EnvironmentRepository
+	projectRepo     projectStore
+	environmentRepo environmentStore
 	envVariableRepo *repositories.EnvVariableRepository
 	deploymentRepo  *repositories.DeploymentRepository
-	containerRepo   *repositories.ContainerRepository
+	containerRepo   containerStore
 	gitSourceRepo   *repositories.GitSourceRepository
 	gitService      *git.Service
-	dockerClient    *docker.Client
+	dockerClient    containerRuntime
+	audit           CleanupAuditStore
+}
+
+// projectStore is the repository behavior the project service needs.
+type projectStore interface {
+	Create(ctx context.Context, p *models.Project) error
+	GetByID(ctx context.Context, id string) (*models.Project, error)
+	Delete(ctx context.Context, id string) error
+	Update(ctx context.Context, p *models.Project) error
+	ListByUserID(ctx context.Context, userID string) ([]*models.Project, error)
+}
+
+// environmentStore is the repository behavior needed for parent lookup and deletion.
+type environmentStore interface {
+	Create(ctx context.Context, env *models.Environment) error
+	GetByID(ctx context.Context, id string) (*models.Environment, error)
+	Update(ctx context.Context, env *models.Environment) error
+	Delete(ctx context.Context, id string) error
+	ListByProjectID(ctx context.Context, projectID string) ([]*models.Environment, error)
+}
+
+// containerStore removes stale host container records.
+type containerStore interface {
+	DeleteByDockerID(ctx context.Context, dockerID string) error
+}
+
+// containerRuntime lists and removes app containers; tests use a fake.
+type containerRuntime interface {
+	ListContainers(ctx context.Context, all bool) ([]mobycontainer.Summary, error)
+	StopContainer(ctx context.Context, id string) error
+	RemoveContainer(ctx context.Context, id string) error
+}
+
+// CleanupAuditStore persists orphan removal records.
+type CleanupAuditStore interface {
+	Create(ctx context.Context, l *models.AuditLog) error
 }
 
 // NewService creates a new project Service.
@@ -297,41 +336,61 @@ func (s *Service) UpdateProject(ctx context.Context, p *models.Project) error {
 	return s.projectRepo.Update(ctx, p)
 }
 
-// DeleteProject deletes a project and all associated resources (containers, deployments, etc.).
+// WithAudit enables audit rows for background orphan cleanup.
+func (s *Service) WithAudit(store CleanupAuditStore) *Service {
+	s.audit = store
+	return s
+}
+
+// DeleteProject deletes a project only after every labeled app container,
+// including rollback-restored copies, has been removed from Docker.
 func (s *Service) DeleteProject(ctx context.Context, id string) error {
-	// 1. List Environments
-	envs, err := s.environmentRepo.ListByProjectID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to list environments for cleanup: %w", err)
+	if err := s.removeLabeledContainers(ctx, docker.ProjectLabelKey, id); err != nil {
+		return fmt.Errorf("failed to remove project containers: %w", err)
 	}
-
-	for _, env := range envs {
-		// 2. List Deployments
-		deployments, err := s.deploymentRepo.ListByEnvironmentID(ctx, env.ID, 1000) // Fetch reasonably all
-		if err != nil {
-			return fmt.Errorf("failed to list deployments for cleanup: %w", err)
-		}
-
-		for _, d := range deployments {
-			// 3. List Containers
-			containers, err := s.containerRepo.ListByDeploymentID(ctx, d.ID)
-			if err != nil {
-				return fmt.Errorf("failed to list containers for cleanup: %w", err)
-			}
-
-			// 4. Stop and Remove Containers
-			for _, c := range containers {
-				if c.DockerID != "" && s.dockerClient != nil {
-					// Ignore errors here to ensure we try to clean everything
-					//nolint:errcheck // We want to proceed even if cleanup fails
-					s.dockerClient.StopContainer(ctx, c.DockerID)
-					//nolint:errcheck // We want to proceed even if cleanup fails
-					s.dockerClient.RemoveContainer(ctx, c.DockerID)
-				}
-			}
-		}
-	}
-
-	// 5. Delete Project Record (cascade should handle database relations)
 	return s.projectRepo.Delete(ctx, id)
+}
+
+func (s *Service) removeLabeledContainers(ctx context.Context, label, id string) error {
+	if !runtimeAvailable(s.dockerClient) {
+		return nil
+	}
+	containers, err := s.dockerClient.ListContainers(ctx, true)
+	if err != nil {
+		return fmt.Errorf("list containers: %w", err)
+	}
+	var errs []error
+	for i := range containers {
+		c := &containers[i]
+		if c.Labels[docker.ManagedLabelKey] != docker.ManagedLabelValue || c.Labels[label] != id {
+			continue
+		}
+		if err := s.removeContainer(ctx, c.ID); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (s *Service) removeContainer(ctx context.Context, id string) error {
+	if err := s.dockerClient.StopContainer(ctx, id); err != nil && !docker.IsNotFound(err) {
+		return fmt.Errorf("stop container %s: %w", id, err)
+	}
+	if err := s.dockerClient.RemoveContainer(ctx, id); err != nil && !docker.IsNotFound(err) {
+		return fmt.Errorf("remove container %s: %w", id, err)
+	}
+	if s.containerRepo != nil {
+		if err := s.containerRepo.DeleteByDockerID(ctx, id); err != nil && !errors.Is(err, repositories.ErrNotFound) {
+			return fmt.Errorf("delete container row %s: %w", id, err)
+		}
+	}
+	return nil
+}
+
+func runtimeAvailable(runtime containerRuntime) bool {
+	if runtime == nil {
+		return false
+	}
+	value := reflect.ValueOf(runtime)
+	return value.Kind() != reflect.Ptr || !value.IsNil()
 }

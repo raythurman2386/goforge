@@ -3,6 +3,9 @@ package project
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/raythurman2386/goforge/internal/docker"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -27,7 +30,11 @@ func (s *Service) UpdateEnvironment(ctx context.Context, env *models.Environment
 	return s.environmentRepo.Update(ctx, env)
 }
 
-// DeleteEnvironment deletes an environment.
+// DeleteEnvironment removes every labeled app container, including a rollback
+// copy, before deleting the environment row and its database-owned containers.
 func (s *Service) DeleteEnvironment(ctx context.Context, id string) error {
+	if err := s.removeLabeledContainers(ctx, docker.EnvironmentLabelKey, id); err != nil {
+		return fmt.Errorf("failed to remove environment containers: %w", err)
+	}
 	return s.environmentRepo.Delete(ctx, id)
 }

@@ -36,7 +36,7 @@ API rows and links to the page filtered to agents.
 
 - Web UI changes, with `details.via` = `ui`: project create, update,
   settings, delete, link and unlink a service; deployment trigger, rollback,
-  and cancel; environment create and update; variable set (key and
+  and cancel; environment create and update; automatic orphan-container removal; variable set (key and
   `is_secret`, never the value), delete, and sync; service deploy, delete,
   restart, config edit (field names, never values), and image update;
   container stop and restart.

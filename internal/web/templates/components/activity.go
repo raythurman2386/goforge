@@ -123,7 +123,7 @@ func activityResource(l *models.AuditLog, d map[string]interface{}) (string, tem
 			return label, templ.SafeURL("/projects/" + url.PathEscape(pid))
 		}
 	case models.ResourceTypeContainer:
-		if id != "" {
+		if id != "" && l.Action != models.AuditActionContainerOrphanRemove {
 			return label, templ.SafeURL("/containers/" + esc)
 		}
 	case models.ResourceTypeAPIToken:

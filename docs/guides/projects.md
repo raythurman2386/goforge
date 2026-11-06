@@ -83,11 +83,13 @@ Secret variables are encrypted at rest using AES-GCM.
 
 Deleting a project will:
 
-1. Stop and remove all running containers
+1. Stop and remove all containers labeled with the project, including rollback-restored copies and stopped containers
 2. Delete all deployments and logs
 3. Remove all environments and variables
 4. Delete the git source configuration
 5. Remove the project record
+
+At startup and every 15 minutes GoForge also reconciles `goforge.managed=true` app containers against the project and environment labels. If either parent no longer exists it removes the container and writes `container.orphan.remove` to Activity. One-click service containers do not have project/environment labels and are left alone. Deleting an environment through the service similarly removes all containers labeled with that environment first; if Docker cleanup fails, the parent record is kept so the deletion can be retried.
 
 !!! warning
     Project deletion is permanent and cannot be undone. All deployment history and container data will be lost.

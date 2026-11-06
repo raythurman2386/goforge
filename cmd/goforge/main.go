@@ -481,7 +481,8 @@ func runServer() error {
 	go sessionManager.RunExpiredSessionPurge(backgroundCtx, auth.SessionPurgeInterval)
 	githubProvider := auth.NewGitHubProvider(cfg)
 	authenticator := auth.NewLocalAuthenticator(userRepo)
-	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo, deploymentRepo, containerRepo, gitSourceRepo, gitService, dockerClient)
+	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo, deploymentRepo, containerRepo, gitSourceRepo, gitService, dockerClient).WithAudit(auditLogRepo)
+	go projectService.RunOrphanReconcile(backgroundCtx, logger.WithComponent(log, "orphan-reconcile"))
 	deployService := deploy.NewService(
 		deploymentRepo,
 		deploymentLogRepo,

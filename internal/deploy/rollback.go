@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -317,9 +318,13 @@ func (rm *RollbackManager) restoreDeployment(ctx context.Context, target *models
 		DockerID:     newDockerID,
 		Name:         opts.Name,
 		Image:        opts.Image,
+		Labels:       mustContainerLabels(opts.Labels),
 		Status:       models.ContainerStatusRunning,
 	}); err != nil {
-		rm.service.logger.Error("failed to record restored container in DB", "error", err, "deployment_id", target.ID)
+		if removeErr := rm.service.dockerClient.RemoveContainer(ctx, newDockerID); removeErr != nil {
+			rm.service.logger.Error("failed to remove unrecorded restored container", "error", removeErr, "container_id", newDockerID)
+		}
+		return fmt.Errorf("failed to record restored container: %w", err)
 	}
 
 	// Mark the target deployment as running again
@@ -359,4 +364,12 @@ func containerOptionsFromContainer(ctx context.Context, c *models.Container, pro
 		Env:         containerEnv,
 		NetworkName: svc.traefikNetwork,
 	}
+}
+
+func mustContainerLabels(labels map[string]string) []byte {
+	raw, err := json.Marshal(labels)
+	if err != nil {
+		return []byte("{}")
+	}
+	return raw
 }

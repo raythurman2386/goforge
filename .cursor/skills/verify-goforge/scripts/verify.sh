@@ -33,7 +33,7 @@ case "$EVIDENCE" in
 esac
 
 usage() {
-  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-backup-settings|drive-mcp-http|drive-ui-a11y|check-backup-sealed|psql|check-sealed|cleanup" >&2
+  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-login-cleanup|drive-backup-settings|drive-mcp-http|drive-ui-a11y|check-backup-sealed|psql|check-sealed|cleanup" >&2
   exit 1
 }
 
@@ -570,6 +570,36 @@ EOF
   if [[ "$harness" != "ok" ]]; then
     exit 2
   fi
+}
+
+cmd_drive_login_cleanup() {
+  need_cmd curl
+  install -d -m 755 "$EVIDENCE"
+  local jar="$STATE_DIR/jar-login.txt" page="$STATE_DIR/login-cleanup.html" headers="$STATE_DIR/login-cleanup.headers"
+  local verdict="$EVIDENCE/login-cleanup-verdict.txt"
+  local project_id status db_row redirect harness=ok
+  project_id=$(db_psql "select id from projects where name = 'verify-smoke' order by created_at desc limit 1;" | tr -d '[:space:]')
+  if [[ -z "$project_id" || ! -f "$jar" ]]; then
+    echo "missing verify-smoke project or login jar; run drive-login first" >&2
+    exit 2
+  fi
+  local csrf
+  csrf=$(csrf_from_jar "$jar")
+  status=$(curl -sS -b "$jar" -c "$jar" -D "$headers" -o "$page" -w '%{http_code}' \
+    -X DELETE "$BASE/projects/$project_id" -H "X-CSRF-Token: $csrf" --data-urlencode "confirm_name=verify-smoke" || true)
+  redirect=$(header_value "$headers" "HX-Redirect")
+  db_row=$(db_psql "select count(*) from projects where id = '$project_id';" | tr -d '[:space:]')
+  [[ "$status" == "200" && "$redirect" == "/projects" && "$db_row" == "0" ]] || harness=fail
+  cat >"$verdict" <<EOF
+harness=$harness
+project-delete-status=$status
+project-delete-redirect=$redirect
+project-db-row=$db_row
+EOF
+  chmod 644 "$verdict"
+  rm -f "$page" "$headers"
+  cat "$verdict"
+  [[ "$harness" == "ok" ]] || exit 1
 }
 
 cmd_psql() {
@@ -1386,6 +1416,7 @@ main() {
     doctor) cmd_doctor ;;
     drive-register) cmd_drive_register ;;
     drive-login) cmd_drive_login ;;
+    drive-login-cleanup) cmd_drive_login_cleanup ;;
     psql) shift; cmd_psql "${1:-}" ;;
     check-sealed) shift; cmd_check_sealed "${1:-}" ;;
     check-backup-sealed) cmd_check_backup_sealed ;;

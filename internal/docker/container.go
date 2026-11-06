@@ -22,6 +22,13 @@ const ManagedLabelValue = "true"
 // ManagedLabelFilter selects Docker objects carrying ManagedLabelKey=ManagedLabelValue.
 const ManagedLabelFilter = ManagedLabelKey + "=" + ManagedLabelValue
 
+// ProjectLabelKey and EnvironmentLabelKey identify app containers. Service
+// containers carry ManagedLabelKey only and are not subject to app cleanup.
+const ProjectLabelKey = "goforge.project.id"
+
+// EnvironmentLabelKey selects all app containers belonging to an environment.
+const EnvironmentLabelKey = "goforge.environment.id"
+
 // ContainerOptions represents options for creating a container.
 type ContainerOptions struct {
 	Name  string
