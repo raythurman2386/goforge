@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -230,43 +231,142 @@ func TestDomainValidator_ValidateWildcard(t *testing.T) {
 	}
 }
 
-func TestDomainValidator_IsDomainRoutable(t *testing.T) {
-	v := NewDomainValidator()
+// newTestResolver serves deterministic DNS answers on loopback. Tests never
+// depend on public DNS or on a name belonging to somebody else.
+func newTestResolver(t *testing.T, exchange func(question string) (uint16, []net.IP, error)) *net.Resolver {
+	t.Helper()
+	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	go func() {
+		defer func() { _ = conn.Close() }()
+		for {
+			buf := make([]byte, 512)
+			n, peer, readErr := conn.ReadFrom(buf)
+			if readErr != nil {
+				return
+			}
+			if n < 12 {
+				continue
+			}
+			question := ""
+			at := 12
+			for at < n {
+				length := int(buf[at])
+				at++
+				if length == 0 {
+					break
+				}
+				if at+length > n {
+					break
+				}
+				if question != "" {
+					question += "."
+				}
+				question += string(buf[at : at+length])
+				at += length
+			}
+			if at+2 > n {
+				continue
+			}
+			qtype := uint16(buf[at])<<8 | uint16(buf[at+1])
+			questionEnd := at + 4 // QTYPE and QCLASS; do not copy EDNS records.
+			rcode, addrs, exchangeErr := exchange(question)
+			if exchangeErr != nil {
+				continue
+			}
+			answer := append([]byte(nil), buf[:questionEnd]...)
+			answer[2] = 0x85
+			answer[3] = 0x80 | byte(rcode)
+			answer[6], answer[7] = 0, 0
+			answer[8], answer[9], answer[10], answer[11] = 0, 0, 0, 0
+			if rcode == 0 && qtype == 1 {
+				for _, ip := range addrs {
+					if v4 := ip.To4(); v4 != nil {
+						answer[7]++
+						answer = append(answer, 0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 30, 0, 4)
+						answer = append(answer, v4...)
+					}
+				}
+			}
+			if _, writeErr := conn.WriteTo(answer, peer); writeErr != nil {
+				return
+			}
+		}
+	}()
+	_, portText, err := net.SplitHostPort(conn.LocalAddr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, network, net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+		},
+	}
+}
 
-	// This test depends on actual DNS resolution
-	// Test with a well-known domain
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func TestDomainValidator_IsDomainRoutable(t *testing.T) {
+	resolver := newTestResolver(t, func(question string) (uint16, []net.IP, error) {
+		switch question {
+		case "app.example.test":
+			return 0, []net.IP{net.ParseIP("192.0.2.10")}, nil
+		case "empty.example.test":
+			return 0, nil, nil
+		case "timeout.example.test":
+			return 0, nil, context.DeadlineExceeded
+		default:
+			return 3, nil, nil
+		}
+	})
+	v := NewDomainValidatorWithResolver(resolver)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 
-	// google.com should be routable
-	routable, err := v.IsDomainRoutable(ctx, "google.com")
-	if err != nil {
-		t.Skipf("DNS resolution failed (network issue?): %v", err)
-	}
-	if !routable {
-		t.Error("expected google.com to be routable")
-	}
-
-	// Non-existent domain should not be routable
-	routable, err = v.IsDomainRoutable(ctx, "this-domain-definitely-does-not-exist-12345.com")
-	if err == nil && routable {
-		t.Error("expected non-existent domain to not be routable")
+	for _, tc := range []struct {
+		name, domain string
+		want         bool
+		wantErr      bool
+	}{
+		{"address", " APP.EXAMPLE.TEST. ", true, false},
+		{"nxdomain", "missing.example.test", false, false},
+		{"no address", "empty.example.test", false, false},
+		{"resolver timeout", "timeout.example.test", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := v.IsDomainRoutable(ctx, tc.domain)
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Fatalf("IsDomainRoutable(%q) = %v, %v; want %v, error=%v", tc.domain, got, err, tc.want, tc.wantErr)
+			}
+		})
 	}
 }
 
 func TestDomainValidator_VerifyDNSRecord(t *testing.T) {
-	v := NewDomainValidator()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	resolver := newTestResolver(t, func(question string) (uint16, []net.IP, error) {
+		if question == "app.example.test" {
+			return 0, []net.IP{net.ParseIP("192.0.2.10")}, nil
+		}
+		return 3, nil, nil
+	})
+	v := NewDomainValidatorWithResolver(resolver)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	// Test with google.com which should have A records
-	hasRecord, err := v.VerifyDNSRecord(ctx, "google.com", "A")
-	if err != nil {
-		t.Skipf("DNS lookup failed (network issue?): %v", err)
+	hasRecord, err := v.VerifyDNSRecord(ctx, "app.example.test", "A")
+	if err != nil || !hasRecord {
+		t.Fatalf("A record = %v, %v; want true, nil", hasRecord, err)
 	}
-	if !hasRecord {
-		t.Error("expected google.com to have A records")
+	hasRecord, err = v.VerifyDNSRecord(ctx, "missing.example.test", "A")
+	if err != nil || hasRecord {
+		t.Fatalf("NXDOMAIN record = %v, %v; want false, nil", hasRecord, err)
 	}
 }
 

@@ -32,6 +32,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/monitor"
 	"github.com/raythurman2386/goforge/internal/notify"
 	"github.com/raythurman2386/goforge/internal/project"
+	"github.com/raythurman2386/goforge/internal/proxy"
 	"github.com/raythurman2386/goforge/internal/secrets"
 	"github.com/raythurman2386/goforge/internal/services"
 	"github.com/raythurman2386/goforge/internal/sse"
@@ -530,8 +531,9 @@ func runServer() error {
 		WithLoginThrottle(loginThrottle).WithTwoFactor(twoFactor)
 	dashboardHandler := handlers.NewDashboardHandler(monitorCollector, instanceService, projectRepo, gitSourceRepo, logger.WithComponent(log, "dashboard"))
 	projectHandler := handlers.NewProjectHandler(projectService, gitSourceRepo, deploymentRepo, containerRepo, projectServiceInstanceRepo, instanceService, logger.WithComponent(log, "projects")).
-		WithAudit(auditService)
-	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments")).WithAudit(auditService)
+		WithAudit(auditService).WithDomainValidator(proxy.NewDomainValidator())
+	envHandler := handlers.NewEnvironmentHandler(projectService, logger.WithComponent(log, "environments")).
+		WithAudit(auditService).WithDomainValidator(proxy.NewDomainValidator())
 	deploymentHandler := handlers.NewDeploymentHandler(deployService, projectService, rollbackManager, deployWorker, logger.WithComponent(log, "deployments")).
 		WithAudit(auditService)
 	serviceHandler := handlers.NewServiceHandler(catalog, instanceService, logger.WithComponent(log, "services")).WithAudit(auditService)

@@ -104,16 +104,13 @@ By default, Traefik uses Let's Encrypt for automatic certificate provisioning:
 
 ### Custom Domains
 
-Each project can have custom domains configured. GoForge validates DNS records and tracks SSL certificate status. See [Custom Domains Guide](../guides/custom-domains.md).
+Each project can have a default domain and a per-environment override. GoForge validates the format and requires a DNS address before saving either value; it does not track SSL certificate status in the UI. See [Custom Domains Guide](../guides/custom-domains.md).
 
 ## Domain Validation
 
-GoForge validates domain names against these rules:
+Project and environment form fields use a hostname format check followed by a DNS address lookup. Create the DNS record before saving. A missing address and a resolver failure produce different errors, and a blank field clears the saved domain without a lookup.
 
-- Must be a valid domain format (e.g., `app.example.com`)
-- Cannot be an IP address
-- Cannot use `localhost` or `.localhost` domains
-- Must have proper DNS records pointing to your server
+One-click service **Domain** and **Console Domain** fields keep their separate local-development rules. Outside Cloudflare Tunnel mode, a service can use `<name>.localhost`; project and environment DNS validation does not apply to these service fields.
 
 ## Troubleshooting
 
