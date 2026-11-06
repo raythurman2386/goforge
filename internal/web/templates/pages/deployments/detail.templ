@@ -16,7 +16,8 @@ type DetailProps struct {
 	Project     *models.Project
 	Environment *models.Environment
 	Logs        []*models.DeploymentLog
-	CanRollback bool
+	CanRollback    bool
+	RollbackTarget *models.Deployment
 	CSRFToken   string
 }
 
@@ -32,6 +33,21 @@ templ Detail(props DetailProps) {
 			{Label: "Deployments", Href: "/projects/" + props.Project.ID + "/deployments"},
 			{Label: truncateID(props.Deployment.ID)},
 		})
+
+		if props.RollbackTarget != nil {
+			<div class="mb-6">
+				@ui.Alert(ui.AlertProps{Tone: ui.AlertSuccess, Title: "Rollback complete"}) {
+					<p>
+						Restored deployment <code class="font-mono">{ truncateID(props.RollbackTarget.ID) }</code>.
+						<a class="ml-1 font-medium underline" href={ templ.URL(fmt.Sprintf("/projects/%s/deployments/%s", props.Project.ID, props.RollbackTarget.ID)) }>View restored deployment</a>
+					</p>
+				}
+			</div>
+		}
+
+		<div id={ components.DeploymentProgressID } class="mb-6">
+			@components.DeploymentProgress(props.Deployment)
+		</div>
 
 		@components.PageHeaderWithBadge("Deployment "+truncateID(props.Deployment.ID), "", liveStatus(props.Deployment.Status)) {
 			if props.CanRollback && props.Deployment.Status == models.DeploymentStatusRunning {

@@ -190,7 +190,7 @@ func TestDeploymentHandler_CrossUserDeploymentIDOR(t *testing.T) {
 		if rr.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200 body=%q", rr.Code, rr.Body.String())
 		}
-		if !strings.Contains(rr.Body.String(), "Deployment in progress") {
+		if !strings.Contains(rr.Body.String(), `data-deployment-stage="pending"`) {
 			t.Fatalf("body = %q, want the status banner", rr.Body.String())
 		}
 	})

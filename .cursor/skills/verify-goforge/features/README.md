@@ -47,7 +47,7 @@ Last driven live on minis after #28: register-admin and login-projects. The othe
 - [Register the bootstrap account](./register-admin.md) covers the first account, the dashboard session, the `GOFORGE_ADMIN_EMAIL` admin grant, and registration closing after that account exists.
 - [Log in and create a project](./login-projects.md) covers login, the projects list, and creating a project.
 - [Project and environment domain DNS validation](./domain-validation.md) covers DNS-first acceptance, unresolved and resolver-failure errors, no partial write, normalization, and blank clearing on project Settings and environment updates. The accompanying t2159u host-mode drive covered the route outcomes and focused desktop/mobile navigation; its broader accessibility run stalled and remains separately reported.
-- [Deploy with log replay](./deploy-log-replay.md) covers creating a project, starting a deploy, and seeing the same log lines after a reconnect.
+- [Deploy with log replay](./deploy-log-replay.md) covers creating a project, starting a deploy, seeing real stage/elapsed feedback, seeing the same log lines after a reconnect without duplicates, failure feedback, and following a rollback result to the restored target.
 - [Container stop and restart ownership](./container-ownership.md) covers stop and restart for the owning account and `403` for a second account.
 - [Cancel a deployment](./cancel-deployment.md) covers canceling an in-flight deploy and the status staying `canceled`.
 - [One-click service credentials](./service-credentials.md) covers a Postgres service whose stored config and connection info are sealed, while the UI still shows the connection string.

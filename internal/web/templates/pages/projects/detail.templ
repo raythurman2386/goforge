@@ -119,10 +119,7 @@ templ DeploymentStatusBanner(projectID string, deployment *models.Deployment) {
 				</svg>
 			</div>
 			<div class="ml-3">
-				<p class="text-sm font-medium text-info">
-					Deployment in progress: 
-					<span class="font-bold">{ string(deployment.Status) }</span>
-				</p>
+				@components.DeploymentProgress(deployment)
 			</div>
 			<div class="ml-auto">
 				<a href={ templ.URL("/projects/" + projectID + "/deployments/" + deployment.ID) } class="text-sm text-info hover:text-info font-medium">
