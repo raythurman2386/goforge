@@ -127,7 +127,7 @@ func activityResource(l *models.AuditLog, d map[string]interface{}) (string, tem
 			return label, templ.SafeURL("/containers/" + esc)
 		}
 	case models.ResourceTypeAPIToken:
-		return label, templ.SafeURL("/settings/profile")
+		return label, templ.SafeURL("/settings/security")
 	case models.ResourceTypeGitSource:
 		return label, templ.SafeURL("/settings/git")
 	}

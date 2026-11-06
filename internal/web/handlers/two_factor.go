@@ -139,7 +139,7 @@ func (h *SettingsHandler) WithTwoFactor(tf *auth.TwoFactor) *SettingsHandler {
 	return h
 }
 
-// twoFactorCard is the Profile card state; nil hides the card.
+// twoFactorCard is the Security section state; nil hides the card.
 func (h *SettingsHandler) twoFactorCard(r *http.Request, u *models.User) *settings.TwoFactorCard {
 	if h.twoFactor == nil {
 		return nil

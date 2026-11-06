@@ -31,7 +31,7 @@ const (
 // rendered.
 //
 // It comes from the BACKUP_* environment, or from the backup_settings row an
-// admin saves in Settings → Profile. Once that row exists it wins over the
+// admin saves in Settings. Once that row exists it wins over the
 // environment (see internal/backup.Effective).
 type BackupConfig struct {
 	// Endpoint is the S3 API endpoint, for example
@@ -253,7 +253,7 @@ func (e *BackupFieldError) Error() string { return e.Field + ": " + e.Message }
 
 func fieldErr(field, msg string) error { return &BackupFieldError{Field: field, Message: msg} }
 
-// ValidateSettings checks settings saved from Settings → Profile with the
+// ValidateSettings checks settings saved from Settings with the
 // same rules validate applies to BACKUP_*: endpoint URL shape, both keys,
 // prefix, retention 1-366, a positive timeout, and the schedule. While
 // Disabled is set the destination fields may be empty, but anything entered

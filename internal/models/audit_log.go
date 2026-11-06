@@ -62,11 +62,11 @@ const (
 	// names]}, never the DSN.
 	AuditActionErrorReportingSettingsUpdate = "error_reporting.settings.update"
 	// AuditActionUserPasswordChange records a successful password change in
-	// Settings → Profile. Details hold {"sessions_revoked": n, "via": "ui"}:
+	// Settings → Security. Details hold {"sessions_revoked": n, "via": "ui"}:
 	// the number of the account's other sessions that were ended. Never the
 	// password or its hash.
 	AuditActionUserPasswordChange = "user.password.change"
-	// AuditActionUserSessionsRevoke records Settings → Profile "Sign out
+	// AuditActionUserSessionsRevoke records Settings → Security "Sign out
 	// other sessions". Details hold {"sessions_revoked": n, "via": "ui"}.
 	AuditActionUserSessionsRevoke = "user.sessions.revoke"
 	// AuditActionUserProfileUpdate records a save of the Settings → Profile
@@ -81,10 +81,10 @@ const (
 	AuditActionGitSourceCreate = "git_source.create"
 	AuditActionGitSourceDelete = "git_source.delete"
 	// AuditActionUser2FAEnable records a confirmed TOTP enrollment in
-	// Settings → Profile. Details hold {"recovery_codes": n, "via": "ui"},
+	// Settings → Security. Details hold {"recovery_codes": n, "via": "ui"},
 	// never the secret or a code.
 	AuditActionUser2FAEnable = "user.2fa.enable"
-	// AuditActionUser2FADisable records Settings → Profile turning TOTP off
+	// AuditActionUser2FADisable records Settings → Security turning TOTP off
 	// with the password and a code. Details hold {"second_factor":
 	// "totp"|"recovery_code", "via": "ui"}.
 	AuditActionUser2FADisable = "user.2fa.disable"

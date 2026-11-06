@@ -71,7 +71,7 @@ func (t *TwoFactor) WithClock(now func() time.Time) *TwoFactor {
 	return t
 }
 
-// TwoFactorStatus is what Settings → Profile shows.
+// TwoFactorStatus is what Settings shows.
 type TwoFactorStatus struct {
 	Enabled           bool
 	EnabledAt         time.Time

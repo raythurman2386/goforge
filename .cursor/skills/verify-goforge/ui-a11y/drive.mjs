@@ -40,7 +40,7 @@ const SHIFT_ONLY = process.env.GOFORGE_UI_SHIFT_ONLY === "1";
 const SCHEMES = (process.env.GOFORGE_UI_SCHEMES || "light,dark").split(",").map((s) => s.trim()).filter(Boolean);
 
 const PUBLIC_ROUTES = ["/login", "/auth/register", "/dev/ui", "/ui-a11y-missing-page"];
-// /settings/profile also carries the backup restore points (#104/#105) and
+// /settings/git also carries the backup restore points (#104/#105) and
 // the notifier form with its SMTP fields (#106/#109). Service, container,
 // and deployment detail routes are added per run (detailIDs below).
 const AUTH_ROUTES = [
@@ -51,6 +51,7 @@ const AUTH_ROUTES = [
   "/services/postgres/configure",
   "/containers",
   "/settings/profile",
+  "/settings/security",
   "/settings/git",
   "/settings/activity",
   "/ui-a11y-missing-page",
@@ -469,7 +470,16 @@ async function appDialogChecks(scheme, page) {
   const settle = () => page.waitForTimeout(300);
   const active = () => page.evaluate(() => ({ hx: document.activeElement.getAttribute("hx-get") || "", dialog: (document.activeElement.closest("dialog") || {}).id || "" }));
   await t("app-token-dialog", async () => {
-    await page.goto(BASE + "/settings/profile", { waitUntil: "load" });
+    await page.goto(BASE + "/settings/security", { waitUntil: "load" });
+    await page.waitForSelector("#sessions-list [data-testid], #sessions-list .empty-state, #sessions-list tr, #sessions-list li", { timeout: 5000 }).catch(() => {});
+    check(scheme, "app-sessions-loaded", !(await page.locator("#sessions-list").innerText()).includes("Loading sessions"), "session fragment loaded; current browser has no revoke action");
+    const disclosure = page.locator('[data-testid="two-factor-disclosure"]');
+    if (await disclosure.count()) {
+      await disclosure.locator("summary").click();
+      check(scheme, "app-2fa-disclosure", await disclosure.evaluate((el) => el.open) && await page.locator('[data-testid="two-factor-setup"]').isVisible(), "Enable reveals password setup without mutation");
+    } else {
+      lines.push(`check ${scheme} app-2fa-disclosure skip reason=already-enabled-or-unavailable`);
+    }
     const trigger = 'button[hx-get="/settings/tokens/new"]';
     await page.focus(trigger);
     await page.keyboard.press("Enter");
@@ -477,7 +487,17 @@ async function appDialogChecks(scheme, page) {
     await settle();
     const a = await active();
     await page.fill("#token-name", `ui-a11y-pr4-${scheme}`);
+    let posts = 0;
+    const onPost = (r) => { if (r.method() === "POST" && new URL(r.url()).pathname === "/settings/tokens") posts++; };
+    page.on("request", onPost);
+    await page.click('dialog[open] [data-ui-dialog-close]');
+    await page.waitForTimeout(300);
+    check(scheme, "app-token-dialog-cancel", posts === 0, `POSTs after Cancel=${posts}`);
+    await page.click(trigger);
+    await page.waitForSelector("dialog[data-ui-dialog][open] #token-name");
+    await page.fill("#token-name", `ui-a11y-pr4-${scheme}`);
     await page.click('dialog[open] button[type="submit"]');
+    page.off("request", onPost);
     await page.waitForSelector("dialog[data-ui-dialog-nondismissible][open]");
     await settle();
     const count = await page.$$eval("dialog[open]", (d) => d.length);
@@ -496,7 +516,7 @@ async function appDialogChecks(scheme, page) {
     );
   });
   await t("app-revoke-confirm-cancel", async () => {
-    await page.goto(BASE + "/settings/profile", { waitUntil: "load" });
+    await page.goto(BASE + "/settings/security", { waitUntil: "load" });
     const revoke = "button[hx-delete^='/settings/tokens/']";
     await page.waitForSelector(revoke);
     deletes = 0;
@@ -506,6 +526,15 @@ async function appDialogChecks(scheme, page) {
     await page.click("#ui-confirm [data-ui-confirm-cancel]");
     await settle();
     check(scheme, "app-revoke-confirm-cancel", deletes === 0 && label === "Revoke/btn-danger", `accept=${label} DELETE requests after Cancel=${deletes}`);
+  });
+  await t("app-admin-settings-fragments", async () => {
+    await page.goto(BASE + "/settings/git", { waitUntil: "load" });
+    await page.waitForFunction(() => !document.querySelector("#backup-restore-points")?.innerText.includes("Loading restore points"));
+    check(scheme, "app-backup-restore-points", (await page.locator("#backup-restore-points").innerText()).includes("Restore points"), "Settings loaded the read-only fragment");
+    for (const [id, attr, path] of [["#backup-status", "hx-put", "/settings/backups"], ["#notify-settings", "hx-put", "/settings/notifications"], ["#error-reporting-settings", "hx-put", "/settings/error-reporting"], ["#audit-retention-settings", "hx-put", "/settings/audit-retention"]]) {
+      const form = page.locator(`${id} form[${attr}="${path}"]`);
+      check(scheme, `app-admin-target-${id.slice(1)}`, await form.count() === 1 && await form.getAttribute("hx-target") === `#${id.slice(1)}` && await form.getAttribute("hx-swap") === "outerHTML", `${path} retains section outerHTML target`);
+    }
   });
   page.off("request", onReq);
   page.off("dialog", onPrompt);
@@ -1785,7 +1814,7 @@ async function touchTargetChecks(scheme, page) {
       }
       return out;
     });
-  for (const route of ["/settings/profile", "/projects/new", "/dashboard"]) {
+  for (const route of ["/settings/profile", "/settings/security", "/settings/git", "/projects/new", "/dashboard"]) {
     await t(`touch-targets ${route}`, async () => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.goto(BASE + route, { waitUntil: "load" });
@@ -1917,6 +1946,60 @@ async function agentActionsCardCheck(scheme, page) {
   }
 }
 
+async function settingsNavigationChecks(scheme, page) {
+  const pages = [
+    { name: "Profile", path: "/settings/profile", sections: ["Account Information"] },
+    { name: "Security", path: "/settings/security", sections: ["Change Password", "Two-factor authentication", "Sessions", "API Tokens"] },
+    { name: "Activity", path: "/settings/activity", sections: ["Source", "Token name"] },
+    { name: "Settings", path: "/settings/git", sections: ["Git Sources", "Backups", "Notifications", "Error reporting", "Audit log"] },
+  ];
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    const tag = `${viewport.width}-${scheme}`;
+    const t = (name, fn) => fn().catch((e) => check(scheme, `settings-navigation-${tag}-${name}`, false, "threw " + String(e.message || e).split("\n")[0]));
+    await t("matrix", async () => {
+      await page.setViewportSize(viewport);
+      await page.goto(BASE + "/dashboard", { waitUntil: "load" });
+      const globalLink = async (name) => {
+        if (viewport.width < 768) {
+          await page.click("#mobile-menu-btn");
+          await page.waitForSelector("#mobile-nav[open]");
+        }
+        return name === "Dashboard" ? `#${viewport.width < 768 ? "mobile-nav" : "sidebar"} a[data-nav="/dashboard"]` : `#${viewport.width < 768 ? "mobile-nav" : "sidebar"} a[data-nav="${pages.find((p) => p.name === name).path}"]`;
+      };
+      const assertPage = async (item) => {
+        await page.waitForURL("**" + item.path);
+        await page.waitForTimeout(700);
+        const state = await page.evaluate((item) => {
+          const nav = document.querySelector('nav[aria-label="Settings pages"]');
+          const current = nav ? [...nav.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute("href")) : [];
+          // The mobile Sheet is closed after navigation. Its current link is then
+          // intentionally not visible; globalLink opened and clicked it above.
+          const globalSelector = viewport.width < 768 ? "#mobile-nav" : "#sidebar";
+          const global = [...document.querySelectorAll(`${globalSelector} [data-nav][aria-current="page"]`)].map((a) => a.dataset.nav);
+          const text = nav.parentElement.innerText;
+          return { current, global, sections: item.sections.every((s) => text.includes(s)), overflow: document.documentElement.scrollWidth > innerWidth, sheetOpen: !!document.querySelector("#mobile-nav[open]") };
+        }, item);
+        const ok = state.current.length === 1 && state.current[0] === item.path && state.global.length === 1 && state.global[0] === item.path && state.sections && !state.overflow && !state.sheetOpen;
+        check(scheme, `settings-navigation-${tag}-${item.name.toLowerCase()}`, ok, JSON.stringify(state));
+        const shot = path.join(EVIDENCE, "settings-split", tag, item.name.toLowerCase() + ".png");
+        await page.screenshot({ path: shot, fullPage: true });
+        fs.chmodSync(shot, 0o644);
+      };
+      await page.click(await globalLink("Profile"));
+      for (let i = 0; i < pages.length; i++) {
+        const item = pages[i];
+        if (i > 0) await page.click(`nav[aria-label="Settings pages"] a[href="${item.path}"]`);
+        await assertPage(item);
+        const away = viewport.width < 768 ? "Dashboard" : "Dashboard";
+        await page.click(await globalLink(away));
+        await page.waitForURL("**/dashboard");
+        await page.goBack({ waitUntil: "load" });
+        await assertPage(item);
+      }
+    });
+  }
+}
+
 async function login(page) {
   await page.goto(BASE + "/login", { waitUntil: "load" });
   const csrf = await page.$eval('form[action="/auth/login"] input[name="csrf_token"]', (el) => el.value).catch(() => "");
@@ -1984,7 +2067,8 @@ async function main() {
           // Layout shift is the same in both schemes; measure it once.
           if (scheme === SCHEMES[0]) await layoutShiftChecks(scheme, page, ids, projectTabs[0]);
           await touchTargetChecks(scheme, page);
-          await buttonCenteringChecks(scheme, page, ["/dev/ui", "/settings/profile", "/settings/git", "/projects/new", ...projectTabs, ...detailRouteList(ids)]);
+          await settingsNavigationChecks(scheme, page);
+          await buttonCenteringChecks(scheme, page, ["/dev/ui", "/settings/profile", "/settings/security", "/settings/git", "/projects/new", ...projectTabs, ...detailRouteList(ids)]);
           await agentActionsCardCheck(scheme, page);
           const routes = AUTH_ROUTES.concat(projectTabs, detailRouteList(ids));
           for (const route of routes) results.push(await scan(page, scheme, route));

@@ -32,7 +32,7 @@ for someone who lost both their authenticator and their recovery codes.
 It deletes the account's TOTP secret, its recovery codes, and any pending
 sign-in step, and writes a user.2fa.reset audit row (via cli). The password,
 sessions, and API tokens are not changed. The user can turn 2FA on again in
-Settings → Profile.
+Settings → Security.
 
 Run it where GoForge's database settings are, for example:
 
@@ -98,6 +98,6 @@ func reset2FA(ctx context.Context, out io.Writer, email string, users userByEmai
 	// RecordAs writes before returning, so the row lands before the process exits.
 	audit.RecordAs(ctx, "", user.ID, models.AuditActionUser2FAReset, models.ResourceTypeUser, user.ID,
 		map[string]interface{}{"via": models.AuditViaCLI}, "", "goforge-cli")
-	_, _ = fmt.Fprintf(out, "Two-factor authentication is off for %s. They can sign in with their password and turn it on again in Settings → Profile.\n", user.Email)
+	_, _ = fmt.Fprintf(out, "Two-factor authentication is off for %s. They can sign in with their password and turn it on again in Settings → Security.\n", user.Email)
 	return nil
 }

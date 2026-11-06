@@ -47,7 +47,7 @@ func TestRunner_FailedRunNotifiesOnce(t *testing.T) {
 	if p.Event != notify.EventBackupFailed || p.Resource.Type != models.ResourceTypeBackupRun || p.Resource.ID != run.ID || p.Resource.Name != run.RunKey {
 		t.Errorf("payload %+v", p)
 	}
-	if !strings.Contains(p.Error, "1 step(s) failed") || p.Link != "https://forge.example.test/settings/profile#backup-status" {
+	if !strings.Contains(p.Error, "1 step(s) failed") || p.Link != "https://forge.example.test/settings/git#backup-status" {
 		t.Errorf("error %q link %q", p.Error, p.Link)
 	}
 	if strings.Contains(reqs[0].Body, "TOPSECRET") {

@@ -48,7 +48,7 @@ func Router(
 
 	// Middleware stack
 	r.Use(chi_middleware.Recoverer)
-	// Optional Sentry (Settings → Profile → Error reporting). It must sit
+	// Optional Sentry (Settings → Error reporting). It must sit
 	// inside Recoverer: it reports a handler panic and re-panics, and
 	// Recoverer still writes the 500. Each request gets a clone of the
 	// process hub, so a saved DSN applies to new requests without a
@@ -237,6 +237,7 @@ func Router(
 					// Settings
 					r.Route("/settings", func(r chi.Router) {
 						r.Get("/profile", settingsHandler.Profile)
+						r.Get("/security", settingsHandler.Security)
 						r.Get("/activity", activityHandler.Page)
 						r.Put("/profile", settingsHandler.UpdateProfile)
 						r.Put("/password", settingsHandler.UpdatePassword)

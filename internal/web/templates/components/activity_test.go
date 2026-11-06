@@ -23,7 +23,7 @@ func TestActivityResourceLinks(t *testing.T) {
 		{models.ResourceTypeDeployment, "d1", nil, ""},
 		{models.ResourceTypeEnvironment, "e1", map[string]any{"project_id": "p1"}, "/projects/p1"},
 		{models.ResourceTypeContainer, "", map[string]any{"resource_ref": "abc123"}, "/containers/abc123"},
-		{models.ResourceTypeAPIToken, "t1", nil, "/settings/profile"},
+		{models.ResourceTypeAPIToken, "t1", nil, "/settings/security"},
 		{models.ResourceTypeGitSource, "g1", nil, "/settings/git"},
 		{models.ResourceTypeUser, "u1", nil, ""},
 	}

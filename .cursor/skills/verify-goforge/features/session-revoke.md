@@ -1,6 +1,6 @@
 # Session revoke on password change
 
-A signed-in local account changes its password in Settings → Profile → **Change Password** (`PUT /settings/password`). On success GoForge deletes every other session of that account and keeps the browser that made the change, so another browser (or a stolen `goforge_session` cookie) is sent to `/login` on its next request. The toast says how many were ended (`Password updated. Signed out 2 other sessions.`). Settings → Profile → **Sessions** → **Sign out other sessions** (`POST /settings/sessions/revoke-others`) does the same without a password change, for local and GitHub accounts. Both write one audit row, `user.password.change` or `user.sessions.revoke`, with `resource_type` `user`, `details.sessions_revoked` (count), and `details.via` = `ui`. API tokens are not sessions and keep working (v0.5.0 S2, t1861u).
+A signed-in local account changes its password in Settings → **Change Password** (`PUT /settings/password`). On success GoForge deletes every other session of that account and keeps the browser that made the change, so another browser (or a stolen `goforge_session` cookie) is sent to `/login` on its next request. The toast says how many were ended (`Password updated. Signed out 2 other sessions.`). Settings → **Sessions** → **Sign out other sessions** (`POST /settings/sessions/revoke-others`) does the same without a password change, for local and GitHub accounts. Both write one audit row, `user.password.change` or `user.sessions.revoke`, with `resource_type` `user`, `details.sessions_revoked` (count), and `details.via` = `ui`. API tokens are not sessions and keep working (v0.5.0 S2, t1861u).
 
 ## Sub-features
 
@@ -16,7 +16,7 @@ A signed-in local account changes its password in Settings → Profile → **Cha
 
 ## How to get to it (user POV)
 
-- Sign in with a local account in two browsers. In one, open **Settings → Profile**, fill **Change Password**, and press **Update Password**. Reload the other browser: it lands on the sign-in page.
+- Sign in with a local account in two browsers. In one, open **Settings → Security**, fill **Change Password**, and press **Update Password**. Reload the other browser: it lands on the sign-in page.
 - Or press **Sign out other sessions** in the **Sessions** card (it asks for confirmation first).
 - **Settings → Activity** lists the `user.password.change` or `user.sessions.revoke` row.
 
@@ -37,7 +37,7 @@ Unit coverage: `internal/database/repositories/session_test.go` `TestSessionRepo
 ## Gotchas
 
 - The current session is the one on the request context (`auth.SessionContextKey`). A request authenticated by a full-scope API token on the UI routes has no session, so a password change made that way ends every session of the account.
-- API tokens and `/mcp` bearer auth are not revoked by either action. Revoke tokens in Settings → Profile → API tokens.
+- API tokens and `/mcp` bearer auth are not revoked by either action. Revoke tokens in Settings → Security → API tokens.
 - If the password is saved but the session delete fails, the handler answers `500` with `Password updated, but other sessions could not be signed out` and writes `user.password.change` with `revoke_error: true` and `sessions_revoked: 0`. Use **Sign out other sessions** to retry.
 - A `goforge backup restore` clears every session separately (see [backup-restore.md](./backup-restore.md)).
 - Never drive the live `goforge-goforge-1` on `:8080` for this; use a stack this run started.

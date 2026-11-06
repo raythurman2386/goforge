@@ -44,9 +44,9 @@ func TestNewMCPCard_Snippet(t *testing.T) {
 	}
 }
 
-func TestProfile_MCPCard(t *testing.T) {
+func TestSecurity_MCPCard(t *testing.T) {
 	user := &models.User{Email: "u@x", Role: models.RoleUser}
-	got := html.UnescapeString(renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, NewMCPCard("https://gf.example.test"), nil, nil)))
+	got := html.UnescapeString(renderMCP(t, Security(user, "tok", NewMCPCard("https://gf.example.test"), nil)))
 	for _, want := range []string{
 		`id="mcp-card"`, "https://gf.example.test/mcp", `"Authorization": "Bearer ${env:GOFORGE_MCP_TOKEN}"`,
 		`hx-get="/settings/tokens/new?preset=mcp"`, "Generate MCP token", "23 read-only tools", "all 37", "Full tokens are refused",
@@ -55,7 +55,7 @@ func TestProfile_MCPCard(t *testing.T) {
 			t.Errorf("profile missing %q", want)
 		}
 	}
-	if off := renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, nil, nil, nil)); strings.Contains(off, "mcp-card") {
+	if off := renderMCP(t, Security(user, "tok", nil, nil)); strings.Contains(off, "mcp-card") {
 		t.Error("MCP card shown with /mcp off")
 	}
 }
@@ -135,15 +135,15 @@ func TestTokenDialogs_KitContract(t *testing.T) {
 func TestCopyButtonsUseKit(t *testing.T) {
 	user := &models.User{Email: "u@x", Role: models.RoleUser}
 	for name, got := range map[string]string{
-		"profile": renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, NewMCPCard("https://gf.example.test"), nil, nil)),
-		"created": renderMCP(t, TokenCreatedModal("API Token Created", "gf_secret", false)),
+		"security": renderMCP(t, Security(user, "tok", NewMCPCard("https://gf.example.test"), nil)),
+		"created":  renderMCP(t, TokenCreatedModal("API Token Created", "gf_secret", false)),
 	} {
 		if strings.Contains(got, "onclick") || strings.Contains(got, "copyText") {
 			t.Errorf("%s: inline copy handler left", name)
 		}
 	}
-	prof := renderMCP(t, Profile(user, "tok", nil, nil, nil, nil, NewMCPCard("https://gf.example.test"), nil, nil))
-	if !strings.Contains(prof, `data-ui-copy="mcp-snippet"`) || !strings.Contains(prof, `id="mcp-snippet"`) {
+	sec := renderMCP(t, Security(user, "tok", NewMCPCard("https://gf.example.test"), nil))
+	if !strings.Contains(sec, `data-ui-copy="mcp-snippet"`) || !strings.Contains(sec, `id="mcp-snippet"`) {
 		t.Error("mcp.json copy button not wired to #mcp-snippet")
 	}
 	created := renderMCP(t, TokenCreatedModal("API Token Created", "gf_secret", false))

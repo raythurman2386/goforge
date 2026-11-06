@@ -125,7 +125,7 @@ func NewSettingsHandler(gsr *repositories.GitSourceRepository, is *services.Inst
 	return h
 }
 
-// APITokenStore is the API token storage the Profile token routes use
+// APITokenStore is the API token storage the Security token routes use
 // (repositories.APITokenRepository).
 type APITokenStore interface {
 	Create(ctx context.Context, token *models.APIToken) error
@@ -148,7 +148,7 @@ type SessionRevoker interface {
 	DeleteByIDAndUserID(ctx context.Context, id, userID string) (int64, error)
 }
 
-// SessionLister reads the current account's sessions for the Profile row list.
+// SessionLister reads the current account's sessions for the Security row list.
 type SessionLister interface {
 	GetByUserID(ctx context.Context, userID string) ([]*models.Session, error)
 }
@@ -161,7 +161,7 @@ func (h *SettingsHandler) WithSessions(s SessionRevoker) *SettingsHandler {
 	return h
 }
 
-// WithSessionLister enables the read-only session rows on Profile.
+// WithSessionLister enables the read-only session rows on Security.
 func (h *SettingsHandler) WithSessionLister(s SessionLister) *SettingsHandler {
 	h.sessionLister = s
 	return h
@@ -221,7 +221,7 @@ func (h *SettingsHandler) WithAudit(a AuditRecorder) *SettingsHandler {
 	return h
 }
 
-// WithMCP shows the MCP card on the Profile page when /mcp is served.
+// WithMCP shows the MCP card on the Security page when /mcp is served.
 // baseURL is GOFORGE_BASE_URL; the endpoint is baseURL + "/mcp".
 func (h *SettingsHandler) WithMCP(baseURL string, enabled bool) *SettingsHandler {
 	h.mcp = nil
@@ -231,23 +231,43 @@ func (h *SettingsHandler) WithMCP(baseURL string, enabled bool) *SettingsHandler
 	return h
 }
 
-// GitSources renders the git sources settings page.
-func (h *SettingsHandler) GitSources(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(auth.UserContextKey)
-	user, ok := val.(*models.User)
+// currentUser reloads the signed-in account before rendering a settings page.
+func (h *SettingsHandler) currentUser(w http.ResponseWriter, r *http.Request) *models.User {
+	user, ok := r.Context().Value(auth.UserContextKey).(*models.User)
 	if !ok {
 		RenderError(w, r, http.StatusUnauthorized, "User not found")
+		return nil
+	}
+	current, err := h.userRepo.GetByID(r.Context(), user.ID)
+	if err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to load profile")
+		return nil
+	}
+	return current
+}
+
+// GitSources renders the instance-wide Settings page at its existing URL.
+func (h *SettingsHandler) GitSources(w http.ResponseWriter, r *http.Request) {
+	currentUser := h.currentUser(w, r)
+	if currentUser == nil {
 		return
 	}
 
-	sources, err := h.gitSourceRepo.ListByUserID(r.Context(), user.ID)
+	sources, err := h.gitSourceRepo.ListByUserID(r.Context(), currentUser.ID)
 	if err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to list git sources")
 		return
 	}
 
 	csrfToken := auth.GetCSRFToken(r)
-	component := settings.GitSources(sources, csrfToken)
+	st := h.backupStatus(r, currentUser)
+	var form *backup.SettingsView
+	if st != nil {
+		form = h.backupForm(r)
+	}
+	// The page carries admin settings for admins; never cache it.
+	w.Header().Set("Cache-Control", "no-store")
+	component := settings.GitSources(sources, csrfToken, st, form, h.notifyForm(r, currentUser), h.errReportForm(r, currentUser), h.auditRetentionForm(r, currentUser))
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render settings page")
 	}
@@ -380,7 +400,7 @@ type BackupStatusReader interface {
 	Status(ctx context.Context) (*backup.Status, error)
 }
 
-// WithBackups enables the admin-only Backups card on the profile page.
+// WithBackups enables the admin-only Backups card on the Settings page.
 func (h *SettingsHandler) WithBackups(b BackupStatusReader) *SettingsHandler {
 	h.backups = b
 	return h
@@ -399,33 +419,30 @@ func (h *SettingsHandler) backupStatus(r *http.Request, user *models.User) *back
 	return st
 }
 
-// Profile renders the profile settings page.
+// Profile renders the personal account-information page.
 func (h *SettingsHandler) Profile(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(auth.UserContextKey)
-	user, ok := val.(*models.User)
-	if !ok {
-		RenderError(w, r, http.StatusUnauthorized, "User not found")
+	currentUser := h.currentUser(w, r)
+	if currentUser == nil {
 		return
 	}
-
-	// Fetch fresh user data
-	currentUser, err := h.userRepo.GetByID(r.Context(), user.ID)
-	if err != nil {
-		RenderError(w, r, http.StatusInternalServerError, "Failed to load profile")
-		return
-	}
-
-	csrfToken := auth.GetCSRFToken(r)
-	st := h.backupStatus(r, currentUser)
-	var form *backup.SettingsView
-	if st != nil {
-		form = h.backupForm(r)
-	}
-	// The page carries backup settings for admins; never cache it.
 	w.Header().Set("Cache-Control", "no-store")
-	component := settings.Profile(currentUser, csrfToken, st, form, h.notifyForm(r, currentUser), h.errReportForm(r, currentUser), h.mcp, h.twoFactorCard(r, currentUser), h.auditRetentionForm(r, currentUser))
+	component := settings.Profile(currentUser, auth.GetCSRFToken(r))
 	if err := component.Render(r.Context(), w); err != nil {
 		RenderError(w, r, http.StatusInternalServerError, "Failed to render profile page")
+	}
+}
+
+// Security renders personal sign-in and programmatic credentials. Admin
+// stores are deliberately not read here; they belong to the Settings page.
+func (h *SettingsHandler) Security(w http.ResponseWriter, r *http.Request) {
+	currentUser := h.currentUser(w, r)
+	if currentUser == nil {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	component := settings.Security(currentUser, auth.GetCSRFToken(r), h.mcp, h.twoFactorCard(r, currentUser))
+	if err := component.Render(r.Context(), w); err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "Failed to render security page")
 	}
 }
 
@@ -600,7 +617,7 @@ func signedOutMessage(revoked int64) string {
 	}
 }
 
-// RevokeOtherSessions handles Settings → Profile "Sign out other sessions":
+// RevokeOtherSessions handles Settings → Security "Sign out other sessions":
 // every session of the account except this one is deleted.
 func (h *SettingsHandler) RevokeOtherSessions(w http.ResponseWriter, r *http.Request) {
 	user := auth.GetUserFromContext(r.Context())

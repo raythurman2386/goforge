@@ -23,7 +23,7 @@ An admin creates an API token with `read`, `write`, or `protected` scopes on the
 
 ## How to get to it (user POV)
 
-- Open `Settings` at `/settings/profile`, section `API Tokens`.
+- Open `Settings → Security` at `/settings/security`, section `API Tokens`.
 - Choose `Generate Token`. The modal `Generate API Token` has a name, an expiry, and the `read`, `write`, `protected` boxes. No box means a legacy `full` token.
 - Choose `Generate Token`. The modal `API Token Created` shows the token once.
 - Call `http://127.0.0.1:8080/api/v1/...` with `Authorization: Bearer <token>`.

@@ -206,7 +206,7 @@ func (r *Runner) notifyFailed(ctx context.Context, run *models.BackupRun) {
 		Kind:     notify.EventBackupFailed,
 		Resource: notify.Resource{Type: models.ResourceTypeBackupRun, ID: run.ID, Name: run.RunKey},
 		Error:    run.ErrorSummary.String,
-		Path:     "/settings/profile#backup-status",
+		Path:     "/settings/git#backup-status",
 		Time:     r.now(),
 	})
 }

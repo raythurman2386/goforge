@@ -14,7 +14,7 @@ import (
 
 // ErrDisabled is returned when backups are off: no bucket in the effective
 // settings, or an admin turned them off in Settings.
-var ErrDisabled = errors.New("backups are disabled: turn them on in Settings → Profile or set BACKUP_S3_BUCKET (see docs/deployment/backup.md)")
+var ErrDisabled = errors.New("backups are disabled: turn them on in Settings or set BACKUP_S3_BUCKET (see docs/deployment/backup.md)")
 
 // Setup is everything serve and the CLI need to run backups.
 type Setup struct {

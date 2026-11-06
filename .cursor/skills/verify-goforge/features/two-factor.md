@@ -1,6 +1,6 @@
 # Two-factor authentication (TOTP)
 
-A local password account turns on TOTP in Settings → Profile → **Two-factor authentication**: `POST /settings/2fa/setup` checks the current password and returns a dialog with a QR code (`data-testid="two-factor-qr"`, a `data:image/png` URI of `otpauth://totp/GoForge:<email>?secret=…&issuer=GoForge`) and the setup key (`#two-factor-secret`). `POST /settings/2fa/enable` with the first `code` turns it on and returns the recovery codes dialog (`#recovery-codes`, 10 codes `xxxxx-xxxxx`, shown once). From then on `POST /auth/login` with the right password answers `303 /auth/2fa` and sets the `goforge_2fa` cookie (HttpOnly, 5 minutes) instead of `goforge_session`; `POST /auth/2fa` with `code` (TOTP or recovery code) creates the session. `POST /settings/2fa/disable` needs `password` and `code`. `goforge user reset-2fa <email>` clears it from the host. GitHub sign-in never asks for the code, and API tokens and `/mcp` are unaffected (v0.5.0 S4, t1873u).
+A local password account turns on TOTP in Settings → Security → **Two-factor authentication**: `POST /settings/2fa/setup` checks the current password and returns a dialog with a QR code (`data-testid="two-factor-qr"`, a `data:image/png` URI of `otpauth://totp/GoForge:<email>?secret=…&issuer=GoForge`) and the setup key (`#two-factor-secret`). `POST /settings/2fa/enable` with the first `code` turns it on and returns the recovery codes dialog (`#recovery-codes`, 10 codes `xxxxx-xxxxx`, shown once). From then on `POST /auth/login` with the right password answers `303 /auth/2fa` and sets the `goforge_2fa` cookie (HttpOnly, 5 minutes) instead of `goforge_session`; `POST /auth/2fa` with `code` (TOTP or recovery code) creates the session. `POST /settings/2fa/disable` needs `password` and `code`. `goforge user reset-2fa <email>` clears it from the host. GitHub sign-in never asks for the code, and API tokens and `/mcp` are unaffected (v0.5.0 S4, t1873u).
 
 ## Sub-features
 
@@ -19,7 +19,7 @@ A local password account turns on TOTP in Settings → Profile → **Two-factor 
 
 ## How to get to it (user POV)
 
-- **Settings → Profile → Two-factor authentication** → enter the password → **Set up 2FA** → scan the QR code → enter the code → **Turn on 2FA** → save the recovery codes → **Done**.
+- **Settings → Security → Two-factor authentication** → enter the password → **Set up 2FA** → scan the QR code → enter the code → **Turn on 2FA** → save the recovery codes → **Done**.
 - Sign out, sign in with the password, then type the code from the app (or a recovery code) on the **Two-factor authentication** page.
 - **Settings → Activity** lists `user.2fa.enable`, `login.2fa_failed`, `login`, `user.2fa.disable`, and `user.2fa.reset`.
 

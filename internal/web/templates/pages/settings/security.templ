@@ -1,0 +1,57 @@
+package settings
+
+import (
+	"github.com/raythurman2386/goforge/internal/models"
+	"github.com/raythurman2386/goforge/internal/web/templates/components"
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+)
+
+// Security renders personal sign-in and programmatic credentials.
+templ Security(user *models.User, csrfToken string, mcp *MCPCard, twoFactor *TwoFactorCard) {
+	@SettingsLayout(SettingsPageSecurity, "Security", "Manage your sign-in, sessions, and access tokens.", csrfToken) {
+		if !user.IsGitHubUser() {
+			@SettingsSection("Change Password", nil) {
+				<form hx-put="/settings/password" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
+					<input type="hidden" name="csrf_token" value={ csrfToken } />
+					@SettingsRow("Current Password", "Confirm your current password.", "password-current") {
+						@ui.Input(ui.InputProps{ID: "password-current", Name: "current_password", Type: "password", Autocomplete: "current-password", Required: true})
+					}
+					@SettingsRow("New Password", "At least 8 characters.", "password-new") {
+						@ui.Input(ui.InputProps{ID: "password-new", Name: "new_password", Type: "password", Autocomplete: "new-password", Required: true, Attrs: templ.Attributes{"minlength": "8"}})
+					}
+					@SettingsRow("Confirm New Password", "Repeat your new password.", "password-confirm") {
+						@ui.Input(ui.InputProps{ID: "password-confirm", Name: "confirm_password", Type: "password", Autocomplete: "new-password", Required: true, Attrs: templ.Attributes{"minlength": "8"}})
+					}
+					@SettingsActions() {
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Type: "submit"}) { Update Password @components.Spinner() }
+					}
+				</form>
+			}
+		}
+		if twoFactor != nil {
+			@TwoFactorCardView(twoFactor, csrfToken)
+		}
+		@SettingsSection("Sessions", nil) {
+			<p class="mb-4 text-sm text-foreground-secondary">Sign out another browser individually or sign out every other session at once. This browser stays signed in. API tokens are not affected.</p>
+			<div id="sessions-list" hx-get="/settings/sessions" hx-trigger="load, sessionRevoked from:body" hx-swap="innerHTML" class="border-t border-divider">@components.LoadingState("Loading sessions...")</div>
+			<form hx-post="/settings/sessions/revoke-others" hx-swap="none" hx-confirm="Sign out every other session of this account?" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="revoke-other-sessions">
+				<input type="hidden" name="csrf_token" value={ csrfToken } />
+				@SettingsActions() { @ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Type: "submit"}) { Sign out other sessions @components.Spinner() } }
+			</form>
+		}
+		if mcp != nil {
+			@MCPCardView(mcp)
+		}
+		@SettingsSection("API Tokens", nil) {
+			<div class="mb-4 flex items-center justify-between gap-4">
+				<p class="text-sm text-foreground-secondary">API tokens allow programmatic access to your account. Keep them secure!</p>
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Attrs: ui.OpenDialogAttrs("/settings/tokens/new")}) {
+					<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+					Generate Token
+				}
+			</div>
+			<div class="mb-4">@ui.AlertMessage(ui.AlertInfo, "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1 and on the MCP endpoint at /mcp. Full tokens also work on the web routes and are refused on /mcp.")</div>
+			<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-divider border-t border-divider animate-fade-in">@components.LoadingState("Loading tokens...")</div>
+		}
+	}
+}

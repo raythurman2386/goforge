@@ -1,12 +1,12 @@
 # Nightly S3 backups
 
-With backups configured, `goforge serve` uploads a backup every night at the schedule (default `02:00 America/Chicago`) and `goforge backup run` uploads one on demand. A run writes the GoForge database, each running Postgres service (one dump per database plus `roles.sql`), and Gitea and Vaultwarden data under `<prefix><date>/<run id>/`, then `manifest.json`. Each run is a `backup_runs` row. Admins see the last run on Settings → Profile, through `GET /api/v1/backups`, and through the MCP tool `get_backup_status`. Retention keeps the newest `BACKUP_RETENTION_DAILY` complete days and prunes only after a successful run.
+With backups configured, `goforge serve` uploads a backup every night at the schedule (default `02:00 America/Chicago`) and `goforge backup run` uploads one on demand. A run writes the GoForge database, each running Postgres service (one dump per database plus `roles.sql`), and Gitea and Vaultwarden data under `<prefix><date>/<run id>/`, then `manifest.json`. Each run is a `backup_runs` row. Admins see the last run on Settings, through `GET /api/v1/backups`, and through the MCP tool `get_backup_status`. Retention keeps the newest `BACKUP_RETENTION_DAILY` complete days and prunes only after a successful run.
 
-Configuration lives in the `backup_settings` row (migration 020) that an admin edits on Settings → Profile → Backups. Once the row exists it wins over `BACKUP_*`; with no row and `BACKUP_S3_BUCKET` set, serve copies `BACKUP_*` into it on start. A save applies live through `backup.Manager` (no restart); a run in progress keeps its config and the advisory lock.
+Configuration lives in the `backup_settings` row (migration 020) that an admin edits on Settings → Backups. Once the row exists it wins over `BACKUP_*`; with no row and `BACKUP_S3_BUCKET` set, serve copies `BACKUP_*` into it on start. A save applies live through `backup.Manager` (no restart); a run in progress keeps its config and the advisory lock.
 
 ## Sub-features
 
-- `backup-disabled` shows "Backups are off" on Settings → Profile and `"enabled": false` from `GET /api/v1/backups` while the bucket is unset. Startup is not blocked.
+- `backup-disabled` shows "Backups are off" on Settings and `"enabled": false` from `GET /api/v1/backups` while the bucket is unset. Startup is not blocked.
 - `backup-run` uploads every artifact and `manifest.json`. Each manifest entry's `sha256` and `bytes` match the object. The manifest includes `audit_chain_head` (`seq`, `hash`) when the chain head can be read. The `backup_runs` row is `succeeded`.
 - `backup-skip` records a stopped instance ("container is not running") and a template with no v1 target, such as redis, in `manifest.json` `skipped`, and the run still succeeds.
 - `backup-failure` leaves a `failed` row with a one-line, redacted `error_summary`, writes no manifest, and prunes nothing.
@@ -25,10 +25,10 @@ Configuration lives in the `backup_settings` row (migration 020) that an admin e
 
 ## How to get to it (user POV)
 
-- As the admin, open Settings → Profile → Backups, fill in the destination and keys (path-style on for MinIO), turn Enabled on, press Test connection, then Save. No restart.
+- As the admin, open Settings → Backups, fill in the destination and keys (path-style on for MinIO), turn Enabled on, press Test connection, then Save. No restart.
 - Or, in host mode (or a compose override), set `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` in the process environment before the first start; serve copies them into the settings row. After that, env changes are ignored with a warning. The repo `docker-compose.yml` passes no `BACKUP_*`, so `BACKUP_*` in the compose `.env` never reaches the container.
 - Run `goforge backup run` in the app container, or wait for the schedule.
-- Open Settings → Profile as the admin, or call `GET /api/v1/backups` with a read token.
+- Open Settings as the admin, or call `GET /api/v1/backups` with a read token.
 
 ## Driving it with verify.sh
 

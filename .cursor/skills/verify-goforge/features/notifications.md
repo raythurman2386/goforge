@@ -1,6 +1,6 @@
 # Notifications and container health watch
 
-An admin sets one outbound notifier on Settings → Profile → Notifications: an ntfy topic (plain text), a webhook (JSON POST), or email over SMTP (migration 028), with an optional bearer token (or SMTP username and password) and a Send test button. With it enabled, GoForge POSTs once when a queued deploy fails, a service run ends failed (with `last_error`), a backup run fails, or a tracked container that should be running goes unhealthy or exits. The payload holds the event, the resource, a redacted error, a link, and the `audit_id`, never a secret. The URL and token are sealed in `notify_settings` (migration 025).
+An admin sets one outbound notifier on Settings → Notifications: an ntfy topic (plain text), a webhook (JSON POST), or email over SMTP (migration 028), with an optional bearer token (or SMTP username and password) and a Send test button. With it enabled, GoForge POSTs once when a queued deploy fails, a service run ends failed (with `last_error`), a backup run fails, or a tracked container that should be running goes unhealthy or exits. The payload holds the event, the resource, a redacted error, a link, and the `audit_id`, never a secret. The URL and token are sealed in `notify_settings` (migration 025).
 
 ## Sub-features
 
@@ -25,7 +25,7 @@ An admin sets one outbound notifier on Settings → Profile → Notifications: a
 
 ## How to get to it (user POV)
 
-- As the admin, open Settings → Profile. The Notifications card is below Backups.
+- As the admin, open Settings. The Notifications card is below Backups.
 - Pick ntfy or Webhook, enter the URL (and a token if the receiver needs one), press Send test, turn Enabled on, press Save notification settings.
 - For email, pick Email (SMTP) and fill the Email (SMTP) fieldset (host, port, TLS, username, password, From, To) instead of the URL.
 - Trigger a failure: a deploy of a project whose Dockerfile does not build, or stop a deployed container's process from inside so it exits (wait a minute for the health watch).

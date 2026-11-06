@@ -43,7 +43,7 @@ func failureEvents() []notify.Event {
 	return []notify.Event{
 		{Kind: notify.EventDeployFailed, Resource: notify.Resource{Type: "deployment", ID: "dep-1", Name: "shop / production"}, Error: "build failed", Path: "/projects/p1/deployments/dep-1", AuditID: "aud-1"},
 		{Kind: notify.EventServiceFailed, Resource: notify.Resource{Type: "service_instance", ID: "svc-1", Name: "pg"}, Error: "container exited with code 1", Path: "/services/svc-1", AuditID: "aud-2"},
-		{Kind: notify.EventBackupFailed, Resource: notify.Resource{Type: "backup_run", ID: "run-1", Name: "2026/11/01"}, Error: "upload failed", Path: "/settings/profile#backup-status"},
+		{Kind: notify.EventBackupFailed, Resource: notify.Resource{Type: "backup_run", ID: "run-1", Name: "2026/11/01"}, Error: "upload failed", Path: "/settings/git#backup-status"},
 	}
 }
 
@@ -345,7 +345,7 @@ func TestSettingsTestButton(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("got %d POSTs", len(reqs))
 	}
-	if p := reqs[0].Payload(t); p.Event != notify.EventTest || p.Link != "https://forge.example.test/settings/profile" {
+	if p := reqs[0].Payload(t); p.Event != notify.EventTest || p.Link != "https://forge.example.test/settings/git" {
 		t.Errorf("payload %+v", p)
 	}
 	// Blank fields fall back to the stored target.

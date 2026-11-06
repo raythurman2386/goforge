@@ -28,7 +28,7 @@ var backupListCmd = &cobra.Command{
 	Short: "List restore points: complete backup runs in the bucket, newest first",
 	Long: `List complete backup runs (the ones with a manifest.json) under the
 backup prefix, newest first. Uses the same backup settings as "goforge serve":
-the saved Settings → Profile → Backups row when one exists, else BACKUP_*.
+the saved Settings → Backups row when one exists, else BACKUP_*.
 Times are shown in the local time zone.`,
 	Args:         cobra.NoArgs,
 	SilenceUsage: true,
@@ -101,7 +101,7 @@ func loadBackupTarget(ctx context.Context, out io.Writer) (*backupTarget, error)
 		return nil, errors.New(red.Redact(err.Error()))
 	}
 	if strings.TrimSpace(bc.Bucket) == "" {
-		return nil, errors.New("no backup bucket is configured: set BACKUP_* or save Settings → Profile → Backups")
+		return nil, errors.New("no backup bucket is configured: set BACKUP_* or save Settings → Backups")
 	}
 	// A paused schedule (Disabled) still names the bucket to read from.
 	bc.Disabled = false
@@ -142,7 +142,7 @@ func effectiveBackupConfig(ctx context.Context, cfg *config.Config, out io.Write
 	}
 	bc, source, err := backup.Effective(ctx, store, cfg.Backup)
 	if errors.Is(err, repositories.ErrBackupSettingsUnreadable) {
-		return config.BackupConfig{}, "", fmt.Errorf("read backup settings: %w; an admin must enter both keys again in Settings → Profile → Backups", err)
+		return config.BackupConfig{}, "", fmt.Errorf("read backup settings: %w; an admin must enter both keys again in Settings → Backups", err)
 	}
 	if err != nil {
 		return config.BackupConfig{}, "", fmt.Errorf("read backup settings: %w", err)

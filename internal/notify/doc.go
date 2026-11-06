@@ -1,5 +1,5 @@
 // Package notify sends one outbound alert per failure to the URL an admin
-// saved in Settings → Profile → Notifications: an ntfy topic (plain text
+// saved in Settings → Notifications: an ntfy topic (plain text
 // with Title, Tags, Priority, and Click headers) or a generic JSON webhook.
 //
 // Events fire when a queued deployment fails, a service deploy or change

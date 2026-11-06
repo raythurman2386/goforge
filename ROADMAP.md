@@ -22,9 +22,9 @@ The cycle order is locked. This section records the order only: each cycle is sc
 
 Open blockers between v0.3.0 and v1.0. Each line says where the gap is recorded today.
 
-- [x] **2FA** for local accounts (v0.5.0 S4, t1873u): opt-in TOTP with 10 single-use recovery codes in Settings → Profile, a second login step at `/auth/2fa` that shares the login lockout, disable with password plus code, and `goforge user reset-2fa <email>`; all audited (`SECURITY.md`, Closed). By Raymond's call: TOTP only (no WebAuthn), GitHub sign-in relies on GitHub's own 2FA, and API tokens and `/mcp` are unaffected.
+- [x] **2FA** for local accounts (v0.5.0 S4, t1873u): opt-in TOTP with 10 single-use recovery codes in Settings → Security, a second login step at `/auth/2fa` that shares the login lockout, disable with password plus code, and `goforge user reset-2fa <email>`; all audited (`SECURITY.md`, Closed). By Raymond's call: TOTP only (no WebAuthn), GitHub sign-in relies on GitHub's own 2FA, and API tokens and `/mcp` are unaffected.
 - [x] **HEALTH-READY-PUBLIC** (v0.5.0 S1, t1858u): `/health/ready` stays public, but each check now reports only `ok`, `unavailable`, or `not_configured`; the error text goes to the server log (`SECURITY.md`, Closed).
-- [x] **Session revoke on password change** (v0.5.0 S2, t1861u): a password change ends the account's other sessions and keeps the current one; Profile has **Sign out other sessions**; both audited with `sessions_revoked` (`SECURITY.md`, Closed).
+- [x] **Session revoke on password change** (v0.5.0 S2, t1861u): a password change ends the account's other sessions and keeps the current one; Security has **Sign out other sessions**; both audited with `sessions_revoked` (`SECURITY.md`, Closed).
 - [x] **Remaining audit gaps** (v0.5.0 S3, t1870u): Git source create and delete, profile (email) saves, and webhook-triggered deploys now write audit rows; webhook runs link their `deployment.run.*` outcome (`SECURITY.md`, Closed). v0.5.1 adds retention (default off, 30-day floor) and hash-chain tamper detection. A host or Docker-socket attacker can still rewrite the log (`SECURITY.md`, Audit logging).
 - [ ] **Custom domain DNS check**: `DomainValidator` in `internal/proxy/acme.go` (`IsDomainRoutable`, `VerifyDNSRecord`, `VerifyDomainFull`) is tested but nothing outside its tests calls it. The project and environment forms check only the name format. The SSL certificate dashboard matters for direct installs that use Let's Encrypt through Traefik; on the recommended Cloudflare Tunnel path Traefik holds no certificate to watch, so whether the dashboard blocks v1.0 is Raymond's call.
 - [ ] **Production validation record**: no load test, resource limit check, or restore drill against a full GoForge stack has been run and written down. The plan is in [docs/deployment/production-validation.md](docs/deployment/production-validation.md). Raymond runs GoForge every day (Gitea and about 14 containers), but that use is not a recorded validation, and the README "Not Production-Ready" note stays until the record exists.
@@ -168,7 +168,7 @@ Hardening the platform and improving the developer experience for power users. I
 
 ### 1. Advanced Observability
 - [x] **Log Persistence:** Clone and build logs are stored in `deployment_logs` and replayed when the deployment log stream connects.
-- [x] **Alerting System:** Outbound alerts for failed deploys, failed services, failed backups, and unhealthy or exited containers, set up in Settings → Profile → Notifications: ntfy and webhook with the container health watch (#106), and Email (SMTP) (#109). *(Not yet: alerts on resource usage thresholds, and a Slack-specific channel.)*
+- [x] **Alerting System:** Outbound alerts for failed deploys, failed services, failed backups, and unhealthy or exited containers, set up in Settings → Notifications: ntfy and webhook with the container health watch (#106), and Email (SMTP) (#109). *(Not yet: alerts on resource usage thresholds, and a Slack-specific channel.)*
 - [ ] **Status Page:** Public-facing status page for services.
 - [x] **Health Checks:** Add real comprehensive health checks for DB, Docker, and other dependencies. *(Moved to Critical Phase)*
 - [ ] **Notifications Center:** In-app notification system for deployment events *(outbound alerts shipped in #106 and #109; there is no in-app center)*
@@ -184,7 +184,7 @@ Hardening the platform and improving the developer experience for power users. I
 - [x] **Deployment cancel status:** The `canceled` status matches the database check constraint
 
 ### 2. Enhanced Services
-- [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. `goforge backup list` / `goforge backup restore` restore the GoForge database (side database, then rename; previous one kept), with a read-only Restore points list on Settings → Profile. `goforge backup restore-service <run key> <instance id>` restores one Postgres, Gitea, or Vaultwarden service's data from a run (dry run by default, size and SHA-256 checks before anything stops, previous data kept aside; #104, #105), and those service pages list their restore points for admins. Not yet: other templates, web/API/MCP restore, run-now from the API
+- [x] **Database Backups:** Nightly backups to S3-compatible storage (R2, B2, MinIO): GoForge database, Postgres services, Gitea, Vaultwarden. `goforge backup list` / `goforge backup restore` restore the GoForge database (side database, then rename; previous one kept), with a read-only Restore points list on Settings. `goforge backup restore-service <run key> <instance id>` restores one Postgres, Gitea, or Vaultwarden service's data from a run (dry run by default, size and SHA-256 checks before anything stops, previous data kept aside; #104, #105), and those service pages list their restore points for admins. Not yet: other templates, web/API/MCP restore, run-now from the API
 - [x] **More Templates:** MySQL, MongoDB, MinIO *(shipped in `templates/`, alongside MariaDB, NocoDB, Uptime Kuma, Gitea, Vaultwarden, and SolidCraft)*
 - [x] **More Templates (next):** PocketBase, with ntfy, Umami, SearXNG, Listmonk, Stirling-PDF, authentik, and Meilisearch (#101); Gitea Actions runner (#112); GeoLibre and RustGIS (#118).
 - [ ] **Plausible template:** not in `templates/` yet.
@@ -204,7 +204,7 @@ Hardening the platform and improving the developer experience for power users. I
 - [x] **API Tokens:** Personal Access Tokens for external integrations, with `read` / `write` / `protected` scopes for `/api/v1` (#61).
 - [x] **Token resource scoping and protected services:** a token can be restricted to listed projects and services (#108), and the service page **Protected** switch makes `/api/v1` and MCP refuse stop, config edit, and image update without the `protected` scope (#107).
 - [x] **JSON API and MCP:** `/api/v1` (bearer only, dry-run by default, audited mutations) and the `goforge-mcp` stdio server (#61).
-- [x] **MCP over HTTP:** `/mcp` on `goforge serve` with scoped Profile tokens (`gf_` prefix, hint, rotate, audited), a Profile MCP card with `mcp.json`, and the stdio binary kept as a fallback pointed at HTTPS. *(Not yet: OAuth, per-token rate limits, MCP ownership of Postgres tenants, Redis ACL users, and backups.)*
+- [x] **MCP over HTTP:** `/mcp` on `goforge serve` with scoped Security tokens (`gf_` prefix, hint, rotate, audited), a Security MCP card with `mcp.json`, and the stdio binary kept as a fallback pointed at HTTPS. *(Not yet: OAuth, per-token rate limits, MCP ownership of Postgres tenants, Redis ACL users, and backups.)*
 - [ ] **Build Caching:** S3/Local cache for faster Docker builds.
 - [x] **UX Polish:** Finalize login template rendering.
 - [ ] **Rollback feedback:** Show the rollback result in the UI. `RollbackDeployment` discards it today because `HX-Redirect` reloads the page and would drop a toast (`internal/web/handlers/deployments.go`).
@@ -311,8 +311,8 @@ Before tagging v1.0.0, the following **must** be completed:
 - [x] **#74** Redis per-app ACL users (#60 template change)
 - [x] **#75** Service edits claim the instance with a status compare-and-swap; a concurrent edit gets `409` (#48)
 - [x] **#76** Aesthetics Goal 3 nits from #68
-- [x] **#77** Backup settings in Settings → Profile (S3 keys sealed with `ENCRYPTION_KEY`)
-- [x] **#78** MCP over HTTP at `/mcp` with Profile API tokens (create, rotate, revoke)
+- [x] **#77** Backup settings in Settings (S3 keys sealed with `ENCRYPTION_KEY`)
+- [x] **#78** MCP over HTTP at `/mcp` with Security API tokens (create, rotate, revoke)
 - [x] **#79** `goforge backup list` and `goforge backup restore` for the GoForge database (CLI)
 - [x] **#80** Repo Compose stops passing `BACKUP_*` into the `goforge` container (ENV-CREDS)
 - [x] **#81** Stats stream resumes after a config save; Container card on service detail and project Overview
@@ -357,7 +357,7 @@ One line per PR; [CHANGELOG.md](CHANGELOG.md) has the detail.
 
 **v0.3.0** (2026-11-02)
 - [x] **#118** GeoLibre and RustGIS templates
-- [x] **#119** Optional Sentry error reporting, DSN in Settings → Profile
+- [x] **#119** Optional Sentry error reporting, DSN in Settings
 - [x] **#120, #121** htmx 2.0.11 interim pin, then htmx 4.0.1 with the bundled `hx-sse` extension
 - [x] **#122** Tailwind CSS 4.3.3
 - [x] **#123, #124** CHANGELOG sections cut for 0.2.0, 0.2.1, and 0.3.0
@@ -366,7 +366,7 @@ One line per PR; [CHANGELOG.md](CHANGELOG.md) has the detail.
 
 Parked items need Raymond's OK before anyone starts them.
 
-- [x] **Backup restore (GoForge database)**: `goforge backup list` and `goforge backup restore <run key>` (CLI only), read-only Restore points on Settings → Profile; PostgreSQL 15 runbook fixed (`docs/deployment/backup.md`)
+- [x] **Backup restore (GoForge database)**: `goforge backup list` and `goforge backup restore <run key>` (CLI only), read-only Restore points on Settings; PostgreSQL 15 runbook fixed (`docs/deployment/backup.md`)
 - [x] **Backup restore, services**: `goforge backup restore-service <run key> <instance id>` for Postgres, Gitea, and Vaultwarden (CLI, dry run by default; #104, #105), with per-service Restore points for admins; see `docs/deployment/backup.md`
 - [ ] **Backup restore, follow-up** (parked): web/API/MCP restore, restore for other templates, run-now from the API
 - [x] **Aesthetics Goal 3 nits** (#68 leftovers): `class_check.py` also checks `class={ ... }`, `*Class()` helpers, and `app.js` classes; `make css` fails unless it runs Tailwind v3.4.17 (standalone or `npx`); unused `.sidebar-link*` removed; dark `select` chevron; auth-aware error page (B17)

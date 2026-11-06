@@ -156,7 +156,7 @@ func TestIntegration_RunAgainstMinIO(t *testing.T) {
 	if storeErr != nil {
 		t.Fatal(storeErr)
 	}
-	// Test connection (Settings → Profile) lists one key under the prefix.
+	// Test connection (Settings) lists one key under the prefix.
 	if found, err := store.Probe(ctx, itPrefix); err != nil || !found {
 		t.Fatalf("probe prefix = %v, %v; want true", found, err)
 	}

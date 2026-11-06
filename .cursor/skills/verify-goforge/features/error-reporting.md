@@ -1,6 +1,6 @@
 # Error reporting (Sentry)
 
-An admin sets an optional Sentry DSN on Settings → Profile → Error reporting (Sentry). With one, GoForge sends panics in web, `/api/v1`, and in-process `/mcp` handlers, and every handled `5xx` page (`RenderError`), to Sentry. The DSN is sealed in `error_reporting_settings` (migration 029). Blank is off; a save hot-applies (`errreport.Reporter.Apply`: a new client, or `BindClient(nil)` for off). `SENTRY_DSN` is a fallback only while no row exists. Tracing is off.
+An admin sets an optional Sentry DSN on Settings → Error reporting (Sentry). With one, GoForge sends panics in web, `/api/v1`, and in-process `/mcp` handlers, and every handled `5xx` page (`RenderError`), to Sentry. The DSN is sealed in `error_reporting_settings` (migration 029). Blank is off; a save hot-applies (`errreport.Reporter.Apply`: a new client, or `BindClient(nil)` for off). `SENTRY_DSN` is a fallback only while no row exists. Tracing is off.
 
 ## Sub-features
 
@@ -17,7 +17,7 @@ An admin sets an optional Sentry DSN on Settings → Profile → Error reporting
 
 ## How to get to it (user POV)
 
-- As the admin, open Settings → Profile. The Error reporting (Sentry) card is below Notifications.
+- As the admin, open Settings. The Error reporting (Sentry) card is below Notifications.
 - Paste a DSN from Sentry → Project settings → Client Keys, press Send test event, then Save error reporting. Tick Remove the stored DSN and save to turn it off.
 
 ## Driving it in host mode

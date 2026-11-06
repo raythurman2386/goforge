@@ -49,17 +49,14 @@ func TestBackupCard_ShortKeyIDNotShown(t *testing.T) {
 	}
 }
 
-func TestProfile_NonAdminHasNoBackupCard(t *testing.T) {
+func TestProfile_OnlyAccountInformation(t *testing.T) {
 	var b bytes.Buffer
-	if err := Profile(&models.User{Email: "u@x", Role: models.RoleUser}, "tok", nil, nil, nil, nil, nil, nil, nil).Render(context.Background(), &b); err != nil {
+	if err := Profile(&models.User{Email: "u@x", Role: models.RoleUser}, "tok").Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	got := b.String()
-	if strings.Contains(got, "backup-status") || strings.Contains(got, "/settings/backups") {
-		t.Fatal("non-admin sees backup card")
-	}
-	if strings.Contains(got, "planned for future releases") || !strings.Contains(got, "Authorization: Bearer") {
-		t.Error("API token alert not updated")
+	if !strings.Contains(got, "Account Information") || strings.Contains(got, "API Tokens") || strings.Contains(got, "backup-status") || strings.Contains(got, "/settings/backups") {
+		t.Fatal("Profile contains a section owned by Security or Settings")
 	}
 }
 

@@ -91,6 +91,34 @@ func setupTestRouterWithMCP(t *testing.T, db *sql.DB, cfg *config.Config, apiV1,
 	t.Cleanup(rl.Stop)
 	return Router(cfg, sm, nil, nil, rl, ah, dbh, ph, eh, dh, sh, sth, gh, wh, sseh, hh, ch, handlers.NewActivityHandler(nil, slog.Default()), apiV1, mcpHTTP)
 }
+
+func TestRouter_SettingsSecurityIsOnlyAddedFullPageRoute(t *testing.T) {
+	cfg := &config.Config{DevMode: true, Port: 8080}
+	db := setupTestRouterDB(t)
+	defer db.Close()
+	r, ok := setupTestRouter(t, db, cfg).(chi.Router)
+	if !ok {
+		t.Fatal("router does not expose chi routes")
+	}
+	var security, bareSettings, settingsGeneral int
+	if err := chi.Walk(r, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		switch route {
+		case "/settings/security":
+			if method == http.MethodGet {
+				security++
+			}
+		case "/settings", "/settings/general":
+			settingsGeneral++
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if security != 1 || bareSettings != 0 || settingsGeneral != 0 {
+		t.Fatalf("security=%d bareSettings=%d general=%d", security, bareSettings, settingsGeneral)
+	}
+}
+
 func TestRouter(t *testing.T) {
 	cfg := &config.Config{
 		DevMode:  true,

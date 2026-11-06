@@ -231,7 +231,7 @@ func runBackupOnce(ctx context.Context) error {
 	}
 	bc, _, err := backup.Effective(ctx, store, cfg.Backup)
 	if errors.Is(err, repositories.ErrBackupSettingsUnreadable) {
-		return fmt.Errorf("read backup settings: %w; an admin must enter both keys again in Settings → Profile → Backups", err)
+		return fmt.Errorf("read backup settings: %w; an admin must enter both keys again in Settings → Backups", err)
 	}
 	if err != nil {
 		return fmt.Errorf("read backup settings: %w", err)
@@ -372,7 +372,7 @@ func runServer() error {
 	// shutdown; an in-flight run then records itself as failed.
 	backgroundCtx, cancelBackground := context.WithCancel(context.Background())
 	backupLog := logger.WithComponent(log, "backup")
-	// One outbound notifier (Settings → Profile → Notifications). It reads
+	// One outbound notifier (Settings → Notifications). It reads
 	// the saved row on every event, so a save applies without a restart.
 	notifySettingsRepo := repositories.NewNotifySettingsRepository(db.DB, secretService)
 	// Redaction knows the app secrets and the backup keys in effect (set
@@ -386,7 +386,7 @@ func runServer() error {
 	// on shutdown still get their 10s to send.
 	defer notifier.Wait()
 	notifySettings := &notify.SettingsService{Store: notifySettingsRepo, BaseURL: cfg.BaseURL, Redactor: notifyRedactor}
-	// Optional Sentry (Settings → Profile → Error reporting, or SENTRY_DSN
+	// Optional Sentry (Settings → Error reporting, or SENTRY_DSN
 	// while no row is saved). Off without a DSN; a save rebinds the client
 	// without a restart. Events go through the same redaction as alerts.
 	errReportEnv := "production"
@@ -697,7 +697,7 @@ func startBackups(ctx context.Context, m *backup.Manager, store backup.SettingsS
 		case ierr != nil:
 			log.Error("backup settings import failed; using BACKUP_* from the environment", "error", ierr)
 		case imported:
-			log.Info("imported BACKUP_* into backup settings; edit them in Settings → Profile from now on and remove every BACKUP_* line from your env file")
+			log.Info("imported BACKUP_* into backup settings; edit them in Settings from now on and remove every BACKUP_* line from your env file")
 		}
 	}
 	eff, source, err := backup.Effective(ctx, store, env)
@@ -706,7 +706,7 @@ func startBackups(ctx context.Context, m *backup.Manager, store backup.SettingsS
 		// Stay off rather than fall back to env and back up somewhere the
 		// admin did not pick. The form shows the other settings and asks
 		// for both keys again.
-		log.Error("saved backup keys do not decrypt with the current ENCRYPTION_KEY; backups stay off until an admin enters both keys again in Settings → Profile → Backups")
+		log.Error("saved backup keys do not decrypt with the current ENCRYPTION_KEY; backups stay off until an admin enters both keys again in Settings → Backups")
 		eff, source = config.BackupConfig{Disabled: true}, backup.SourceSettings
 	case err != nil:
 		log.Error("backup settings unreadable; backups stay off", "error", err)

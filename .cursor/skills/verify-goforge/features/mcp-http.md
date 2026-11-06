@@ -1,10 +1,10 @@
 # GoForge MCP over HTTP
 
-`goforge serve` answers MCP at `POST /mcp`, beside `/api/v1`. A client such as Cursor sends a Profile API token as `Authorization: Bearer`. A read token sees 24 read tools (23 API reads plus `wait_for`), and a token with `write` sees 38. Write tools are dry runs by default, need `approval_ref` to run, and the audit row records the caller's IP. Legacy `full` tokens, cookies, and cross-site browser requests are refused. Settings → Profile has an MCP card with the endpoint, an `mcp.json` snippet that reads the token from `${env:GOFORGE_MCP_TOKEN}`, and a Generate MCP token button. Token rows show a `gf_…` hint and can be rotated or revoked, and each of those writes an audit row.
+`goforge serve` answers MCP at `POST /mcp`, beside `/api/v1`. A client such as Cursor sends a Security API token as `Authorization: Bearer`. A read token sees 24 read tools (23 API reads plus `wait_for`), and a token with `write` sees 38. Write tools are dry runs by default, need `approval_ref` to run, and the audit row records the caller's IP. Legacy `full` tokens, cookies, and cross-site browser requests are refused. Settings → Security has an MCP card with the endpoint, an `mcp.json` snippet that reads the token from `${env:GOFORGE_MCP_TOKEN}`, and a Generate MCP token button. Token rows show a `gf_…` hint and can be rotated or revoked, and each of those writes an audit row.
 
 ## Sub-features
 
-- `mcp-profile-card`: Settings → Profile shows `id="mcp-card"`, the endpoint `<GOFORGE_BASE_URL>/mcp`, and a snippet holding `${env:GOFORGE_MCP_TOKEN}`.
+- `mcp-security-card`: Settings → Security shows `id="mcp-card"`, the endpoint `<GOFORGE_BASE_URL>/mcp`, and a snippet holding `${env:GOFORGE_MCP_TOKEN}`.
 - `token-mcp-preset`: `GET /settings/tokens/new?preset=mcp` is the preset form (hidden `preset=mcp`, 90 days, no Never). Posting it with no scopes makes a `read,write` token that expires in 90 days (`201`). A preset with only `protected` is `400`.
 - `token-hint`: the token list (`GET /settings/tokens`) shows `gf_…` plus the last four characters, never the token. `api_tokens.token_hint` holds the same string.
 - `mcp-no-bearer-401`: no `Authorization` is `401` with `WWW-Authenticate: Bearer realm="goforge-mcp"`.
@@ -37,14 +37,14 @@ Also unit-tested: `GOFORGE_MCP_HTTP=false` leaves `/mcp` unmounted (`internal/co
 
 ## How to get to it (user POV)
 
-- Open Settings → Profile. The MCP card shows the endpoint and the `mcp.json` snippet.
+- Open Settings → Security. The MCP card shows the endpoint and the `mcp.json` snippet.
 - Press Generate MCP token, keep read and write (90 days), and copy the token from the modal. It is shown once.
 - Export it as `GOFORGE_MCP_TOKEN` where Cursor runs, and paste the snippet into `~/.cursor/mcp.json`.
 - Rotate or Revoke from the token row.
 
 ## Driving it with verify.sh
 
-`verify.sh drive-mcp-http` runs after `drive-register` and `drive-login` (it uses project `verify-smoke` and its first environment). It creates tokens `verify-mcp-write`, `verify-mcp-read`, and `verify-legacy-full` through the Profile form, checks every sub-feature above, and writes `$EVIDENCE/mcp-http-verdict.txt`. Tokens go only to mode `600` files in `$STATE_DIR`, `mcp-<name>.token` and `mcp-<name>.hdr`. curl reads the header file with `-H @file`, so no token is on argv. The drive deletes both files before it exits, and it fails with exit `2` if any token value shows up in the verdict.
+`verify.sh drive-mcp-http` runs after `drive-register` and `drive-login` (it uses project `verify-smoke` and its first environment). It creates tokens `verify-mcp-write`, `verify-mcp-read`, and `verify-legacy-full` through the Security form, checks every sub-feature above, and writes `$EVIDENCE/mcp-http-verdict.txt`. Tokens go only to mode `600` files in `$STATE_DIR`, `mcp-<name>.token` and `mcp-<name>.hdr`. curl reads the header file with `-H @file`, so no token is on argv. The drive deletes both files before it exits, and it fails with exit `2` if any token value shows up in the verdict.
 
 The drive needs `GOFORGE_PROTECTED_SERVICES` set to one UUID on the stack. It reads that id from `whoami` and inserts a stopped `service_instances` row with it, owned by the admin. Nothing is deployed and no container is touched.
 

@@ -21,7 +21,7 @@ This page documents GoForge's security model, current protections, and known are
 
 ### Two-factor authentication
 
-Local password accounts can turn on TOTP in Settings → Profile → **Two-factor authentication**. It is optional.
+Local password accounts can turn on TOTP in Settings → Security → **Two-factor authentication**. It is optional.
 
 - **Setup** asks for the current password, then shows a QR code (`otpauth://totp/GoForge:<email>`) and the key once. 2FA turns on only when the first code from the app checks out. Then 10 recovery codes (`xxxxx-xxxxx`) are shown once.
 - **Codes**: RFC 6238 with SHA-1, 6 digits, and a 30-second step. The previous and next step are accepted for clock skew. A time step that was accepted once is refused after that (`user_totp.last_used_step`), so a code seen over someone's shoulder cannot be replayed.
@@ -60,7 +60,7 @@ The OAuth flow validates the `state` parameter using a cookie-based approach: a 
 ### Known Limitations
 
 - Each login, registration, and GitHub callback creates a new session with a new random token. There is no anonymous session that becomes authenticated, so a session cookie planted before login is not promoted
-- **Password change ends other sessions**: a successful password change deletes every other session of the account and keeps the browser that made it. Settings → Profile → **Sign out other sessions** does the same on demand. Both are audited (`user.password.change`, `user.sessions.revoke`) with the number of sessions ended. API tokens are not revoked by either
+- **Password change ends other sessions**: a successful password change deletes every other session of the account and keeps the browser that made it. Settings → **Sign out other sessions** does the same on demand. Both are audited (`user.password.change`, `user.sessions.revoke`) with the number of sessions ended. API tokens are not revoked by either
 - **No concurrent session limits**: Users can have unlimited active sessions
 
 ---
@@ -131,9 +131,9 @@ Accounts have a `role` of `admin` or `user`. Registration creates users, includi
 ### One-click services, backups, and tokens
 
 - One-click service `config` and `connection_info` (generated passwords included) are encrypted with the same key
-- The S3 access key ID and secret saved in Settings → Profile → Backups are sealed with `ENCRYPTION_KEY` and never sent back to the browser. `ENCRYPTION_KEY` itself is never uploaded with a backup
+- The S3 access key ID and secret saved in Settings → Backups are sealed with `ENCRYPTION_KEY` and never sent back to the browser. `ENCRYPTION_KEY` itself is never uploaded with a backup
 - API tokens and session tokens are stored only as SHA-256 hashes
-- The Sentry DSN saved in Settings → Profile → Error reporting is sealed with `ENCRYPTION_KEY` and never sent back to the browser (only scheme, host, and project)
+- The Sentry DSN saved in Settings → Error reporting is sealed with `ENCRYPTION_KEY` and never sent back to the browser (only scheme, host, and project)
 
 ### Error reporting (Sentry)
 
@@ -277,7 +277,7 @@ Bodies are capped at 1 MB. GitHub and Gitea `ping` events are answered before th
 - [ ] Enable HTTPS via Traefik with valid SSL certificates
 - [ ] Keep PostgreSQL unpublished (the repo `docker-compose.yml` does not publish it; do not add a mapping in an override)
 - [ ] Set `TRUSTED_PROXIES` to your proxy addresses, and `CLOUDFLARE_PROXY_MODE=true` only when every request arrives through Cloudflare
-- [ ] Turn on nightly backups (Settings → Profile → Backups; see [Backup & Restore](deployment/backup.md)) and keep a copy of `ENCRYPTION_KEY` somewhere other than the server
+- [ ] Turn on nightly backups (Settings → Backups; see [Backup & Restore](deployment/backup.md)) and keep a copy of `ENCRYPTION_KEY` somewhere other than the server
 - [ ] Review and restrict Docker socket access. The read-write socket in the `goforge` container, Traefik's `:ro` socket, and `docker` group membership are all root-equivalent on the host (see `SECURITY.md`, "Docker socket trust model")
 - [ ] Keep the Traefik dashboard off (`TRAEFIK_DASHBOARD_INSECURE=false`, the default)
 - [ ] Configure firewall rules to limit access (allow outbound to Cloudflare only)

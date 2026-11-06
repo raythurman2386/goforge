@@ -74,7 +74,7 @@ type Config struct {
 	LogFormat string
 
 	// SentryDSN is SENTRY_DSN: optional Sentry error reporting for the
-	// control plane, used only while no admin has saved Settings → Profile
+	// control plane, used only while no admin has saved Settings → Security
 	// → Error reporting (a saved row, even a blank one, wins).
 	SentryDSN string
 

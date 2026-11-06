@@ -554,10 +554,10 @@ func (r *Restorer) settingsWarnings(ctx context.Context, db *sql.DB) ([]string, 
 	}
 	var out []string
 	if r.Bucket != "" && bucket != r.Bucket {
-		out = append(out, fmt.Sprintf("the backup's saved bucket %q differs from %q, where this run was found; check Settings → Profile → Backups", bucket, r.Bucket))
+		out = append(out, fmt.Sprintf("the backup's saved bucket %q differs from %q, where this run was found; check Settings → Backups", bucket, r.Bucket))
 	}
 	if prefix != r.Prefix {
-		out = append(out, fmt.Sprintf("the backup's saved prefix %q differs from %q, where this run was found; check Settings → Profile → Backups", prefix, r.Prefix))
+		out = append(out, fmt.Sprintf("the backup's saved prefix %q differs from %q, where this run was found; check Settings → Backups", prefix, r.Prefix))
 	}
 	return out, nil
 }

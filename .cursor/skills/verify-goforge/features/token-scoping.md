@@ -1,6 +1,6 @@
 # Per-project and per-service API token scoping
 
-On Settings → Profile, the token and MCP token forms have **Restrict to (optional)** with the owner's projects and services. A token with nothing checked is host-wide, as before. A token with some checked reaches only those projects (with their environments, deployments, and containers) and those services on `/api/v1` and `/mcp`; anything else answers `403 resource_out_of_scope` before any dry run, audit row, or Docker call. Scopes and the `protected` rule still apply. `whoami` shows the lists and the token list shows the restriction.
+On Settings, the token and MCP token forms have **Restrict to (optional)** with the owner's projects and services. A token with nothing checked is host-wide, as before. A token with some checked reaches only those projects (with their environments, deployments, and containers) and those services on `/api/v1` and `/mcp`; anything else answers `403 resource_out_of_scope` before any dry run, audit row, or Docker call. Scopes and the `protected` rule still apply. `whoami` shows the lists and the token list shows the restriction.
 
 ## Sub-features
 
@@ -17,7 +17,7 @@ On Settings → Profile, the token and MCP token forms have **Restrict to (optio
 
 ## How to get to it (user POV)
 
-- Settings → Profile → API Tokens → **Generate Token** (or MCP → **Generate MCP token**). Pick scopes, then check projects or services under **Restrict to (optional)**. The fieldset is shown only when the account has a project or service.
+- Settings → Security → API Tokens → **Generate Token** (or MCP → **Generate MCP token**). Pick scopes, then check projects or services under **Restrict to (optional)**. The fieldset is shown only when the account has a project or service.
 - The token list shows "Restricted to" with one badge per project or service, or "All projects and services".
 - There is no edit form. Revoke and create a new token to change the lists; **Rotate** keeps them.
 
