@@ -81,12 +81,13 @@ var settingsNavItems = []settingsNavItem{
 	{SettingsPageSettings, "Settings", "/settings/git"},
 }
 
-// SettingsLayout is the one shell and left navigation shared by all settings
-// pages. Only the active page gets aria-current and the current-link style.
+// SettingsLayout is the one shell shared by all settings pages. Its in-page
+// navigation is for mobile; the global sidebar owns settings navigation at md+.
+// Only the active page gets aria-current and the current-link style.
 templ SettingsLayout(active SettingsPage, title, description, csrfToken string) {
 	@layouts.AppLayout(title, csrfToken) {
-		<div class="mx-auto max-w-5xl lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-10">
-			<nav class="mb-6 flex gap-1 overflow-x-auto border-b border-divider lg:sticky lg:top-0 lg:mb-0 lg:h-fit lg:flex-col lg:border-b-0" aria-label="Settings pages" tabindex="0">
+		<div class="mx-auto max-w-5xl">
+			<nav class="mb-6 flex gap-1 overflow-x-auto border-b border-divider md:hidden" aria-label="Settings pages" tabindex="0">
 				for _, item := range settingsNavItems {
 					<a href={ templ.SafeURL(item.href) } aria-current={ settingsCurrent(active, item.page) } class={ "shrink-0 rounded-md px-3 py-2 text-sm font-medium max-md:min-h-11 max-md:flex max-md:items-center " + settingsNavClass(active, item.page) }>{ item.name }</a>
 				}

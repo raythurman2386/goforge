@@ -1969,17 +1969,22 @@ async function settingsNavigationChecks(scheme, page) {
       const assertPage = async (item) => {
         await page.waitForURL("**" + item.path);
         await page.waitForTimeout(700);
-        const state = await page.evaluate((item) => {
+        const state = await page.evaluate(({ item, viewport }) => {
+          const mobile = viewport.width < 768;
           const nav = document.querySelector('nav[aria-label="Settings pages"]');
           const current = nav ? [...nav.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute("href")) : [];
+          const stripVisible = Boolean(nav && getComputedStyle(nav).display !== "none" && nav.getClientRects().length);
           // The mobile Sheet is closed after navigation. Its current link is then
           // intentionally not visible; globalLink opened and clicked it above.
-          const globalSelector = viewport.width < 768 ? "#mobile-nav" : "#sidebar";
+          const globalSelector = mobile ? "#mobile-nav" : "#sidebar";
           const global = [...document.querySelectorAll(`${globalSelector} [data-nav][aria-current="page"]`)].map((a) => a.dataset.nav);
           const text = nav.parentElement.innerText;
-          return { current, global, sections: item.sections.every((s) => text.includes(s)), overflow: document.documentElement.scrollWidth > innerWidth, sheetOpen: !!document.querySelector("#mobile-nav[open]") };
-        }, item);
-        const ok = state.current.length === 1 && state.current[0] === item.path && state.global.length === 1 && state.global[0] === item.path && state.sections && !state.overflow && !state.sheetOpen;
+          return { current, global, stripVisible, sections: item.sections.every((s) => text.includes(s)), overflow: document.documentElement.scrollWidth > innerWidth, sheetOpen: !!document.querySelector("#mobile-nav[open]") };
+        }, { item, viewport });
+        const stripOK = viewport.width < 768
+          ? state.stripVisible && state.current.length === 1 && state.current[0] === item.path
+          : !state.stripVisible;
+        const ok = stripOK && state.global.length === 1 && state.global[0] === item.path && state.sections && !state.overflow && !state.sheetOpen;
         check(scheme, `settings-navigation-${tag}-${item.name.toLowerCase()}`, ok, JSON.stringify(state));
         const shot = path.join(EVIDENCE, "settings-split", tag, item.name.toLowerCase() + ".png");
         await page.screenshot({ path: shot, fullPage: true });
@@ -1988,10 +1993,12 @@ async function settingsNavigationChecks(scheme, page) {
       await page.click(await globalLink("Profile"));
       for (let i = 0; i < pages.length; i++) {
         const item = pages[i];
-        if (i > 0) await page.click(`nav[aria-label="Settings pages"] a[href="${item.path}"]`);
+        if (i > 0) {
+          const selector = viewport.width < 768 ? `nav[aria-label="Settings pages"] a[href="${item.path}"]` : await globalLink(item.name);
+          await page.click(selector);
+        }
         await assertPage(item);
-        const away = viewport.width < 768 ? "Dashboard" : "Dashboard";
-        await page.click(await globalLink(away));
+        await page.click(await globalLink("Dashboard"));
         await page.waitForURL("**/dashboard");
         await page.goBack({ waitUntil: "load" });
         await assertPage(item);
