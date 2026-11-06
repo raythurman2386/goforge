@@ -8,6 +8,7 @@ A registered user signs in with their email and password, opens the projects lis
 - `projects-list` shows the `Projects` page.
 - `project-create` saves a project from the new project form and redirects to its page.
 - `project-listed` shows the new project name on the `Projects` page.
+- `project-delete-cleanup` removes the fixture through the UI after all dependent drives finish.
 
 ## How to get to it (user POV)
 
@@ -26,9 +27,12 @@ Preconditions:
 - **Create.** `POST /projects` with `name=verify-smoke`, `repository_url=https://github.com/raythurman2386/goforge.git`, `default_branch=main`, `dockerfile_path=Dockerfile`, `build_context=.` returns `303` and `Location` is `/projects/{id}`. `GET` that path returns `200`.
 - **Second view.** `GET /projects` contains `verify-smoke`, and `select count(*) from projects where name = 'verify-smoke'` prints `1`.
 - **Proof.** `/tmp/goforge-verify/proof/login-verdict.txt`.
+- **Isolation.** Set `GOFORGE_TEST_DOCKER_HOST` and `DOCKER_HOST` to the same dedicated `unix:///tmp/...` Docker socket, `GOFORGE_VERIFY_DOCKER` to a command selecting that socket, `GOFORGE_VERIFY_FIXTURE_REPO="$$ROOT/.cursor/skills/verify-goforge/scripts/cleanup_fixture.py"`, and `GOFORGE_VERIFY_FIXTURE_STATE` to a mode-700 state path. The app uses the same isolated socket, and its `GOFORGE_VERIFY_PSQL` selects a disposable DB. Never use the default engine for a fixture run.
+- **Cleanup.** After `drive-mcp-http` and any other drive that uses `verify-smoke`, run `verify.sh drive-login-cleanup`. It deletes the project through `DELETE /projects/{id}` with `confirm_name=verify-smoke`, creates an actual original/restored container pair and an unrelated service fixture only when explicitly pointed at an isolated temporary Docker engine. It proves the host objects and app rows are gone and the service fixture/row is preserved. Its verdict is `/tmp/goforge-verify/proof/login-cleanup-verdict.txt`.
 
 ## Gotchas
 
 - A wrong password returns `401` and re-renders the login page with `Invalid email or password`. It is not a redirect.
 - Creating a project does not clone or build. Deploy is a separate journey.
 - The project form needs a CSRF token in `csrf_token`. Read it again from the jar after login.
+- Do not run the cleanup before other drives that read the `verify-smoke` project or its production environment.

@@ -8,7 +8,7 @@ PROJECT=goforge-verify
 # the drives at a stack verify.sh did not launch (see features/backups.md).
 BASE="${GOFORGE_VERIFY_BASE:-http://127.0.0.1:8080}"
 VERIFY_DIR=/tmp/goforge-verify
-STATE_DIR="$VERIFY_DIR/state"
+STATE_DIR="${GOFORGE_VERIFY_STATE_DIR:-$VERIFY_DIR/state}"
 ROOT=$(git rev-parse --show-toplevel)
 # Evidence lives outside the repo so proofs are never committed.
 EVIDENCE="${GOFORGE_VERIFY_PROOF:-$VERIFY_DIR/proof}"
@@ -33,7 +33,7 @@ case "$EVIDENCE" in
 esac
 
 usage() {
-  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-backup-settings|drive-mcp-http|drive-ui-a11y|check-backup-sealed|psql|check-sealed|cleanup" >&2
+  echo "usage: verify.sh launch|doctor|drive-register|drive-login|drive-login-cleanup|drive-orphan-activity|drive-backup-settings|drive-mcp-http|drive-ui-a11y|check-backup-sealed|psql|check-sealed|cleanup" >&2
   exit 1
 }
 
@@ -189,6 +189,18 @@ refuse() {
   printf '%s\n' "$reason" | tee "$EVIDENCE/BLOCKED.txt" >&2
   chmod 644 "$EVIDENCE/BLOCKED.txt"
   exit 1
+}
+
+cmd_validate_ui_stack() {
+  # Host-mode Docker proofs must name their isolated engine explicitly.
+  if [[ -n "${GOFORGE_VERIFY_FIXTURE_REPO:-}" ]]; then
+    case "${GOFORGE_TEST_DOCKER_HOST:-}" in
+      unix:///tmp/*) ;;
+      *) echo "refusing Docker fixture without a dedicated temporary engine" >&2; return 1 ;;
+    esac
+    [[ "${DOCKER_HOST:-}" == "$GOFORGE_TEST_DOCKER_HOST" ]] || { echo "refusing mismatched app/host Docker sockets" >&2; return 1; }
+    [[ "${GOFORGE_VERIFY_DOCKER:-}" == *"$GOFORGE_TEST_DOCKER_HOST"* ]] || { echo "refusing mismatched fixture Docker socket" >&2; return 1; }
+  fi
 }
 
 cmd_launch() {
@@ -570,6 +582,68 @@ EOF
   if [[ "$harness" != "ok" ]]; then
     exit 2
   fi
+}
+
+cmd_drive_login_cleanup() {
+  cmd_validate_ui_stack
+  need_cmd curl
+  install -d -m 755 "$EVIDENCE"
+  local jar="$STATE_DIR/jar-login.txt" page="$STATE_DIR/login-cleanup.html" headers="$STATE_DIR/login-cleanup.headers"
+  local verdict="$EVIDENCE/login-cleanup-verdict.txt"
+  local project_id status db_row redirect harness=ok env_id dep_id user_id
+  project_id=$(db_psql "select id from projects where name = 'verify-smoke' order by created_at desc limit 1;" | tr -d '[:space:]')
+  if [[ -z "$project_id" || ! -f "$jar" ]]; then
+    echo "missing verify-smoke project or login jar; run drive-login first" >&2
+    exit 2
+  fi
+  local csrf
+  csrf=$(csrf_from_jar "$jar")
+  env_id=$(db_psql "select id from environments where project_id = '$project_id' limit 1;" | tr -d '[:space:]')
+  user_id=$(db_psql "select user_id from projects where id = '$project_id';" | tr -d '[:space:]')
+  dep_id=$(python3 -c 'import uuid; print(uuid.uuid4())')
+  if [[ -z "$env_id" || -z "$user_id" ]]; then
+    echo "missing fixture environment or owner" >&2
+    exit 2
+  fi
+  # The caller points DOCKER at an isolated disposable engine. All fixture
+  # names are owned by this helper, never broad-label or production deletes.
+  local fixture_repo=${GOFORGE_VERIFY_FIXTURE_REPO:-}
+  if [[ -n "$fixture_repo" ]]; then
+    "$fixture_repo" fixture "$project_id" "$env_id" "$dep_id" "$user_id" >"$STATE_DIR/cleanup.fixture"
+  fi
+  status=$(curl -sS -b "$jar" -c "$jar" -D "$headers" -o "$page" -w '%{http_code}' \
+    -X DELETE "$BASE/projects/$project_id" -H "X-CSRF-Token: $csrf" --data-urlencode "confirm_name=verify-smoke" || true)
+  redirect=$(header_value "$headers" "HX-Redirect")
+  db_row=$(db_psql "select count(*) from projects where id = '$project_id';" | tr -d '[:space:]')
+  if [[ -n "$fixture_repo" ]]; then
+    "$fixture_repo" verify >>"$STATE_DIR/cleanup.fixture" || harness=fail
+  fi
+  [[ "$status" == "200" && "$redirect" == "/projects" && "$db_row" == "0" ]] || harness=fail
+  {
+    echo "harness=$harness"
+    echo "project-delete-status=$status"
+    echo "project-delete-redirect=$redirect"
+    echo "project-db-row=$db_row"
+    [[ ! -f "$STATE_DIR/cleanup.fixture" ]] || cat "$STATE_DIR/cleanup.fixture"
+  } >"$verdict"
+  chmod 644 "$verdict"
+  rm -f "$page" "$headers"
+  cat "$verdict"
+  [[ "$harness" == "ok" ]] || exit 1
+}
+
+cmd_drive_orphan_activity() {
+  cmd_validate_ui_stack
+  need_cmd curl python3
+  local jar="$STATE_DIR/jar-login.txt" verdict="$EVIDENCE/activity-orphan-verdict.txt"
+  local user_id fixture_repo=${GOFORGE_VERIFY_FIXTURE_REPO:-}
+  if [[ -z "$fixture_repo" || ! -f "$jar" ]]; then echo "need login and explicit isolated fixture repo" >&2; exit 1; fi
+  user_id=$(db_psql "select user_id from projects where name='verify-smoke'" | tr -d '[:space:]')
+  local state="${GOFORGE_VERIFY_FIXTURE_STATE:-$STATE_DIR/cleanup.orphan}"
+  [[ "$user_id" && -f "$state" ]] || { echo "retained activity owner or startup orphan fixture missing" >&2; exit 1; }
+  "$fixture_repo" orphan-verify "$user_id" >"$STATE_DIR/orphan-retained.txt"
+  python3 "$ROOT/.cursor/skills/verify-goforge/scripts/activity_fixture.py" "$STATE_DIR" "$BASE" "$jar" "$verdict"
+  chmod 644 "$verdict"
 }
 
 cmd_psql() {
@@ -1386,6 +1460,8 @@ main() {
     doctor) cmd_doctor ;;
     drive-register) cmd_drive_register ;;
     drive-login) cmd_drive_login ;;
+    drive-login-cleanup) cmd_drive_login_cleanup ;;
+  drive-orphan-activity) cmd_drive_orphan_activity ;;
     psql) shift; cmd_psql "${1:-}" ;;
     check-sealed) shift; cmd_check_sealed "${1:-}" ;;
     check-backup-sealed) cmd_check_backup_sealed ;;

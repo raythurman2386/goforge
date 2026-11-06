@@ -481,7 +481,10 @@ func runServer() error {
 	go sessionManager.RunExpiredSessionPurge(backgroundCtx, auth.SessionPurgeInterval)
 	githubProvider := auth.NewGitHubProvider(cfg)
 	authenticator := auth.NewLocalAuthenticator(userRepo)
-	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo, deploymentRepo, containerRepo, gitSourceRepo, gitService, dockerClient)
+	appLifecycle := docker.NewAppLifecycle()
+	cleanupRepo := repositories.NewContainerCleanupRepository(db.DB)
+	projectService := project.NewService(projectRepo, environmentRepo, envVariableRepo, deploymentRepo, containerRepo, gitSourceRepo, gitService, dockerClient).
+		WithAudit(auditLogRepo).WithLifecycle(appLifecycle).WithContainerCleanup(cleanupRepo)
 	deployService := deploy.NewService(
 		deploymentRepo,
 		deploymentLogRepo,
@@ -499,6 +502,11 @@ func runServer() error {
 		cfg.BuildDir,
 		logger.WithComponent(log, "deploy"),
 	)
+
+	deployService.WithLifecycle(appLifecycle).WithContainerCleanup(cleanupRepo)
+	// Start after create/retire and delete share exclusion; this orders the
+	// reconciliation trigger with deployment and rollback cleanup safely.
+	go projectService.RunOrphanReconcile(backgroundCtx, logger.WithComponent(log, "orphan-reconcile"))
 
 	// Initialize deployment worker
 	// WithAudit before Start: deployments queued with an audit id write

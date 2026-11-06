@@ -124,7 +124,7 @@ func fmtErr(out string, err error) error {
 	return cmdError{msg: out}
 }
 
-func TestMigration032_DownAndUp(t *testing.T) {
+func TestMigration033_DownAndUp(t *testing.T) {
 	db := openThrowaway(t, "goforge_audit_down")
 	ctx := context.Background()
 	cfg := &config.Config{DatabaseType: config.DatabaseTypePostgres, DatabaseURL: withDatabase(t, testAdminDSN(t), "goforge_audit_down")}
@@ -137,13 +137,32 @@ func TestMigration032_DownAndUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var reasonColumn int
+	if err := fresh.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns
+		WHERE table_name = 'container_cleanup' AND column_name = 'reason'`).Scan(&reasonColumn); err != nil {
+		t.Fatal(err)
+	}
+	if reasonColumn != 1 {
+		t.Fatal("container_cleanup.reason missing after migration 033")
+	}
 	version, dirty, verr := m.Version()
-	if verr != nil || dirty || version != 32 {
+	if verr != nil || dirty || version != 33 {
 		t.Fatalf("version after up = %d dirty=%v err=%v", version, dirty, verr)
 	}
 	if downErr := m.Down(); downErr != nil {
 		t.Fatal(downErr)
 	}
+	var cleanupTable sql.NullString
+	if scanErr := db.QueryRowContext(ctx, `SELECT to_regclass('public.container_cleanup')::text`).Scan(&cleanupTable); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if cleanupTable.Valid {
+		t.Fatalf("container_cleanup present after 033 down: %s", cleanupTable.String)
+	}
+	if downErr := m.Down(); downErr != nil {
+		t.Fatal(downErr)
+	}
+
 	var col int
 	if scanErr := db.QueryRowContext(ctx, `
 		SELECT count(*) FROM information_schema.columns
@@ -176,7 +195,7 @@ func TestMigration032_DownAndUp(t *testing.T) {
 		t.Fatal(upErr)
 	}
 	version, dirty, verr = m.Version()
-	if verr != nil || dirty || version != 32 {
+	if verr != nil || dirty || version != 33 {
 		t.Fatalf("version after re-up = %d dirty=%v err=%v", version, dirty, verr)
 	}
 	if scanErr := db.QueryRowContext(ctx, `

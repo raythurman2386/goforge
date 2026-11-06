@@ -123,7 +123,7 @@ func activityResource(l *models.AuditLog, d map[string]interface{}) (string, tem
 			return label, templ.SafeURL("/projects/" + url.PathEscape(pid))
 		}
 	case models.ResourceTypeContainer:
-		if id != "" {
+		if id != "" && l.Action != models.AuditActionContainerOrphanRemove {
 			return label, templ.SafeURL("/containers/" + esc)
 		}
 	case models.ResourceTypeAPIToken:
@@ -141,6 +141,8 @@ func shortID(id string) string {
 	return id
 }
 
+const systemActivityLabel = "System"
+
 // activitySourceLabel is the badge text for a source.
 func activitySourceLabel(source string) string {
 	switch source {
@@ -152,6 +154,8 @@ func activitySourceLabel(source string) string {
 		return "Webhook"
 	case models.AuditSourceCLI:
 		return "CLI"
+	case models.AuditSourceSystem:
+		return systemActivityLabel
 	default:
 		return "UI"
 	}
@@ -167,6 +171,8 @@ func activitySourceTone(source string) ui.BadgeTone {
 		return ui.BadgeWarning
 	case models.AuditSourceCLI:
 		return ui.BadgeSuccess
+	case models.AuditSourceSystem:
+		return ui.BadgeWarning
 	default:
 		return ui.BadgeNeutral
 	}

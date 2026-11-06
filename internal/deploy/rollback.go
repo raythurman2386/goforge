@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -306,20 +307,30 @@ func (rm *RollbackManager) restoreDeployment(ctx context.Context, target *models
 	opts := containerOptionsFromContainer(ctx, targetContainer, project, env, rm.service)
 
 	// Create a new container with the same image
-	newDockerID, err := rm.service.dockerClient.CreateContainer(ctx, opts)
+	newDockerID, finishCreate, err := rm.service.createAppContainer(ctx, env, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create restored container: %w", err)
 	}
 
-	// Record the new container in the database
+	// Record the new container in the database while creation remains locked.
+	if finishCreate != nil {
+		defer finishCreate()
+	}
 	if err := rm.service.containerRepo.Create(ctx, &models.Container{
 		DeploymentID: sql.NullString{String: target.ID, Valid: true},
 		DockerID:     newDockerID,
 		Name:         opts.Name,
 		Image:        opts.Image,
+		Labels:       mustContainerLabels(opts.Labels),
 		Status:       models.ContainerStatusRunning,
 	}); err != nil {
-		rm.service.logger.Error("failed to record restored container in DB", "error", err, "deployment_id", target.ID)
+		if removeErr := rm.service.dockerClient.RemoveContainer(ctx, newDockerID); removeErr != nil && !docker.IsNotFound(removeErr) {
+			if retainErr := rm.service.retainUnrecordedCleanup(ctx, newDockerID, env); retainErr != nil {
+				return errors.Join(fmt.Errorf("record restored container: %w", err), fmt.Errorf("retain failed removal: %w", retainErr))
+			}
+			rm.service.logger.Error("failed to retain unrecorded restored-container cleanup", "error", removeErr, "container_id", newDockerID)
+		}
+		return fmt.Errorf("failed to record restored container: %w", err)
 	}
 
 	// Mark the target deployment as running again
@@ -359,4 +370,12 @@ func containerOptionsFromContainer(ctx context.Context, c *models.Container, pro
 		Env:         containerEnv,
 		NetworkName: svc.traefikNetwork,
 	}
+}
+
+func mustContainerLabels(labels map[string]string) []byte {
+	raw, err := json.Marshal(labels)
+	if err != nil {
+		return []byte("{}")
+	}
+	return raw
 }

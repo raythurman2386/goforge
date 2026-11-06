@@ -2,10 +2,12 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
@@ -218,5 +220,38 @@ func TestCreateContainer_Entrypoint(t *testing.T) {
 				t.Errorf("Config.Entrypoint = %q, want %q", got.Entrypoint, tt.entrypoint)
 			}
 		})
+	}
+}
+
+func TestRemoveContainer_RemovalInProgressRetries(t *testing.T) {
+	attempts := 0
+	c := &Client{docker: &mockDockerAPI{containerRemoveFunc: func(_ context.Context, _ string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+		attempts++
+		if attempts == 1 {
+			return client.ContainerRemoveResult{}, errors.New("removal of container test is already in progress")
+		}
+		return client.ContainerRemoveResult{}, nil
+	}}}
+	if err := c.RemoveContainer(context.Background(), "test"); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 2 {
+		t.Fatalf("remove attempts=%d, want retry exactly once", attempts)
+	}
+}
+
+func TestRemoveContainer_RemovalInProgressHonorsCancellation(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+	c := &Client{docker: &mockDockerAPI{
+		containerRemoveFunc: func(_ context.Context, _ string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			return client.ContainerRemoveResult{}, errors.New("removal of container test is already in progress")
+		},
+		containerInspectFunc: func(_ context.Context, _ string) (client.ContainerInspectResult, error) {
+			return client.ContainerInspectResult{Container: container.InspectResponse{}}, nil
+		},
+	}}
+	if err := c.RemoveContainer(ctx, "test"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err=%v", err)
 	}
 }
