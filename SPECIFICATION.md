@@ -425,21 +425,23 @@ Deployments:
   GET    /deployments/{id}/logs                 SSE log stream
 
 User Settings:
-  GET    /settings/profile                    User profile page
+  GET    /settings/profile                    Account Information (email)
   PUT    /settings/profile                    Update email
+  GET    /settings/security                   Security (password, 2FA, sessions, MCP, API tokens)
   PUT    /settings/password                    Change password
-  GET    /settings/tokens                     List API tokens
+  GET    /settings/tokens                     List API tokens (HTMX partial; owned by Security)
   POST   /settings/tokens                     Create API token
   DELETE /settings/tokens/{id}                Revoke API token
 
-Git Sources:
-  GET    /settings/git                          Git source list
+Settings (combined instance configuration at /settings/git):
+  GET    /settings/git                          Git sources plus admin Backups / Notifications / Error reporting / Audit retention
   POST   /settings/git                          Add git source
-  GET    /settings/git/{id}                     Git source detail
-  PUT    /settings/git/{id}                     Update git source
+  GET    /settings/git/new                      New git source modal (HTMX)
   DELETE /settings/git/{id}                     Remove git source
-  GET    /settings/git/{id}/repos               Repository browser (HTMX)
-  GET    /settings/git/{id}/repos/{repo}/branches  Branch list (HTMX)
+  # Repository browser lives under the git API (not /settings/git/{id}/…):
+  GET    /api/git/sources/{sourceId}/repos      Repository browser (HTMX)
+  GET    /api/git/sources/{sourceId}/repos/{owner}/{repo}/branches  Branch list (HTMX)
+  GET    /api/git/sources/{sourceId}/repos/{owner}/{repo}/tags      Tag list (HTMX)
 
 Services (One-Click):
   GET    /services                              Service catalog

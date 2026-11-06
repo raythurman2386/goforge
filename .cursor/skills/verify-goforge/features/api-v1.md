@@ -1,6 +1,6 @@
 # JSON API v1 with scoped tokens
 
-An admin creates an API token with `read`, `write`, or `protected` scopes on the profile page and calls `/api/v1` with it as a bearer token. Session cookies do not work there. Reads return masked secrets. Every mutation is a dry run unless the body says `"dry_run": false`, a real run needs `approval_ref`, and the audit log records it before anything changes. Stop, config edit, and image update of a protected service are refused without the `protected` scope; restart is allowed.
+An admin creates an API token with `read`, `write`, or `protected` scopes on the Security page and calls `/api/v1` with it as a bearer token. Session cookies do not work there. Reads return masked secrets. Every mutation is a dry run unless the body says `"dry_run": false`, a real run needs `approval_ref`, and the audit log records it before anything changes. Stop, config edit, and image update of a protected service are refused without the `protected` scope; restart is allowed.
 
 ## Sub-features
 

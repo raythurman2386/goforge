@@ -10,8 +10,9 @@ A signed-in local account changes its password in Settings → **Change Password
 - `failed-change-keeps-sessions` a wrong current password returns `400` and ends no session (handler test).
 - `other-accounts-untouched` another account's sessions survive (repository and handler tests).
 - `old-password-refused` login with the old password returns `401`; the new password logs in (`303` to `/dashboard`).
-- `sign-out-others` the Profile **Sessions** card button ends every other session (`Signed out 1 other session.`), keeps jar A, and writes `user.sessions.revoke`.
-- `audit-no-secret` the two actions carry only `sessions_revoked` and `via` in `details`.
+- `sign-out-others` the Security **Sessions** card button ends every other session (`Signed out 1 other session.`), keeps jar A, and writes `user.sessions.revoke`.
+- `sign-out-one` Security **Sessions** also offers per-row **Sign out** for another browser (`POST /settings/sessions/{id}/revoke`); it ends only that session (`Signed out 1 session.`), refuses the current browser session, and writes `user.sessions.revoke` with `sessions_revoked` 1.
+- `audit-no-secret` the revoke actions carry only `sessions_revoked` and `via` in `details`.
 - `csrf` `POST /settings/sessions/revoke-others` without a CSRF token is `403`.
 
 ## How to get to it (user POV)
@@ -30,6 +31,7 @@ Host mode (live stack holds `:8080`; see SKILL.md "Host mode"): throwaway `postg
 - **Audit.** `verify.sh psql "select action, details->>'sessions_revoked', details->>'via' from audit_logs where action like 'user.%' order by created_at"` shows `user.password.change|2|ui`. Keep the word `password` out of the SQL text: `verify.sh psql` refuses queries that look like they read secrets, so use `like 'user.%'`.
 - **Old password.** `POST /auth/login` with the old password is `401`; with the new one in jar D it is `303` to `/dashboard`.
 - **Sign out other sessions.** `curl -b jar-a -c jar-a -X POST /settings/sessions/revoke-others -H 'HX-Request: true' --data-urlencode csrf_token=<...>` is `200` with `Signed out 1 other session.`; jar D then gets `303` to `/login`, jar A `200`, and a `user.sessions.revoke|1|ui` row is written.
+- **Sign out one session.** From Security → Sessions, `curl -b jar-a -c jar-a -X POST /settings/sessions/<other-session-id>/revoke -H 'HX-Request: true' --data-urlencode csrf_token=<...>` is `200` with `Signed out 1 session.` and a `user.sessions.revoke|1|ui` row; the current session id is `400` (`The current browser session cannot be signed out here`).
 - **Proof.** One verdict file in the evidence directory with each status, the session counts before and after, and the audit rows. Never copy the jars or password files into it.
 
 Unit coverage: `internal/database/repositories/session_test.go` `TestSessionRepository_DeleteByUserIDExcept` (keeps the named session, removes the rest, leaves other users alone, empty keep id removes all) and `internal/web/handlers/settings_sessions_test.go` (`TestSettingsHandler_UpdatePassword_RevokesOtherSessions` with two real sessions plus another account's, a failed change first, then the audit row; `TestSettingsHandler_RevokeOtherSessions` with a fake store). Both DB tests skip without `DATABASE_URL`.
