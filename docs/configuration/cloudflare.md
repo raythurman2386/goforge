@@ -44,7 +44,11 @@ CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoiYWN...your-token-here
 docker compose --profile cloudflare up -d
 ```
 
-This starts the `cloudflared` container alongside the other services.
+This starts the `cloudflared` container alongside the other services. **`CLOUDFLARE_PROXY_MODE` is the application configuration signal**: set it deliberately to match your routing. GoForge does not detect the container. `CLOUDFLARE_TUNNEL_TOKEN` only supplies the connector token.
+
+## Certificate UI scope
+
+Cloudflare terminates public TLS for Tunnel hostnames. Use Cloudflare's dashboard for certificate status and renewal; GoForge adds no primary-navigation certificate item or inert renewal action. The unbuilt certificate dashboard is not a v1.0 blocker for this recommended configuration. Direct Traefik installations still lack a GoForge certificate status/expiration and renewal UI; that is tracked separately as a direct-install limitation in the [SSL guide](../deployment/ssl.md#certificate-dashboard-scope).
 
 ## What Changes in Proxy Mode
 

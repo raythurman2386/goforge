@@ -47,15 +47,16 @@ type statsSampler interface {
 
 // SSEHandler handles Server-Sent Events for log streaming.
 type SSEHandler struct {
-	hub            *sse.Hub
-	dockerClient   *docker.Client
-	stats          statsSampler
-	statsPrime     time.Duration
-	statsInterval  time.Duration
-	ownsContainer  func(ctx context.Context, dockerID, userID string) (bool, error)
-	deployService  *deploy.Service
-	projectService *project.Service
-	logger         *slog.Logger
+	hub             *sse.Hub
+	dockerClient    *docker.Client
+	stats           statsSampler
+	statsPrime      time.Duration
+	statsInterval   time.Duration
+	ownsContainer   func(ctx context.Context, dockerID, userID string) (bool, error)
+	deployService   deploymentAPI
+	projectService  projectAPI
+	rollbackManager rollbackAPI
+	logger          *slog.Logger
 }
 
 // NewSSEHandler creates a new SSE handler.
@@ -78,6 +79,9 @@ func NewSSEHandler(hub *sse.Hub, dc *docker.Client, c *monitor.Collector,
 	}
 	if cr != nil {
 		h.ownsContainer = cr.OwnedByUser
+	}
+	if ds != nil {
+		h.rollbackManager = deploy.NewRollbackManager(ds)
 	}
 	return h
 }
@@ -437,12 +441,45 @@ func (h *SSEHandler) writeDeploymentSnapshot(w http.ResponseWriter, flusher http
 	}
 	writeDeploymentSnapshot(w, flusher, r, logs)
 	h.writeCurrentDeploymentProgress(w, flusher, r, deploymentID)
+	h.writeCurrentDeploymentActions(w, flusher, r, deploymentID, "")
 	return seen
 }
 
 func (h *SSEHandler) writeDeploymentStatusUpdate(w http.ResponseWriter, flusher http.Flusher, r *http.Request, deploymentID string, status models.DeploymentStatus) {
 	writeDeploymentStatus(w, flusher, r, status)
+	h.writeCurrentDeploymentActions(w, flusher, r, deploymentID, status)
 	h.writeCurrentDeploymentProgress(w, flusher, r, deploymentID)
+}
+
+// writeDeploymentActions replaces the Cancel/Rollback actions with one unnamed
+// htmx 4 OOB frame. Existing authorization and manager rules choose its contents.
+func writeDeploymentActions(w http.ResponseWriter, flusher http.Flusher, r *http.Request, deployment *models.Deployment, projectID string, canRollback bool, csrfToken string) {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, `<div id="%s" hx-swap-oob="innerHTML">`, deployments.ActionBarID)
+	if err := deployments.ActionButtons(deployment, projectID, canRollback, csrfToken).Render(r.Context(), &buf); err != nil {
+		return
+	}
+	buf.WriteString(`</div>`)
+	writeMessage(w, flusher, buf.Bytes())
+}
+
+// writeCurrentDeploymentActions re-reads the persisted row and reuses the
+// manager's eligibility check before swapping the action bar on a terminal
+// event. A stale event cannot expose Cancel after the row becomes terminal.
+func (h *SSEHandler) writeCurrentDeploymentActions(w http.ResponseWriter, flusher http.Flusher, r *http.Request, deploymentID string, status models.DeploymentStatus) {
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		return
+	}
+	environment, err := h.projectService.GetEnvironment(r.Context(), deployment.EnvironmentID)
+	if err != nil {
+		return
+	}
+	if status != "" && deployment.Status != status {
+		return
+	}
+	canRollback := h.rollbackManager != nil && h.rollbackManager.CanRollback(deployment)
+	writeDeploymentActions(w, flusher, r, deployment, environment.ProjectID, canRollback, auth.GetCSRFToken(r))
 }
 
 // writeCurrentDeploymentProgress reads the persisted stage and timestamps so
