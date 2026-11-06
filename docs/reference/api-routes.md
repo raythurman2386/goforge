@@ -181,7 +181,8 @@ Used by HTMX components for dynamic repository/branch selection.
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| `GET` | `/settings/profile` | `settingsHandler.Profile` | User profile page |
+| `GET` | `/settings/profile` | `settingsHandler.Profile` | Account Information only |
+| `GET` | `/settings/security` | `settingsHandler.Security` | Personal password, 2FA, sessions, MCP, and API tokens |
 | `PUT` | `/settings/profile` | `settingsHandler.UpdateProfile` | Update email. Audited as `user.profile.update` with `changed` and the old and new email domain only |
 | `PUT` | `/settings/password` | `settingsHandler.UpdatePassword` | Change password. On success every other session of the account is deleted (the current one is kept). Audited as `user.password.change` with `sessions_revoked` |
 | `POST` | `/settings/sessions/revoke-others` | `settingsHandler.RevokeOtherSessions` | Sign out other sessions: deletes every session of the account except the current one. Audited as `user.sessions.revoke` with `sessions_revoked` |

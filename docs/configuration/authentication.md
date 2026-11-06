@@ -10,7 +10,7 @@ Local authentication works out of the box with no additional configuration. User
 
 ### Two-factor authentication (TOTP)
 
-A local password account can turn on two-factor authentication in **Settings → Profile → Two-factor authentication**. Nothing to configure; it needs `ENCRYPTION_KEY`, which seals the TOTP key.
+A local password account can turn on two-factor authentication in **Settings → Security → Two-factor authentication**. Nothing to configure; it needs `ENCRYPTION_KEY`, which seals the TOTP key.
 
 1. Enter the current password and choose **Set up 2FA**.
 2. Scan the QR code with an authenticator app (or type the setup key), then enter the 6-digit code it shows.

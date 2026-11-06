@@ -13,7 +13,7 @@ GoForge is configured entirely through environment variables. This page document
 | `GOFORGE_DEV_SECRETS_FILE` | `.goforge/dev-secrets.json` | Dev-mode file that keeps generated secrets across restarts |
 | `GOFORGE_ENABLE_REGISTRATION` | `false` | Allow accounts after the first one. The first account can always register. New accounts are users |
 | `GOFORGE_ADMIN_EMAIL` | empty | Promote this email to admin on startup and when the account is created. Matching is case-insensitive |
-| `GOFORGE_AUDIT_RETENTION_DAYS` | unset (keep forever) | Audit log retention used until an admin saves Settings → Profile → Audit log. `0`, or 30 to 3650. A saved row wins. See [Activity and audit log](../guides/activity.md#retention-and-tamper-detection) |
+| `GOFORGE_AUDIT_RETENTION_DAYS` | unset (keep forever) | Audit log retention used until an admin saves Settings → Audit log. `0`, or 30 to 3650. A saved row wins. See [Activity and audit log](../guides/activity.md#retention-and-tamper-detection) |
 | `GOFORGE_HOST` | `0.0.0.0` | Host address to bind to |
 | `GOFORGE_PORT` | `8080` | Port to listen on |
 | `GOFORGE_BASE_URL` | `http://localhost:8080` | Public-facing base URL (used for OAuth callbacks, webhooks) |
@@ -59,7 +59,7 @@ Dev mode writes any secrets it generates to `GOFORGE_DEV_SECRETS_FILE` (mode `06
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GOFORGE_PROTECTED_SERVICES` | empty | Comma-separated service instance IDs. Through `/api/v1` (and so the MCP server), stopping, reconfiguring, or re-imaging one of them needs a token with the `protected` scope; without it the API answers `403 protected_resource` before any Docker call. Restart is still allowed with `write`. The UI is not affected. A service is also protected when the **Protected** switch on its page is on; services listed here show that switch on and locked |
-| `GOFORGE_MCP_HTTP` | `true` | Serves the MCP tools at `/mcp` for scoped Profile API tokens. `false` removes the route (`404`) and hides the Profile MCP card; `/api/v1` and `cmd/goforge-mcp` are not affected |
+| `GOFORGE_MCP_HTTP` | `true` | Serves the MCP tools at `/mcp` for scoped Security API tokens. `false` removes the route (`404`) and hides the Security MCP card; `/api/v1` and `cmd/goforge-mcp` are not affected |
 
 See [API v1](../reference/api-v1.md) and [MCP server](../guides/mcp.md).
 
@@ -131,7 +131,7 @@ See [Cloudflare Tunnel Configuration](cloudflare.md) for setup instructions.
 
 ## Backups
 
-Nightly backups to S3-compatible storage. An admin sets them up in **Settings → Profile → Backups**, and a save applies without a restart. With Docker Compose this is the way to set them up: `docker-compose.yml` does not pass any `BACKUP_*` variable into the `goforge` container, so `BACKUP_*` in your env file (`.env`) has no effect there.
+Nightly backups to S3-compatible storage. An admin sets them up in **Settings → Backups**, and a save applies without a restart. With Docker Compose this is the way to set them up: `docker-compose.yml` does not pass any `BACKUP_*` variable into the `goforge` container, so `BACKUP_*` in your env file (`.env`) has no effect there.
 
 The variables below are read from the process environment. Use them when you run the binary on the host, or for a one-time import on a compose install by adding them under `services.goforge.environment` in your own `docker-compose.override.yml` (see [Backup & Restore](../deployment/backup.md#from-the-environment-host-runs-or-an-override)). With no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies them into the saved settings on its first start. Once saved settings exist they win, and later changes to these variables are ignored with a warning in the log; an incomplete or invalid `BACKUP_*` set no longer stops startup then. With no saved settings, an invalid set stops GoForge at startup. After the import, remove every `BACKUP_*` variable again. With neither, backups are off. `goforge backup run` uses the same settings. See [Backup & Restore](../deployment/backup.md#turn-it-on).
 
@@ -153,7 +153,7 @@ The variables below are read from the process environment. Use them when you run
 
 ## Error reporting (Sentry)
 
-Optional. An admin sets it in **Settings → Profile → Error reporting (Sentry)**: paste the project's DSN (Sentry → Project settings → Client Keys), optionally an environment name, press **Send test event**, then **Save error reporting**. A save applies at once, with no restart; a blank DSN (or **Remove the stored DSN**) turns it off. The DSN is stored encrypted with `ENCRYPTION_KEY` and never shown again.
+Optional. An admin sets it in **Settings → Error reporting (Sentry)**: paste the project's DSN (Sentry → Project settings → Client Keys), optionally an environment name, press **Send test event**, then **Save error reporting**. A save applies at once, with no restart; a blank DSN (or **Remove the stored DSN**) turns it off. The DSN is stored encrypted with `ENCRYPTION_KEY` and never shown again.
 
 When it is on, GoForge sends panics in web, `/api/v1`, and in-process `/mcp` handlers, and every `5xx` error page it renders. Each event carries the route pattern (`/projects/{id}`, not the id), method, and status, and the release `goforge@<version>`. It never carries cookies, `Authorization` or other credential headers, the query string, the request body, the client IP, or who the user is; error text goes through the same redactor as notifications. Performance tracing is off. Background job panics are not reported.
 

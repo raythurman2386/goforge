@@ -20,7 +20,7 @@ goforge/
 │   ├── docker/            # Docker SDK wrapper
 │   ├── git/               # Git provider integrations
 │   ├── logger/            # Structured logging
-│   ├── mcphttp/           # /mcp: MCP over streamable HTTP for Profile tokens
+│   ├── mcphttp/           # /mcp: MCP over streamable HTTP for Security tokens
 │   ├── mcpserver/         # MCP tools (shared by /mcp and cmd/goforge-mcp)
 │   ├── models/            # Domain models
 │   ├── monitor/           # Container metrics
@@ -242,7 +242,7 @@ HTTP layer.
 | `handlers/environments.go` | Environment management handlers |
 | `handlers/deployments.go` | Deployment trigger, status, logs |
 | `handlers/services.go` | One-click service management |
-| `handlers/settings.go` | User settings page |
+| `handlers/settings.go` | Profile, Security, Activity, and instance Settings pages |
 | `handlers/git.go` | Git source configuration, repo browser |
 | `handlers/sse.go` | SSE endpoints for logs, stats, deployment events |
 | `handlers/health.go` | Health check endpoint |

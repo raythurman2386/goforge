@@ -5,147 +5,43 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/raythurman2386/goforge/internal/audit"
 	"github.com/raythurman2386/goforge/internal/backup"
-	"github.com/raythurman2386/goforge/internal/errreport"
 	"github.com/raythurman2386/goforge/internal/models"
-	"github.com/raythurman2386/goforge/internal/notify"
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
-	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
-// Profile renders the profile page. backups is nil for non-admins, which
-// hides the Backups card. backupForm is the admin settings form; nil shows
-// the card read-only. mcp is nil when /mcp is off (GOFORGE_MCP_HTTP=false),
-// which hides the MCP card. notifyForm is the admin Notifications form; nil
-// hides that card. errReportForm is the admin Error reporting (Sentry) form;
-// nil hides that card. twoFactor is the opt-in TOTP card; nil hides it.
-// auditRetention is the admin audit log card; nil hides it.
-templ Profile(user *models.User, csrfToken string, backups *backup.Status, backupForm *backup.SettingsView, notifyForm *notify.SettingsView, errReportForm *errreport.SettingsView, mcp *MCPCard, twoFactor *TwoFactorCard, auditRetention *audit.SettingsView) {
-	@layouts.AppLayout("Profile Settings", csrfToken) {
-		<div class="mx-auto max-w-5xl lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-10">
-			<nav class="mb-6 flex gap-1 overflow-x-auto border-b border-divider lg:sticky lg:top-0 lg:mb-0 lg:h-fit lg:flex-col lg:border-b-0" aria-label="Profile settings navigation">
-				<a href="/settings/profile" aria-current="page" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-foreground">Profile</a>
-				<a href="/settings/activity" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-foreground-secondary">Activity</a>
-				<a href="/settings/git" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-foreground-secondary">Settings</a>
-			</nav>
-			<div class="min-w-0 max-w-3xl">
-				<div class="mb-6"><h1 class="text-2xl font-semibold tracking-tight text-foreground">Profile Settings</h1><p class="mt-1 text-sm text-foreground-secondary">Manage your account information and security.</p></div>
-
-			<!-- Profile Information -->
-			@SettingsSection("Account Information", nil) {
-				@SettingsRow("Username", components.UserDisplayName(user), "") {
-					<div class="flex items-center justify-between gap-3">
-						@ui.Avatar(ui.AvatarProps{Name: components.UserDisplayName(user), Size: ui.AvatarLG})
-						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Type: "submit", Attrs: templ.Attributes{"form": "profile-form", "hx-put": "/settings/profile", "hx-swap": "none", "hx-disable": "find button[type='submit']", "hx-indicator": "find .htmx-indicator"}}) {
-							Save Changes
-							@components.Spinner()
-						}
+// Profile renders only personal identity; sign-in and instance settings
+// live on their own pages.
+templ Profile(user *models.User, csrfToken string) {
+	@SettingsLayout(SettingsPageProfile, "Profile Settings", "Manage your account information.", csrfToken) {
+		@SettingsSection("Account Information", nil) {
+			@SettingsRow("Username", components.UserDisplayName(user), "") {
+				<div class="flex items-center justify-between gap-3">
+					@ui.Avatar(ui.AvatarProps{Name: components.UserDisplayName(user), Size: ui.AvatarLG})
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Type: "submit", Attrs: templ.Attributes{"form": "profile-form", "hx-put": "/settings/profile", "hx-swap": "none", "hx-disable": "find button[type='submit']", "hx-indicator": "find .htmx-indicator"}}) {
+						Save Changes
+						@components.Spinner()
+					}
+				</div>
+			}
+			<form id="profile-form" hx-put="/settings/profile" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
+				<input type="hidden" name="csrf_token" value={ csrfToken } />
+				@SettingsRow("Email Address", "The address used for your GoForge account.", "profile-email") {
+					<div class="relative">
+						@ui.Input(ui.InputProps{ID: "profile-email", Name: "email", Type: "email", Value: user.Email, Autocomplete: "email", Required: true, ControlClass: "pr-11"})
+						<svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
 					</div>
 				}
-				<form id="profile-form" hx-put="/settings/profile" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
-					<input type="hidden" name="csrf_token" value={ csrfToken } />
-					@SettingsRow("Email Address", "The address used for your GoForge account.", "profile-email") {
-						<div class="relative">
-							@ui.Input(ui.InputProps{ID: "profile-email", Name: "email", Type: "email", Value: user.Email, Autocomplete: "email", Required: true, ControlClass: "pr-11"})
-							<svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
-						</div>
+				@SettingsRow("Account Type", "Your sign-in connection.", "") {
+					if user.IsGitHubUser() {
+						<div class="flex items-center gap-2">@StatusPill(ui.BadgePrimary) { GitHub Account }</div>
+						<p class="mt-2 text-sm text-foreground-secondary">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
+					} else {
+						@StatusPill(ui.BadgePrimary) { Local Account }
 					}
-					@SettingsRow("Account Type", "Your sign-in connection.", "") {
-						if user.IsGitHubUser() {
-							<div class="flex items-center gap-2">
-								@StatusPill(ui.BadgePrimary) { GitHub Account }
-							</div>
-							<p class="mt-2 text-sm text-foreground-secondary">Your account is linked to GitHub. Some settings may be managed through GitHub.</p>
-						} else {
-							@StatusPill(ui.BadgePrimary) { Local Account }
-						}
-					}
-
-				</form>
-			}
-
-			<!-- Change Password (Local accounts only) -->
-			if !user.IsGitHubUser() {
-				@SettingsSection("Change Password", nil) {
-					<form hx-put="/settings/password" hx-swap="none" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator">
-						<input type="hidden" name="csrf_token" value={ csrfToken } />
-						@SettingsRow("Current Password", "Confirm your current password.", "password-current") {
-							@ui.Input(ui.InputProps{ID: "password-current", Name: "current_password", Type: "password", Autocomplete: "current-password", Required: true})
-						}
-						@SettingsRow("New Password", "At least 8 characters.", "password-new") {
-							@ui.Input(ui.InputProps{ID: "password-new", Name: "new_password", Type: "password", Autocomplete: "new-password", Required: true, Attrs: templ.Attributes{"minlength": "8"}})
-						}
-						@SettingsRow("Confirm New Password", "Repeat your new password.", "password-confirm") {
-							@ui.Input(ui.InputProps{ID: "password-confirm", Name: "confirm_password", Type: "password", Autocomplete: "new-password", Required: true, Attrs: templ.Attributes{"minlength": "8"}})
-						}
-						@SettingsActions() {
-							@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Type: "submit"}) {
-								Update Password
-								@components.Spinner()
-							}
-						}
-					</form>
 				}
-			}
-
-			if twoFactor != nil {
-				@TwoFactorCardView(twoFactor, csrfToken)
-			}
-
-			<!-- Sessions -->
-			@SettingsSection("Sessions", nil) {
-				<p class="mb-4 text-sm text-foreground-secondary">Sign out another browser individually or sign out every other session at once. This browser stays signed in. API tokens are not affected.</p>
-				<div id="sessions-list" hx-get="/settings/sessions" hx-trigger="load, sessionRevoked from:body" hx-swap="innerHTML" class="border-t border-divider">
-					@components.LoadingState("Loading sessions...")
-				</div>
-				<form hx-post="/settings/sessions/revoke-others" hx-swap="none" hx-confirm="Sign out every other session of this account?" hx-disable="find button[type='submit']" hx-indicator="find .htmx-indicator" data-testid="revoke-other-sessions">
-					<input type="hidden" name="csrf_token" value={ csrfToken } />
-					@SettingsActions() {
-						@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Type: "submit"}) {
-							Sign out other sessions
-							@components.Spinner()
-						}
-					}
-				</form>
-			}
-
-			if backups != nil {
-				@BackupCard(backups, backupForm, csrfToken)
-			}
-
-			if notifyForm != nil {
-				@NotifyCard(notifyForm, csrfToken)
-			}
-
-			if errReportForm != nil {
-				@ErrorReportingCard(errReportForm, csrfToken)
-			}
-
-			if auditRetention != nil {
-				@AuditRetentionCard(auditRetention, csrfToken)
-			}
-
-			if mcp != nil {
-				@MCPCardView(mcp)
-			}
-
-			<!-- API Tokens -->
-			@SettingsSection("API Tokens", nil) {
-				<div class="mb-4 flex items-center justify-between gap-4">
-					<p class="text-sm text-foreground-secondary">API tokens allow programmatic access to your account. Keep them secure!</p>
-					@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Size: ui.ButtonSM, Attrs: ui.OpenDialogAttrs("/settings/tokens/new")}) {
-						<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-						Generate Token
-					}
-				</div>
-				<div class="mb-4">@ui.AlertMessage(ui.AlertInfo, "Send a token as Authorization: Bearer <token>. Scoped tokens (read, write, protected) work on the JSON API under /api/v1 and on the MCP endpoint at /mcp. Full tokens also work on the web routes and are refused on /mcp.")</div>
-				<div id="tokens-list" hx-get="/settings/tokens" hx-trigger="load, tokenCreated from:body" hx-swap="innerHTML" class="divide-y divide-divider border-t border-divider animate-fade-in">
-					@components.LoadingState("Loading tokens...")
-				</div>
-			}
-			</div>
-		</div>
+			</form>
+		}
 	}
 }
 
@@ -158,7 +54,7 @@ templ MCPCardView(mcp *MCPCard) {
 			<code id="mcp-endpoint" class="block w-full rounded-md bg-code p-3 text-sm font-mono break-all border border-border">{ mcp.Endpoint }</code>
 		}
 		@SettingsRow("mcp.json", "Client configuration.", "") {
-			<pre id="mcp-snippet" class="w-full overflow-x-auto rounded-md bg-code p-3 text-xs font-mono border border-border">{ mcp.Snippet }</pre>
+			<pre id="mcp-snippet" tabindex="0" role="region" aria-label="MCP client configuration" class="w-full overflow-x-auto rounded-md bg-code p-3 text-xs font-mono border border-border">{ mcp.Snippet }</pre>
 		}
 		<p class="mt-2 text-xs text-foreground-secondary">Set <code>{ MCPTokenEnv }</code> in the client's environment to the token. The token is not stored in the file.</p>
 		@SettingsActions() {
@@ -168,7 +64,7 @@ templ MCPCardView(mcp *MCPCard) {
 	}
 }
 
-// APITokenRow is one token on the Profile list. res names the token's
+// APITokenRow is one token on the Security list. res names the token's
 // projects and services; nil shows short IDs.
 templ APITokenRow(token *models.APIToken, res *TokenResources) {
 	<div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between" id={ "token-" + token.ID }>

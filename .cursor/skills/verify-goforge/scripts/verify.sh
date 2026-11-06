@@ -616,7 +616,7 @@ PY
   return "$rc"
 }
 
-# ---- Backup settings (Settings → Profile) ----------------------------------
+# ---- Backup settings (Settings) ----------------------------------
 # A throwaway MinIO the app can reach. Keys live in $STATE_DIR (mode 600) and
 # are never printed.
 BK_MINIO=gfbk-verify-minio
@@ -770,7 +770,7 @@ cmd_drive_backup_settings() {
 
   # Fresh stack: no BACKUP_* env, so the card is off and the form is empty.
   local profile_status cache_control form_present off_before
-  profile_status=$(curl -sS -b "$jar" -c "$jar" -D "$hdr" -o "$page" -w '%{http_code}' "$BASE/settings/profile" || true)
+  profile_status=$(curl -sS -b "$jar" -c "$jar" -D "$hdr" -o "$page" -w '%{http_code}' "$BASE/settings/git" || true)
   cache_control=$(header_value "$hdr" "Cache-Control")
   form_present=$(body_has "$page" 'data-testid="backup-settings-form"')
   off_before=$(body_has "$page" "Backups are off")
@@ -793,7 +793,7 @@ cmd_drive_backup_settings() {
   sleep 2
   local sched_after card_schedule
   sched_after=$(bk_count_log "next backup scheduled")
-  curl -sS -b "$jar" -c "$jar" -o "$page" "$BASE/settings/profile" >/dev/null || true
+  curl -sS -b "$jar" -c "$jar" -o "$page" "$BASE/settings/git" >/dev/null || true
   card_schedule=$(body_has "$page" "Schedule 03:30 UTC, keeping 7 days, to $BK_BUCKET/verify/.")
   if [[ "$card_schedule" == "yes" && "$sched_after" -gt "$sched_before" ]]; then
     live=pass
@@ -859,7 +859,7 @@ cmd_drive_backup_settings() {
     na_reg=$(curl -sS -c "$jar_u" -b "$jar_u" -o /dev/null -w '%{http_code}' -X POST "$BASE/auth/register" \
       --data-urlencode "csrf_token=$(csrf_from_jar "$jar_u")" --data-urlencode "email=verify-user@example.test" \
       --data-urlencode "password@$STATE_DIR/register.password" --data-urlencode "confirm_password@$STATE_DIR/register.password" || true)
-    curl -sS -b "$jar_u" -c "$jar_u" -o "$page" "$BASE/settings/profile" >/dev/null || true
+    curl -sS -b "$jar_u" -c "$jar_u" -o "$page" "$BASE/settings/git" >/dev/null || true
     if [[ "$(body_has "$page" 'id="backup-status"')" == "no" ]]; then na_card=hidden; else na_card=shown; fi
     na_put=$(bk_send PUT /settings/backups "$jar_u" "$out" --data-urlencode "enabled=false" --data-urlencode "bucket=x" \
       --data-urlencode "region=auto" --data-urlencode "retention_daily=7" --data-urlencode "timeout=2h" --data-urlencode "schedule_off=true")
@@ -877,7 +877,7 @@ cmd_drive_backup_settings() {
     --data-urlencode "schedule_zone=UTC" --data-urlencode "retention_daily=5" --data-urlencode "timeout=2h")
   sleep 1
   dis_row=$(db_psql "select enabled::text || ',' || bucket || ',' || (secret_access_key_sealed <> '')::text from backup_settings" 2>/dev/null | tr -d '[:space:]')
-  curl -sS -b "$jar" -c "$jar" -o "$page" "$BASE/settings/profile" >/dev/null || true
+  curl -sS -b "$jar" -c "$jar" -o "$page" "$BASE/settings/git" >/dev/null || true
   dis_card=$(body_has "$page" "Backups are off")
   dis_log=$(bk_count_log "backups disabled")
   [[ "$dis_status" == "200" && "$dis_row" == "false,$BK_BUCKET,true" && "$dis_card" == "yes" && "$dis_log" -ge 1 ]] && disable=pass
@@ -1059,15 +1059,15 @@ cmd_drive_mcp_http() {
   user_id=$(db_psql "select id from users where lower(email) = '$admin_email';" | tr -d '[:space:]')
   [[ -n "$project_id" && -n "$env_id" ]] || harness=fail
 
-  # mcp-profile-card: the card shows the endpoint and the env-var snippet.
+  # mcp-security-card: the card shows the endpoint and the env-var snippet.
   local profile_status
-  profile_status=$(curl -sS -b "$jar" -c "$jar" -o "$page" -w '%{http_code}' "$BASE/settings/profile" || true)
-  R[profile-status]=$profile_status
+  profile_status=$(curl -sS -b "$jar" -c "$jar" -o "$page" -w '%{http_code}' "$BASE/settings/security" || true)
+  R[security-status]=$profile_status
   R[card-present]=$(body_has "$page" 'id="mcp-card"')
   R[card-endpoint]=$(body_has "$page" "$BASE/mcp")
   R[card-env-snippet]=$(body_has "$page" '${env:GOFORGE_MCP_TOKEN}')
-  R[mcp-profile-card]=fail
-  [[ "$profile_status" == "200" && "${R[card-present]}${R[card-endpoint]}${R[card-env-snippet]}" == "yesyesyes" ]] && R[mcp-profile-card]=pass
+  R[mcp-security-card]=fail
+  [[ "$profile_status" == "200" && "${R[card-present]}${R[card-endpoint]}${R[card-env-snippet]}" == "yesyesyes" ]] && R[mcp-security-card]=pass
 
   # token-mcp-preset: the preset form is read+write, 90 days, no Never.
   local modal_status
@@ -1100,7 +1100,7 @@ cmd_drive_mcp_http() {
   [[ "${R[token-write-saved]}${R[token-read-saved]}${R[token-full-saved]}" == "yesyesyes" ]] || harness=fail
 
   # token-hint: the row shows gf_…last4, never the token. The list loads
-  # into Profile with hx-get /settings/tokens.
+  # into Security with hx-get /settings/tokens.
   bk_send GET /settings/tokens "$jar" "$page" >/dev/null
   local write_hint
   write_hint="gf_…$(tail -c 5 "$STATE_DIR/mcp-write.token" | tr -d '\n')"
@@ -1272,7 +1272,7 @@ cmd_drive_mcp_http() {
   {
     echo "harness=$harness"
     local k
-    for k in mcp-profile-card token-mcp-preset token-hint mcp-no-bearer-401 mcp-cookie-only-401 mcp-bad-bearer-401 \
+    for k in mcp-security-card token-mcp-preset token-hint mcp-no-bearer-401 mcp-cookie-only-401 mcp-bad-bearer-401 \
       mcp-full-refused mcp-get-405 mcp-initialize mcp-read-inventory mcp-write-inventory mcp-read-call \
       mcp-read-token-write-refused mcp-dry-run mcp-approval-audit mcp-protected-refusal mcp-protected-restart-allowed \
       mcp-cross-origin-403 token-rotate token-revoke token-audit; do
@@ -1280,7 +1280,7 @@ cmd_drive_mcp_http() {
     done
     echo "---"
     for k in $(printf '%s\n' "${!R[@]}" | sort); do
-      case "$k" in mcp-*|token-mcp-preset|token-hint|token-rotate|token-revoke|token-audit) continue ;; esac
+      case "$k" in mcp-security-card|token-mcp-preset|token-hint|token-rotate|token-revoke|token-audit) continue ;; esac
       echo "$k=${R[$k]}"
     done
   } >"$verdict"

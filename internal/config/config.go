@@ -74,8 +74,8 @@ type Config struct {
 	LogFormat string
 
 	// SentryDSN is SENTRY_DSN: optional Sentry error reporting for the
-	// control plane, used only while no admin has saved Settings → Profile
-	// → Error reporting (a saved row, even a blank one, wins).
+	// control plane, used only while no admin has saved Settings →
+	// Error reporting at /settings/git (a saved row, even a blank one, wins).
 	SentryDSN string
 
 	// Trusted Proxies - CIDR ranges whose X-Forwarded-For / X-Real-IP headers

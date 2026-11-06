@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// TwoFactorCard is the Settings → Profile two-factor card. A nil card hides
+// TwoFactorCard is the Settings → Security two-factor card. A nil card hides
 // it (2FA not wired). PasswordAccount is false for GitHub-only accounts,
 // which see a note that GitHub's own 2FA applies instead.
 type TwoFactorCard struct {

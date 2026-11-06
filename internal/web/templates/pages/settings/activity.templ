@@ -3,7 +3,6 @@ package settings
 import (
 	"github.com/raythurman2386/goforge/internal/web/templates/components"
 	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
-	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
 )
 
 var activitySourceOptions = []ui.SelectOption{
@@ -18,8 +17,7 @@ var activitySourceOptions = []ui.SelectOption{
 // Activity is /settings/activity: the audit log, newest first, filterable by
 // source, token name, and action.
 templ Activity(rows []components.ActivityRow, f ActivityFilters, csrfToken string) {
-	@layouts.AppLayout("Activity", csrfToken) {
-		@components.PageHeader("Activity", "Every change to your projects and services, from the UI, the API, or an MCP agent.")
+	@SettingsLayout(SettingsPageActivity, "Activity", "Every change to your projects and services, from the UI, the API, or an MCP agent.", csrfToken) {
 		if f.RetentionNote != "" {
 			<p class="mb-4 text-sm text-foreground-secondary" data-testid="audit-retention-note">{ f.RetentionNote }</p>
 		}

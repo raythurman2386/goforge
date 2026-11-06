@@ -1,11 +1,11 @@
 # Restore the GoForge database from a backup run
 
-An operator lists the backup runs with `goforge backup list` and restores the GoForge database from one with `goforge backup restore <run key>`, with GoForge stopped. Only `app/goforge-db.dump` is restored: the dump loads into a side database, sessions are cleared, a `backup.restore` audit row is written, and the side database is renamed into place. The previous database is kept as `<db>_pre_restore_<UTC time>`. Admins also see a read-only Restore points list on Settings → Profile → Backups with the command to run. There is no restore in the web UI, the API, or MCP.
+An operator lists the backup runs with `goforge backup list` and restores the GoForge database from one with `goforge backup restore <run key>`, with GoForge stopped. Only `app/goforge-db.dump` is restored: the dump loads into a side database, sessions are cleared, a `backup.restore` audit row is written, and the side database is renamed into place. The previous database is kept as `<db>_pre_restore_<UTC time>`. Admins also see a read-only Restore points list on Settings → Backups with the command to run. There is no restore in the web UI, the API, or MCP.
 
 ## Sub-features
 
 - `restore-list`: `goforge backup list` prints complete runs newest first (run key, trigger, GoForge version, start, bytes, skipped) and counts runs with no manifest as incomplete.
-- `restore-points-card`: Settings → Profile loads `GET /settings/backups/restore-points` (admin only, `Cache-Control: no-store`, `404` when not wired) showing the same runs and the stop / `docker compose run --rm --no-deps goforge ./goforge backup restore <key>` / start commands. No form, button, or `hx-post`/`hx-put`/`hx-delete`.
+- `restore-points-card`: Settings loads `GET /settings/backups/restore-points` (admin only, `Cache-Control: no-store`, `404` when not wired) showing the same runs and the stop / `docker compose run --rm --no-deps goforge ./goforge backup restore <key>` / start commands. No form, button, or `hx-post`/`hx-put`/`hx-delete`.
 - `restore-dry-run`: without `--yes` it prints the plan (run, dump size and SHA-256, side database, rename) and the preflight result, and changes nothing. A failing preflight exits non-zero.
 - `restore-confirm`: `--yes` asks for the run key on a TTY; with no TTY it needs `--confirm=<run key>`; a wrong key changes nothing.
 - `restore-refuse-no-manifest`, `restore-refuse-manifest-too-new`, `restore-refuse-sha-mismatch`, `restore-refuse-bytes-mismatch`, `restore-refuse-lock-held` (a backup run holds the advisory lock), `restore-refuse-other-connections` (message ends `stop GoForge first: docker compose stop goforge`), `restore-refuse-schema-newer` (side DB `schema_migrations` newer than the binary), `restore-refuse-schema-dirty` (backup taken while `schema_migrations` was dirty), and `restore-refuse-broken-dump`: each leaves the live database and its data unchanged and no side database behind.
@@ -27,7 +27,7 @@ docker compose run --rm --no-deps goforge ./goforge backup restore <run key> --y
 docker compose start goforge
 ```
 
-Or open Settings → Profile → Backups as the admin and read Restore points.
+Or open Settings → Backups as the admin and read Restore points.
 
 ## Driving it with verify.sh
 

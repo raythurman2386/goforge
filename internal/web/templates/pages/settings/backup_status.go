@@ -15,7 +15,10 @@ const (
 	statusFailed  = string(models.BackupRunFailed)
 )
 
-const backupTimeLayout = "Jan 2, 2006 15:04 MST"
+const (
+	backupTimeLayout           = "Jan 2, 2006 15:04 MST"
+	settingsSecondaryTextClass = "text-foreground-secondary"
+)
 
 // backupLastLine is the one-line summary: last success, or why there is none.
 func backupLastLine(st *backup.Status) string {
@@ -39,7 +42,7 @@ func backupLineClass(st *backup.Status) string {
 	if st.LastRun != nil && st.LastRun.Status == statusFailed {
 		return "text-danger"
 	}
-	return "text-foreground-secondary"
+	return settingsSecondaryTextClass
 }
 
 func backupScheduleLine(st *backup.Status) string {
@@ -110,7 +113,7 @@ func backupOffClass(form *backup.SettingsView) string {
 	if form != nil && form.KeysUnreadable {
 		return "text-warning-foreground"
 	}
-	return "text-foreground-secondary"
+	return settingsSecondaryTextClass
 }
 
 func accessKeyState(f *backup.SettingsView) string {

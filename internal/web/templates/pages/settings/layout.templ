@@ -1,6 +1,9 @@
 package settings
 
-import "github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+import (
+	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
+	"github.com/raythurman2386/goforge/internal/web/templates/layouts"
+)
 
 // SettingsSection replaces the former filled cards with a flat settings group.
 templ SettingsSection(title string, attrs templ.Attributes) {
@@ -53,4 +56,59 @@ templ SettingsFormGrid() {
 	<div class="grid gap-x-4 sm:grid-cols-2">
 		{ children... }
 	</div>
+}
+
+// SettingsPage identifies the active full settings page.
+type SettingsPage string
+
+const (
+	SettingsPageProfile  SettingsPage = "profile"
+	SettingsPageSecurity SettingsPage = "security"
+	SettingsPageActivity SettingsPage = "activity"
+	SettingsPageSettings SettingsPage = "settings"
+)
+
+type settingsNavItem struct {
+	page SettingsPage
+	name string
+	href string
+}
+
+var settingsNavItems = []settingsNavItem{
+	{SettingsPageProfile, "Profile", "/settings/profile"},
+	{SettingsPageSecurity, "Security", "/settings/security"},
+	{SettingsPageActivity, "Activity", "/settings/activity"},
+	{SettingsPageSettings, "Settings", "/settings/git"},
+}
+
+// SettingsLayout is the one shell and left navigation shared by all settings
+// pages. Only the active page gets aria-current and the current-link style.
+templ SettingsLayout(active SettingsPage, title, description, csrfToken string) {
+	@layouts.AppLayout(title, csrfToken) {
+		<div class="mx-auto max-w-5xl lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-10">
+			<nav class="mb-6 flex gap-1 overflow-x-auto border-b border-divider lg:sticky lg:top-0 lg:mb-0 lg:h-fit lg:flex-col lg:border-b-0" aria-label="Settings pages" tabindex="0">
+				for _, item := range settingsNavItems {
+					<a href={ templ.SafeURL(item.href) } aria-current={ settingsCurrent(active, item.page) } class={ "shrink-0 rounded-md px-3 py-2 text-sm font-medium max-md:min-h-11 max-md:flex max-md:items-center " + settingsNavClass(active, item.page) }>{ item.name }</a>
+				}
+			</nav>
+			<div class="min-w-0 max-w-3xl">
+				<div class="mb-6"><h1 class="text-2xl font-semibold tracking-tight text-foreground">{ title }</h1><p class="mt-1 text-sm text-foreground-secondary">{ description }</p></div>
+				{ children... }
+			</div>
+		</div>
+	}
+}
+
+func settingsCurrent(active, item SettingsPage) string {
+	if active == item {
+		return "page"
+	}
+	return ""
+}
+
+func settingsNavClass(active, item SettingsPage) string {
+	if active == item {
+		return "text-foreground"
+	}
+	return settingsSecondaryTextClass
 }

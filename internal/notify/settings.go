@@ -359,7 +359,7 @@ func (s *SettingsService) Test(ctx context.Context, in SettingsInput) (string, e
 		Kind:     EventTest,
 		Resource: Resource{Type: "notifier", ID: next.Kind},
 		Error:    "This is a test from GoForge. Failures will look like this.",
-		Path:     "/settings/profile",
+		Path:     "/settings/git",
 		Time:     time.Now(),
 	}
 	client := s.Client

@@ -7,12 +7,12 @@ An admin sets how long audit rows are kept. The default is forever. A daily job 
 - `retention-off` with no saved row and no `GOFORGE_AUDIT_RETENTION_DAYS`, rows of any age stay. The activity page says rows are kept until deleted by hand.
 - `retention-30` saving `30` deletes only rows older than 30 days, leaves a younger row, and writes one `audit.retention.purge` row with `deleted`, `cutoff`, `through_seq`, and `through_hash`.
 - `retention-invalid` `10` and `abc` are a field error on `retention_days`. Nothing is saved.
-- `retention-admin-only` a non-admin does not see the card on Settings → Profile and `PUT /settings/audit-retention` is `403`.
+- `retention-admin-only` a non-admin does not see the card on Settings and `PUT /settings/audit-retention` is `403`.
 - `retention-replay` `FindApproval` still returns a row that is inside the window, so the same `approval_ref` is still refused.
 
 ## How to get to it (user POV)
 
-- Settings → Profile → **Audit log**, admins only.
+- Settings → **Audit log**, admins only.
 - The field is **Retention days**. **Save audit retention** posts `PUT /settings/audit-retention`.
 - Settings → Activity shows one line, `data-testid="audit-retention-note"`.
 

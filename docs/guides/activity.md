@@ -67,7 +67,7 @@ API rows and links to the page filtered to agents.
 ## Retention and tamper detection
 
 Rows are kept forever unless you set a retention. Admins set it in
-Settings → Profile → **Audit log**, or with `GOFORGE_AUDIT_RETENTION_DAYS`
+Settings → **Audit log**, or with `GOFORGE_AUDIT_RETENTION_DAYS`
 until someone saves the card (a saved value wins). `0` keeps every row.
 Any other value must be 30 to 3650 days. The page above the table says
 which rule is in effect. About five minutes after startup, and then once

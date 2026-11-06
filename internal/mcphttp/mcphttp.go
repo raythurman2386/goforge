@@ -36,7 +36,7 @@ const innerTimeout = 15 * time.Second
 
 // writeRefusal is the tool error a read-only token gets for a mutation tool.
 const writeRefusal = "insufficient_scope: this token lacks the write scope, so write tools do not run on /mcp. " +
-	"Create an MCP token with write in Settings → Profile."
+	"Create an MCP token with write in Settings → Security."
 
 // Deps wires the handler.
 type Deps struct {
@@ -100,9 +100,9 @@ func (h *handler) authenticate(next http.Handler) http.Handler {
 		}
 		if !token.IsMCPCapable() {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="`+Realm+`", error="insufficient_scope", scope="read write"`)
-			msg := "this token cannot use /mcp: create a scoped token (read, or read and write) in Settings → Profile"
+			msg := "this token cannot use /mcp: create a scoped token (read, or read and write) in Settings → Security"
 			if token.IsFull() {
-				msg = "full-scope tokens are not accepted on /mcp: create a scoped MCP token (read, or read and write) in Settings → Profile"
+				msg = "full-scope tokens are not accepted on /mcp: create a scoped MCP token (read, or read and write) in Settings → Security"
 			}
 			writeError(w, http.StatusForbidden, "insufficient_scope", msg)
 			return

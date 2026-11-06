@@ -1,6 +1,6 @@
 # Notifications
 
-GoForge can send an alert to one outbound notifier when something fails: an [ntfy](https://ntfy.sh) topic, a webhook that takes a JSON POST, or an email over SMTP. An admin sets it up in **Settings → Profile → Notifications**. A save applies at once, with no restart.
+GoForge can send an alert to one outbound notifier when something fails: an [ntfy](https://ntfy.sh) topic, a webhook that takes a JSON POST, or an email over SMTP. An admin sets it up in **Settings → Notifications**. A save applies at once, with no restart.
 
 ## What sends an alert
 
@@ -8,7 +8,7 @@ GoForge can send an alert to one outbound notifier when something fails: an [ntf
 |-------|------|------|
 | `deploy.failed` | A queued deployment fails. A canceled deployment sends nothing. | The deployment page |
 | `service.failed` | A service deploy, config edit, or image update ends with the service failed. The error is the service's `last_error`. | The service page |
-| `backup.failed` | A backup run (nightly or `goforge backup run`) ends `failed`. A run that cannot start, for example because another run holds the lock, sends nothing. | Settings → Profile, Backups card |
+| `backup.failed` | A backup run (nightly or `goforge backup run`) ends `failed`. A run that cannot start, for example because another run holds the lock, sends nothing. | Settings, Backups card |
 | `container.unhealthy` | A tracked container's Docker health check reports `unhealthy`. | The container page |
 | `container.exited` | A tracked container that should be running is `exited`, `dead`, or `restarting`. | The container page |
 
@@ -16,7 +16,7 @@ GoForge sends each alert once. A failed deploy or service is reported by the run
 
 ## Set it up
 
-1. Open **Settings → Profile** as an admin. The **Notifications** card is under **Backups**.
+1. Open **Settings** as an admin. The **Notifications** card is under **Backups**.
 2. Pick **Type**:
     - **ntfy topic**: GoForge POSTs plain text to the topic URL, with `Title`, `Tags`, `Priority` (`high` for failures), and `Click` (the link) headers.
     - **Webhook**: GoForge POSTs the JSON payload below with `Content-Type: application/json`.

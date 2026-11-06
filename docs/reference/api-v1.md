@@ -19,7 +19,7 @@ Route definitions: `internal/apiv1/handler.go`.
 
 ## Tokens and scopes
 
-Create a token in **Settings → Profile → API Tokens → Generate Token** (or
+Create a token in **Settings → Security → API Tokens → Generate Token** (or
 **MCP → Generate MCP token** for the MCP preset: `read` + `write`, 90 days).
 Pick a name, an expiry, and the scopes. The raw token is shown once. Tokens
 created since migration `021_api_token_hint` start with `gf_` and store a

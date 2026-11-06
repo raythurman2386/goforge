@@ -1,5 +1,5 @@
 // Package errreport sends GoForge control-plane errors to Sentry when an
-// admin saves a DSN in Settings → Profile → Error reporting (or SENTRY_DSN
+// admin saves a DSN in Settings → Error reporting (or SENTRY_DSN
 // is set and no settings row exists). With no DSN it is off: no client is
 // bound, nothing is captured, and no traffic leaves the process.
 //

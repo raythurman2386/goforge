@@ -15,13 +15,13 @@ import (
 func renderProfileTF(t *testing.T, u *models.User, c *TwoFactorCard) string {
 	t.Helper()
 	var b bytes.Buffer
-	if err := Profile(u, "tok", nil, nil, nil, nil, nil, c, nil).Render(context.Background(), &b); err != nil {
+	if err := Security(u, "tok", nil, c).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	return html.UnescapeString(b.String())
 }
 
-func TestProfileTwoFactorCard(t *testing.T) {
+func TestSecurityTwoFactorCard(t *testing.T) {
 	local := &models.User{Email: "u@x", PasswordHash: sql.NullString{String: "h", Valid: true}}
 	if got := renderProfileTF(t, local, nil); strings.Contains(got, "two-factor-card") {
 		t.Error("nil card rendered")

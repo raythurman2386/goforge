@@ -7,7 +7,7 @@ import (
 	"github.com/raythurman2386/goforge/internal/web/templates/components/ui"
 )
 
-// TwoFactorCardView is the Profile card for opt-in TOTP. Password accounts
+// TwoFactorCardView is the Security section for opt-in TOTP. Password accounts
 // turn it on with their password and a first code, and off with their
 // password and a current code. GitHub sign-in never asks for this code.
 templ TwoFactorCardView(c *TwoFactorCard, csrfToken string) {
@@ -109,7 +109,7 @@ templ RecoveryCodesModal(codes []string) {
 			@ui.Button(ui.ButtonProps{Variant: ui.ButtonSecondary, Attrs: ui.CopyAttrs("recovery-codes")}) {
 				Copy codes
 			}
-			@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/settings/profile"}) {
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Href: "/settings/security"}) {
 				Done
 			}
 		</div>

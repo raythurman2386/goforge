@@ -1,6 +1,6 @@
 # JSON API v1 with scoped tokens
 
-An admin creates an API token with `read`, `write`, or `protected` scopes on the profile page and calls `/api/v1` with it as a bearer token. Session cookies do not work there. Reads return masked secrets. Every mutation is a dry run unless the body says `"dry_run": false`, a real run needs `approval_ref`, and the audit log records it before anything changes. Stop, config edit, and image update of a protected service are refused without the `protected` scope; restart is allowed.
+An admin creates an API token with `read`, `write`, or `protected` scopes on the Security page and calls `/api/v1` with it as a bearer token. Session cookies do not work there. Reads return masked secrets. Every mutation is a dry run unless the body says `"dry_run": false`, a real run needs `approval_ref`, and the audit log records it before anything changes. Stop, config edit, and image update of a protected service are refused without the `protected` scope; restart is allowed.
 
 ## Sub-features
 
@@ -23,7 +23,7 @@ An admin creates an API token with `read`, `write`, or `protected` scopes on the
 
 ## How to get to it (user POV)
 
-- Open `Settings` at `/settings/profile`, section `API Tokens`.
+- Open `Settings → Security` at `/settings/security`, section `API Tokens`.
 - Choose `Generate Token`. The modal `Generate API Token` has a name, an expiry, and the `read`, `write`, `protected` boxes. No box means a legacy `full` token.
 - Choose `Generate Token`. The modal `API Token Created` shows the token once.
 - Call `http://127.0.0.1:8080/api/v1/...` with `Authorization: Bearer <token>`.

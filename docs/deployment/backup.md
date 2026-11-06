@@ -4,7 +4,7 @@ GoForge can upload a backup every night to S3-compatible storage: Cloudflare R2,
 
 ## Turn it on
 
-An admin sets backups up in the web UI: **Settings → Profile → Backups**. The form has every setting below plus an **Enabled** switch. **Save** applies the change right away, with no restart. **Test connection** checks the endpoint, bucket, and key by listing one object under the prefix, and nothing is written. It gives up after 10 seconds. Only admins see the form; other users get `403` from its routes.
+An admin sets backups up in the web UI: **Settings → Backups**. The form has every setting below plus an **Enabled** switch. **Save** applies the change right away, with no restart. **Test connection** checks the endpoint, bucket, and key by listing one object under the prefix, and nothing is written. It gives up after 10 seconds. Only admins see the form; other users get `403` from its routes.
 
 - The secret access key is never shown again after it is saved. Leave the field blank to keep the stored key, or type a new one to replace it. The access key ID shows at most its last 4 characters.
 - Both keys are stored in the GoForge database, encrypted with `ENCRYPTION_KEY`, like Git source tokens.
@@ -30,7 +30,7 @@ services:
 
 Start GoForge (`docker compose up -d goforge`), check the log, then delete those lines from the override and recreate the container (`docker compose up -d goforge`) so the keys leave its environment. How GoForge treats the variables:
 
-1. With no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies the `BACKUP_*` values into the saved settings on its first start and logs `imported BACKUP_* into backup settings`. From then on, edit them in Settings → Profile.
+1. With no saved settings and `BACKUP_S3_BUCKET` set, GoForge copies the `BACKUP_*` values into the saved settings on its first start and logs `imported BACKUP_* into backup settings`. From then on, edit them in Settings.
 2. Once saved settings exist, they win. Changing `BACKUP_*` afterwards has no effect, and GoForge logs a warning that names the fields that differ. After the import, remove **every** `BACKUP_*` variable, not only the two keys.
 3. With no saved settings and no bucket, backups are off.
 
@@ -56,8 +56,8 @@ While no saved settings exist, a bucket in the environment with a missing endpoi
 
 The saved access key ID and secret are sealed with `ENCRYPTION_KEY`. If GoForge starts with a different key (lost, rotated, or a restore onto a new server), the keys no longer decrypt:
 
-- Backups stay off. GoForge does not fall back to `BACKUP_*`. It logs `saved backup keys do not decrypt with the current ENCRYPTION_KEY; backups stay off until an admin enters both keys again in Settings → Profile → Backups`. `goforge backup run` fails with the same advice.
-- Settings → Profile → Backups still shows the endpoint, bucket, prefix, region, schedule, retention, and timeout. Both key fields say the saved key does not decrypt.
+- Backups stay off. GoForge does not fall back to `BACKUP_*`. It logs `saved backup keys do not decrypt with the current ENCRYPTION_KEY; backups stay off until an admin enters both keys again in Settings → Backups`. `goforge backup run` fails with the same advice.
+- Settings → Backups still shows the endpoint, bucket, prefix, region, schedule, retention, and timeout. Both key fields say the saved key does not decrypt.
 - Enter **both** the access key ID and the secret, tick Enabled, and save. GoForge stores them sealed with the current key and backups resume with no restart. A save with only one key, or none, is refused with a message naming the problem. Test connection also needs both keys.
 
 `goforge backup run` uses the same settings as the server: the saved settings if they exist, otherwise `BACKUP_*`.
@@ -65,7 +65,7 @@ The saved access key ID and secret are sealed with `ENCRYPTION_KEY`. If GoForge 
 Use a key that can only read, write, list, and delete in this one bucket. Encryption is the provider's at-rest encryption; GoForge does not encrypt the files itself. Anyone with the key can read the dumps.
 
 !!! danger "Keep ENCRYPTION_KEY outside the server"
-    The GoForge database holds service passwords, tokens, and env vars encrypted with `ENCRYPTION_KEY`. The key is never written to a backup, a log line, or a run's error. Without a copy of it, a restored database cannot decrypt those values. Store it, with the rest of your env file (`.env`), in a password manager. If the key is lost, the saved backup keys cannot be decrypted either: backups stay off until an admin enters both keys again in Settings → Profile → Backups (see [If ENCRYPTION_KEY changes](#if-encryption_key-changes)).
+    The GoForge database holds service passwords, tokens, and env vars encrypted with `ENCRYPTION_KEY`. The key is never written to a backup, a log line, or a run's error. Without a copy of it, a restored database cannot decrypt those values. Store it, with the rest of your env file (`.env`), in a password manager. If the key is lost, the saved backup keys cannot be decrypted either: backups stay off until an admin enters both keys again in Settings → Backups (see [If ENCRYPTION_KEY changes](#if-encryption_key-changes)).
 
 ## What a run backs up
 
@@ -124,7 +124,7 @@ The scheduler runs inside `goforge serve`. Missed runs are not caught up: if GoF
 
 Every run is a row in `backup_runs` with its status, object count, bytes, skipped count, pruned count, and a one-line error with secrets removed. Failures are also logged. There is no other alert.
 
-- **Settings → Profile** shows admins the last run, the error of a failed run, and the next run.
+- **Settings** shows admins the last run, the error of a failed run, and the next run.
 - **`GET /api/v1/backups`** (read scope, admin account) returns the same status as JSON with the recent runs. See [API v1](../reference/api-v1.md).
 - **MCP**: `get_backup_status` calls that endpoint.
 
@@ -144,7 +144,7 @@ It prints the result and exits non-zero when the run failed. It does not run mig
 docker compose exec goforge ./goforge backup list
 ```
 
-It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Profile → Backups → Restore points**, with the command to run, and each Postgres, Gitea, Vaultwarden, or MinIO service page lists the runs that hold that service's data (run key, time, size) with its `restore-service` command. There is no restore button in the web UI, the API, or MCP.
+It lists the runs under the prefix, newest first: run key, trigger, GoForge version, start time, bytes, and skipped count. Runs without a `manifest.json` are counted as incomplete and cannot be restored. Admins see the same list, read-only, under **Settings → Backups → Restore points**, with the command to run, and each Postgres, Gitea, Vaultwarden, or MinIO service page lists the runs that hold that service's data (run key, time, size) with its `restore-service` command. There is no restore button in the web UI, the API, or MCP.
 
 ### GoForge database
 

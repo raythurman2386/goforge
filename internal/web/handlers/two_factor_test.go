@@ -175,7 +175,7 @@ var (
 	codesRE  = regexp.MustCompile(`id="recovery-codes"[^>]*>([^<]+)<`)
 )
 
-// enroll drives Settings → Profile setup and confirm, returning the TOTP
+// enroll drives Settings → Security setup and confirm, returning the TOTP
 // secret and the recovery codes the dialogs showed.
 func (e *tfEnv) enroll(t *testing.T, u *models.User) (string, []string) {
 	t.Helper()

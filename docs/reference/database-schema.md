@@ -340,7 +340,7 @@ One row at most (`id = 1`). Holds the admin retention choice and the hash-chain 
 |--------|------|-------------|-------------|
 | `id` | `SMALLINT` | PK, default 1, CHECK = 1 | Single row |
 | `retention_days` | `INT` | NOT NULL, default 0, CHECK 0 or 30–3650 | How long to keep rows. 0 keeps them |
-| `retention_saved` | `BOOLEAN` | NOT NULL, default false | True after an admin saves the Profile card. Until then `GOFORGE_AUDIT_RETENTION_DAYS` wins |
+| `retention_saved` | `BOOLEAN` | NOT NULL, default false | True after an admin saves the Settings card. Until then `GOFORGE_AUDIT_RETENTION_DAYS` wins |
 | `boundary_seq` | `BIGINT` | NOT NULL, default 0 | Highest seal seq removed by retention |
 | `boundary_hash` | `BYTEA` | NOT NULL, 32 bytes, default 32 zero bytes | `row_hash` of that seal. The oldest remaining seal's `prev_hash` must equal it |
 | `updated_by` | `UUID` | FK -> users(id) ON DELETE SET NULL | Admin who last saved retention |
@@ -418,7 +418,7 @@ One row per backup run, from the nightly scheduler or `goforge backup run`. Hold
 
 ### backup_settings
 
-The backup destination and policy an admin saves in Settings → Profile. At most one row (`id = 1`). Once the row exists it wins over the `BACKUP_*` environment. With no row GoForge uses the environment, and on first start copies `BACKUP_*` into the row when `BACKUP_S3_BUCKET` is set. See [Backup & Restore](../deployment/backup.md#turn-it-on).
+The backup destination and policy an admin saves in Settings. At most one row (`id = 1`). Once the row exists it wins over the `BACKUP_*` environment. With no row GoForge uses the environment, and on first start copies `BACKUP_*` into the row when `BACKUP_S3_BUCKET` is set. See [Backup & Restore](../deployment/backup.md#turn-it-on).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -451,7 +451,7 @@ The backup destination and policy an admin saves in Settings → Profile. At mos
 
 ### notify_settings
 
-The outbound notifier an admin saves in Settings → Profile → Notifications. At most one row (`id = 1`). See [Notifications](../guides/notifications.md).
+The outbound notifier an admin saves in Settings → Notifications. At most one row (`id = 1`). See [Notifications](../guides/notifications.md).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|

@@ -213,7 +213,7 @@ func ProbeS3(ctx context.Context, cfg config.BackupConfig) (bool, error) {
 	return store.Probe(ctx, cfg.Prefix)
 }
 
-// SettingsService backs the admin Backups form on Settings → Profile.
+// SettingsService backs the admin Backups form on Settings.
 type SettingsService struct {
 	Store SettingsStore
 	// Env is BACKUP_* from the environment, used until a row exists.

@@ -22,7 +22,7 @@ cannot speak HTTP; it calls `/api/v1` over HTTPS (see
 
 ## 1. Create an MCP token
 
-Sign in and open **Settings → Profile → MCP → Generate MCP token**. The
+Sign in and open **Settings → Security → MCP → Generate MCP token**. The
 preset checks `read` and `write` and expires in 90 days (30, 90, or 365; an
 MCP token always expires).
 
