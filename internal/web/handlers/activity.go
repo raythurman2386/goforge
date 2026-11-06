@@ -58,7 +58,7 @@ func NewActivityHandler(audit AuditLister, logger *slog.Logger) *ActivityHandler
 
 func activitySource(s string) string {
 	switch s {
-	case models.AuditSourceMCP, models.AuditSourceAPI, models.AuditSourceUI, models.AuditSourceWebhook, models.AuditSourceCLI, models.AuditSourceAgent:
+	case models.AuditSourceMCP, models.AuditSourceAPI, models.AuditSourceUI, models.AuditSourceWebhook, models.AuditSourceCLI, models.AuditSourceSystem, models.AuditSourceAgent:
 		return s
 	}
 	return ""

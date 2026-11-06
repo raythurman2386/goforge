@@ -42,6 +42,8 @@ func TestActivityRowSourceAndFailure(t *testing.T) {
 		{ID: "1", Action: "service.delete", Details: json.RawMessage(`{"via":"ui"}`)},
 		{ID: "2", Action: "api_v1.deploy_service.failed", Details: json.RawMessage(`{"error":"boom"}`)},
 		{ID: "3", Action: "deployment.run.failed", UserAgent: sql.NullString{String: "goforge-mcp/1", Valid: true}, Details: json.RawMessage(`{"audit_id":"9"}`)},
+		{ID: "4", Action: models.AuditActionContainerOrphanRemove, Details: json.RawMessage(`{"via":"system"}`)},
+		{ID: "5", Action: "unknown", Details: json.RawMessage(`{"via":"future"}`)},
 	})
 	if rows[0].Source != models.AuditSourceUI || rows[0].Failed {
 		t.Errorf("ui row = %+v", rows[0])
@@ -51,5 +53,11 @@ func TestActivityRowSourceAndFailure(t *testing.T) {
 	}
 	if rows[2].Source != models.AuditSourceMCP || rows[2].RelatedURL != "/settings/activity?audit_id=9" {
 		t.Errorf("mcp row = %+v", rows[2])
+	}
+	if rows[3].Source != models.AuditSourceSystem || activitySourceLabel(rows[3].Source) != "System" {
+		t.Errorf("system row = %+v", rows[3])
+	}
+	if activitySourceLabel(rows[4].Source) != "UI" {
+		t.Errorf("unknown source is labeled UI: %s", activitySourceLabel(rows[4].Source))
 	}
 }

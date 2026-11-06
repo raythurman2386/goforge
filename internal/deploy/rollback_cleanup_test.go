@@ -22,6 +22,7 @@ func (r *rollbackTrackingRuntime) CreateContainer(_ context.Context, opts docker
 	r.createdOpts = opts
 	return "restored-docker-id", nil
 }
+
 func (r *rollbackTrackingRuntime) RemoveContainer(_ context.Context, id string) error {
 	r.removedID = id
 	return nil
@@ -54,5 +55,41 @@ func TestRollbackRestoredOptions_KeepOwnershipLabels(t *testing.T) {
 	opts := containerOptionsFromContainer(context.Background(), row, nil, nil, svc)
 	if opts.Name != "app-restored" || opts.Labels[docker.ManagedLabelKey] != docker.ManagedLabelValue || opts.Labels[docker.ProjectLabelKey] != "project-id" || opts.Labels[docker.EnvironmentLabelKey] != "environment-id" {
 		t.Fatalf("restored options = %+v", opts)
+	}
+}
+
+type rollbackRemovalFailureRuntime struct {
+	rollbackTrackingRuntime
+	removeFails bool
+}
+
+func (r *rollbackRemovalFailureRuntime) RemoveContainer(ctx context.Context, id string) error {
+	if r.removeFails {
+		return errors.New("transient host removal failed")
+	}
+	return r.rollbackTrackingRuntime.RemoveContainer(ctx, id)
+}
+
+type creationCleanupIntents struct{ retained *models.ContainerCleanup }
+
+func (s *creationCleanupIntents) Retain(_ context.Context, c *models.ContainerCleanup) error {
+	s.retained = c
+	return nil
+}
+
+func TestRestoreDeployment_FailedCompensationRetainsCleanupIntent(t *testing.T) {
+	runtime := &rollbackRemovalFailureRuntime{removeFails: true}
+	store := &rollbackFailingContainerStore{}
+	intents := &creationCleanupIntents{}
+	projects := &memProjects{items: map[string]*models.Project{"project": {ID: "project"}}}
+	envs := &memEnvironments{items: map[string]*models.Environment{"env": {ID: "env", ProjectID: "project"}}}
+	svc := &Service{containerRepo: store, projectRepo: projects, environmentRepo: envs, dockerClient: runtime, containerCleanup: intents, logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	store.items = []*models.Container{{ID: "original", DeploymentID: sql.NullString{String: "target", Valid: true}, Name: "app", Image: "unused"}}
+	err := NewRollbackManager(svc).restoreDeployment(context.Background(), &models.Deployment{ID: "target", EnvironmentID: "env"})
+	if err == nil || intents.retained == nil || intents.retained.Reason != models.ContainerCleanupCreateFailure {
+		t.Fatalf("error=%v retained=%+v", err, intents.retained)
+	}
+	if intents.retained.ProjectID.String != "project" || intents.retained.EnvironmentID.String != "env" || runtime.removedID != "" {
+		t.Fatalf("cleanup intent or compensating removal wrong: %+v removed=%q", intents.retained, runtime.removedID)
 	}
 }

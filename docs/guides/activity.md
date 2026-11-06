@@ -8,7 +8,7 @@ first: every change made in the web UI, through `/api/v1`, or by an MCP agent.
 | Column | Meaning |
 |--------|---------|
 | Time | When the row was written |
-| Source | `MCP` (user agent starts with `goforge-mcp`), `API` (an `api_v1.` action or `details.via` = `api_v1`), `Webhook` (`details.via` = `webhook`), `CLI` (`details.via` = `cli`, a host command such as `goforge user reset-2fa`), or `UI` |
+| Source | `MCP` (user agent starts with `goforge-mcp`), `API` (an `api_v1.` action or `details.via` = `api_v1`), `Webhook` (`details.via` = `webhook`), `CLI` (`details.via` = `cli`, a host command such as `goforge user reset-2fa`), `System` (automatic host maintenance, `details.via` = `system`), or `UI` |
 | Action | The action, for example `service.delete` or `api_v1.restart_service`. It links to the change and its outcome rows |
 | Token | The API token name that made the change (API and MCP rows) |
 | Resource | A link to the project, service, deployment, environment's project, container, API token, or Git source |
@@ -19,7 +19,7 @@ Rows whose action ends in `.failed` are tinted red.
 
 ## Filters
 
-- **Source**: Agents (MCP or API), MCP, API, UI, Webhook, or CLI.
+- **Source**: Agents (MCP or API), MCP, API, UI, Webhook, CLI, or System.
 - **Token name**: exact token name, for example `ci-bot`.
 - **Action**: part of the action, ignoring case (`restart`, `delete`).
 - `?audit_id=<id>` shows one change and every row whose `details.audit_id`
@@ -36,13 +36,14 @@ API rows and links to the page filtered to agents.
 
 - Web UI changes, with `details.via` = `ui`: project create, update,
   settings, delete, link and unlink a service; deployment trigger, rollback,
-  and cancel; environment create and update; automatic orphan-container removal; variable set (key and
+  and cancel; environment create and update; variable set (key and
   `is_secret`, never the value), delete, and sync; service deploy, delete,
   restart, config edit (field names, never values), and image update;
   container stop and restart.
 - Every `/api/v1` and `/mcp` write, recorded before it acts, as before.
 - Login, logout, registration, API token create, rotate, and revoke, backup
   settings, and `goforge backup restore`, as before.
+- Automatic orphan-container removal (`container.orphan.remove`), with `details.via` = `system`. If the project row still exists, the row is attributed to its owner and is present in that owner's Activity under **System**. When both parents are already unrecoverable, there is no tenant owner to attribute and the row remains discoverable by an admin using **All users**; no fake actor is assigned.
 - Settings changes about your account, with `details.via` = `ui`: password
   change (`user.password.change`) and **Sign out other sessions**
   (`user.sessions.revoke`), both with `sessions_revoked`; Profile save

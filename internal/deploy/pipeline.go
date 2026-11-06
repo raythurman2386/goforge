@@ -74,7 +74,7 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) (err err
 	containerEnv := s.buildContainerEnv(ctx, d.EnvironmentID, env.ProjectID)
 
 	containerName := fmt.Sprintf("goforge-%s-%s-%s", p.ID, env.Name, d.ID)
-	containerID, err := s.dockerClient.CreateContainer(ctx, docker.ContainerOptions{
+	containerID, finishCreate, err := s.createAppContainer(ctx, env, docker.ContainerOptions{
 		Name:          containerName,
 		Image:         imageName,
 		Env:           containerEnv,
@@ -86,16 +86,11 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) (err err
 		return fmt.Errorf("docker deploy failed: %w", err)
 	}
 
-	if s.containerRepo != nil {
-		if cErr := s.containerRepo.Create(ctx, &models.Container{
-			DeploymentID: sql.NullString{String: d.ID, Valid: true},
-			DockerID:     containerID,
-			Name:         containerName,
-			Image:        imageName,
-			Status:       models.ContainerStatusRunning,
-		}); cErr != nil && s.logger != nil {
-			s.logger.Error("failed to record container in DB", "error", cErr, "deployment_id", d.ID)
-		}
+	if finishCreate != nil {
+		defer finishCreate()
+	}
+	if err := s.recordDeployedContainer(ctx, d, env, containerID, containerName, imageName); err != nil {
+		return err
 	}
 
 	if hErr := s.performHealthCheck(ctx, p, env, containerID, d.ID); hErr != nil {
@@ -116,6 +111,24 @@ func (s *Service) RunPipeline(ctx context.Context, deploymentID string) (err err
 		}
 	}(d.EnvironmentID, d.ID)
 
+	return nil
+}
+
+func (s *Service) recordDeployedContainer(ctx context.Context, d *models.Deployment, env *models.Environment, containerID, name, image string) error {
+	if s.containerRepo == nil {
+		return nil
+	}
+	if err := s.containerRepo.Create(ctx, &models.Container{
+		DeploymentID: sql.NullString{String: d.ID, Valid: true}, DockerID: containerID,
+		Name: name, Image: image, Status: models.ContainerStatusRunning,
+	}); err != nil {
+		if removeErr := s.dockerClient.RemoveContainer(ctx, containerID); removeErr != nil && !docker.IsNotFound(removeErr) {
+			if retainErr := s.retainUnrecordedCleanup(ctx, containerID, env); retainErr != nil {
+				return errors.Join(fmt.Errorf("record deployed container: %w", err), fmt.Errorf("retain failed removal: %w", retainErr))
+			}
+		}
+		return fmt.Errorf("failed to record deployed container: %w", err)
+	}
 	return nil
 }
 

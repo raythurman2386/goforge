@@ -41,6 +41,35 @@ func TestIntegration_DeleteProjectRemovesRestoredAndDBRows(t *testing.T) {
 	}
 }
 
+func TestIntegration_CleanupCreationFailureIntents(t *testing.T) {
+	fixture := newCleanupIntegrationFixture(t)
+	ids := fixture.create("unrecorded", map[string]string{docker.ManagedLabelKey: docker.ManagedLabelValue, docker.ProjectLabelKey: fixture.project.ID, docker.EnvironmentLabelKey: fixture.environment.ID}, "", "-restored")
+	if len(ids) != 2 {
+		t.Fatalf("real fixture has %d containers, want 2", len(ids))
+	}
+	if err := fixture.docker.StopContainer(fixture.ctx, ids[1]); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		intent := &models.ContainerCleanup{DockerID: id, ProjectID: sql.NullString{String: fixture.project.ID, Valid: true}, EnvironmentID: sql.NullString{String: fixture.environment.ID, Valid: true}, Reason: models.ContainerCleanupCreateFailure}
+		if err := fixture.service.cleanupStore.Add(fixture.ctx, intent); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := fixture.containers.Create(fixture.ctx, &models.Container{DockerID: ids[0], Name: "unrecorded", Image: "busybox:stable", Status: models.ContainerStatusRunning}); err != nil {
+		t.Fatal(err)
+	}
+	if err := fixture.service.ReconcileOrphans(fixture.ctx); err != nil {
+		t.Fatal(err)
+	}
+	fixture.assertRemoved(ids)
+	rows, err := fixture.service.cleanupStore.List(fixture.ctx)
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("pending cleanup after retry: %d %v", len(rows), err)
+	}
+}
+
 func TestIntegration_DeleteEnvironmentRemovesRestored(t *testing.T) {
 	fixture := newCleanupIntegrationFixture(t)
 	ids := fixture.createPair("environment")
@@ -58,26 +87,49 @@ func TestIntegration_DeleteEnvironmentRemovesRestored(t *testing.T) {
 
 func TestIntegration_OrphanReconcileRemovesAndAudits(t *testing.T) {
 	fixture := newCleanupIntegrationFixture(t)
-	ids := fixture.createOrphans()
+	// Simulate an environment removed while its host object remains. The
+	// project owner is recoverable and must see the system audit in Activity.
+	ids := fixture.createPair("orphan")
+	if err := fixture.service.environmentRepo.Delete(fixture.ctx, fixture.environment.ID); err != nil {
+		t.Fatal(err)
+	}
 	audits := repositories.NewAuditLogRepository(fixture.db.DB)
 	fixture.service.WithAudit(audits)
 	if err := fixture.service.ReconcileOrphans(fixture.ctx); err != nil {
 		t.Fatal(err)
 	}
 	fixture.assertRemoved(ids)
-	rows, err := audits.List(fixture.ctx, 10, 0)
+	rows, err := audits.ListFiltered(fixture.ctx, repositories.AuditFilter{UserID: fixture.project.UserID, Source: models.AuditSourceSystem, Limit: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
+	other := &models.User{Email: "gfcleanup-other-" + uuid.NewString() + "@example.test"}
+	if err := repositories.NewUserRepository(fixture.db.DB, nil).Create(fixture.ctx, other); err != nil {
+		t.Fatal(err)
+	}
+	otherRows, err := audits.ListFiltered(fixture.ctx, repositories.AuditFilter{UserID: other.ID, Source: models.AuditSourceSystem, Limit: 100})
+	if err != nil || len(otherRows) != 0 {
+		t.Fatalf("cross-tenant system rows=%d err=%v", len(otherRows), err)
+	}
 	found := 0
 	for _, row := range rows {
-		if row.Action == models.AuditActionContainerOrphanRemove {
+		if row.Action == models.AuditActionContainerOrphanRemove && row.UserID.String == fixture.project.UserID {
 			found++
 		}
 	}
 	if found != len(ids) {
-		t.Fatalf("orphan audit rows = %d, want %d", found, len(ids))
+		t.Fatalf("owner-visible system orphan audit rows = %d, want %d", found, len(ids))
 	}
+	rows, err = audits.ListFiltered(fixture.ctx, repositories.AuditFilter{UserID: fixture.project.UserID, Source: models.AuditSourceUI, Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.Action == models.AuditActionContainerOrphanRemove {
+			t.Error("system orphan row classified as UI")
+		}
+	}
+	// Env deletion has no standalone HTTP route at this head; its proof remains service-level.
 	if err := fixture.service.DeleteProject(fixture.ctx, fixture.project.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +164,7 @@ func newCleanupIntegrationFixture(t *testing.T) *cleanupIntegrationFixture {
 		db.Close()
 		t.Fatal(err)
 	}
-	dc, err := docker.NewClient("")
+	dc, err := docker.NewClient(os.Getenv("GOFORGE_TEST_DOCKER_HOST"))
 	if err != nil {
 		db.Close()
 		t.Skipf("docker unavailable: %v", err)
@@ -132,7 +184,7 @@ func newCleanupIntegrationFixture(t *testing.T) *cleanupIntegrationFixture {
 	if err := users.Create(f.ctx, user); err != nil {
 		t.Fatal(err)
 	}
-	f.service = NewService(f.projects, envs, repositories.NewEnvVariableRepository(db.DB, nil), f.deployments, f.containers, nil, nil, dc)
+	f.service = NewService(f.projects, envs, repositories.NewEnvVariableRepository(db.DB, nil), f.deployments, f.containers, nil, nil, dc).WithContainerCleanup(repositories.NewContainerCleanupRepository(db.DB))
 	f.project, err = f.service.CreateProject(f.ctx, &models.Project{UserID: user.ID, Name: "gfcleanup-it-" + uuid.NewString()[:8], RepositoryURL: "https://example.invalid/app.git", DefaultBranch: "main", DockerfilePath: "Dockerfile", BuildContext: "."})
 	if err != nil {
 		t.Fatal(err)

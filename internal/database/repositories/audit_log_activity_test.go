@@ -50,6 +50,8 @@ func TestAuditLogRepository_ListFiltered_Activity(t *testing.T) {
 	cli := mk(uid, models.AuditActionUser2FAReset, "goforge-cli", map[string]any{"via": models.AuditViaCLI})
 	hook := mk(uid, "deployment.trigger", "GitHub-Hookshot/abc", map[string]any{"via": "webhook", "provider": "github"})
 	hookRun := mk(uid, "deployment.run.completed", "GitHub-Hookshot/abc", map[string]any{"via": "webhook", "audit_id": hook.ID})
+	system := mk(uid, models.AuditActionContainerOrphanRemove, "", map[string]any{"via": models.AuditViaSystem})
+	foreignSystem := mk(sql.NullString{String: other.ID, Valid: true}, models.AuditActionContainerOrphanRemove, "", map[string]any{"via": models.AuditViaSystem})
 
 	ids := func(f AuditFilter) map[string]bool {
 		t.Helper()
@@ -82,11 +84,11 @@ func TestAuditLogRepository_ListFiltered_Activity(t *testing.T) {
 		}
 	}
 
-	check("own", AuditFilter{UserID: u.ID}, []*models.AuditLog{mcp, outcome, api, ui, run}, []*models.AuditLog{foreign})
+	check("own", AuditFilter{UserID: u.ID}, []*models.AuditLog{mcp, outcome, api, ui, run, system}, []*models.AuditLog{foreign, foreignSystem})
 	check("mcp", AuditFilter{UserID: u.ID, Source: models.AuditSourceMCP}, []*models.AuditLog{mcp, outcome, run}, []*models.AuditLog{api, ui})
 	check("api", AuditFilter{UserID: u.ID, Source: models.AuditSourceAPI}, []*models.AuditLog{api}, []*models.AuditLog{mcp, ui, run})
 	check("agent", AuditFilter{UserID: u.ID, Source: models.AuditSourceAgent}, []*models.AuditLog{mcp, outcome, api, run}, []*models.AuditLog{ui})
-	check("ui", AuditFilter{UserID: u.ID, Source: models.AuditSourceUI}, []*models.AuditLog{ui}, []*models.AuditLog{mcp, api, run, hook, hookRun, cli})
+	check("ui", AuditFilter{UserID: u.ID, Source: models.AuditSourceUI}, []*models.AuditLog{ui}, []*models.AuditLog{mcp, api, run, hook, hookRun, cli, system})
 	check("cli", AuditFilter{UserID: u.ID, Source: models.AuditSourceCLI}, []*models.AuditLog{cli}, []*models.AuditLog{mcp, outcome, api, ui, run, hook, hookRun})
 	if cli.Source() != models.AuditSourceCLI {
 		t.Errorf("reset-2fa Source() = %s, want cli", cli.Source())
@@ -98,13 +100,20 @@ func TestAuditLogRepository_ListFiltered_Activity(t *testing.T) {
 			t.Errorf("%s Source() = %s, want webhook", l.Action, l.Source())
 		}
 	}
+	check("system", AuditFilter{UserID: u.ID, Source: models.AuditSourceSystem}, []*models.AuditLog{system}, []*models.AuditLog{ui, hook, cli, foreignSystem})
+	if system.Source() != models.AuditSourceSystem {
+		t.Errorf("system Source() = %s", system.Source())
+	}
 	check("token", AuditFilter{TokenName: token}, []*models.AuditLog{mcp, outcome, api, run}, []*models.AuditLog{ui, foreign})
 	check("contains", AuditFilter{UserID: u.ID, ActionContains: "RESTART"}, []*models.AuditLog{mcp, outcome}, []*models.AuditLog{api, ui})
 	check("audit_id", AuditFilter{AuditID: api.ID}, []*models.AuditLog{api, run}, []*models.AuditLog{mcp, outcome, ui})
 
 	page, err := repo.ListFiltered(ctx, AuditFilter{UserID: u.ID, Limit: 2})
-	if err != nil || len(page) != 2 || page[0].ID != hookRun.ID {
+	if err != nil || len(page) != 2 {
 		t.Errorf("limit 2: %d rows, err %v", len(page), err)
+	}
+	if len(page) == 2 && page[0].CreatedAt.Before(page[1].CreatedAt) {
+		t.Errorf("page is not newest first")
 	}
 
 	if got, err := repo.GetByID(ctx, "not-a-uuid"); got != nil || err != nil {

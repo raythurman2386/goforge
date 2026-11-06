@@ -132,9 +132,10 @@ const (
 // activity page filters on it (repositories.AuditFilter.Source uses the same
 // rule in SQL).
 const (
-	AuditSourceMCP = "mcp"
-	AuditSourceAPI = "api"
-	AuditSourceUI  = "ui"
+	AuditSourceMCP    = "mcp"
+	AuditSourceAPI    = "api"
+	AuditSourceUI     = "ui"
+	AuditSourceSystem = "system"
 	// AuditSourceWebhook is a row written for a signed push webhook
 	// (details.via "webhook") and the run outcomes linked to it.
 	AuditSourceWebhook = "webhook"
@@ -156,8 +157,8 @@ const AuditAPIActionPrefix = "api_v1."
 // Source reports who made the change: MCP when the User-Agent is an MCP
 // client, API for other api_v1 rows (or rows whose details.via is api_v1,
 // such as a background run started by the API), webhook for rows whose
-// details.via is webhook, CLI for rows whose details.via is cli, and UI for
-// everything else.
+// details.via is webhook, CLI for rows whose details.via is cli, System for
+// automatic host maintenance, and UI for everything else.
 func (a *AuditLog) Source() string {
 	if a.UserAgent.Valid && strings.HasPrefix(a.UserAgent.String, AuditMCPUserAgentPrefix) {
 		return AuditSourceMCP
@@ -173,6 +174,8 @@ func (a *AuditLog) Source() string {
 			return AuditSourceWebhook
 		case AuditViaCLI:
 			return AuditSourceCLI
+		case AuditViaSystem:
+			return AuditSourceSystem
 		}
 	}
 	return AuditSourceUI

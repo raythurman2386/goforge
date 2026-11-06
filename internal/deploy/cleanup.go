@@ -253,7 +253,8 @@ func (s *Service) retireSuperseded(ctx context.Context, environmentID, currentDe
 			if c.Status != models.ContainerStatusRunning {
 				continue
 			}
-			if s.retireContainer(ctx, d.ID, currentDeploymentID, c) {
+			err := s.retireParentContainer(ctx, environmentID, d.ID, currentDeploymentID, c)
+			if err == nil {
 				retired++
 			} else {
 				pending = true
@@ -264,6 +265,38 @@ func (s *Service) retireSuperseded(ctx context.Context, environmentID, currentDe
 		return retired, errRetirePending
 	}
 	return retired, nil
+}
+
+// retireParentContainer keeps the delete lock through host removal and status
+// update, after re-checking the deployment's parent under that lock.
+func (s *Service) retireParentContainer(ctx context.Context, environmentID, deploymentID, currentDeploymentID string, c *models.Container) error {
+	env, err := s.retirementEnvironment(ctx, environmentID)
+	if err != nil {
+		return err
+	}
+	if s.lifecycle != nil {
+		unlock, err := s.lifecycle.Create(env.ProjectID)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
+	if _, err := s.environmentRepo.GetByID(ctx, environmentID); err != nil {
+		return err
+	}
+	if _, err := s.projectRepo.GetByID(ctx, env.ProjectID); err != nil {
+		return err
+	}
+	if !s.retireContainer(ctx, deploymentID, currentDeploymentID, c) {
+		return errRetirePending
+	}
+	return nil
+}
+
+// environmentForRetire names the parent lookup explicitly; it
+// intentionally happens before entering the parent critical section.
+func (s *Service) retirementEnvironment(ctx context.Context, id string) (*models.Environment, error) {
+	return s.environmentRepo.GetByID(ctx, id)
 }
 
 // pruneImages removes dangling images; a failure is only logged.

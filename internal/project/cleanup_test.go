@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/google/uuid"
 	mobycontainer "github.com/moby/moby/api/types/container"
 
@@ -73,6 +75,7 @@ func (*cleanupEnvironmentStore) ListByProjectID(context.Context, string) ([]*mod
 
 type cleanupContainerStore struct {
 	deleted []string
+	pending []*models.ContainerCleanup
 	err     error
 }
 
@@ -91,6 +94,7 @@ type cleanupRuntime struct {
 	removed    []string
 	stopErr    error
 	listErr    error
+	removeErr  error
 	removedCh  chan string
 }
 
@@ -108,6 +112,19 @@ func (r *cleanupRuntime) StopContainer(_ context.Context, id string) error {
 func (r *cleanupRuntime) RemoveContainer(_ context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.removeErr != nil {
+		return r.removeErr
+	}
+	found := false
+	for _, c := range r.containers {
+		if c.ID == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return cerrdefs.ErrNotFound
+	}
 	r.removed = append(r.removed, id)
 	if r.removedCh != nil {
 		r.removedCh <- id
@@ -126,6 +143,37 @@ type cleanupAuditStore struct{ rows []*models.AuditLog }
 
 func (s *cleanupAuditStore) Create(_ context.Context, row *models.AuditLog) error {
 	s.rows = append(s.rows, row)
+	return nil
+}
+
+func (s *cleanupContainerStore) Add(_ context.Context, c *models.ContainerCleanup) error {
+	for _, existing := range s.pending {
+		if existing.DockerID == c.DockerID {
+			return nil
+		}
+	}
+	s.pending = append(s.pending, c)
+	return nil
+}
+func (s *cleanupContainerStore) List(_ context.Context) ([]*models.ContainerCleanup, error) {
+	return append([]*models.ContainerCleanup(nil), s.pending...), nil
+}
+func (s *cleanupContainerStore) ListForParent(_ context.Context, column, id string) ([]*models.ContainerCleanup, error) {
+	var out []*models.ContainerCleanup
+	for _, c := range s.pending {
+		if column == docker.ProjectLabelKey && c.ProjectID.String == id || column == docker.EnvironmentLabelKey && c.EnvironmentID.String == id {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+func (s *cleanupContainerStore) Complete(_ context.Context, id string) error {
+	for i, c := range s.pending {
+		if c.DockerID == id {
+			s.pending = append(s.pending[:i], s.pending[i+1:]...)
+			break
+		}
+	}
 	return nil
 }
 
@@ -266,5 +314,164 @@ func TestRunOrphanReconcile_StartupAndCancellation(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("reconcile did not stop")
+	}
+}
+
+func TestDeleteProject_RowFailureIsRetriedWithoutDockerObjectOrOrphanAudit(t *testing.T) {
+	projectID, envID := uuid.NewString(), uuid.NewString()
+	projects := &cleanupProjectStore{project: &models.Project{ID: projectID}}
+	rows := &cleanupContainerStore{err: errors.New("transient row failure")}
+	runtime := &cleanupRuntime{containers: []mobycontainer.Summary{managedAppContainer("app", projectID, envID)}}
+	svc := &Service{projectRepo: projects, environmentRepo: &cleanupEnvironmentStore{}, containerRepo: rows, dockerClient: runtime, cleanupStore: rows}
+	if err := svc.DeleteProject(context.Background(), projectID); err == nil {
+		t.Fatal("first delete should retain the parent")
+	}
+	if projects.deleted || len(runtime.removed) != 1 || len(rows.pending) != 1 {
+		t.Fatalf("deleted=%v removed=%v pending=%v", projects.deleted, runtime.removed, rows.pending)
+	}
+	rows.err = nil
+	if err := svc.DeleteProject(context.Background(), projectID); err != nil {
+		t.Fatal(err)
+	}
+	if !projects.deleted || len(rows.deleted) != 1 || len(rows.pending) != 0 {
+		t.Fatalf("deleted=%v rows=%v pending=%v", projects.deleted, rows.deleted, rows.pending)
+	}
+}
+
+func TestDeleteEnvironment_ContainerRowFailureIsRetried(t *testing.T) {
+	projectID, envID := uuid.NewString(), uuid.NewString()
+	envs := &cleanupEnvironmentStore{env: &models.Environment{ID: envID, ProjectID: projectID}}
+	rows := &cleanupContainerStore{err: errors.New("transient")}
+	runtime := &cleanupRuntime{containers: []mobycontainer.Summary{managedAppContainer("app", projectID, envID)}}
+	svc := &Service{projectRepo: &cleanupProjectStore{}, environmentRepo: envs, containerRepo: rows, dockerClient: runtime, cleanupStore: rows}
+	if err := svc.DeleteEnvironment(context.Background(), envID); err == nil || envs.deleted {
+		t.Fatalf("first delete = %v, deleted=%v", err, envs.deleted)
+	}
+	rows.err = nil
+	if err := svc.DeleteEnvironment(context.Background(), envID); err != nil || !envs.deleted {
+		t.Fatalf("retry = %v deleted=%v", err, envs.deleted)
+	}
+}
+
+func TestReconcileOrphans_TransientLookupsListAndRemoveAreSafe(t *testing.T) {
+	t.Run("project lookup", func(t *testing.T) {
+		svc := &Service{projectRepo: &errorProjectStore{}, environmentRepo: &cleanupEnvironmentStore{}, dockerClient: &cleanupRuntime{containers: []mobycontainer.Summary{managedAppContainer("app", uuid.NewString(), uuid.NewString())}}}
+		if err := svc.ReconcileOrphans(context.Background()); err == nil || len(svc.dockerClient.(*cleanupRuntime).removed) != 0 {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("environment lookup", func(t *testing.T) {
+		id := uuid.NewString()
+		svc := &Service{projectRepo: &cleanupProjectStore{project: &models.Project{ID: id}}, environmentRepo: &errorEnvironmentStore{}, dockerClient: &cleanupRuntime{containers: []mobycontainer.Summary{managedAppContainer("app", id, uuid.NewString())}}}
+		if err := svc.ReconcileOrphans(context.Background()); err == nil || len(svc.dockerClient.(*cleanupRuntime).removed) != 0 {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("list error", func(t *testing.T) {
+		runtime := &cleanupRuntime{listErr: errors.New("docker down")}
+		svc := &Service{projectRepo: &cleanupProjectStore{}, environmentRepo: &cleanupEnvironmentStore{}, dockerClient: runtime}
+		if err := svc.ReconcileOrphans(context.Background()); err == nil || len(runtime.removed) != 0 {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("failed remove no audit retry succeeds once", func(t *testing.T) {
+		runtime := &cleanupRuntime{containers: []mobycontainer.Summary{managedAppContainer("app", uuid.NewString(), uuid.NewString())}, removeErr: errors.New("remove failed")}
+		audit := &cleanupAuditStore{}
+		svc := &Service{projectRepo: &cleanupProjectStore{}, environmentRepo: &cleanupEnvironmentStore{}, dockerClient: runtime, audit: audit, cleanupStore: &cleanupContainerStore{}, containerRepo: &cleanupContainerStore{}}
+		if err := svc.ReconcileOrphans(context.Background()); err == nil || len(audit.rows) != 0 {
+			t.Fatalf("err=%v audits=%d", err, len(audit.rows))
+		}
+		runtime.removeErr = nil
+		if err := svc.ReconcileOrphans(context.Background()); err != nil || len(audit.rows) != 1 {
+			t.Fatalf("retry=%v audits=%d", err, len(audit.rows))
+		}
+	})
+}
+
+type errorProjectStore struct{ cleanupProjectStore }
+
+func (*errorProjectStore) GetByID(context.Context, string) (*models.Project, error) {
+	return nil, errors.New("transient")
+}
+
+type errorEnvironmentStore struct{ cleanupEnvironmentStore }
+
+func (*errorEnvironmentStore) GetByID(context.Context, string) (*models.Environment, error) {
+	return nil, errors.New("transient")
+}
+
+func TestReconcileOrphans_ManualDeleteIntentIsNotReclassified(t *testing.T) {
+	projectID, envID := uuid.NewString(), uuid.NewString()
+	rows := &cleanupContainerStore{pending: []*models.ContainerCleanup{{DockerID: "gone", ProjectID: sql.NullString{String: projectID, Valid: true}, EnvironmentID: sql.NullString{String: envID, Valid: true}, Reason: models.ContainerCleanupDelete}}}
+	audit := &cleanupAuditStore{}
+	svc := &Service{projectRepo: &cleanupProjectStore{}, environmentRepo: &cleanupEnvironmentStore{}, containerRepo: rows, cleanupStore: rows, dockerClient: &cleanupRuntime{}, audit: audit}
+	if err := svc.ReconcileOrphans(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(audit.rows) != 0 || len(rows.deleted) != 1 || len(rows.pending) != 0 {
+		t.Fatalf("audit=%d deleted=%v pending=%v", len(audit.rows), rows.deleted, rows.pending)
+	}
+}
+
+func TestReconcileOrphans_RetainedLiveDeleteRetryKeepsSiblings(t *testing.T) {
+	projectID, envID, otherEnv := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	rows := &cleanupContainerStore{pending: []*models.ContainerCleanup{{DockerID: "removed", ProjectID: sql.NullString{String: projectID, Valid: true}, EnvironmentID: sql.NullString{String: envID, Valid: true}, Reason: models.ContainerCleanupDelete}}}
+	projects := &mapProjectStore{cleanupProjectStore: cleanupProjectStore{project: &models.Project{ID: projectID, UserID: "owner"}}, others: map[string]*models.Project{otherEnv: {ID: otherEnv, UserID: "other"}}}
+	envs := &mapEnvironmentStore{cleanupEnvironmentStore: cleanupEnvironmentStore{env: &models.Environment{ID: envID, ProjectID: projectID}}, others: map[string]*models.Environment{otherEnv: {ID: otherEnv, ProjectID: otherEnv}}}
+	runtime := &cleanupRuntime{containers: []mobycontainer.Summary{
+		managedAppContainer("sibling", otherEnv, otherEnv),
+		managedAppContainer("service", "", ""),
+	}}
+	audit := &cleanupAuditStore{}
+	svc := &Service{projectRepo: projects, environmentRepo: envs, dockerClient: runtime, cleanupStore: rows, containerRepo: rows, audit: audit}
+	if err := svc.ReconcileOrphans(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(runtime.removed) != 0 || len(rows.deleted) != 1 || len(audit.rows) != 0 {
+		t.Fatalf("removed=%v rows=%v audits=%v", runtime.removed, rows.deleted, audit.rows)
+	}
+}
+
+type mapProjectStore struct {
+	cleanupProjectStore
+	others map[string]*models.Project
+}
+
+func (s mapProjectStore) GetByID(ctx context.Context, id string) (*models.Project, error) {
+	if p := s.others[id]; p != nil {
+		return p, nil
+	}
+	return s.cleanupProjectStore.GetByID(ctx, id)
+}
+
+type mapEnvironmentStore struct {
+	cleanupEnvironmentStore
+	others map[string]*models.Environment
+}
+
+func (s mapEnvironmentStore) GetByID(ctx context.Context, id string) (*models.Environment, error) {
+	if env := s.others[id]; env != nil {
+		return env, nil
+	}
+	return s.cleanupEnvironmentStore.GetByID(ctx, id)
+}
+
+func TestDeleteProject_DockerGoneThenRowFailureRetriesAndSkipsAudit(t *testing.T) {
+	id := uuid.NewString()
+	rows := &cleanupContainerStore{pending: []*models.ContainerCleanup{{DockerID: "gone", ProjectID: sql.NullString{String: id, Valid: true}, Reason: models.ContainerCleanupDelete}}}
+	rows.err = errors.New("transient row deletion")
+	projects := &cleanupProjectStore{project: &models.Project{ID: id}}
+	audit := &cleanupAuditStore{}
+	runtime := &cleanupRuntime{containers: []mobycontainer.Summary{{ID: "unrelated", Labels: map[string]string{docker.ManagedLabelKey: docker.ManagedLabelValue}}}}
+	svc := &Service{projectRepo: projects, environmentRepo: &cleanupEnvironmentStore{}, dockerClient: runtime, containerRepo: rows, cleanupStore: rows, audit: audit}
+	if err := svc.DeleteProject(context.Background(), id); err == nil || projects.deleted {
+		t.Fatal("first row removal failure must retain parent")
+	}
+	rows.err = nil
+	if err := svc.DeleteProject(context.Background(), id); err != nil || !projects.deleted {
+		t.Fatalf("retry = %v deleted=%v", err, projects.deleted)
+	}
+	if len(rows.deleted) != 1 || len(rows.pending) != 0 || len(audit.rows) != 0 || len(runtime.containers) != 1 {
+		t.Fatalf("rows = %v pending=%v audit=%v runtime=%v", rows.deleted, rows.pending, audit.rows, runtime.containers)
 	}
 }

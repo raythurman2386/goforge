@@ -420,10 +420,22 @@ func (m *memLogs) messages() []string {
 }
 
 type memProjects struct {
+	mu    sync.Mutex
 	items map[string]*models.Project
 }
 
+func (*memProjects) Create(context.Context, *models.Project) error { return nil }
+func (m *memProjects) Delete(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.items, id)
+	return nil
+}
+func (*memProjects) Update(context.Context, *models.Project) error                   { return nil }
+func (*memProjects) ListByUserID(context.Context, string) ([]*models.Project, error) { return nil, nil }
 func (m *memProjects) GetByID(_ context.Context, id string) (*models.Project, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	p, ok := m.items[id]
 	if !ok {
 		return nil, errors.New("not found")
@@ -432,10 +444,24 @@ func (m *memProjects) GetByID(_ context.Context, id string) (*models.Project, er
 }
 
 type memEnvironments struct {
+	mu    sync.Mutex
 	items map[string]*models.Environment
 }
 
+func (*memEnvironments) Create(context.Context, *models.Environment) error { return nil }
+func (m *memEnvironments) Delete(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.items, id)
+	return nil
+}
+func (*memEnvironments) Update(context.Context, *models.Environment) error { return nil }
+func (*memEnvironments) ListByProjectID(context.Context, string) ([]*models.Environment, error) {
+	return nil, nil
+}
 func (m *memEnvironments) GetByID(_ context.Context, id string) (*models.Environment, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	env, ok := m.items[id]
 	if !ok {
 		return nil, errors.New("not found")
@@ -448,6 +474,17 @@ type memContainers struct {
 	items []*models.Container
 }
 
+func (m *memContainers) DeleteByDockerID(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, row := range m.items {
+		if row.DockerID == id {
+			m.items = append(m.items[:i], m.items[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
 func (m *memContainers) Create(_ context.Context, c *models.Container) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

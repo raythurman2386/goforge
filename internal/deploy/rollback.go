@@ -307,12 +307,15 @@ func (rm *RollbackManager) restoreDeployment(ctx context.Context, target *models
 	opts := containerOptionsFromContainer(ctx, targetContainer, project, env, rm.service)
 
 	// Create a new container with the same image
-	newDockerID, err := rm.service.dockerClient.CreateContainer(ctx, opts)
+	newDockerID, finishCreate, err := rm.service.createAppContainer(ctx, env, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create restored container: %w", err)
 	}
 
-	// Record the new container in the database
+	// Record the new container in the database while creation remains locked.
+	if finishCreate != nil {
+		defer finishCreate()
+	}
 	if err := rm.service.containerRepo.Create(ctx, &models.Container{
 		DeploymentID: sql.NullString{String: target.ID, Valid: true},
 		DockerID:     newDockerID,
@@ -321,8 +324,11 @@ func (rm *RollbackManager) restoreDeployment(ctx context.Context, target *models
 		Labels:       mustContainerLabels(opts.Labels),
 		Status:       models.ContainerStatusRunning,
 	}); err != nil {
-		if removeErr := rm.service.dockerClient.RemoveContainer(ctx, newDockerID); removeErr != nil {
-			rm.service.logger.Error("failed to remove unrecorded restored container", "error", removeErr, "container_id", newDockerID)
+		if removeErr := rm.service.dockerClient.RemoveContainer(ctx, newDockerID); removeErr != nil && !docker.IsNotFound(removeErr) {
+			if retainErr := rm.service.retainUnrecordedCleanup(ctx, newDockerID, env); retainErr != nil {
+				return errors.Join(fmt.Errorf("record restored container: %w", err), fmt.Errorf("retain failed removal: %w", retainErr))
+			}
+			rm.service.logger.Error("failed to retain unrecorded restored-container cleanup", "error", removeErr, "container_id", newDockerID)
 		}
 		return fmt.Errorf("failed to record restored container: %w", err)
 	}

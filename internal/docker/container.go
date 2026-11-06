@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strings"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
@@ -171,12 +173,27 @@ func (c *Client) StopContainer(ctx context.Context, id string) error {
 	return nil
 }
 
-// RemoveContainer removes a container.
+// RemoveContainer waits briefly for Docker's in-progress remove after StopContainer.
+// The caller's durable cleanup intent handles a still-running removal or error.
 func (c *Client) RemoveContainer(ctx context.Context, id string) error {
-	if _, err := c.docker.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
-		return fmt.Errorf("failed to remove container: %w", err)
+	for range 20 {
+		if _, err := c.docker.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
+			if strings.Contains(err.Error(), "removal of container") && strings.HasSuffix(err.Error(), "is already in progress") {
+				if _, inspectErr := c.InspectContainer(ctx, id); IsNotFound(inspectErr) {
+					return nil
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(50 * time.Millisecond):
+				}
+				continue
+			}
+			return fmt.Errorf("failed to remove container: %w", err)
+		}
+		return nil
 	}
-	return nil
+	return fmt.Errorf("failed to remove container %s: Docker removal still in progress", id)
 }
 
 // RenameContainer gives an existing container a new name.

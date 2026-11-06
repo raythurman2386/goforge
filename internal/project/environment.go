@@ -33,8 +33,21 @@ func (s *Service) UpdateEnvironment(ctx context.Context, env *models.Environment
 // DeleteEnvironment removes every labeled app container, including a rollback
 // copy, before deleting the environment row and its database-owned containers.
 func (s *Service) DeleteEnvironment(ctx context.Context, id string) error {
-	if err := s.removeLabeledContainers(ctx, docker.EnvironmentLabelKey, id); err != nil {
-		return fmt.Errorf("failed to remove environment containers: %w", err)
+	env, err := s.environmentRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
 	}
-	return s.environmentRepo.Delete(ctx, id)
+	return s.lifecycleCoordinator().Exclusive(env.ProjectID, func() error {
+		if _, err := s.environmentRepo.GetByID(ctx, id); err != nil {
+			return err
+		}
+		owned, err := s.collectLabeledContainers(ctx, docker.EnvironmentLabelKey, id, models.ContainerCleanupDelete)
+		if err != nil {
+			return fmt.Errorf("failed to remove environment containers: %w", err)
+		}
+		if err := s.removeContainers(ctx, owned); err != nil {
+			return fmt.Errorf("failed to remove environment containers: %w", err)
+		}
+		return s.environmentRepo.Delete(ctx, id)
+	})
 }
