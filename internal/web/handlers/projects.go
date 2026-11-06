@@ -40,12 +40,19 @@ type ProjectHandler struct {
 	inspector              containerInspector
 	logger                 *slog.Logger
 	audit                  uiAudit
+	domainValidator        DomainValidator
 }
 
 // WithAudit records project create, update, settings, delete, and service
 // link changes in the audit log (via=ui).
 func (h *ProjectHandler) WithAudit(rec UIAuditRecorder) *ProjectHandler {
 	h.audit = uiAudit{rec: rec}
+	return h
+}
+
+// WithDomainValidator enables DNS checks on project and environment domains.
+func (h *ProjectHandler) WithDomainValidator(validator DomainValidator) *ProjectHandler {
+	h.domainValidator = validator
 	return h
 }
 
@@ -408,9 +415,9 @@ func (h *ProjectHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	customDomain := r.FormValue("custom_domain")
-	if customDomain != "" && !isValidDomain(customDomain) {
-		http.Error(w, "invalid domain format", http.StatusBadRequest)
+	customDomain, validationErr := validateDomainDNS(r.Context(), h.domainValidator, r.FormValue("custom_domain"), "domain")
+	if validationErr != nil {
+		RenderError(w, r, validationErr.status, validationErr.message)
 		return
 	}
 	p.CustomDomain = sql.NullString{String: customDomain, Valid: customDomain != ""}
@@ -438,52 +445,45 @@ func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) 
 	}
 
 	envID := r.FormValue("env_id")
-
-	customDomain := r.FormValue("custom_domain")
-	if customDomain != "" && !isValidDomain(customDomain) {
-		RenderError(w, r, http.StatusBadRequest, "invalid domain format")
-		return
-	}
-	// Only update if present in form (it will be, but safe check)
-	p.CustomDomain = sql.NullString{String: customDomain, Valid: customDomain != ""}
-
-	if err := h.projectService.UpdateProject(r.Context(), p); err != nil {
-		RenderError(w, r, http.StatusInternalServerError, "failed to update project settings")
+	customDomain, validationErr := validateDomainDNS(r.Context(), h.domainValidator, r.FormValue("custom_domain"), "domain")
+	if validationErr != nil {
+		RenderError(w, r, validationErr.status, validationErr.message)
 		return
 	}
 
-	// Update Environment if ID provided
+	var env *models.Environment
+	var envDomain string
 	if envID != "" {
-		env, err := h.projectService.GetEnvironment(r.Context(), envID)
+		var err error
+		env, err = h.projectService.GetEnvironment(r.Context(), envID)
 		if err != nil {
 			RenderError(w, r, http.StatusNotFound, "environment not found")
 			return
 		}
-
-		// Verify environment belongs to this project
 		if env.ProjectID != p.ID {
 			http.Error(w, "environment does not belong to this project", http.StatusForbidden)
 			return
 		}
 
-		if domain := r.FormValue("domain"); domain != "" {
-			if !isValidDomain(domain) {
-				RenderError(w, r, http.StatusBadRequest, "invalid environment domain format")
-				return
-			}
-			env.Domain.String = domain
+		// Both domains are checked before either repository write. A late DNS
+		// or ownership refusal therefore cannot leave a partial settings save.
+		envDomain, validationErr = validateDomainDNS(r.Context(), h.domainValidator, r.FormValue("domain"), "environment domain")
+		if validationErr != nil {
+			RenderError(w, r, validationErr.status, validationErr.message)
+			return
+		}
+		if envDomain != "" {
+			env.Domain.String = envDomain
 			env.Domain.Valid = true
 		} else {
-			env.Domain.Valid = false
+			env.Domain = sql.NullString{}
 		}
-
 		if branch := r.FormValue("branch"); branch != "" {
 			env.Branch.String = branch
 			env.Branch.Valid = true
 		} else {
-			env.Branch.Valid = false
+			env.Branch = sql.NullString{}
 		}
-
 		if portStr := r.FormValue("port"); portStr != "" {
 			port, err := strconv.Atoi(portStr)
 			if err == nil && port > 0 && port < 65536 {
@@ -491,7 +491,14 @@ func (h *ProjectHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) 
 				env.Port.Valid = true
 			}
 		}
+	}
 
+	p.CustomDomain = sql.NullString{String: customDomain, Valid: customDomain != ""}
+	if err := h.projectService.UpdateProject(r.Context(), p); err != nil {
+		RenderError(w, r, http.StatusInternalServerError, "failed to update project settings")
+		return
+	}
+	if env != nil {
 		if err := h.projectService.UpdateEnvironment(r.Context(), env); err != nil {
 			RenderError(w, r, http.StatusInternalServerError, "failed to update environment settings")
 			return

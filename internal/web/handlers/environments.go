@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -16,15 +17,22 @@ import (
 
 // EnvironmentHandler handles environment related requests.
 type EnvironmentHandler struct {
-	projectService *project.Service
-	logger         *slog.Logger
-	audit          uiAudit
+	projectService  *project.Service
+	logger          *slog.Logger
+	audit           uiAudit
+	domainValidator DomainValidator
 }
 
 // WithAudit records environment and variable changes in the audit log
 // (via=ui). Rows name the variable key, never its value.
 func (h *EnvironmentHandler) WithAudit(rec UIAuditRecorder) *EnvironmentHandler {
 	h.audit = uiAudit{rec: rec}
+	return h
+}
+
+// WithDomainValidator enables DNS checks on environment domains.
+func (h *EnvironmentHandler) WithDomainValidator(validator DomainValidator) *EnvironmentHandler {
+	h.domainValidator = validator
 	return h
 }
 
@@ -138,15 +146,16 @@ func (h *EnvironmentHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if domain := r.FormValue("domain"); domain != "" {
-		if !isValidDomain(domain) {
-			http.Error(w, "invalid domain format", http.StatusBadRequest)
-			return
-		}
+	domain, validationErr := validateDomainDNS(r.Context(), h.domainValidator, r.FormValue("domain"), "domain")
+	if validationErr != nil {
+		RenderError(w, r, validationErr.status, validationErr.message)
+		return
+	}
+	if domain != "" {
 		env.Domain.String = domain
 		env.Domain.Valid = true
 	} else {
-		env.Domain.Valid = false
+		env.Domain = sql.NullString{}
 	}
 
 	if branch := r.FormValue("branch"); branch != "" {

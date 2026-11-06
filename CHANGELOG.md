@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Project **Default Domain** and environment **Domain** settings now reject hostnames without a DNS address before saving. All submitted domains are checked before the first write, resolver failures have a retryable message distinct from an unresolved name, and blank fields still clear their values. One-click service domains retain their existing local-development rules (t2159u)
 - Split Profile into personal Account Information, a new Security page for credentials and sessions, and instance-wide Settings at `/settings/git`, with shared settings navigation. Existing mutation and HTMX routes are unchanged. (t2126u)
 
 ### Added

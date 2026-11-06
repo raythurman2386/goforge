@@ -4,13 +4,17 @@ GoForge supports custom domains for your deployed projects, with automatic SSL c
 
 ## Adding a Custom Domain
 
-1. Navigate to your project's **Settings** tab
-2. Enter your custom domain in the **Custom Domain** field (e.g., `app.example.com`)
-3. Click **Save Settings**
+1. Open **Projects**, choose your project, then open its **Settings** tab.
+2. Configure the DNS record described below and wait for it to resolve.
+3. Enter the hostname in **Default Domain** (for example, `app.example.com`). GoForge saves the lowercase hostname without a trailing dot.
+4. To override that default for the selected environment, enter a hostname in **Domain** beneath **Environment Overrides** instead. Leave it blank to use the project's default.
+5. Click **Save Changes**.
+
+GoForge requires every nonblank project or environment domain to resolve before it saves either value. An unresolved name produces an error; a resolver timeout or server error asks you to try again instead. If either domain is refused, neither domain changes. Blank fields remain supported for clearing a saved value.
 
 ## DNS Configuration
 
-After adding a domain, configure your DNS records:
+Configure these records **before** entering the domain in project Settings:
 
 ### A Record (Direct)
 
