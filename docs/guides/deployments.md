@@ -6,10 +6,11 @@ Deployments are the process of building and running your application from source
 
 ### Manual Deployment
 
-1. Navigate to your project
-2. Click **Deploy** or **New Deployment**
-3. Select the environment and branch
-4. GoForge will clone, build, and deploy your application
+1. Navigate to your project and select the environment
+2. Click **Deploy Now**
+3. GoForge will clone, build, and deploy your application
+
+The branch is the project's **Default Branch**, edited in project **Settings**. The project banner and deployment detail show the actual stage and elapsed time once the worker starts; GoForge does not estimate a completion percentage.
 
 ### Webhook-Triggered Deployment
 
@@ -81,6 +82,8 @@ Clone and build output is stored in `deployment_logs`. The deployment page rende
 
 ### Deployment Status
 
+The project banner shows the current stage and stops polling when the deployment reaches a terminal state. Open **View Logs** for the detail page's stage and elapsed time. A failed deployment keeps its error message visible after the status update and after reconnecting or reloading the page.
+
 | Status | Description |
 |--------|-------------|
 | `pending` | Queued, waiting for worker |
@@ -97,8 +100,10 @@ Clone and build output is stored in `deployment_logs`. The deployment page rende
 If a deployment causes issues, you can roll back to a previous deployment:
 
 1. Go to the project's **Deployments** tab
-2. Find a previous successful deployment
-3. Click **Rollback to this deployment**
+2. Open the newest running deployment
+3. Click **Rollback** and confirm
+
+GoForge chooses the latest prior successful deployment in the same environment; the button does not select an arbitrary older row. After the redirect, **Rollback complete** names the restored deployment and links to its detail page. Follow that link to inspect it. Returning to the original deployment still shows its `rolled_back` status and its own logs.
 
 The rollback process:
 

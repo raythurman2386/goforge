@@ -121,19 +121,7 @@ func (h *SSEHandler) DeploymentLogs(w http.ResponseWriter, r *http.Request) {
 		"id":    deploymentID,
 	})
 
-	seen := map[string]struct{}{}
-	if h.deployService != nil {
-		logs, logErr := h.deployService.GetLogs(r.Context(), deploymentID)
-		if logErr != nil {
-			h.logger.Warn("failed to load deployment logs", "deployment_id", deploymentID, "error", logErr)
-		}
-		for _, entry := range logs {
-			if entry.ID != "" {
-				seen[entry.ID] = struct{}{}
-			}
-		}
-		writeDeploymentSnapshot(w, flusher, r, logs)
-	}
+	seen := h.writeDeploymentSnapshot(w, flusher, r, deploymentID)
 
 	for {
 		select {
@@ -142,7 +130,7 @@ func (h *SSEHandler) DeploymentLogs(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if status, isStatus := deploymentStatusFromEvent(event.Data); isStatus {
-				writeDeploymentStatus(w, flusher, r, status)
+				h.writeDeploymentStatusUpdate(w, flusher, r, deploymentID, status)
 				continue
 			}
 			entry, isLog := deploymentLogFromEvent(event.Data)
@@ -431,6 +419,42 @@ func writeDeploymentSnapshot(w http.ResponseWriter, flusher http.Flusher, r *htt
 	writeMessage(w, flusher, buf.Bytes())
 }
 
+// writeDeploymentSnapshot replays stored logs once and returns their IDs so
+// live events racing the snapshot are not appended twice.
+func (h *SSEHandler) writeDeploymentSnapshot(w http.ResponseWriter, flusher http.Flusher, r *http.Request, deploymentID string) map[string]struct{} {
+	seen := make(map[string]struct{})
+	if h.deployService == nil {
+		return seen
+	}
+	logs, err := h.deployService.GetLogs(r.Context(), deploymentID)
+	if err != nil {
+		h.logger.Warn("failed to load deployment logs", "deployment_id", deploymentID, "error", err)
+	}
+	for _, entry := range logs {
+		if entry.ID != "" {
+			seen[entry.ID] = struct{}{}
+		}
+	}
+	writeDeploymentSnapshot(w, flusher, r, logs)
+	h.writeCurrentDeploymentProgress(w, flusher, r, deploymentID)
+	return seen
+}
+
+func (h *SSEHandler) writeDeploymentStatusUpdate(w http.ResponseWriter, flusher http.Flusher, r *http.Request, deploymentID string, status models.DeploymentStatus) {
+	writeDeploymentStatus(w, flusher, r, status)
+	h.writeCurrentDeploymentProgress(w, flusher, r, deploymentID)
+}
+
+// writeCurrentDeploymentProgress reads the persisted stage and timestamps so
+// both an initial stream and a status event update the same summary.
+func (h *SSEHandler) writeCurrentDeploymentProgress(w http.ResponseWriter, flusher http.Flusher, r *http.Request, deploymentID string) {
+	deployment, err := h.deployService.GetDeployment(r.Context(), deploymentID)
+	if err != nil {
+		return
+	}
+	writeDeploymentProgress(w, flusher, r, deployment)
+}
+
 // writeDeploymentStatus replaces the live status badge.
 func writeDeploymentStatus(w http.ResponseWriter, flusher http.Flusher, r *http.Request, status models.DeploymentStatus) {
 	var buf bytes.Buffer
@@ -439,6 +463,18 @@ func writeDeploymentStatus(w http.ResponseWriter, flusher http.Flusher, r *http.
 		return
 	}
 	buf.WriteString(`</span>`)
+	writeMessage(w, flusher, buf.Bytes())
+}
+
+// writeDeploymentProgress replaces the stage and elapsed summary with fresh
+// persisted timestamps after each status transition and on reconnect.
+func writeDeploymentProgress(w http.ResponseWriter, flusher http.Flusher, r *http.Request, deployment *models.Deployment) {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, `<div id="%s" hx-swap-oob="innerHTML">`, components.DeploymentProgressID)
+	if err := components.DeploymentProgress(deployment).Render(r.Context(), &buf); err != nil {
+		return
+	}
+	buf.WriteString(`</div>`)
 	writeMessage(w, flusher, buf.Bytes())
 }
 

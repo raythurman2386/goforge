@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/raythurman2386/goforge/internal/models"
 )
@@ -40,6 +42,12 @@ func TestDeploymentStreamMessagesAreUnnamedOOBSwaps(t *testing.T) {
 		}
 	}
 	w := httptest.NewRecorder()
+	writeDeploymentProgress(w, w, r, &models.Deployment{Status: models.DeploymentStatusBuilding, StartedAt: sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true}})
+	body := w.Body.String()
+	if strings.Contains(body, "event:") || !strings.Contains(body, `data: <div id="deployment-progress" hx-swap-oob="innerHTML">`) || !strings.Contains(body, `data-deployment-stage="building"`) || !strings.Contains(body, "Elapsed: 1m 0s") {
+		t.Errorf("progress is not an unnamed OOB stage update:\n%s", body)
+	}
+	w = httptest.NewRecorder()
 	writeDeploymentLog(w, w, r, line)
 	if !strings.Contains(w.Body.String(), "built &lt;ok&gt;") {
 		t.Errorf("log line not escaped:\n%s", w.Body.String())

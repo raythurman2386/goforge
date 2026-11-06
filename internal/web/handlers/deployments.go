@@ -32,11 +32,18 @@ type projectAPI interface {
 	GetEnvironment(ctx context.Context, id string) (*models.Environment, error)
 }
 
+// rollbackAPI is the rollback behavior this handler calls.
+// *deploy.RollbackManager implements it.
+type rollbackAPI interface {
+	CanRollback(deployment *models.Deployment) bool
+	Rollback(ctx context.Context, environmentID, reason string) (*deploy.RollbackInfo, error)
+}
+
 // DeploymentHandler handles deployment related requests.
 type DeploymentHandler struct {
 	deployService   deploymentAPI
 	projectService  projectAPI
-	rollbackManager *deploy.RollbackManager
+	rollbackManager rollbackAPI
 	worker          *deploy.Worker
 	logger          *slog.Logger
 	audit           uiAudit
@@ -153,12 +160,13 @@ func (h *DeploymentHandler) GetDeployment(w http.ResponseWriter, r *http.Request
 
 	csrfToken := auth.GetCSRFToken(r)
 	props := deployments.DetailProps{
-		Deployment:  deployment,
-		Project:     proj,
-		Environment: env,
-		Logs:        logs,
-		CanRollback: canRollback,
-		CSRFToken:   csrfToken,
+		Deployment:     deployment,
+		Project:        proj,
+		Environment:    env,
+		Logs:           logs,
+		CanRollback:    canRollback,
+		RollbackTarget: h.rollbackTarget(r, deployment, projectID),
+		CSRFToken:      csrfToken,
 	}
 
 	component := deployments.Detail(props)
@@ -194,10 +202,8 @@ func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Perform the rollback. The returned rollback info is not shown in the UI:
-	// HX-Redirect reloads the deployment page, so a toast sent with this
-	// response would be lost. ROADMAP.md tracks surfacing it.
-	if _, err := h.rollbackManager.Rollback(r.Context(), deployment.EnvironmentID, "manual rollback"); err != nil {
+	info, err := h.rollbackManager.Rollback(r.Context(), deployment.EnvironmentID, "manual rollback")
+	if err != nil {
 		h.audit.record(r, models.AuditActionDeploymentRollback+".failed", models.ResourceTypeDeployment, deploymentID,
 			map[string]interface{}{"project_id": projectID, "error": err.Error()})
 		http.Error(w, "rollback failed: "+err.Error(), http.StatusInternalServerError)
@@ -206,9 +212,28 @@ func (h *DeploymentHandler) RollbackDeployment(w http.ResponseWriter, r *http.Re
 	h.audit.record(r, models.AuditActionDeploymentRollback, models.ResourceTypeDeployment, deploymentID,
 		map[string]interface{}{"project_id": projectID, "environment_id": deployment.EnvironmentID})
 
-	// Redirect back to the deployment detail page.
-	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID)
+	// Carry the returned target through the redirect. The detail handler checks
+	// that it belongs to this deployment's environment before showing it.
+	w.Header().Set("HX-Redirect", "/projects/"+projectID+"/deployments/"+deploymentID+"?rollback="+info.ToDeploymentID)
 	w.WriteHeader(http.StatusOK)
+}
+
+// rollbackTarget resolves the target named by a successful rollback redirect.
+// Query input never grants access to another environment's deployment.
+func (h *DeploymentHandler) rollbackTarget(r *http.Request, current *models.Deployment, projectID string) *models.Deployment {
+	targetID := r.URL.Query().Get("rollback")
+	if targetID == "" {
+		return nil
+	}
+	target, err := h.deployService.GetDeployment(r.Context(), targetID)
+	if err != nil || target.EnvironmentID != current.EnvironmentID {
+		return nil
+	}
+	env, err := h.projectService.GetEnvironment(r.Context(), target.EnvironmentID)
+	if err != nil || env.ProjectID != projectID {
+		return nil
+	}
+	return target
 }
 
 // CancelDeployment handles deployment cancellation requests.

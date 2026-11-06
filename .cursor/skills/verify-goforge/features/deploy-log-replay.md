@@ -1,6 +1,6 @@
 # Deploy with log replay
 
-Deploy lets a signed-in user create a project from a public Git URL, start a build, and read the same log lines again after the stream reconnects. The build uses the project's Dockerfile path and build context.
+Deploy lets a signed-in user create a project from a public Git URL, start a build, see its real stage and elapsed time, read the same log lines again after the stream reconnects, and follow a rollback result to the restored deployment. The build uses the project's Dockerfile path and build context.
 
 ## Sub-features
 
@@ -9,13 +9,18 @@ Deploy lets a signed-in user create a project from a public Git URL, start a bui
 - `deploy-sse-replay` returns the earlier log lines on a second connection to the log stream.
 - `deploy-db-rows` shows those lines in `deployment_logs`.
 - `deploy-build-context` builds from the submitted build context directory.
+- `deploy-stage-elapsed` shows actual model stages and elapsed time in the project banner and deployment detail, without a percentage.
+- `deploy-failure-feedback` keeps a terminal error visible on the detail page.
+- `rollback-result` names and links the manager-selected restored target after the redirect.
+- `rollback-return` preserves the original row's `rolled_back` status and logs on a later return, and the restored target's own status and logs on its detail page.
 
 ## How to get to it (user POV)
 
 - In the sidebar, choose `Projects`, then `New Project`. The page heading is `Create Project`.
 - Submit `Create Project`.
 - On the project page, choose `Deploy Now`.
-- Open the deployment. The log pane id is `deployment-logs`. While the deployment is not terminal, that pane connects to the log stream.
+- Open the deployment. The log pane id is `deployment-logs`. While the deployment is not terminal, that pane connects to the log stream. The `deployment-progress` region names the actual stage and elapsed time. The project banner polls the same stage every three seconds.
+- After two successful deployments, open the newest and choose `Rollback`. The post-redirect success alert names the restored target and links to it. Follow the link, navigate to the Deployments tab, and return to both rows to check their independent statuses and logs.
 
 ## Driving it with verify.sh
 
@@ -66,9 +71,11 @@ curl -sS -N --max-time 10 \
 - **Build context.** `verify.sh psql "select build_context from projects where name = 'verify-hello'"` prints `app`. Since #28 the pipeline builds from that directory and rejects a context or Dockerfile that is missing or escapes the clone. This repository has no `app/` directory, so the deployment is expected to fail with `build context not found: app`. Record that as `deploy-build-context=pass` only when the failure names the context. For a build that succeeds, create a second project with `build_context=.`.
 - **Proof.** The deployment detail `GET /projects/$PROJECT_ID/deployments/$DEPLOYMENT_ID` returns `200`. Record whether the body contains `No logs available yet` or a log line. Do not save the HTML.
 
+- **Stage, reconnect, and rollback browser drive.** Use a throwaway host-mode app and Postgres when the live stack holds port 8080; host mode needs the Docker socket mounted or accessible so deploy and rollback work. Create a disposable public repository with two known-good commits and a deliberately slow valid Dockerfile. Deploy each revision, then drive Rollback from the newest row with Playwright. Capture the named restored target and working link, navigate away and return, and compare the original and restored statuses and log text. During a third deploy capture at least two real stages in the project banner and detail, force the SSE connection to reconnect by navigating away and back, and assert each stored log message appears exactly once. Create a separate project with a missing Dockerfile or build context to capture terminal failure feedback. Save `revision.txt` as the exact PR head. No browser evidence means this is not a completed live drive.
+
 ## Gotchas
 
-- Not re-driven live since #28. The expectations below come from the merged source.
+- t2166u slice 2 browser drive evidence is external proof; do not commit it. The feature expectations remain the source of truth.
 - Pipeline log lines are stored in `deployment_logs`. A reconnect to the log stream sends one snapshot message with the stored lines before live log messages. Since htmx 4 these are unnamed messages (no `event:` line) carrying out-of-band swaps: the snapshot is `<div id="deployment-log-lines" hx-swap-oob="innerHTML">`, each line `<div hx-swap-oob="beforeend:#deployment-log-lines">`, and the status `<span id="deployment-live-status" hx-swap-oob="innerHTML">`. Do not treat `event: connected` alone as replay.
 - The manual repository field is named `repository_url_manual` until page script renames it. HTTP posts must send `repository_url`.
 - The log stream is behind `RequireAuth`. A missing session is `401` or a redirect to `/login`, not an empty log.
