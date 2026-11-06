@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Hide the duplicate in-page settings navigation on desktop while retaining the mobile strip; the global sidebar now owns settings navigation from `md` up. (t1257u)
 - Split Profile into personal Account Information, a new Security page for credentials and sessions, and instance-wide Settings at `/settings/git`, with shared settings navigation. Existing mutation and HTMX routes are unchanged. (t2126u)
 
 ### Added

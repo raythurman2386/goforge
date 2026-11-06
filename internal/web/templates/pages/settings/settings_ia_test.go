@@ -48,6 +48,24 @@ func TestSettingsPages_OneSharedNavigationCurrent(t *testing.T) {
 	}
 }
 
+func TestSettingsLayout_HidesInPageNavigationOnDesktop(t *testing.T) {
+	got := renderMCP(t, Profile(&models.User{Email: "local@example.test"}, "csrf"))
+	shell := regexp.MustCompile(`<div class="([^"]*)"><nav class="[^"]*" aria-label="Settings pages"`).FindStringSubmatch(got)
+	if len(shell) != 2 || shell[1] != "mx-auto max-w-5xl" {
+		t.Fatalf("settings shell no longer centers its content: %s", got)
+	}
+	nav := regexp.MustCompile(`<nav class="([^"]*)" aria-label="Settings pages"`).FindStringSubmatch(got)
+	if len(nav) != 2 {
+		t.Fatal("shared navigation classes not found")
+	}
+	for _, class := range strings.Fields(nav[1]) {
+		if class == "md:hidden" {
+			return
+		}
+	}
+	t.Fatalf("in-page navigation remains visible at desktop breakpoints: %s", nav[1])
+}
+
 func TestSettingsPages_SectionPlacementAndHTMXContracts(t *testing.T) {
 	local := &models.User{Email: "local@example.test"}
 	profile := renderMCP(t, Profile(local, "csrf"))
