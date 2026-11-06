@@ -58,7 +58,7 @@ var backupFieldLabels = map[string]string{
 func backupInput(r *http.Request) backup.SettingsInput {
 	on := func(name string) bool {
 		v := r.PostFormValue(name)
-		return v == "true" || v == "on" || v == "1"
+		return v == htmxTrue || v == "on" || v == "1"
 	}
 	return backup.SettingsInput{
 		Enabled:          on("enabled"),
